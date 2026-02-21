@@ -1,0 +1,95 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth models
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  docs          Doc[]
+  labels        Label[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// App models
+model Label {
+  id     String     @id @default(cuid())
+  userId String
+  name   String
+  color  String?
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  docs   DocLabel[]
+
+  @@unique([userId, name])
+}
+
+model Doc {
+  id                  String     @id @default(cuid())
+  userId              String
+  googleDocId         String
+  title               String
+  driveUrl            String
+  role                String     @default("REVIEWER")  // AUTHOR | REVIEWER
+  status              String     @default("ACTIVE")    // ACTIVE | ARCHIVED
+  lastModifiedInDrive DateTime?
+  addedAt             DateTime   @default(now())
+  user                User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  labels              DocLabel[]
+
+  @@unique([userId, googleDocId])
+}
+
+model DocLabel {
+  docId   String
+  labelId String
+  doc     Doc    @relation(fields: [docId], references: [id], onDelete: Cascade)
+  label   Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([docId, labelId])
+}
