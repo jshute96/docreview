@@ -14,11 +14,11 @@ interface FilterBarProps {
   labels: Label[];
   showArchived: boolean;
   selectedLabelIds: string[];
-  roleFilter: "AUTHOR" | "REVIEWER" | null;
+  roleFilter: "AUTHOR" | "NOT_AUTHOR" | null;
   selectedMimeTypes: string[];
   onShowArchivedChange: (v: boolean) => void;
   onLabelToggle: (id: string) => void;
-  onRoleFilterChange: (role: "AUTHOR" | "REVIEWER" | null) => void;
+  onRoleFilterChange: (role: "AUTHOR" | "NOT_AUTHOR" | null) => void;
   onMimeTypeToggle: (mimeType: string) => void;
 }
 
@@ -95,21 +95,22 @@ export function FilterBar({
         {/* Role */}
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-zinc-400">Role</span>
-          <div className="flex items-center gap-1">
-            {(["AUTHOR", "REVIEWER"] as const).map((role) => (
-              <button
-                key={role}
-                onClick={() => onRoleFilterChange(roleFilter === role ? null : role)}
-                className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-                  roleFilter === role
-                    ? ROLE_COLORS[role].activeFilter
-                    : ROLE_COLORS[role].inactiveFilter
-                }`}
-              >
-                {role.charAt(0) + role.slice(1).toLowerCase()}
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={() => {
+              if (roleFilter === null) onRoleFilterChange("AUTHOR");
+              else if (roleFilter === "AUTHOR") onRoleFilterChange("NOT_AUTHOR");
+              else onRoleFilterChange(null);
+            }}
+            className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+              roleFilter === "AUTHOR"
+                ? ROLE_COLORS.AUTHOR.activeFilter
+                : roleFilter === "NOT_AUTHOR"
+                ? `${ROLE_COLORS.AUTHOR.inactiveFilter} ring-2 ring-blue-300 ring-offset-1`
+                : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200"
+            }`}
+          >
+            {roleFilter === "NOT_AUTHOR" ? <s>Author</s> : "Author"}
+          </button>
         </div>
 
         <div className="h-4 w-px bg-zinc-200" />

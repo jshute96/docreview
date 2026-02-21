@@ -70,13 +70,11 @@ export function DocRow({ doc, allLabels, onUpdate, onArchive }: DocRowProps) {
         </div>
       </td>
       <td className="py-1.5 pr-4">
-        <span
-          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-            ROLE_COLORS[doc.role as keyof typeof ROLE_COLORS]?.badge ?? "bg-zinc-100 text-zinc-600"
-          }`}
-        >
-          {doc.role.charAt(0) + doc.role.slice(1).toLowerCase()}
-        </span>
+        {doc.role === "AUTHOR" && (
+          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>
+            Author
+          </span>
+        )}
       </td>
       <td className="py-1.5 pr-4 text-sm text-zinc-500">{lastModified}</td>
       <td className="py-1.5">

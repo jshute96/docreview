@@ -23,7 +23,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
   const [labels, setLabels] = useState<Label[]>(initialLabels);
   const [showArchived, setShowArchived] = useState(false);
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
-  const [roleFilter, setRoleFilter] = useState<"AUTHOR" | "REVIEWER" | null>(null);
+  const [roleFilter, setRoleFilter] = useState<"AUTHOR" | "NOT_AUTHOR" | null>(null);
   const [selectedMimeTypes, setSelectedMimeTypes] = useState<string[]>([]);
   const [sortCol, setSortCol] = useState<SortCol>("lastModifiedInDrive");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -67,7 +67,8 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
   const filteredDocs = docs
     .filter((doc) => {
       if (!showArchived && doc.status === "ARCHIVED") return false;
-      if (roleFilter && doc.role !== roleFilter) return false;
+      if (roleFilter === "AUTHOR" && doc.role !== "AUTHOR") return false;
+      if (roleFilter === "NOT_AUTHOR" && doc.role === "AUTHOR") return false;
       if (selectedMimeTypes.length > 0 && !selectedMimeTypes.includes(doc.mimeType ?? "")) return false;
       if (
         selectedLabelIds.length > 0 &&

@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dialog";
 import { ROLE_COLORS } from "@/lib/role-colors";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 
 interface EditDocDialogProps {
   doc: DocWithLabels;
@@ -82,19 +81,16 @@ export function EditDocDialog({
               Role
             </label>
             <div className="flex gap-2">
-              {(["AUTHOR", "REVIEWER"] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRole(r)}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                    role === r
-                      ? ROLE_COLORS[r].activeFilter
-                      : ROLE_COLORS[r].inactiveFilter
-                  }`}
-                >
-                  {r.charAt(0) + r.slice(1).toLowerCase()}
-                </button>
-              ))}
+              <button
+                onClick={() => setRole(role === "AUTHOR" ? "REVIEWER" : "AUTHOR")}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  role === "AUTHOR"
+                    ? ROLE_COLORS.AUTHOR.activeFilter
+                    : ROLE_COLORS.AUTHOR.inactiveFilter
+                }`}
+              >
+                Author
+              </button>
             </div>
           </div>
 
@@ -103,23 +99,22 @@ export function EditDocDialog({
               <label className="mb-1.5 block text-xs font-medium text-zinc-500 uppercase tracking-wide">
                 Labels
               </label>
-              <div className="flex flex-col gap-1.5">
-                {allLabels.map((label) => (
-                  <label
-                    key={label.id}
-                    className="flex items-center gap-2 cursor-pointer"
-                  >
-                    <Checkbox
-                      checked={selectedLabelIds.includes(label.id)}
-                      onCheckedChange={() => toggleLabel(label.id)}
-                    />
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
+              <div className="flex flex-wrap gap-1.5">
+                {allLabels.map((label) => {
+                  const active = selectedLabelIds.includes(label.id);
+                  return (
+                    <button
+                      key={label.id}
+                      onClick={() => toggleLabel(label.id)}
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium transition-opacity ${
+                        active ? "opacity-100 ring-2 ring-offset-1 ring-zinc-400" : "opacity-40 hover:opacity-70"
+                      }`}
                       style={{ backgroundColor: label.color ?? "#e4e4e7" }}
-                    />
-                    <span className="text-sm text-zinc-800">{label.name}</span>
-                  </label>
-                ))}
+                    >
+                      {label.name}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
