@@ -31,7 +31,7 @@ export function DocRow({ doc, allLabels, onUpdate, onArchive }: DocRowProps) {
       const updated: DocWithLabels = await res.json();
       onUpdate(updated);
       if (newStatus === "ARCHIVED") onArchive(doc.id);
-      toast.success(newStatus === "ARCHIVED" ? "Archived" : "Restored");
+      toast.success(newStatus === "ARCHIVED" ? "Archived" : "Unarchived");
     } catch {
       toast.error("Failed to update status");
     } finally {
@@ -74,32 +74,21 @@ export function DocRow({ doc, allLabels, onUpdate, onArchive }: DocRowProps) {
         </span>
       </td>
       <td className="py-3 pr-4 text-sm text-zinc-500">{lastModified}</td>
-      <td className="py-3 pr-4">
-        <span
-          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-            doc.status === "ACTIVE"
-              ? "bg-green-100 text-green-700"
-              : "bg-zinc-100 text-zinc-500"
-          }`}
-        >
-          {doc.status.charAt(0) + doc.status.slice(1).toLowerCase()}
-        </span>
-      </td>
       <td className="py-3">
         <div className="flex items-center gap-1">
           <EditDocDialog doc={doc} allLabels={allLabels} onSave={onUpdate}>
-            <Button variant="ghost" size="sm" className="h-7 text-xs">
+            <Button variant="outline" size="sm" className="h-7 text-xs">
               Edit
             </Button>
           </EditDocDialog>
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             className="h-7 text-xs"
             onClick={handleArchive}
             disabled={archiving}
           >
-            {doc.status === "ACTIVE" ? "Archive" : "Restore"}
+            {doc.status === "ACTIVE" ? "Archive" : "Unarchive"}
           </Button>
         </div>
       </td>

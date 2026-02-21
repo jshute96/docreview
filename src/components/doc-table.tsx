@@ -31,13 +31,6 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
     setDocs((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
   }
 
-  function handleDocArchive(id: string) {
-    // If not showing archived, hide the doc
-    if (!showArchived) {
-      setDocs((prev) => prev.filter((d) => d.id !== id));
-    }
-  }
-
   const filteredDocs = docs.filter((doc) => {
     if (!showArchived && doc.status === "ARCHIVED") return false;
     if (
@@ -55,7 +48,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
         <h1 className="text-xl font-semibold text-zinc-900">Your Docs</h1>
         <div className="flex items-center gap-2">
           <ManageLabelsDialog labels={labels} onLabelsChange={setLabels} />
-          <RefreshButton />
+          <RefreshButton onRefresh={(newDocs) => setDocs(newDocs)} />
           <Button
             variant="ghost"
             size="sm"
@@ -95,9 +88,6 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
                   Last Modified
                 </th>
                 <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                  Status
-                </th>
-                <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
                   Actions
                 </th>
               </tr>
@@ -109,11 +99,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
                   doc={doc}
                   allLabels={labels}
                   onUpdate={handleDocUpdate}
-                  onArchive={(id) => {
-                    if (!showArchived) {
-                      setDocs((prev) => prev.filter((d) => d.id !== id));
-                    }
-                  }}
+                  onArchive={() => {}}
                 />
               ))}
             </tbody>

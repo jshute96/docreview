@@ -58,15 +58,21 @@ export async function POST() {
     });
 
     if (existing) {
-      await prisma.doc.update({
-        where: { id: existing.id },
-        data: {
-          title: doc.title,
-          driveUrl: doc.driveUrl,
-          lastModifiedInDrive: doc.lastModifiedInDrive,
-        },
-      });
-      updated++;
+      const changed =
+        existing.title !== doc.title ||
+        existing.driveUrl !== doc.driveUrl ||
+        existing.lastModifiedInDrive?.getTime() !== doc.lastModifiedInDrive?.getTime();
+      if (changed) {
+        await prisma.doc.update({
+          where: { id: existing.id },
+          data: {
+            title: doc.title,
+            driveUrl: doc.driveUrl,
+            lastModifiedInDrive: doc.lastModifiedInDrive,
+          },
+        });
+        updated++;
+      }
     } else {
       await prisma.doc.create({
         data: {
