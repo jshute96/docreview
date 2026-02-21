@@ -10,7 +10,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
-type SortCol = "title" | "role" | "lastModifiedInDrive";
+type SortCol = "title" | "lastModifiedInDrive";
 type SortDir = "asc" | "desc";
 
 interface DocTableProps {
@@ -82,8 +82,6 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
       let cmp = 0;
       if (sortCol === "title") {
         cmp = a.title.localeCompare(b.title);
-      } else if (sortCol === "role") {
-        cmp = a.role.localeCompare(b.role);
       } else {
         const aTime = a.lastModifiedInDrive ? new Date(a.lastModifiedInDrive).getTime() : 0;
         const bTime = b.lastModifiedInDrive ? new Date(b.lastModifiedInDrive).getTime() : 0;
@@ -152,7 +150,6 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50">
                 <ThButton col="title">Title</ThButton>
-                <ThButton col="role">Role</ThButton>
                 <ThButton col="lastModifiedInDrive">Last Modified</ThButton>
                 <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide text-left">
                   Actions

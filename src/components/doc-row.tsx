@@ -64,17 +64,15 @@ export function DocRow({ doc, allLabels, onUpdate, onArchive }: DocRowProps) {
             <DocTypeIcon mimeType={doc.mimeType} />
             {doc.title}
           </a>
+          {doc.role === "AUTHOR" && (
+            <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>
+              Author
+            </span>
+          )}
           {doc.labels.map((dl) => (
             <LabelBadge key={dl.labelId} label={dl.label} />
           ))}
         </div>
-      </td>
-      <td className="py-1.5 pr-4">
-        {doc.role === "AUTHOR" && (
-          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>
-            Author
-          </span>
-        )}
       </td>
       <td className="py-1.5 pr-4 text-sm text-zinc-500">{lastModified}</td>
       <td className="py-1.5">
