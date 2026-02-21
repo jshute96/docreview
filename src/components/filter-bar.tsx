@@ -7,16 +7,20 @@ interface FilterBarProps {
   labels: Label[];
   showArchived: boolean;
   selectedLabelIds: string[];
+  roleFilter: "AUTHOR" | "REVIEWER" | null;
   onShowArchivedChange: (v: boolean) => void;
   onLabelToggle: (id: string) => void;
+  onRoleFilterChange: (role: "AUTHOR" | "REVIEWER" | null) => void;
 }
 
 export function FilterBar({
   labels,
   showArchived,
   selectedLabelIds,
+  roleFilter,
   onShowArchivedChange,
   onLabelToggle,
+  onRoleFilterChange,
 }: FilterBarProps) {
   return (
     <div className="flex flex-wrap items-center gap-4">
@@ -27,6 +31,24 @@ export function FilterBar({
         />
         Show archived
       </label>
+
+      <div className="flex items-center gap-1">
+        {(["AUTHOR", "REVIEWER"] as const).map((role) => (
+          <button
+            key={role}
+            onClick={() => onRoleFilterChange(roleFilter === role ? null : role)}
+            className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+              roleFilter === role
+                ? role === "AUTHOR"
+                  ? "bg-blue-100 text-blue-700 ring-2 ring-offset-1 ring-blue-300"
+                  : "bg-zinc-200 text-zinc-700 ring-2 ring-offset-1 ring-zinc-400"
+                : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+            }`}
+          >
+            {role.charAt(0) + role.slice(1).toLowerCase()}
+          </button>
+        ))}
+      </div>
 
       {labels.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">

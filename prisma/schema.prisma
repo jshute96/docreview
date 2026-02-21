@@ -77,6 +77,7 @@ model Doc {
   driveUrl            String
   role                String     @default("REVIEWER")  // AUTHOR | REVIEWER
   status              String     @default("ACTIVE")    // ACTIVE | ARCHIVED
+  isDeleted           Boolean    @default(false)
   lastModifiedInDrive DateTime?
   addedAt             DateTime   @default(now())
   user                User       @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -46,6 +46,35 @@ export interface DriveDoc {
   lastModifiedInDrive: Date | null;
 }
 
+// Returns the subset of googleDocIds that are deleted (trashed, permanently deleted, or access revoked).
+// Runs all files.get calls in parallel rather than sequentially.
+export async function findDeletedDocIds(
+  userId: string,
+  googleDocIds: string[]
+): Promise<Set<string>> {
+  if (googleDocIds.length === 0) return new Set();
+
+  const auth = await getDriveClient(userId);
+  const drive = google.drive({ version: "v3", auth });
+
+  const results = await Promise.all(
+    googleDocIds.map(async (id) => {
+      try {
+        console.log(`[Drive] files.get ${id}`);
+        const res = await drive.files.get({ fileId: id, fields: "trashed" });
+        const deleted = res.data.trashed === true;
+        console.log(`[Drive] files.get ${id} → ${deleted ? "deleted/trashed" : "ok"}`);
+        return { id, deleted };
+      } catch {
+        console.log(`[Drive] files.get ${id} → not found (deleted)`);
+        return { id, deleted: true };
+      }
+    })
+  );
+
+  return new Set(results.filter((r) => r.deleted).map((r) => r.id));
+}
+
 export async function listRecentDocs(userId: string): Promise<DriveDoc[]> {
   const auth = await getDriveClient(userId);
   const drive = google.drive({ version: "v3", auth });
@@ -58,6 +87,7 @@ export async function listRecentDocs(userId: string): Promise<DriveDoc[]> {
   let pageToken: string | undefined;
 
   do {
+    console.log(`[Drive] files.list (recent docs${pageToken ? ", page " + pageToken.slice(0, 8) + "…" : ""})`);
     const res = await drive.files.list({
       q: `mimeType='application/vnd.google-apps.document' and modifiedTime > '${modifiedAfter}' and trashed = false`,
       fields:
@@ -65,6 +95,7 @@ export async function listRecentDocs(userId: string): Promise<DriveDoc[]> {
       pageSize: 100,
       pageToken,
     });
+    console.log(`[Drive] files.list → ${res.data.files?.length ?? 0} files`);
 
     const files = res.data.files ?? [];
     for (const file of files) {

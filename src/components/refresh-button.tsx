@@ -27,6 +27,7 @@ export function RefreshButton({ onRefresh }: RefreshButtonProps) {
       const parts = [
         data.added > 0 ? `${data.added} new` : "",
         data.updated > 0 ? `${data.updated} updated` : "",
+        data.deleted > 0 ? `${data.deleted} deleted` : "",
       ].filter(Boolean).join(", ");
       toast.success(`Sync complete — ${parts || "no updates"}`, { duration: 8000 });
     } catch {

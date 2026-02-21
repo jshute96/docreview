@@ -50,7 +50,9 @@ export function DocRow({ doc, allLabels, onUpdate, onArchive }: DocRowProps) {
           href={doc.driveUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sm font-medium text-zinc-900 hover:underline hover:text-blue-600"
+          className={`text-sm font-medium hover:underline hover:text-blue-600 ${
+            doc.isDeleted ? "line-through text-zinc-400" : "text-zinc-900"
+          }`}
         >
           {doc.title}
         </a>

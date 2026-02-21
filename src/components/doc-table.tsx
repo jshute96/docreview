@@ -20,6 +20,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
   const [labels, setLabels] = useState<Label[]>(initialLabels);
   const [showArchived, setShowArchived] = useState(false);
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
+  const [roleFilter, setRoleFilter] = useState<"AUTHOR" | "REVIEWER" | null>(null);
 
   function handleLabelToggle(id: string) {
     setSelectedLabelIds((prev) =>
@@ -31,8 +32,20 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
     setDocs((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
   }
 
+  function handleLabelDelete(id: string) {
+    setLabels((prev) => prev.filter((l) => l.id !== id));
+    setDocs((prev) =>
+      prev.map((d) => ({
+        ...d,
+        labels: d.labels.filter((dl) => dl.labelId !== id),
+      }))
+    );
+    setSelectedLabelIds((prev) => prev.filter((l) => l !== id));
+  }
+
   const filteredDocs = docs.filter((doc) => {
     if (!showArchived && doc.status === "ARCHIVED") return false;
+    if (roleFilter && doc.role !== roleFilter) return false;
     if (
       selectedLabelIds.length > 0 &&
       !doc.labels.some((dl) => selectedLabelIds.includes(dl.labelId))
@@ -47,7 +60,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-zinc-900">Your Docs</h1>
         <div className="flex items-center gap-2">
-          <ManageLabelsDialog labels={labels} onLabelsChange={setLabels} />
+          <ManageLabelsDialog labels={labels} onLabelsChange={setLabels} onLabelDelete={handleLabelDelete} />
           <RefreshButton onRefresh={(newDocs) => setDocs(newDocs)} />
           <Button
             variant="ghost"
@@ -63,8 +76,10 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
         labels={labels}
         showArchived={showArchived}
         selectedLabelIds={selectedLabelIds}
+        roleFilter={roleFilter}
         onShowArchivedChange={setShowArchived}
         onLabelToggle={handleLabelToggle}
+        onRoleFilterChange={setRoleFilter}
       />
 
       {filteredDocs.length === 0 ? (

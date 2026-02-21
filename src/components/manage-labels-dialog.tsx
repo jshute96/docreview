@@ -26,11 +26,13 @@ const PRESET_COLORS = [
 interface ManageLabelsDialogProps {
   labels: Label[];
   onLabelsChange: (labels: Label[]) => void;
+  onLabelDelete: (id: string) => void;
 }
 
 export function ManageLabelsDialog({
   labels,
   onLabelsChange,
+  onLabelDelete,
 }: ManageLabelsDialogProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -66,7 +68,7 @@ export function ManageLabelsDialog({
     try {
       const res = await fetch(`/api/labels/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete");
-      onLabelsChange(labels.filter((l) => l.id !== id));
+      onLabelDelete(id);
       toast.success("Label deleted");
     } catch {
       toast.error("Failed to delete label");

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { listRecentDocs } from "@/lib/google-drive";
+import { listRecentDocs, findDeletedDocIds } from "@/lib/google-drive";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -51,6 +51,9 @@ export async function POST() {
 
   let added = 0;
   let updated = 0;
+  let deleted = 0;
+
+  const driveDocIds = new Set(driveDocs.map((d) => d.googleDocId));
 
   for (const doc of driveDocs) {
     const existing = await prisma.doc.findUnique({
@@ -61,7 +64,8 @@ export async function POST() {
       const changed =
         existing.title !== doc.title ||
         existing.driveUrl !== doc.driveUrl ||
-        existing.lastModifiedInDrive?.getTime() !== doc.lastModifiedInDrive?.getTime();
+        existing.lastModifiedInDrive?.getTime() !== doc.lastModifiedInDrive?.getTime() ||
+        existing.isDeleted;
       if (changed) {
         await prisma.doc.update({
           where: { id: existing.id },
@@ -69,6 +73,7 @@ export async function POST() {
             title: doc.title,
             driveUrl: doc.driveUrl,
             lastModifiedInDrive: doc.lastModifiedInDrive,
+            isDeleted: false,
           },
         });
         updated++;
@@ -88,5 +93,26 @@ export async function POST() {
     }
   }
 
-  return NextResponse.json({ added, updated, total: driveDocs.length });
+  // Check active docs that didn't appear in Drive results — one list call, not N gets
+  const missingDocs = await prisma.doc.findMany({
+    where: {
+      userId,
+      isDeleted: false,
+      status: "ACTIVE",
+      googleDocId: { notIn: [...driveDocIds] },
+    },
+    select: { id: true, googleDocId: true },
+  });
+
+  if (missingDocs.length > 0) {
+    const deletedIds = await findDeletedDocIds(userId, missingDocs.map((d) => d.googleDocId));
+    for (const doc of missingDocs) {
+      if (deletedIds.has(doc.googleDocId)) {
+        await prisma.doc.update({ where: { id: doc.id }, data: { isDeleted: true } });
+        deleted++;
+      }
+    }
+  }
+
+  return NextResponse.json({ added, updated, deleted, total: driveDocs.length });
 }
