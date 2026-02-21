@@ -10,6 +10,9 @@ import { RefreshButton } from "@/components/refresh-button";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
+type SortCol = "title" | "role" | "lastModifiedInDrive";
+type SortDir = "asc" | "desc";
+
 interface DocTableProps {
   initialDocs: DocWithLabels[];
   initialLabels: Label[];
@@ -21,6 +24,18 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
   const [showArchived, setShowArchived] = useState(false);
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [roleFilter, setRoleFilter] = useState<"AUTHOR" | "REVIEWER" | null>(null);
+  const [selectedMimeTypes, setSelectedMimeTypes] = useState<string[]>([]);
+  const [sortCol, setSortCol] = useState<SortCol>("lastModifiedInDrive");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  function handleSort(col: SortCol) {
+    if (sortCol === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortCol(col);
+      setSortDir(col === "lastModifiedInDrive" ? "desc" : "asc");
+    }
+  }
 
   function handleLabelToggle(id: string) {
     setSelectedLabelIds((prev) =>
@@ -43,17 +58,57 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
     setSelectedLabelIds((prev) => prev.filter((l) => l !== id));
   }
 
-  const filteredDocs = docs.filter((doc) => {
-    if (!showArchived && doc.status === "ARCHIVED") return false;
-    if (roleFilter && doc.role !== roleFilter) return false;
-    if (
-      selectedLabelIds.length > 0 &&
-      !doc.labels.some((dl) => selectedLabelIds.includes(dl.labelId))
-    ) {
-      return false;
-    }
-    return true;
-  });
+  function handleMimeTypeToggle(mimeType: string) {
+    setSelectedMimeTypes((prev) =>
+      prev.includes(mimeType) ? prev.filter((m) => m !== mimeType) : [...prev, mimeType]
+    );
+  }
+
+  const filteredDocs = docs
+    .filter((doc) => {
+      if (!showArchived && doc.status === "ARCHIVED") return false;
+      if (roleFilter && doc.role !== roleFilter) return false;
+      if (selectedMimeTypes.length > 0 && !selectedMimeTypes.includes(doc.mimeType ?? "")) return false;
+      if (
+        selectedLabelIds.length > 0 &&
+        !doc.labels.some((dl) => selectedLabelIds.includes(dl.labelId))
+      ) {
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      let cmp = 0;
+      if (sortCol === "title") {
+        cmp = a.title.localeCompare(b.title);
+      } else if (sortCol === "role") {
+        cmp = a.role.localeCompare(b.role);
+      } else {
+        const aTime = a.lastModifiedInDrive ? new Date(a.lastModifiedInDrive).getTime() : 0;
+        const bTime = b.lastModifiedInDrive ? new Date(b.lastModifiedInDrive).getTime() : 0;
+        cmp = aTime - bTime;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+  function SortIcon({ col }: { col: SortCol }) {
+    if (sortCol !== col) return <span className="ml-1 text-zinc-300">↕</span>;
+    return <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
+  }
+
+  function ThButton({ col, children }: { col: SortCol; children: React.ReactNode }) {
+    return (
+      <th className="px-4 py-2.5 text-left">
+        <button
+          onClick={() => handleSort(col)}
+          className="flex items-center text-xs font-medium text-zinc-500 uppercase tracking-wide hover:text-zinc-800"
+        >
+          {children}
+          <SortIcon col={col} />
+        </button>
+      </th>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -77,32 +132,28 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
         showArchived={showArchived}
         selectedLabelIds={selectedLabelIds}
         roleFilter={roleFilter}
+        selectedMimeTypes={selectedMimeTypes}
         onShowArchivedChange={setShowArchived}
         onLabelToggle={handleLabelToggle}
         onRoleFilterChange={setRoleFilter}
+        onMimeTypeToggle={handleMimeTypeToggle}
       />
 
       {filteredDocs.length === 0 ? (
         <p className="py-12 text-center text-sm text-zinc-400">
           {docs.length === 0
-            ? 'No docs yet. Click "Refresh from Drive" to sync.'
+            ? 'No docs yet. Click "Refresh" to sync.'
             : "No docs match the current filters."}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-zinc-200">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-zinc-200 bg-zinc-50 text-left">
-                <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                  Title
-                </th>
-                <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                  Role
-                </th>
-                <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                  Last Modified
-                </th>
-                <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+              <tr className="border-b border-zinc-200 bg-zinc-50">
+                <ThButton col="title">Title</ThButton>
+                <ThButton col="role">Role</ThButton>
+                <ThButton col="lastModifiedInDrive">Last Modified</ThButton>
+                <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide text-left">
                   Actions
                 </th>
               </tr>

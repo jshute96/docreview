@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ROLE_COLORS } from "@/lib/role-colors";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -87,8 +88,8 @@ export function EditDocDialog({
                   onClick={() => setRole(r)}
                   className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                     role === r
-                      ? "bg-zinc-900 text-white"
-                      : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                      ? ROLE_COLORS[r].activeFilter
+                      : ROLE_COLORS[r].inactiveFilter
                   }`}
                 >
                   {r.charAt(0) + r.slice(1).toLowerCase()}

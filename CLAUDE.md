@@ -1,6 +1,7 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this
+repository.
 
 ## Commands
 
@@ -20,6 +21,9 @@ npx prisma studio                     # open DB browser at http://localhost:5555
 npx prisma generate                   # regenerate client after schema changes
 ```
 
+After any schema change, restart the dev server — Next.js holds the Prisma client in memory
+and won't pick up the regenerated client until restart.
+
 ## Environment
 
 `.env` requires:
@@ -30,16 +34,41 @@ AUTH_GOOGLE_ID="..."
 AUTH_GOOGLE_SECRET="..."
 ```
 
-Google Cloud: OAuth redirect URI must be `http://localhost:3000/api/auth/callback/google`. Drive API and `drive.readonly` scope must be enabled. Your Google account must be added as a test user.
+Google Cloud: OAuth redirect URI must be `http://localhost:3000/api/auth/callback/google`.
+Drive API and `drive.readonly` scope must be enabled. Your Google account must be added as a
+test user.
 
 ## Architecture
 
-**Auth flow:** `src/auth.ts` exports `{ handlers, auth, signIn, signOut }` from NextAuth v5. The `auth()` function works in both server components and API routes. `PrismaAdapter` persists sessions and OAuth tokens to SQLite. The `Account` table stores the Google `access_token` and `refresh_token` needed for Drive API calls.
+**Auth flow:** `src/auth.ts` exports `{ handlers, auth, signIn, signOut }` from NextAuth v5.
+The `auth()` function works in both server components and API routes. `PrismaAdapter` persists
+sessions and OAuth tokens to SQLite. The `Account` table stores the Google `access_token` and
+`refresh_token` needed for Drive API calls.
 
-**Google Drive sync:** `src/lib/google-drive.ts` reads tokens from the `Account` table, builds an `OAuth2Client`, and registers a `tokens` event to write refreshed tokens back to the DB. `listRecentDocs()` queries docs modified in the last 30 days and auto-detects role: `owners[].me === true` → AUTHOR, else REVIEWER.
+**Google Drive sync:** `src/lib/google-drive.ts` reads tokens from the `Account` table, builds
+an `OAuth2Client`, and registers a `tokens` event to write refreshed tokens back to the DB.
+`listRecentDocs()` queries files modified in the last 30 days (Docs, Sheets, Slides) and
+auto-detects role: `owners[].me === true` → AUTHOR, else REVIEWER. `findDeletedDocIds()` runs
+parallel `files.get` calls to detect deletions; only ACTIVE docs are checked.
 
-**Data flow:** `POST /api/docs` calls `listRecentDocs()` and upserts results — new docs get default role/status, existing docs only get title and `lastModifiedInDrive` updated (preserving user-set metadata). `PATCH /api/docs/[id]` handles role, status, and label assignments in one call (labels are replaced wholesale via `deleteMany` + `create`).
+**Data flow:** `POST /api/docs` calls `listRecentDocs()` and upserts results — new docs get
+default role/status, existing docs get title/URL/mimeType/lastModified updated (preserving
+user-set role/status/labels). After upserting, checks ACTIVE docs absent from Drive results and
+marks them `isDeleted = true`. `PATCH /api/docs/[id]` handles role, status, and label
+assignments in one call (labels replaced wholesale via `deleteMany` + `create`).
 
-**UI state:** `docs/page.tsx` is a server component that fetches initial data and passes it to `DocTable` (client component). All filter state (`showArchived`, `selectedLabelIds`) and optimistic doc list updates live in `DocTable`. Mutations in `DocRow` and `EditDocDialog` call the API then invoke `onUpdate`/`onArchive` callbacks to update parent state — no full page reload except after Drive sync (which calls `router.refresh()`).
+**UI state:** `docs/page.tsx` is a server component that fetches initial data and passes it to
+`DocTable` (client component). All filter/sort state and optimistic doc list updates live in
+`DocTable`. After Drive sync, `RefreshButton` fetches the full updated doc list from
+`GET /api/docs?includeArchived=true` and calls `onRefresh` to update `DocTable` state directly
+— no page reload needed. Mutations in `DocRow` and `EditDocDialog` call the API then invoke
+`onUpdate` callbacks to update parent state.
 
-**Schema notes:** SQLite doesn't support enums — `Doc.role` and `Doc.status` are `String` fields with string defaults (`"REVIEWER"`, `"ACTIVE"`). Valid values are `AUTHOR`/`REVIEWER` and `ACTIVE`/`ARCHIVED`. Prisma 5 is pinned (Prisma 7 dropped `url = env(...)` support in schema.prisma).
+**Role colors:** Defined in `src/lib/role-colors.ts` and shared across `DocRow`,
+`EditDocDialog`, and `FilterBar`. Author = blue, Reviewer = violet.
+
+**Schema notes:** SQLite doesn't support enums — `Doc.role` and `Doc.status` are `String`
+fields with string defaults (`"REVIEWER"`, `"ACTIVE"`). Valid values are `AUTHOR`/`REVIEWER`
+and `ACTIVE`/`ARCHIVED`. `Doc.isDeleted` (Boolean) marks files deleted/trashed/access-revoked
+in Drive. `Doc.mimeType` stores the Drive MIME type for icon display. Prisma 5 is pinned
+(Prisma 7 dropped `url = env(...)` support in schema.prisma).

@@ -42,6 +42,7 @@ export interface DriveDoc {
   googleDocId: string;
   title: string;
   driveUrl: string;
+  mimeType: string;
   role: "AUTHOR" | "REVIEWER";
   lastModifiedInDrive: Date | null;
 }
@@ -89,9 +90,9 @@ export async function listRecentDocs(userId: string): Promise<DriveDoc[]> {
   do {
     console.log(`[Drive] files.list (recent docs${pageToken ? ", page " + pageToken.slice(0, 8) + "…" : ""})`);
     const res = await drive.files.list({
-      q: `mimeType='application/vnd.google-apps.document' and modifiedTime > '${modifiedAfter}' and trashed = false`,
+      q: `(mimeType='application/vnd.google-apps.document' or mimeType='application/vnd.google-apps.spreadsheet' or mimeType='application/vnd.google-apps.presentation') and modifiedTime > '${modifiedAfter}' and trashed = false`,
       fields:
-        "nextPageToken, files(id, name, webViewLink, modifiedTime, owners)",
+        "nextPageToken, files(id, name, mimeType, webViewLink, modifiedTime, owners)",
       pageSize: 100,
       pageToken,
     });
@@ -105,6 +106,7 @@ export async function listRecentDocs(userId: string): Promise<DriveDoc[]> {
         googleDocId: file.id,
         title: file.name,
         driveUrl: file.webViewLink ?? `https://docs.google.com/document/d/${file.id}/edit`,
+        mimeType: file.mimeType ?? "",
         role: isOwner ? "AUTHOR" : "REVIEWER",
         lastModifiedInDrive: file.modifiedTime
           ? new Date(file.modifiedTime)

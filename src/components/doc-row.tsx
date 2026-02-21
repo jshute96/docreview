@@ -5,7 +5,9 @@ import { toast } from "sonner";
 import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import { LabelBadge } from "@/components/label-badge";
+import { ROLE_COLORS } from "@/lib/role-colors";
 import { EditDocDialog } from "@/components/edit-doc-dialog";
+import { DocTypeIcon } from "@/components/doc-type-icon";
 import { Button } from "@/components/ui/button";
 
 interface DocRowProps {
@@ -40,53 +42,54 @@ export function DocRow({ doc, allLabels, onUpdate, onArchive }: DocRowProps) {
   }
 
   const lastModified = doc.lastModifiedInDrive
-    ? new Date(doc.lastModifiedInDrive).toLocaleDateString()
+    ? (() => {
+        const d = new Date(doc.lastModifiedInDrive!);
+        const pad = (n: number) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      })()
     : "—";
 
   return (
     <tr className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
-      <td className="py-3 pr-4">
-        <a
-          href={doc.driveUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`text-sm font-medium hover:underline hover:text-blue-600 ${
-            doc.isDeleted ? "line-through text-zinc-400" : "text-zinc-900"
-          }`}
-        >
-          {doc.title}
-        </a>
-        {doc.labels.length > 0 && (
-          <div className="mt-1 flex flex-wrap gap-1">
-            {doc.labels.map((dl) => (
-              <LabelBadge key={dl.labelId} label={dl.label} />
-            ))}
-          </div>
-        )}
+      <td className="py-1.5 pr-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={doc.driveUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline hover:text-blue-600 ${
+              doc.isDeleted ? "line-through text-zinc-400" : "text-zinc-900"
+            }`}
+          >
+            <DocTypeIcon mimeType={doc.mimeType} />
+            {doc.title}
+          </a>
+          {doc.labels.map((dl) => (
+            <LabelBadge key={dl.labelId} label={dl.label} />
+          ))}
+        </div>
       </td>
-      <td className="py-3 pr-4">
+      <td className="py-1.5 pr-4">
         <span
           className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-            doc.role === "AUTHOR"
-              ? "bg-blue-100 text-blue-700"
-              : "bg-zinc-100 text-zinc-600"
+            ROLE_COLORS[doc.role as keyof typeof ROLE_COLORS]?.badge ?? "bg-zinc-100 text-zinc-600"
           }`}
         >
           {doc.role.charAt(0) + doc.role.slice(1).toLowerCase()}
         </span>
       </td>
-      <td className="py-3 pr-4 text-sm text-zinc-500">{lastModified}</td>
-      <td className="py-3">
+      <td className="py-1.5 pr-4 text-sm text-zinc-500">{lastModified}</td>
+      <td className="py-1.5">
         <div className="flex items-center gap-1">
           <EditDocDialog doc={doc} allLabels={allLabels} onSave={onUpdate}>
-            <Button variant="outline" size="sm" className="h-7 text-xs">
+            <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
               Edit
             </Button>
           </EditDocDialog>
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs"
+            className="h-6 px-2 text-xs"
             onClick={handleArchive}
             disabled={archiving}
           >

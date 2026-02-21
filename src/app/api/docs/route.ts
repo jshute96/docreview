@@ -64,6 +64,7 @@ export async function POST() {
       const changed =
         existing.title !== doc.title ||
         existing.driveUrl !== doc.driveUrl ||
+        existing.mimeType !== doc.mimeType ||
         existing.lastModifiedInDrive?.getTime() !== doc.lastModifiedInDrive?.getTime() ||
         existing.isDeleted;
       if (changed) {
@@ -72,6 +73,7 @@ export async function POST() {
           data: {
             title: doc.title,
             driveUrl: doc.driveUrl,
+            mimeType: doc.mimeType,
             lastModifiedInDrive: doc.lastModifiedInDrive,
             isDeleted: false,
           },
@@ -85,6 +87,7 @@ export async function POST() {
           googleDocId: doc.googleDocId,
           title: doc.title,
           driveUrl: doc.driveUrl,
+          mimeType: doc.mimeType,
           role: doc.role,
           lastModifiedInDrive: doc.lastModifiedInDrive,
         },
