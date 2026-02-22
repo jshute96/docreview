@@ -47,6 +47,22 @@ npm run dev -- -p 3001
 Fill in `.env` with your credentials before starting (see CLAUDE.md for details). Then visit
 `http://localhost:3000`, sign in with Google, and click **Refresh** to sync files from Drive.
 
+## After Schema Changes
+
+If the Prisma schema (`prisma/schema.prisma`) has changed, regenerate the Prisma client and
+restart the dev server:
+
+```bash
+npx prisma generate
+# Then restart the dev server — Next.js won't pick up the new client until restart
+```
+
+If there are new migrations to apply:
+
+```bash
+npx prisma migrate dev
+```
+
 ## Database
 
 ```bash
