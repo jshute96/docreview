@@ -18,7 +18,7 @@ Visit `http://localhost:3000`.
 ## Setup
 
 ```bash
-# Install dependencies
+# Install dependencies (each checkout needs its own node_modules)
 . /home/jshute/.nvm/nvm.sh && nvm use 20
 npm install
 
@@ -27,6 +27,9 @@ npx prisma migrate dev
 
 # Start the dev server
 npm run dev
+
+# Start server on a specific port.
+npm run dev -- -p 3001
 ```
 
 Fill in `.env` with your credentials before starting (see CLAUDE.md for details). Then visit

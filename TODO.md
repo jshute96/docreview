@@ -5,3 +5,14 @@
     be excessive polling
 
 * Search/filter for doc title
+* /screenshot tool
+* Add screen
+* improve labels UI
+* show comment threads
+* reply to comments
+* resolve comments
+* hosting
+  * postgres
+  * cloud run
+  * deployment scripts
+* testing?
