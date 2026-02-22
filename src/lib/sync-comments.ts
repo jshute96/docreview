@@ -109,6 +109,7 @@ export async function syncComments(
         suggestionType: s.suggestionType,
         resolved: false,
         status: "ACTIVE",
+        driveCreatedAt: doc.lastModifiedInDrive ?? new Date(),
       },
       update: {
         suggestionType: s.suggestionType,

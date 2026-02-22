@@ -74,11 +74,13 @@ All suggestions are stored with `suggest.xxx` IDs (Docs API format). There is no
 `AAAB0xxx` Drive comment ID available, so `?disco=` navigation does not work. Clicking a
 suggestion row opens the doc but does not scroll to the suggestion.
 
-### No timestamps
+### Approximate created timestamp
 
-The Docs API does not return `createdTime` or `modifiedTime` for suggestions. These fields
-are `null` for all suggestion records, showing "—" in the UI. The Drive Activity API would
-be required to get timestamps (a separate scope not currently used).
+The Docs API does not return `createdTime` or `modifiedTime` for suggestions. When a
+suggestion is first synced, `driveCreatedAt` is set to the doc's `lastModifiedInDrive`
+timestamp (falling back to the current time if that is null). This is a rough
+approximation — the suggestion may have been created before or after that timestamp.
+`driveModifiedAt` remains `null` and shows "—" in the UI.
 
 ### No isMine / iParticipated
 

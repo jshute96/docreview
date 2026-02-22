@@ -22,8 +22,9 @@ function formatDate(d: Date | string | null): string {
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 }
 
-export function DocDetail({ doc }: DocDetailProps) {
-  const [comments, setComments] = useState<Comment[]>(doc.comments);
+export function DocDetail({ doc: initialDoc }: DocDetailProps) {
+  const [doc, setDoc] = useState(initialDoc);
+  const [comments, setComments] = useState<Comment[]>(initialDoc.comments);
   const [commentContent, setCommentContent] = useState<Record<string, string>>({});
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
 
@@ -64,6 +65,7 @@ export function DocDetail({ doc }: DocDetailProps) {
       const res = await fetch(`/api/docs/${doc.id}/refresh`, { method: "POST" });
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithComments = await res.json();
+      setDoc(updated);
       setComments(updated.comments);
       void fetchContent();
       toast.success("Comments synced");

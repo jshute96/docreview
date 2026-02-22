@@ -70,7 +70,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     comment.driveModifiedAt &&
     new Date(comment.driveCreatedAt).getTime() === new Date(comment.driveModifiedAt).getTime();
 
-  const hasContentRow = isSuggestion ? !!suggestionContent : !!content;
+  const hasContentRow = isSuggestion ? (!!suggestionContent || comment.resolved) : !!content;
   const cellPy = hasContentRow ? "pt-1.5 pb-0" : "py-1.5";
   const { author, text } = content ? splitContent(content) : { author: null, text: "" };
   const rowBg = hovered ? "bg-zinc-50" : "";
@@ -157,7 +157,9 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         {...hoverHandlers}
       >
         <td colSpan={7} className="pt-0.5 pb-2 pl-4 pr-4 max-w-0 overflow-hidden">
-          {isSuggestion && suggestionContent ? (
+          {isSuggestion && !suggestionContent && comment.resolved ? (
+            <p className="truncate text-sm text-zinc-400 italic">Resolved suggestion</p>
+          ) : isSuggestion && suggestionContent ? (
             <p className="truncate text-sm text-zinc-400">
               <span className="text-zinc-500">{suggestionLabel}: </span>
               {(comment.suggestionType === "EDIT" || comment.suggestionType === "DELETE") && (

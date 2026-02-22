@@ -10,9 +10,10 @@ deletions, then sync comments.
 ## Per-doc Refresh (detail page)
 
 The doc detail page has its own **Refresh** button that calls `POST /api/docs/[id]/refresh`.
-This syncs comments for only that one doc and returns the updated doc + comments in a single
-response — no separate GET needed. Useful for quickly checking a single doc without waiting
-for a full sync.
+This fetches fresh file metadata from Drive (`files.get`), updates the doc record, then syncs
+comments — all for that one doc — and returns the updated doc + comments in a single response.
+No separate GET needed. Useful for quickly checking a single doc without waiting for a full
+sync.
 
 ---
 
@@ -105,7 +106,9 @@ rather than being silently dropped). The fresh list is passed to `DocTable` via 
 `onRefresh` callback, which calls `setDocs(newDocs)` directly.
 
 **Per-doc refresh:** the `POST /api/docs/[id]/refresh` response includes the full updated doc
-with its comments array. `DocDetail` calls `setComments(updated.comments)` directly.
+with its comments array. `DocDetail` calls `setDoc(updated)` and `setComments(updated.comments)`
+directly, so the title, owner, and modified date in the header also reflect the latest Drive
+data without a page reload.
 
 The main POST response includes summary counts (`added`, `updated`, `deleted`, `comments`)
 which are shown in a toast: e.g., "Sync complete — 2 new, 1 updated". If nothing changed,
