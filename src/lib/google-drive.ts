@@ -146,6 +146,35 @@ export async function fetchComments(
   return comments;
 }
 
+export async function fetchCommentContent(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  googleDocId: string
+): Promise<Record<string, string>> {
+  const drive = google.drive({ version: "v3", auth });
+  const result: Record<string, string> = {};
+  let pageToken: string | undefined;
+
+  do {
+    const res = await drive.comments.list({
+      fileId: googleDocId,
+      fields: "nextPageToken, comments(id, content, author(displayName))",
+      pageSize: 100,
+      ...(pageToken ? { pageToken } : {}),
+    });
+
+    for (const c of res.data.comments ?? []) {
+      if (c.id && c.content != null) {
+        const author = c.author?.displayName;
+        result[c.id] = author ? `${author}: ${c.content}` : c.content;
+      }
+    }
+
+    pageToken = res.data.nextPageToken ?? undefined;
+  } while (pageToken);
+
+  return result;
+}
+
 export async function listRecentDocs(userId: string): Promise<DriveDoc[]> {
   const auth = await getDriveClient(userId);
   const drive = google.drive({ version: "v3", auth });

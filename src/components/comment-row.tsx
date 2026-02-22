@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 interface CommentRowProps {
   comment: Comment;
   docId: string;
+  content?: string;
   onUpdate: (updated: Comment) => void;
 }
 
@@ -18,7 +19,13 @@ function formatDate(d: Date | string | null): string {
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 }
 
-export function CommentRow({ comment, docId, onUpdate }: CommentRowProps) {
+function splitContent(raw: string): { author: string | null; text: string } {
+  const sep = raw.indexOf(": ");
+  if (sep === -1) return { author: null, text: raw };
+  return { author: raw.slice(0, sep), text: raw.slice(sep + 2) };
+}
+
+export function CommentRow({ comment, docId, content, onUpdate }: CommentRowProps) {
   const [loading, setLoading] = useState(false);
 
   async function updateStatus(status: "ACTIVE" | "ARCHIVED" | "MUTED") {
@@ -48,32 +55,36 @@ export function CommentRow({ comment, docId, onUpdate }: CommentRowProps) {
     comment.driveModifiedAt &&
     new Date(comment.driveCreatedAt).getTime() === new Date(comment.driveModifiedAt).getTime();
 
+  const cellPy = content ? "pt-1.5 pb-0" : "py-1.5";
+  const { author, text } = content ? splitContent(content) : { author: null, text: "" };
+
   return (
-    <tr className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
-      <td className="py-1.5 pl-4 pr-4 text-sm text-zinc-500 whitespace-nowrap">
+    <>
+    <tr className={`hover:bg-zinc-50 transition-colors${content ? "" : " border-b border-zinc-100"}`}>
+      <td className={`${cellPy} pl-4 pr-4 text-sm text-zinc-500 whitespace-nowrap`}>
         {formatDate(comment.driveCreatedAt)}
       </td>
-      <td className="py-1.5 pr-4 text-sm text-zinc-500 whitespace-nowrap">
+      <td className={`${cellPy} pr-4 text-sm text-zinc-500 whitespace-nowrap`}>
         {sameAsCreated ? "—" : formatDate(comment.driveModifiedAt)}
       </td>
-      <td className="py-1.5 pr-4 text-sm text-zinc-500 tabular-nums">
+      <td className={`${cellPy} pr-4 text-sm text-zinc-500 tabular-nums`}>
         {comment.replyCount > 0 ? comment.replyCount : ""}
       </td>
-      <td className="py-1.5 pr-4">
+      <td className={`${cellPy} pr-4`}>
         {comment.isMine && (
           <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
             Mine
           </span>
         )}
       </td>
-      <td className="py-1.5 pr-4">
+      <td className={`${cellPy} pr-4`}>
         {comment.iParticipated && (
           <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700">
             Replied
           </span>
         )}
       </td>
-      <td className="py-1.5 pr-4">
+      <td className={`${cellPy} pr-4`}>
         {comment.resolved ? (
           <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-zinc-100 text-zinc-500">
             Resolved
@@ -84,7 +95,7 @@ export function CommentRow({ comment, docId, onUpdate }: CommentRowProps) {
           </span>
         )}
       </td>
-      <td className="py-1.5 pr-4">
+      <td className={`${cellPy} pr-4`}>
         <div className="flex items-center gap-1">
           <Button
             variant="outline"
@@ -107,5 +118,16 @@ export function CommentRow({ comment, docId, onUpdate }: CommentRowProps) {
         </div>
       </td>
     </tr>
+    {content && (
+      <tr className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
+        <td colSpan={7} className="pt-0.5 pb-2 pl-4 pr-4 max-w-0 overflow-hidden">
+          <p className="truncate text-sm text-zinc-400">
+            {author && <span className="text-zinc-600">{author}: </span>}
+            {text}
+          </p>
+        </td>
+      </tr>
+    )}
+    </>
   );
 }

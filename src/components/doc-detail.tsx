@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import type { Comment } from "@prisma/client";
@@ -23,6 +23,16 @@ function formatDate(d: Date | string | null): string {
 
 export function DocDetail({ doc }: DocDetailProps) {
   const [comments, setComments] = useState<Comment[]>(doc.comments);
+  const [commentContent, setCommentContent] = useState<Record<string, string>>({});
+
+  async function fetchContent() {
+    try {
+      const res = await fetch(`/api/docs/${doc.id}/comments`);
+      if (res.ok) setCommentContent(await res.json());
+    } catch { /* content is optional */ }
+  }
+
+  useEffect(() => { void fetchContent(); }, [doc.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [myThreadsFilter, setMyThreadsFilter] = useState(false);
   const [myCommentsFilter, setMyCommentsFilter] = useState(false);
   const [showMode, setShowMode] = useState<"active" | "open" | "all">("active");
@@ -48,6 +58,7 @@ export function DocDetail({ doc }: DocDetailProps) {
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithComments = await res.json();
       setComments(updated.comments);
+      void fetchContent();
       toast.success("Comments synced");
     } catch {
       toast.error("Failed to sync comments");
@@ -198,6 +209,7 @@ export function DocDetail({ doc }: DocDetailProps) {
                   key={comment.id}
                   comment={comment}
                   docId={doc.id}
+                  content={commentContent[comment.googleCommentId]}
                   onUpdate={handleCommentUpdate}
                 />
               ))}
