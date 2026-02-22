@@ -146,100 +146,38 @@ export async function fetchComments(
   return comments;
 }
 
-export interface CommentContentResult {
-  // Drive comment ID → "AuthorName: text" for regular comments
-  commentContent: Record<string, string>;
-  // Drive comment ID → Docs API suggestion ID (for suggestion content lookup)
-  driveIdToDocsId: Record<string, string>;
-}
-
+// Drive comment ID → "AuthorName: text" for regular comments
 export async function fetchCommentContent(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string
-): Promise<CommentContentResult> {
+): Promise<Record<string, string>> {
   const drive = google.drive({ version: "v3", auth });
   const commentContent: Record<string, string> = {};
-  const driveIdToDocsId: Record<string, string> = {};
   let pageToken: string | undefined;
 
   do {
     const res = await drive.comments.list({
       fileId: googleDocId,
-      fields: "nextPageToken, comments(id, content, author(displayName), anchor)",
+      fields: "nextPageToken, comments(id, content, author(displayName))",
       pageSize: 100,
       ...(pageToken ? { pageToken } : {}),
     });
 
     for (const c of res.data.comments ?? []) {
-      if (!c.id) continue;
-
-      // Extract Docs API suggestion ID from anchor for suggestion comments
-      if (c.anchor) {
-        try {
-          const anchor = JSON.parse(c.anchor) as {
-            a?: Array<{ ct?: string; si?: unknown }>;
-          };
-          const firstAction = anchor?.a?.[0];
-          if (firstAction?.ct === "sgst" && typeof firstAction.si === "string") {
-            driveIdToDocsId[c.id] = firstAction.si;
-            continue; // suggestion content comes from Docs API, not Drive
-          }
-        } catch { /* unexpected anchor format */ }
-      }
-
-      if (c.content != null) {
-        const author = c.author?.displayName;
-        commentContent[c.id] = author ? `${author}: ${c.content}` : c.content;
-      }
+      if (!c.id || c.content == null) continue;
+      const author = c.author?.displayName;
+      commentContent[c.id] = author ? `${author}: ${c.content}` : c.content;
     }
 
     pageToken = res.data.nextPageToken ?? undefined;
   } while (pageToken);
 
-  return { commentContent, driveIdToDocsId };
+  return commentContent;
 }
 
 export interface DriveSuggestion {
   id: string;
   suggestionType: "INSERT" | "DELETE" | "EDIT";
-}
-
-// Fetches a mapping of Docs API suggestion ID → Drive comment ID by scanning all comments
-// (no since filter). This is needed because the since filter used in fetchComments hides
-// suggestions that haven't been touched recently, and we need the Drive comment ID for
-// correct ?disco= URL navigation.
-export async function fetchDriveSuggestionIds(
-  auth: Awaited<ReturnType<typeof getDriveClient>>,
-  googleDocId: string
-): Promise<Map<string, string>> {
-  const drive = google.drive({ version: "v3", auth });
-  const result = new Map<string, string>(); // docsSuggestionId → driveCommentId
-  let pageToken: string | undefined;
-
-  console.log(`[Drive] comments.list ${googleDocId} (suggestion ID mapping)`);
-
-  do {
-    const res = await drive.comments.list({
-      fileId: googleDocId,
-      fields: "nextPageToken, comments(id, anchor)",
-      pageSize: 100,
-      ...(pageToken ? { pageToken } : {}),
-    });
-
-    for (const c of res.data.comments ?? []) {
-      if (!c.id || !c.anchor) continue;
-      console.log(`[Drive] comment ${c.id} anchor: ${c.anchor}`);
-      // Suggestion anchors are plain kix.xxx strings, not JSON
-      if (c.anchor.startsWith("kix.")) {
-        result.set(c.anchor, c.id); // kix.xxx → AAAB0xxx Drive comment ID
-      }
-    }
-
-    pageToken = res.data.nextPageToken ?? undefined;
-  } while (pageToken);
-
-  console.log(`[Drive] comments.list ${googleDocId} (suggestion ID mapping) → ${result.size} suggestions found`);
-  return result;
 }
 
 export interface SuggestionContent {
