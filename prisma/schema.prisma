@@ -63,6 +63,7 @@ model Label {
   userId String
   name   String
   color  String?
+  position Int      @default(0)
   user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   docs   DocLabel[]
 

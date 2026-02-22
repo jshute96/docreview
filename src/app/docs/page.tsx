@@ -20,7 +20,7 @@ export default async function DocsPage() {
     }),
     prisma.label.findMany({
       where: { userId },
-      orderBy: { name: "asc" },
+      orderBy: { position: "asc" },
     }),
   ]);
 

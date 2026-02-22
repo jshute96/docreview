@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
+import { GripVertical, Trash2 } from "lucide-react";
 import type { Label } from "@prisma/client";
 import {
   Dialog,
@@ -41,6 +42,74 @@ export function ManageLabelsDialog({
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [colorChanges, setColorChanges] = useState<Map<string, string>>(new Map());
 
+  // Pointer-based drag reorder (no ghost image)
+  const dragIndexRef = useRef<number | null>(null);
+  const rowRectsRef = useRef<DOMRect[]>([]);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const [dragActiveIndex, setDragActiveIndex] = useState<number | null>(null);
+
+  const handlePointerDown = useCallback((index: number, e: React.PointerEvent) => {
+    e.preventDefault();
+    dragIndexRef.current = index;
+    setDragging(true);
+    setDragActiveIndex(index);
+
+    // Snapshot row positions at drag start
+    if (listRef.current) {
+      const rows = listRef.current.querySelectorAll<HTMLElement>("[data-label-row]");
+      rowRectsRef.current = Array.from(rows).map((r) => r.getBoundingClientRect());
+    }
+
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    const fromIndex = dragIndexRef.current;
+    if (fromIndex === null) return;
+
+    const rects = rowRectsRef.current;
+    if (rects.length === 0) return;
+
+    // Find which row the pointer is over by comparing Y midpoints
+    const y = e.clientY;
+    let toIndex = fromIndex;
+    for (let i = 0; i < rects.length; i++) {
+      const mid = rects[i].top + rects[i].height / 2;
+      if (y < mid) {
+        toIndex = i;
+        break;
+      }
+      toIndex = i;
+    }
+
+    if (toIndex !== fromIndex) {
+      setDraft((prev) => {
+        const next = [...prev];
+        const [moved] = next.splice(fromIndex, 1);
+        next.splice(toIndex, 0, moved);
+        return next;
+      });
+      dragIndexRef.current = toIndex;
+      setDragActiveIndex(toIndex);
+
+      // Re-snapshot after reorder on next frame
+      requestAnimationFrame(() => {
+        if (listRef.current) {
+          const rows = listRef.current.querySelectorAll<HTMLElement>("[data-label-row]");
+          rowRectsRef.current = Array.from(rows).map((r) => r.getBoundingClientRect());
+        }
+      });
+    }
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    dragIndexRef.current = null;
+    rowRectsRef.current = [];
+    setDragging(false);
+    setDragActiveIndex(null);
+  }, []);
+
   function handleOpen(isOpen: boolean) {
     if (isOpen) {
       // Reset draft to current labels
@@ -56,12 +125,18 @@ export function ManageLabelsDialog({
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+    const trimmed = name.trim();
+    if (draft.some((l) => l.name.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error("A label with that name already exists");
+      return;
+    }
     const tempId = `__temp_${nextTempId.current++}`;
     const newLabel: Label = {
       id: tempId,
       userId: "",
-      name: name.trim(),
+      name: trimmed,
       color: randomPrimaryColor(),
+      position: draft.length,
     };
     setDraft((prev) => [...prev, newLabel]);
     setAddedIds((prev) => new Set(prev).add(tempId));
@@ -141,6 +216,16 @@ export function ManageLabelsDialog({
 
       // Build final labels list: start from draft, replace temp IDs with real ones
       const finalLabels = draft.map((l) => tempToReal.get(l.id) ?? l);
+
+      // 4. Persist label order
+      const orderIds = finalLabels.map((l) => l.id);
+      const reorderRes = await fetch("/api/labels/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: orderIds }),
+      });
+      if (!reorderRes.ok) throw new Error("Failed to save label order");
+
       onLabelsChange(finalLabels);
       setOpen(false);
     } catch (err: unknown) {
@@ -175,22 +260,44 @@ export function ManageLabelsDialog({
           </Button>
         </form>
 
-        <div className="mt-4 flex flex-col gap-1">
+        <div
+          ref={listRef}
+          className="mt-4 flex flex-col gap-1"
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+        >
           {draft.length === 0 && (
             <p className="text-sm text-zinc-400">No labels yet.</p>
           )}
-          {draft.map((label) => (
+          {draft.map((label, index) => (
             <div
               key={label.id}
-              className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-zinc-50"
+              data-label-row
+              className={`flex items-center justify-between rounded-md px-2 py-1.5 select-none touch-none ${
+                dragActiveIndex === index
+                  ? "bg-zinc-100 ring-1 ring-zinc-300 cursor-grabbing"
+                  : "hover:bg-zinc-50 cursor-grab"
+              } ${dragging ? "cursor-grabbing" : ""}`}
+              onPointerDown={(e) => handlePointerDown(index, e)}
             >
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => handleDelete(label.id)}
+                  className={`text-zinc-500 ${dragging ? "" : "hover:text-red-500"}`}
+                  aria-label={`Delete ${label.name}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+                <GripVertical className="h-4 w-4 text-zinc-300 flex-shrink-0" />
                 <ColorPicker
                   color={label.color ?? "#e4e4e7"}
                   onChange={(c) => handleColorChange(label, c)}
                 >
                   <button
                     type="button"
+                    onPointerDown={(e) => e.stopPropagation()}
                     className="h-4 w-4 rounded-full cursor-pointer ring-1 ring-zinc-200 hover:ring-zinc-400"
                     style={{ backgroundColor: label.color ?? "#e4e4e7" }}
                     aria-label={`Change color for ${label.name}`}
@@ -198,13 +305,6 @@ export function ManageLabelsDialog({
                 </ColorPicker>
                 <span className="text-sm text-zinc-800">{label.name}</span>
               </div>
-              <button
-                type="button"
-                onClick={() => handleDelete(label.id)}
-                className="text-xs text-zinc-400 hover:text-red-500"
-              >
-                Delete
-              </button>
             </div>
           ))}
         </div>

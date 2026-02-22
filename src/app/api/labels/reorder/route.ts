@@ -1,0 +1,42 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+
+export async function PATCH(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.id;
+
+  const body = await req.json();
+  const { order } = body as { order?: string[] };
+
+  if (!Array.isArray(order) || order.length === 0) {
+    return NextResponse.json({ error: "order must be a non-empty array of label IDs" }, { status: 400 });
+  }
+
+  // Validate all IDs belong to the current user
+  const labels = await prisma.label.findMany({
+    where: { userId },
+    select: { id: true },
+  });
+  const ownedIds = new Set(labels.map((l) => l.id));
+  if (order.length !== ownedIds.size || new Set(order).size !== order.length) {
+    return NextResponse.json({ error: "order must include all labels exactly once" }, { status: 400 });
+  }
+  for (const id of order) {
+    if (!ownedIds.has(id)) {
+      return NextResponse.json({ error: "Invalid label ID" }, { status: 400 });
+    }
+  }
+
+  // Update each label's position to its index
+  await prisma.$transaction(
+    order.map((id, index) =>
+      prisma.label.update({ where: { id }, data: { position: index } })
+    )
+  );
+
+  return NextResponse.json({ ok: true });
+}

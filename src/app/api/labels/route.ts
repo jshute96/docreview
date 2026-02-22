@@ -12,7 +12,7 @@ export async function GET() {
 
   const labels = await prisma.label.findMany({
     where: { userId },
-    orderBy: { name: "asc" },
+    orderBy: { position: "asc" },
   });
 
   return NextResponse.json(labels);
