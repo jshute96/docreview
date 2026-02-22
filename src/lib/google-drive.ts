@@ -87,6 +87,10 @@ export interface DriveComment {
   driveCreatedAt: Date | null;
   driveModifiedAt: Date | null;
   replyCount: number;
+  // Set if this comment is a Google Docs suggestion (detected via anchor field)
+  isSuggestion: boolean;
+  // Docs API suggestion ID extracted from the anchor JSON (used to look up content)
+  docsSuggestionId?: string;
 }
 
 export async function fetchComments(
@@ -107,7 +111,7 @@ export async function fetchComments(
     const res = await drive.comments.list({
       fileId: googleDocId,
       fields:
-        "nextPageToken, comments(id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me)))",
+        "nextPageToken, comments(id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me)), anchor)",
       ...(sinceStr ? { startModifiedTime: sinceStr } : {}),
       ...(pageToken ? { pageToken } : {}),
     });
@@ -125,6 +129,32 @@ export async function fetchComments(
         .find((r) => r.action === "resolve");
       const iResolvedIt = lastResolveReply?.author?.me === true;
 
+      // Detect suggestion comments via their anchor.
+      // Two formats exist:
+      //   Older docs: plain "kix.xxx" string
+      //   Newer docs: JSON {"r":"head","a":[{"ct":"sgst","si":"suggest.xxx"}]}
+      let isSuggestion = false;
+      let docsSuggestionId: string | undefined;
+      if (c.anchor) {
+        if (c.anchor.startsWith("kix.")) {
+          isSuggestion = true;
+          // kix.xxx anchor — no Docs API suggestion ID available
+        } else {
+          try {
+            const anchor = JSON.parse(c.anchor) as {
+              a?: Array<{ ct?: string; si?: unknown }>;
+            };
+            const firstAction = anchor?.a?.[0];
+            if (firstAction?.ct === "sgst") {
+              isSuggestion = true;
+              if (typeof firstAction.si === "string") {
+                docsSuggestionId = firstAction.si;
+              }
+            }
+          } catch { /* non-JSON anchor or unexpected format */ }
+        }
+      }
+
       comments.push({
         id: c.id,
         resolved: c.resolved === true,
@@ -134,6 +164,8 @@ export async function fetchComments(
         driveCreatedAt: c.createdTime ? new Date(c.createdTime) : null,
         driveModifiedAt: c.modifiedTime ? new Date(c.modifiedTime) : null,
         replyCount: replies.length,
+        isSuggestion,
+        docsSuggestionId,
       });
     }
 
@@ -146,31 +178,207 @@ export async function fetchComments(
   return comments;
 }
 
+export interface CommentContentResult {
+  // Drive comment ID → "AuthorName: text" for regular comments
+  commentContent: Record<string, string>;
+  // Drive comment ID → Docs API suggestion ID (for suggestion content lookup)
+  driveIdToDocsId: Record<string, string>;
+}
+
 export async function fetchCommentContent(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string
-): Promise<Record<string, string>> {
+): Promise<CommentContentResult> {
   const drive = google.drive({ version: "v3", auth });
-  const result: Record<string, string> = {};
+  const commentContent: Record<string, string> = {};
+  const driveIdToDocsId: Record<string, string> = {};
   let pageToken: string | undefined;
 
   do {
     const res = await drive.comments.list({
       fileId: googleDocId,
-      fields: "nextPageToken, comments(id, content, author(displayName))",
+      fields: "nextPageToken, comments(id, content, author(displayName), anchor)",
       pageSize: 100,
       ...(pageToken ? { pageToken } : {}),
     });
 
     for (const c of res.data.comments ?? []) {
-      if (c.id && c.content != null) {
+      if (!c.id) continue;
+
+      // Extract Docs API suggestion ID from anchor for suggestion comments
+      if (c.anchor) {
+        try {
+          const anchor = JSON.parse(c.anchor) as {
+            a?: Array<{ ct?: string; si?: unknown }>;
+          };
+          const firstAction = anchor?.a?.[0];
+          if (firstAction?.ct === "sgst" && typeof firstAction.si === "string") {
+            driveIdToDocsId[c.id] = firstAction.si;
+            continue; // suggestion content comes from Docs API, not Drive
+          }
+        } catch { /* unexpected anchor format */ }
+      }
+
+      if (c.content != null) {
         const author = c.author?.displayName;
-        result[c.id] = author ? `${author}: ${c.content}` : c.content;
+        commentContent[c.id] = author ? `${author}: ${c.content}` : c.content;
       }
     }
 
     pageToken = res.data.nextPageToken ?? undefined;
   } while (pageToken);
+
+  return { commentContent, driveIdToDocsId };
+}
+
+export interface DriveSuggestion {
+  id: string;
+  suggestionType: "INSERT" | "DELETE" | "EDIT";
+}
+
+// Fetches a mapping of Docs API suggestion ID → Drive comment ID by scanning all comments
+// (no since filter). This is needed because the since filter used in fetchComments hides
+// suggestions that haven't been touched recently, and we need the Drive comment ID for
+// correct ?disco= URL navigation.
+export async function fetchDriveSuggestionIds(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  googleDocId: string
+): Promise<Map<string, string>> {
+  const drive = google.drive({ version: "v3", auth });
+  const result = new Map<string, string>(); // docsSuggestionId → driveCommentId
+  let pageToken: string | undefined;
+
+  console.log(`[Drive] comments.list ${googleDocId} (suggestion ID mapping)`);
+
+  do {
+    const res = await drive.comments.list({
+      fileId: googleDocId,
+      fields: "nextPageToken, comments(id, anchor)",
+      pageSize: 100,
+      ...(pageToken ? { pageToken } : {}),
+    });
+
+    for (const c of res.data.comments ?? []) {
+      if (!c.id || !c.anchor) continue;
+      console.log(`[Drive] comment ${c.id} anchor: ${c.anchor}`);
+      // Suggestion anchors are plain kix.xxx strings, not JSON
+      if (c.anchor.startsWith("kix.")) {
+        result.set(c.anchor, c.id); // kix.xxx → AAAB0xxx Drive comment ID
+      }
+    }
+
+    pageToken = res.data.nextPageToken ?? undefined;
+  } while (pageToken);
+
+  console.log(`[Drive] comments.list ${googleDocId} (suggestion ID mapping) → ${result.size} suggestions found`);
+  return result;
+}
+
+export interface SuggestionContent {
+  insertedText: string;
+  deletedText: string;
+}
+
+// Walks a Docs document body and extracts all pending suggestions.
+// Returns metadata only (no text content) — use fetchSuggestionContent for display text.
+export async function fetchSuggestions(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  googleDocId: string
+): Promise<DriveSuggestion[]> {
+  const docs = google.docs({ version: "v1", auth });
+  console.log(`[Docs] documents.get ${googleDocId} (suggestions)`);
+
+  let res;
+  try {
+    res = await docs.documents.get({
+      documentId: googleDocId,
+      suggestionsViewMode: "SUGGESTIONS_INLINE",
+      fields: "body(content(paragraph(elements(textRun(suggestedInsertionIds,suggestedDeletionIds)))))",
+    });
+  } catch (err) {
+    console.error(`[Docs] documents.get ${googleDocId} failed:`, err);
+    return [];
+  }
+
+  const insertionIds = new Set<string>();
+  const deletionIds = new Set<string>();
+
+  for (const el of res.data.body?.content ?? []) {
+    for (const pe of el.paragraph?.elements ?? []) {
+      for (const id of pe.textRun?.suggestedInsertionIds ?? []) {
+        insertionIds.add(id);
+      }
+      for (const id of pe.textRun?.suggestedDeletionIds ?? []) {
+        deletionIds.add(id);
+      }
+    }
+  }
+
+  const allIds = new Set([...insertionIds, ...deletionIds]);
+  const suggestions: DriveSuggestion[] = [];
+
+  for (const id of allIds) {
+    const hasInsert = insertionIds.has(id);
+    const hasDelete = deletionIds.has(id);
+    suggestions.push({
+      id,
+      suggestionType: hasInsert && hasDelete ? "EDIT" : hasInsert ? "INSERT" : "DELETE",
+    });
+  }
+
+  console.log(`[Docs] documents.get ${googleDocId} → ${suggestions.length} suggestions`);
+  return suggestions;
+}
+
+// Fetches the text content of all pending suggestions in a document.
+// Returns a map of suggestionId → { insertedText, deletedText } for live display.
+export async function fetchSuggestionContent(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  googleDocId: string
+): Promise<Record<string, SuggestionContent>> {
+  const docs = google.docs({ version: "v1", auth });
+  console.log(`[Docs] documents.get ${googleDocId} (suggestion content)`);
+
+  let res;
+  try {
+    res = await docs.documents.get({
+      documentId: googleDocId,
+      suggestionsViewMode: "SUGGESTIONS_INLINE",
+      fields: "body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds)))))",
+    });
+  } catch (err) {
+    console.error(`[Docs] documents.get ${googleDocId} failed:`, err);
+    return {};
+  }
+
+  const insertions: Record<string, string> = {};
+  const deletions: Record<string, string> = {};
+
+  for (const el of res.data.body?.content ?? []) {
+    for (const pe of el.paragraph?.elements ?? []) {
+      const run = pe.textRun;
+      if (!run?.content) continue;
+      // Strip trailing newline that Docs API appends to paragraph-ending runs
+      const text = run.content.replace(/\n$/, "");
+      if (!text) continue;
+      for (const id of run.suggestedInsertionIds ?? []) {
+        insertions[id] = (insertions[id] ?? "") + text;
+      }
+      for (const id of run.suggestedDeletionIds ?? []) {
+        deletions[id] = (deletions[id] ?? "") + text;
+      }
+    }
+  }
+
+  const allIds = new Set([...Object.keys(insertions), ...Object.keys(deletions)]);
+  const result: Record<string, SuggestionContent> = {};
+
+  for (const id of allIds) {
+    result[id] = {
+      insertedText: insertions[id] ?? "",
+      deletedText: deletions[id] ?? "",
+    };
+  }
 
   return result;
 }

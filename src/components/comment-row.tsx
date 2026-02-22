@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Comment } from "@prisma/client";
+import type { SuggestionContent } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
 
 interface CommentRowProps {
@@ -10,6 +11,7 @@ interface CommentRowProps {
   docId: string;
   driveUrl: string;
   content?: string;
+  suggestionContent?: SuggestionContent;
   onUpdate: (updated: Comment) => void;
 }
 
@@ -26,7 +28,7 @@ function splitContent(raw: string): { author: string | null; text: string } {
   return { author: raw.slice(0, sep), text: raw.slice(sep + 2) };
 }
 
-export function CommentRow({ comment, docId, driveUrl, content, onUpdate }: CommentRowProps) {
+export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, onUpdate }: CommentRowProps) {
   const [loading, setLoading] = useState(false);
   const [hovered, setHovered] = useState(false);
 
@@ -61,13 +63,15 @@ export function CommentRow({ comment, docId, driveUrl, content, onUpdate }: Comm
 
   const isArchived = comment.status === "ARCHIVED";
   const isMuted = comment.status === "MUTED";
+  const isSuggestion = comment.type === "SUGGESTION";
 
   const sameAsCreated =
     comment.driveCreatedAt &&
     comment.driveModifiedAt &&
     new Date(comment.driveCreatedAt).getTime() === new Date(comment.driveModifiedAt).getTime();
 
-  const cellPy = content ? "pt-1.5 pb-0" : "py-1.5";
+  const hasContentRow = isSuggestion ? !!suggestionContent : !!content;
+  const cellPy = hasContentRow ? "pt-1.5 pb-0" : "py-1.5";
   const { author, text } = content ? splitContent(content) : { author: null, text: "" };
   const rowBg = hovered ? "bg-zinc-50" : "";
   const hoverHandlers = {
@@ -75,10 +79,17 @@ export function CommentRow({ comment, docId, driveUrl, content, onUpdate }: Comm
     onMouseLeave: () => setHovered(false),
   };
 
+  const suggestionLabel =
+    comment.suggestionType === "INSERT"
+      ? "Suggested add"
+      : comment.suggestionType === "DELETE"
+      ? "Suggested delete"
+      : "Suggested edit";
+
   return (
     <>
     <tr
-      className={`${rowBg} transition-colors cursor-pointer${content ? "" : " border-b border-zinc-100"}`}
+      className={`${rowBg} transition-colors cursor-pointer${hasContentRow ? "" : " border-b border-zinc-100"}`}
       onClick={openInDoc}
       {...hoverHandlers}
     >
@@ -92,14 +103,14 @@ export function CommentRow({ comment, docId, driveUrl, content, onUpdate }: Comm
         {comment.replyCount > 0 ? comment.replyCount : ""}
       </td>
       <td className={`${cellPy} pr-4`}>
-        {comment.isMine && (
+        {!isSuggestion && comment.isMine && (
           <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
             Mine
           </span>
         )}
       </td>
       <td className={`${cellPy} pr-4`}>
-        {comment.iParticipated && (
+        {!isSuggestion && comment.iParticipated && (
           <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700">
             Replied
           </span>
@@ -139,17 +150,32 @@ export function CommentRow({ comment, docId, driveUrl, content, onUpdate }: Comm
         </div>
       </td>
     </tr>
-    {content && (
+    {hasContentRow && (
       <tr
         className={`${rowBg} border-b border-zinc-100 transition-colors cursor-pointer`}
         onClick={openInDoc}
         {...hoverHandlers}
       >
         <td colSpan={7} className="pt-0.5 pb-2 pl-4 pr-4 max-w-0 overflow-hidden">
-          <p className="truncate text-sm text-zinc-400">
-            {author && <span className="text-zinc-600">{author}: </span>}
-            {text}
-          </p>
+          {isSuggestion && suggestionContent ? (
+            <p className="truncate text-sm text-zinc-400">
+              <span className="text-zinc-500">{suggestionLabel}: </span>
+              {(comment.suggestionType === "EDIT" || comment.suggestionType === "DELETE") && (
+                <span className="line-through text-red-400">{suggestionContent.deletedText}</span>
+              )}
+              {comment.suggestionType === "EDIT" && (
+                <span className="text-zinc-400"> → </span>
+              )}
+              {(comment.suggestionType === "EDIT" || comment.suggestionType === "INSERT") && (
+                <span className="text-zinc-600">{suggestionContent.insertedText}</span>
+              )}
+            </p>
+          ) : (
+            <p className="truncate text-sm text-zinc-400">
+              {author && <span className="text-zinc-600">{author}: </span>}
+              {text}
+            </p>
+          )}
         </td>
       </tr>
     )}

@@ -104,6 +104,14 @@ Modified shows "—" when it equals Created (i.e., no replies have been added).
 
 ---
 
+## Suggestions
+
+Suggestions (tracked changes) are a separate comment type (`type: "SUGGESTION"`) and have
+their own sync logic. They are displayed in the comment table and can be filtered with the
+**Suggestions** toggle. For full details, see [`suggestions.md`](./suggestions.md).
+
+---
+
 ## Drive API Notes
 
 - **Endpoint**: `GET /drive/v3/files/{fileId}/comments`

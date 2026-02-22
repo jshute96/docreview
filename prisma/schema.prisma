@@ -92,19 +92,21 @@ model Doc {
 }
 
 model Comment {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   docId           String
   googleCommentId String
+  type            String    @default("COMMENT")  // COMMENT | SUGGESTION
+  suggestionType  String?                         // INSERT | DELETE | EDIT
   resolved        Boolean   @default(false)
   isMine          Boolean   @default(false)
   iParticipated   Boolean   @default(false)
-  status          String    @default("ACTIVE") // ACTIVE | ARCHIVED | MUTED
+  status          String    @default("ACTIVE")    // ACTIVE | ARCHIVED | MUTED
   driveCreatedAt  DateTime?
   driveModifiedAt DateTime?
   replyCount      Int       @default(0)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
-  doc             Doc      @relation(fields: [docId], references: [id], onDelete: Cascade)
+  doc             Doc       @relation(fields: [docId], references: [id], onDelete: Cascade)
 
   @@unique([docId, googleCommentId])
 }

@@ -75,18 +75,26 @@ same `syncComments` logic for a single doc.
 **Why not gate on file `modifiedTime`:** Drive does not update a file's `modifiedTime` when
 comments change, so we cannot use it as a signal.
 
-**Incremental sync:** each doc stores `commentsLastSyncedAt`. The Drive `comments.list` call
-passes this as `startModifiedTime`, so Drive only returns comments modified since the last
-sync. If nothing changed on a doc, the response is empty — the call is cheap.
+**Full scan (no `startModifiedTime`):** unlike the older incremental approach, the per-doc
+Refresh always performs a full `comments.list` scan. This is required because Drive API's
+`startModifiedTime` filter silently excludes suggestion-type comment threads, which would
+cause pending suggestions to disappear after the first sync.
 
-**Fields fetched per comment:** `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me))`
+**Fields fetched per comment:** `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me)), anchor`
 
 **Fields stored per comment:** `driveCreatedAt`, `driveModifiedAt`, `replyCount` (= number
-of replies), plus the existing `resolved`, `isMine`, `iParticipated`, `iResolvedIt`. All are
-updated on both create and update paths, including the MUTED path.
+of replies), plus `resolved`, `isMine`, `iParticipated`, `iResolvedIt`, `type`
+(COMMENT/SUGGESTION), and `suggestionType` (INSERT/DELETE/EDIT). All are updated on both
+create and update paths, including the MUTED path.
+
+**Suggestions require a second sync pass:** `comments.list` only surfaces some pending
+suggestions as Drive comments. To capture all pending suggestions, a second pass calls
+`documents.get` via the Docs API. The two syncs produce records with different ID formats
+(`AAAB0xxx` vs `suggest.xxx`) and coexist in the Comment table.
 
 For full details on comment status logic (ACTIVE / ARCHIVED / MUTED, who-resolved-it
 detection, `isMine` / `iParticipated`), see [`comment-tracking.md`](./comment-tracking.md).
+For the full picture on suggestions specifically, see [`suggestions.md`](./suggestions.md).
 
 ---
 

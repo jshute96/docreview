@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import type { Comment } from "@prisma/client";
 import type { DocWithComments } from "@/types";
+import type { SuggestionContent } from "@/lib/google-drive";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
@@ -24,11 +25,16 @@ function formatDate(d: Date | string | null): string {
 export function DocDetail({ doc }: DocDetailProps) {
   const [comments, setComments] = useState<Comment[]>(doc.comments);
   const [commentContent, setCommentContent] = useState<Record<string, string>>({});
+  const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
 
   async function fetchContent() {
     try {
       const res = await fetch(`/api/docs/${doc.id}/comments`);
-      if (res.ok) setCommentContent(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setCommentContent(data.comments ?? {});
+        setSuggestionContent(data.suggestions ?? {});
+      }
     } catch { /* content is optional */ }
   }
 
@@ -36,6 +42,7 @@ export function DocDetail({ doc }: DocDetailProps) {
   const [myThreadsFilter, setMyThreadsFilter] = useState(false);
   const [myCommentsFilter, setMyCommentsFilter] = useState(false);
   const [showMode, setShowMode] = useState<"active" | "open" | "all">("active");
+  const [suggestionsOnly, setSuggestionsOnly] = useState(false);
   type SortCol = "driveCreatedAt" | "driveModifiedAt" | "replyCount" | "isMine" | "iParticipated" | "resolved";
   type SortDir = "asc" | "desc";
   const [sortCol, setSortCol] = useState<SortCol>("driveCreatedAt");
@@ -73,6 +80,7 @@ export function DocDetail({ doc }: DocDetailProps) {
 
   const filteredComments = comments
     .filter((c) => {
+      if (suggestionsOnly && c.type !== "SUGGESTION") return false;
       if (showMode === "active" && (c.status === "ARCHIVED" || c.status === "MUTED")) return false;
       if (showMode === "open" && c.resolved) return false;
       if (myThreadsFilter && !c.isMine && !c.iParticipated) return false;
@@ -168,9 +176,11 @@ export function DocDetail({ doc }: DocDetailProps) {
         myThreadsFilter={myThreadsFilter}
         myCommentsFilter={myCommentsFilter}
         showMode={showMode}
+        suggestionsOnly={suggestionsOnly}
         onMyThreadsChange={setMyThreadsFilter}
         onMyCommentsChange={setMyCommentsFilter}
         onShowModeChange={setShowMode}
+        onSuggestionsOnlyChange={setSuggestionsOnly}
       />
 
       {/* Comment table */}
@@ -210,7 +220,8 @@ export function DocDetail({ doc }: DocDetailProps) {
                   comment={comment}
                   docId={doc.id}
                   driveUrl={doc.driveUrl}
-                  content={commentContent[comment.googleCommentId]}
+                  content={comment.type === "COMMENT" ? commentContent[comment.googleCommentId] : undefined}
+                  suggestionContent={comment.type === "SUGGESTION" ? suggestionContent[comment.googleCommentId] : undefined}
                   onUpdate={handleCommentUpdate}
                 />
               ))}

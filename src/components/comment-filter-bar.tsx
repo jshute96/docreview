@@ -1,23 +1,26 @@
 "use client";
 
 type ShowMode = "active" | "open" | "all";
-
 interface CommentFilterBarProps {
   myThreadsFilter: boolean;
   myCommentsFilter: boolean;
   showMode: ShowMode;
+  suggestionsOnly: boolean;
   onMyThreadsChange: (v: boolean) => void;
   onMyCommentsChange: (v: boolean) => void;
   onShowModeChange: (v: ShowMode) => void;
+  onSuggestionsOnlyChange: (v: boolean) => void;
 }
 
 export function CommentFilterBar({
   myThreadsFilter,
   myCommentsFilter,
   showMode,
+  suggestionsOnly,
   onMyThreadsChange,
   onMyCommentsChange,
   onShowModeChange,
+  onSuggestionsOnlyChange,
 }: CommentFilterBarProps) {
   function toggleBtn(active: boolean, label: string, onClick: () => void) {
     return (
@@ -43,6 +46,7 @@ export function CommentFilterBar({
 
         {toggleBtn(myThreadsFilter, "My threads", () => onMyThreadsChange(!myThreadsFilter))}
         {toggleBtn(myCommentsFilter, "My comments", () => onMyCommentsChange(!myCommentsFilter))}
+        {toggleBtn(suggestionsOnly, "Suggestions", () => onSuggestionsOnlyChange(!suggestionsOnly))}
 
         <div className="h-4 w-px bg-zinc-200" />
 
