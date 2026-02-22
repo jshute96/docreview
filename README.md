@@ -13,6 +13,18 @@ npm run dev
 
 Visit `http://localhost:3000`.
 
+To run a second instance (e.g. from a separate checkout), use the `-p` flag:
+
+```bash
+npm run dev -- -p 3001
+```
+
+To share the database with another checkout, set the database path in `.env`:
+
+```
+DATABASE_URL="file:/home/jshute/dev/docreview/prisma/prisma/dev.db"
+```
+
 ---
 
 ## Setup
