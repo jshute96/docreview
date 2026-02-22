@@ -17,11 +17,13 @@ interface FilterBarProps {
   selectedLabelIds: string[];
   roleFilter: "AUTHOR" | "NOT_AUTHOR" | null;
   selectedMimeTypes: string[];
+  titleFilter: string;
   onShowArchivedChange: (v: boolean) => void;
   onHasCommentsFilterChange: (v: boolean) => void;
   onLabelToggle: (id: string) => void;
   onRoleFilterChange: (role: "AUTHOR" | "NOT_AUTHOR" | null) => void;
   onMimeTypeToggle: (mimeType: string) => void;
+  onTitleFilterChange: (v: string) => void;
 }
 
 export function FilterBar({
@@ -31,22 +33,25 @@ export function FilterBar({
   selectedLabelIds,
   roleFilter,
   selectedMimeTypes,
+  titleFilter,
   onShowArchivedChange,
   onHasCommentsFilterChange,
   onLabelToggle,
   onRoleFilterChange,
   onMimeTypeToggle,
+  onTitleFilterChange,
 }: FilterBarProps) {
   return (
-    <fieldset className="rounded-lg border border-zinc-200 px-4 py-2">
-      <legend className="px-1 text-xs font-medium text-zinc-400 uppercase tracking-wide">
+    <fieldset className="rounded-lg border border-zinc-200 px-4 py-3">
+      <legend className="px-1 text-xs font-medium text-zinc-900 uppercase tracking-wide">
         Filters
       </legend>
+      <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
 
         {/* Doc type */}
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-zinc-400">Doc type</span>
+          <span className="text-xs text-zinc-900">Doc type</span>
           <div className="flex items-center gap-1">
             {DOC_TYPES.map(({ mimeType, label }) => {
               const active = selectedMimeTypes.includes(mimeType);
@@ -75,7 +80,7 @@ export function FilterBar({
             className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
               hasCommentsFilter
                 ? "bg-zinc-800 text-white"
-                : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+                : "bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
             }`}
           >
             Has comments
@@ -86,7 +91,7 @@ export function FilterBar({
 
         {/* Labels */}
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-zinc-400">Labels</span>
+          <span className="text-xs text-zinc-900">Labels</span>
           <div className="flex flex-wrap items-center gap-1">
             {labels.length === 0 ? (
               <span className="text-xs text-zinc-300">None</span>
@@ -114,7 +119,7 @@ export function FilterBar({
 
         {/* Role */}
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-zinc-400">Role</span>
+          <span className="text-xs text-zinc-900">Role</span>
           <button
             onClick={() => {
               if (roleFilter === null) onRoleFilterChange("AUTHOR");
@@ -126,7 +131,7 @@ export function FilterBar({
                 ? ROLE_COLORS.AUTHOR.activeFilter
                 : roleFilter === "NOT_AUTHOR"
                 ? `${ROLE_COLORS.AUTHOR.inactiveFilter} ring-2 ring-blue-300 ring-offset-1`
-                : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200"
+                : "bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
             }`}
           >
             {roleFilter === "NOT_AUTHOR" ? <s>Author</s> : "Author"}
@@ -144,7 +149,7 @@ export function FilterBar({
               className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
                 showArchived === archived
                   ? "bg-zinc-800 text-white"
-                  : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+                  : "bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
               }`}
             >
               {archived ? "All" : "Active"}
@@ -152,6 +157,18 @@ export function FilterBar({
           ))}
         </div>
 
+      </div>
+
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-zinc-900">Title</span>
+        <input
+          type="text"
+          value={titleFilter}
+          onChange={(e) => onTitleFilterChange(e.target.value)}
+          placeholder="regex filter…"
+          className="rounded border border-zinc-200 bg-white px-2 py-0.5 text-xs text-zinc-700 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none w-90"
+        />
+      </div>
       </div>
     </fieldset>
   );

@@ -4,9 +4,6 @@
   * There's no timestamp-based detection of new ones or updates, so there might
     be excessive polling
 
-* Search/filter for doc title
-* /screenshot tool
-* Add screen
 * improve labels UI
 * show comment threads
 * reply to comments

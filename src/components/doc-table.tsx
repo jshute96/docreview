@@ -27,6 +27,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [roleFilter, setRoleFilter] = useState<"AUTHOR" | "NOT_AUTHOR" | null>(null);
   const [selectedMimeTypes, setSelectedMimeTypes] = useState<string[]>([]);
+  const [titleFilter, setTitleFilter] = useState("");
   const [sortCol, setSortCol] = useState<SortCol>("lastModifiedInDrive");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -82,6 +83,15 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
         !doc.labels.some((dl) => selectedLabelIds.includes(dl.labelId))
       ) {
         return false;
+      }
+      if (titleFilter) {
+        try {
+          const re = new RegExp(titleFilter, "i");
+          if (!re.test(doc.title)) return false;
+        } catch {
+          // invalid regex — fall back to plain substring match
+          if (!doc.title.toLowerCase().includes(titleFilter.toLowerCase())) return false;
+        }
       }
       return true;
     })
@@ -143,11 +153,13 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
         selectedLabelIds={selectedLabelIds}
         roleFilter={roleFilter}
         selectedMimeTypes={selectedMimeTypes}
+        titleFilter={titleFilter}
         onShowArchivedChange={setShowArchived}
         onHasCommentsFilterChange={setHasCommentsFilter}
         onLabelToggle={handleLabelToggle}
         onRoleFilterChange={setRoleFilter}
         onMimeTypeToggle={handleMimeTypeToggle}
+        onTitleFilterChange={setTitleFilter}
       />
 
       {filteredDocs.length === 0 ? (
