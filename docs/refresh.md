@@ -68,29 +68,27 @@ Drive. If a doc re-appears in Drive (e.g., shared again), the upsert in Phase 1 
 
 ## Phase 3 — Comment Sync
 
-Comment threads are synced for every non-deleted doc after the doc list and deletion checks
-complete. All docs are processed in parallel (`Promise.all`). The per-doc refresh runs the
-same `syncComments` logic for a single doc.
+Both the main Refresh and the per-doc Refresh run the same `syncComments` function
+(`src/lib/sync-comments.ts`). The main Refresh processes all non-deleted docs in parallel
+(`Promise.all`); the per-doc Refresh runs it for a single doc.
 
 **Why not gate on file `modifiedTime`:** Drive does not update a file's `modifiedTime` when
 comments change, so we cannot use it as a signal.
 
-**Full scan (no `startModifiedTime`):** unlike the older incremental approach, the per-doc
-Refresh always performs a full `comments.list` scan. This is required because Drive API's
-`startModifiedTime` filter silently excludes suggestion-type comment threads, which would
-cause pending suggestions to disappear after the first sync.
+**Full scan (no `startModifiedTime`):** every sync performs a full `comments.list` scan.
+Drive API's `startModifiedTime` filter silently excludes suggestions, so incremental syncs
+were dropped entirely.
 
-**Fields fetched per comment:** `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me)), anchor`
+**Fields fetched per comment:** `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me))`
 
 **Fields stored per comment:** `driveCreatedAt`, `driveModifiedAt`, `replyCount` (= number
-of replies), plus `resolved`, `isMine`, `iParticipated`, `iResolvedIt`, `type`
-(COMMENT/SUGGESTION), and `suggestionType` (INSERT/DELETE/EDIT). All are updated on both
-create and update paths, including the MUTED path.
+of replies), plus `resolved`, `isMine`, `iParticipated`, `iResolvedIt`. All Drive API
+results are stored as `type: "COMMENT"`.
 
-**Suggestions require a second sync pass:** `comments.list` only surfaces some pending
-suggestions as Drive comments. To capture all pending suggestions, a second pass calls
-`documents.get` via the Docs API. The two syncs produce records with different ID formats
-(`AAAB0xxx` vs `suggest.xxx`) and coexist in the Comment table.
+**Suggestions via Docs API:** for Google Docs files, a second pass calls `documents.get`
+via the Docs API to capture all pending suggestions. These are stored as `type: "SUGGESTION"`
+with `suggest.xxx` IDs. Any previously-active suggestion no longer returned by the Docs API
+is marked resolved — this runs even when the Docs API returns zero suggestions.
 
 For full details on comment status logic (ACTIVE / ARCHIVED / MUTED, who-resolved-it
 detection, `isMine` / `iParticipated`), see [`comment-tracking.md`](./comment-tracking.md).

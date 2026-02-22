@@ -87,10 +87,6 @@ export interface DriveComment {
   driveCreatedAt: Date | null;
   driveModifiedAt: Date | null;
   replyCount: number;
-  // Set if this comment is a Google Docs suggestion (detected via anchor field)
-  isSuggestion: boolean;
-  // Docs API suggestion ID extracted from the anchor JSON (used to look up content)
-  docsSuggestionId?: string;
 }
 
 export async function fetchComments(
@@ -111,7 +107,7 @@ export async function fetchComments(
     const res = await drive.comments.list({
       fileId: googleDocId,
       fields:
-        "nextPageToken, comments(id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me)), anchor)",
+        "nextPageToken, comments(id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me)))",
       ...(sinceStr ? { startModifiedTime: sinceStr } : {}),
       ...(pageToken ? { pageToken } : {}),
     });
@@ -129,32 +125,6 @@ export async function fetchComments(
         .find((r) => r.action === "resolve");
       const iResolvedIt = lastResolveReply?.author?.me === true;
 
-      // Detect suggestion comments via their anchor.
-      // Two formats exist:
-      //   Older docs: plain "kix.xxx" string
-      //   Newer docs: JSON {"r":"head","a":[{"ct":"sgst","si":"suggest.xxx"}]}
-      let isSuggestion = false;
-      let docsSuggestionId: string | undefined;
-      if (c.anchor) {
-        if (c.anchor.startsWith("kix.")) {
-          isSuggestion = true;
-          // kix.xxx anchor — no Docs API suggestion ID available
-        } else {
-          try {
-            const anchor = JSON.parse(c.anchor) as {
-              a?: Array<{ ct?: string; si?: unknown }>;
-            };
-            const firstAction = anchor?.a?.[0];
-            if (firstAction?.ct === "sgst") {
-              isSuggestion = true;
-              if (typeof firstAction.si === "string") {
-                docsSuggestionId = firstAction.si;
-              }
-            }
-          } catch { /* non-JSON anchor or unexpected format */ }
-        }
-      }
-
       comments.push({
         id: c.id,
         resolved: c.resolved === true,
@@ -164,8 +134,6 @@ export async function fetchComments(
         driveCreatedAt: c.createdTime ? new Date(c.createdTime) : null,
         driveModifiedAt: c.modifiedTime ? new Date(c.modifiedTime) : null,
         replyCount: replies.length,
-        isSuggestion,
-        docsSuggestionId,
       });
     }
 

@@ -1,105 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import {
-  listRecentDocs,
-  findDeletedDocIds,
-  fetchComments,
-  getDriveClient,
-} from "@/lib/google-drive";
-import type { Doc } from "@prisma/client";
-
-async function syncComments(
-  userId: string,
-  doc: Doc,
-  driveAuth: Awaited<ReturnType<typeof getDriveClient>>
-): Promise<number> {
-  let comments;
-  try {
-    comments = await fetchComments(
-      driveAuth,
-      doc.googleDocId,
-      doc.commentsLastSyncedAt ?? undefined
-    );
-  } catch (err) {
-    console.error(`[Comments] failed for ${doc.googleDocId}:`, err);
-    return 0;
-  }
-
-  const isFirstSync = doc.commentsLastSyncedAt === null;
-  let processed = 0;
-
-  for (const c of comments) {
-    const existing = await prisma.comment.findUnique({
-      where: { docId_googleCommentId: { docId: doc.id, googleCommentId: c.id } },
-    });
-
-    if (!existing) {
-      // New comment: determine initial status
-      const status = c.resolved ? "ARCHIVED" : "ACTIVE";
-      await prisma.comment.create({
-        data: {
-          docId: doc.id,
-          googleCommentId: c.id,
-          resolved: c.resolved,
-          isMine: c.isMine,
-          iParticipated: c.iParticipated,
-          status,
-          driveCreatedAt: c.driveCreatedAt,
-          driveModifiedAt: c.driveModifiedAt,
-          replyCount: c.replyCount,
-        },
-      });
-      processed++;
-    } else {
-      // Existing comment returned by startModifiedTime filter — something changed
-      if (existing.status === "MUTED") {
-        // MUTED is sticky; only update Drive fields
-        await prisma.comment.update({
-          where: { id: existing.id },
-          data: {
-            resolved: c.resolved,
-            iParticipated: c.iParticipated,
-            driveCreatedAt: c.driveCreatedAt,
-            driveModifiedAt: c.driveModifiedAt,
-            replyCount: c.replyCount,
-          },
-        });
-        continue;
-      }
-      let status: string;
-      if (c.resolved && c.iResolvedIt) {
-        status = "ARCHIVED";
-      } else {
-        status = "ACTIVE";
-      }
-      await prisma.comment.update({
-        where: { id: existing.id },
-        data: {
-          resolved: c.resolved,
-          iParticipated: c.iParticipated,
-          status,
-          driveCreatedAt: c.driveCreatedAt,
-          driveModifiedAt: c.driveModifiedAt,
-          replyCount: c.replyCount,
-        },
-      });
-      processed++;
-    }
-  }
-
-  // Only update commentsLastSyncedAt if we actually queried Drive (even if 0 results)
-  await prisma.doc.update({
-    where: { id: doc.id },
-    data: { commentsLastSyncedAt: new Date() },
-  });
-
-  if (!isFirstSync) {
-    // On incremental syncs, comments not returned haven't changed — no action needed
-  }
-
-  return processed;
-}
+import { listRecentDocs, findDeletedDocIds, getDriveClient } from "@/lib/google-drive";
+import { syncComments } from "@/lib/sync-comments";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -228,7 +131,7 @@ export async function POST() {
     where: { userId, isDeleted: false },
   });
   const commentCounts = await Promise.all(
-    activeDocs.map((doc) => syncComments(userId, doc, driveAuth))
+    activeDocs.map((doc) => syncComments(doc, driveAuth))
   );
   const comments = commentCounts.reduce((sum, n) => sum + n, 0);
 
