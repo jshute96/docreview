@@ -117,38 +117,38 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
     );
   }
 
+  useEffect(() => {
+    document.title = `Docreview: ${doc.title}`;
+  }, [doc.title]);
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Header row */}
-      <div className="flex items-center justify-between">
-        <Link
-          href="/docs"
-          className="text-sm text-zinc-500 hover:text-zinc-800 transition-colors"
-        >
-          ← Doc list
-        </Link>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={refreshing}
-        >
-          <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
-      </div>
-
-      {/* Title */}
-      <div className="flex items-center gap-2">
-        <DocTypeIcon mimeType={doc.mimeType} className="h-5 w-5 flex-shrink-0" />
-        <a
-          href={doc.driveUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xl font-semibold text-zinc-900 hover:underline hover:text-blue-600"
-        >
-          {doc.title}
-        </a>
+      {/* Header row: title left, buttons right */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-baseline text-xl font-semibold pt-1">
+          <span className="flex-shrink-0 text-zinc-500 mr-2">Docreview:</span>
+          <DocTypeIcon mimeType={doc.mimeType} className="h-5 w-5 flex-shrink-0 translate-y-[3px] mr-1" />
+          <a
+            href={doc.driveUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-zinc-900 hover:underline hover:text-blue-600"
+          >{doc.title}</a>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/docs">Doc list</Link>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Metadata */}
@@ -189,7 +189,7 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
             : "No comments match the current filters."}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-200">
+        <div className="rounded-lg border border-zinc-200">
           <table className="w-full">
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50">

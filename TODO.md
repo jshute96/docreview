@@ -4,9 +4,8 @@
   * There's no timestamp-based detection of new ones or updates, so there might
     be excessive polling
 
-* show comment threads
-* reply to comments
-* resolve comments
+* Make refresh on a doc faster, and probably cheaper, by doing fewer API calls.
+
 * hosting
   * postgres
   * cloud run

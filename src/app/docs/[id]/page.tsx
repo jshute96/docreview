@@ -27,7 +27,7 @@ export default async function DocDetailPage({
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="px-4 py-8">
         <DocDetail doc={doc as DocWithComments} />
       </div>
     </div>

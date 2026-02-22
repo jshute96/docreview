@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useRef, useEffect, useCallback } from "react";
 import { RefreshCw } from "lucide-react";
 import type { CommentThread } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
@@ -29,10 +32,52 @@ export function CommentThreadPanel({
   onRefresh,
   refreshing,
 }: CommentThreadPanelProps) {
+  const [replyText, setReplyText] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const measureRef = useRef<HTMLSpanElement>(null);
+  const replyContainerRef = useRef<HTMLDivElement>(null);
+
+  const resizeTextarea = useCallback(() => {
+    const textarea = textareaRef.current;
+    const measure = measureRef.current;
+    const container = replyContainerRef.current;
+    if (!textarea || !measure || !container) return;
+
+    // Measure single-line text width via hidden span
+    measure.textContent = replyText || "";
+    const textWidth = measure.getBoundingClientRect().width;
+    const containerWidth = container.clientWidth;
+    const minWidth = containerWidth * 0.25;
+    const padding = 26; // horizontal padding + border
+    const targetWidth = Math.max(minWidth, Math.min(textWidth + padding, containerWidth));
+    textarea.style.width = targetWidth + "px";
+
+    // Auto-grow height for wrapped text
+    textarea.style.height = "auto";
+    textarea.style.height = textarea.scrollHeight + "px";
+  }, [replyText]);
+
+  useEffect(() => {
+    resizeTextarea();
+  }, [resizeTextarea]);
+
+  // Recalculate on container resize (window resize, layout changes)
+  useEffect(() => {
+    const container = replyContainerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(() => resizeTextarea());
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [resizeTextarea]);
+
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setReplyText(e.target.value);
+  }
+
   const hasButtons = commentUrl || onRefresh;
 
   const buttons = hasButtons ? (
-    <div className="flex justify-end gap-1 mb-2">
+    <div className="float-right flex gap-1 ml-2 mb-1">
       {commentUrl && (
         <Button variant="outline" size="sm" className="h-6 px-2 text-xs" asChild>
           <a href={commentUrl} target="_blank" rel="noopener noreferrer">
@@ -55,6 +100,44 @@ export function CommentThreadPanel({
     </div>
   ) : null;
 
+  const replyBox = (
+    <div ref={replyContainerRef} className="mt-3 pt-3 border-t border-zinc-200">
+      {/* Hidden span mirrors textarea font to measure single-line text width */}
+      <span
+        ref={measureRef}
+        className="fixed whitespace-pre text-sm"
+        style={{ display: "inline-block", visibility: "hidden", left: "-9999px", top: "-9999px" }}
+        aria-hidden="true"
+      />
+      <textarea
+        ref={textareaRef}
+        value={replyText}
+        onChange={handleChange}
+        placeholder="Reply..."
+        rows={1}
+        className="block resize-none rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+        style={{ width: "25%", overflow: "hidden" }}
+      />
+      <div className="mt-2 flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 px-3 text-xs"
+          disabled={replyText.trim().length === 0}
+        >
+          Reply
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 px-3 text-xs"
+        >
+          Resolve
+        </Button>
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
@@ -69,12 +152,13 @@ export function CommentThreadPanel({
       <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
         {buttons}
         <p className="text-sm text-zinc-400">No comments on this document.</p>
+        {replyBox}
       </div>
     );
   }
 
   return (
-    <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4 max-h-96 overflow-y-auto">
+    <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
       {buttons}
       <div className="divide-y divide-zinc-200">
         {threads.map((thread) => (
@@ -117,6 +201,7 @@ export function CommentThreadPanel({
           </div>
         ))}
       </div>
+      {replyBox}
     </div>
   );
 }
