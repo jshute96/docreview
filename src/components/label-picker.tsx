@@ -1,6 +1,7 @@
 "use client";
 
 import type { Label } from "@prisma/client";
+import { contrastText } from "@/lib/utils";
 
 interface LabelPickerProps {
   allLabels: Label[];
@@ -23,6 +24,7 @@ export function LabelPicker({
       <div className="flex flex-wrap gap-1.5">
         {allLabels.map((label) => {
           const active = selectedLabelIds.includes(label.id);
+          const bg = label.color ?? "#e4e4e7";
           return (
             <button
               key={label.id}
@@ -30,7 +32,7 @@ export function LabelPicker({
               className={`rounded-full px-2 py-0.5 text-xs font-medium transition-opacity ${
                 active ? "opacity-100 ring-2 ring-offset-1 ring-zinc-400" : "opacity-40 hover:opacity-70"
               }`}
-              style={{ backgroundColor: label.color ?? "#e4e4e7" }}
+              style={{ backgroundColor: bg, color: contrastText(bg) }}
             >
               {label.name}
             </button>

@@ -21,7 +21,22 @@ interface DocTableProps {
 
 export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
   const [docs, setDocs] = useState<DocWithLabels[]>(initialDocs);
-  const [labels, setLabels] = useState<Label[]>(initialLabels);
+  const [labels, setLabelsRaw] = useState<Label[]>(initialLabels);
+
+  // When labels change (e.g. color update), propagate into docs state too
+  function setLabels(newLabels: Label[]) {
+    setLabelsRaw(newLabels);
+    const labelMap = new Map(newLabels.map((l) => [l.id, l]));
+    setDocs((prev) =>
+      prev.map((doc) => ({
+        ...doc,
+        labels: doc.labels.map((dl) => ({
+          ...dl,
+          label: labelMap.get(dl.labelId) ?? dl.label,
+        })),
+      }))
+    );
+  }
   const [showArchived, setShowArchived] = useState(false);
   const [hasCommentsFilter, setHasCommentsFilter] = useState(false);
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
@@ -55,7 +70,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
   }
 
   function handleLabelDelete(id: string) {
-    setLabels((prev) => prev.filter((l) => l.id !== id));
+    setLabels(labels.filter((l) => l.id !== id));
     setDocs((prev) =>
       prev.map((d) => ({
         ...d,

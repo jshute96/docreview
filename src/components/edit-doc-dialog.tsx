@@ -12,8 +12,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ROLE_COLORS } from "@/lib/role-colors";
-import { Button } from "@/components/ui/button";
 import { LabelPicker } from "@/components/label-picker";
+import { DialogButtons } from "@/components/dialog-buttons";
 
 interface EditDocDialogProps {
   doc: DocWithLabels;
@@ -98,14 +98,12 @@ export function EditDocDialog({
           <LabelPicker allLabels={allLabels} selectedLabelIds={selectedLabelIds} onToggle={toggleLabel} />
         </div>
 
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : "Save"}
-          </Button>
-        </div>
+        <DialogButtons
+          onConfirm={handleSave}
+          onCancel={() => setOpen(false)}
+          confirmLabel={saving ? "Saving…" : "Save"}
+          disabled={saving}
+        />
       </DialogContent>
     </Dialog>
   );

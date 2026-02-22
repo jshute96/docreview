@@ -1,27 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
 import type { Label } from "@prisma/client";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ColorPicker, PRIMARY_COLORS } from "@/components/color-picker";
+import { DialogButtons } from "@/components/dialog-buttons";
 
-const PRESET_COLORS = [
-  "#ef4444", // red
-  "#f97316", // orange
-  "#eab308", // yellow
-  "#22c55e", // green
-  "#3b82f6", // blue
-  "#8b5cf6", // violet
-  "#ec4899", // pink
-  "#6b7280", // gray
-];
+function randomPrimaryColor(): string {
+  return PRIMARY_COLORS[Math.floor(Math.random() * PRIMARY_COLORS.length)];
+}
 
 interface ManageLabelsDialogProps {
   labels: Label[];
@@ -36,103 +32,174 @@ export function ManageLabelsDialog({
 }: ManageLabelsDialogProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [color, setColor] = useState(PRESET_COLORS[0]);
   const [saving, setSaving] = useState(false);
 
-  async function handleCreate(e: React.FormEvent) {
+  // Buffered local state — only committed on Save
+  const [draft, setDraft] = useState<Label[]>([]);
+  const nextTempId = useRef(0);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [colorChanges, setColorChanges] = useState<Map<string, string>>(new Map());
+
+  function handleOpen(isOpen: boolean) {
+    if (isOpen) {
+      // Reset draft to current labels
+      setDraft([...labels]);
+      setAddedIds(new Set());
+      setDeletedIds(new Set());
+      setColorChanges(new Map());
+      setName("");
+    }
+    setOpen(isOpen);
+  }
+
+  function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+    const tempId = `__temp_${nextTempId.current++}`;
+    const newLabel: Label = {
+      id: tempId,
+      userId: "",
+      name: name.trim(),
+      color: randomPrimaryColor(),
+    };
+    setDraft((prev) => [...prev, newLabel]);
+    setAddedIds((prev) => new Set(prev).add(tempId));
+    setName("");
+  }
+
+  function handleColorChange(label: Label, color: string) {
+    setDraft((prev) =>
+      prev.map((l) => (l.id === label.id ? { ...l, color } : l))
+    );
+    if (!addedIds.has(label.id)) {
+      setColorChanges((prev) => new Map(prev).set(label.id, color));
+    }
+  }
+
+  function handleDelete(id: string) {
+    setDraft((prev) => prev.filter((l) => l.id !== id));
+    if (addedIds.has(id)) {
+      // Was never persisted — just remove from added set
+      setAddedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    } else {
+      setDeletedIds((prev) => new Set(prev).add(id));
+      // No need to patch color for a deleted label
+      setColorChanges((prev) => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
+
+  function handleCancel() {
+    setOpen(false);
+  }
+
+  async function handleSave() {
     setSaving(true);
     try {
-      const res = await fetch("/api/labels", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), color }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Failed");
+      // 1. Delete labels
+      for (const id of deletedIds) {
+        const res = await fetch(`/api/labels/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Failed to delete label");
+        onLabelDelete(id);
       }
-      const label: Label = await res.json();
-      onLabelsChange([...labels, label]);
-      setName("");
-      toast.success(`Label "${label.name}" created`);
+
+      // 2. Create new labels
+      const tempToReal = new Map<string, Label>();
+      for (const tempId of addedIds) {
+        const tempLabel = draft.find((l) => l.id === tempId);
+        if (!tempLabel) continue;
+        const res = await fetch("/api/labels", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: tempLabel.name, color: tempLabel.color }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error ?? "Failed to create label");
+        }
+        const created: Label = await res.json();
+        tempToReal.set(tempId, created);
+      }
+
+      // 3. Update colors
+      for (const [id, color] of colorChanges) {
+        const res = await fetch(`/api/labels/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ color }),
+        });
+        if (!res.ok) throw new Error("Failed to update label color");
+      }
+
+      // Build final labels list: start from draft, replace temp IDs with real ones
+      const finalLabels = draft.map((l) => tempToReal.get(l.id) ?? l);
+      onLabelsChange(finalLabels);
+      setOpen(false);
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to create label");
+      toast.error(err instanceof Error ? err.message : "Failed to save labels");
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleDelete(id: string) {
-    try {
-      const res = await fetch(`/api/labels/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete");
-      onLabelDelete(id);
-      toast.success("Label deleted");
-    } catch {
-      toast.error("Failed to delete label");
-    }
-  }
-
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           Manage Labels
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" hideClose>
         <DialogHeader>
           <DialogTitle>Manage Labels</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleCreate} className="flex flex-col gap-3 mt-2">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Label name…"
-              className="flex-1 rounded-md border border-zinc-200 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-zinc-300"
-            />
-            <Button type="submit" size="sm" disabled={saving || !name.trim()}>
-              Add
-            </Button>
-          </div>
-          <div className="flex gap-1.5">
-            {PRESET_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                className={`h-6 w-6 rounded-full transition-transform ${
-                  color === c ? "scale-125 ring-2 ring-offset-1 ring-zinc-400" : ""
-                }`}
-                style={{ backgroundColor: c }}
-                aria-label={`Color ${c}`}
-              />
-            ))}
-          </div>
+        <form onSubmit={handleAdd} className="flex gap-2 mt-2">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Label name…"
+            className="flex-1 rounded-md border border-zinc-200 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-zinc-300"
+          />
+          <Button type="submit" variant="outline" size="sm" disabled={!name.trim()}>
+            Add
+          </Button>
         </form>
 
         <div className="mt-4 flex flex-col gap-1">
-          {labels.length === 0 && (
+          {draft.length === 0 && (
             <p className="text-sm text-zinc-400">No labels yet.</p>
           )}
-          {labels.map((label) => (
+          {draft.map((label) => (
             <div
               key={label.id}
               className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-zinc-50"
             >
               <div className="flex items-center gap-2">
-                <span
-                  className="h-3 w-3 rounded-full"
-                  style={{ backgroundColor: label.color ?? "#e4e4e7" }}
-                />
+                <ColorPicker
+                  color={label.color ?? "#e4e4e7"}
+                  onChange={(c) => handleColorChange(label, c)}
+                >
+                  <button
+                    type="button"
+                    className="h-4 w-4 rounded-full cursor-pointer ring-1 ring-zinc-200 hover:ring-zinc-400"
+                    style={{ backgroundColor: label.color ?? "#e4e4e7" }}
+                    aria-label={`Change color for ${label.name}`}
+                  />
+                </ColorPicker>
                 <span className="text-sm text-zinc-800">{label.name}</span>
               </div>
               <button
+                type="button"
                 onClick={() => handleDelete(label.id)}
                 className="text-xs text-zinc-400 hover:text-red-500"
               >
@@ -141,6 +208,13 @@ export function ManageLabelsDialog({
             </div>
           ))}
         </div>
+
+        <DialogButtons
+          onConfirm={handleSave}
+          onCancel={handleCancel}
+          confirmLabel={saving ? "Saving…" : "Save"}
+          disabled={saving}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { DialogButtons } from "@/components/dialog-buttons";
 import { LabelPicker } from "@/components/label-picker";
 
 interface AddDocDialogProps {
@@ -194,18 +195,12 @@ export function AddDocDialog({ allLabels, onDocAdded }: AddDocDialogProps) {
           />
         </div>
 
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleAdd}
-            disabled={validationState !== "valid" || adding}
-          >
-            {adding ? "Adding…" : "Add"}
-          </Button>
-        </div>
+        <DialogButtons
+          onConfirm={handleAdd}
+          onCancel={() => setOpen(false)}
+          confirmLabel={adding ? "Adding…" : "Add"}
+          disabled={validationState !== "valid" || adding}
+        />
       </DialogContent>
     </Dialog>
   );
