@@ -20,22 +20,53 @@ function formatTime(iso: string): string {
 interface CommentThreadPanelProps {
   threads: CommentThread[];
   loading: boolean;
+  resolved?: boolean;
   commentUrl?: string;
   onRefresh?: () => void;
   refreshing?: boolean;
+  onReply?: (content: string) => Promise<void>;
+  onResolve?: (content: string) => Promise<void>;
+  onReopen?: (content: string) => Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 export function CommentThreadPanel({
   threads,
   loading,
+  resolved,
   commentUrl,
   onRefresh,
   refreshing,
+  onReply,
+  onResolve,
+  onReopen,
+  onDirtyChange,
 }: CommentThreadPanelProps) {
   const [replyText, setReplyText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const prevDirtyRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const replyContainerRef = useRef<HTMLDivElement>(null);
+
+  // Notify parent when dirty state changes
+  const isDirty = replyText.trim().length > 0;
+  useEffect(() => {
+    if (isDirty !== prevDirtyRef.current) {
+      prevDirtyRef.current = isDirty;
+      onDirtyChange?.(isDirty);
+    }
+  }, [isDirty, onDirtyChange]);
+
+  // Warn before closing/navigating away with unsaved reply
+  useEffect(() => {
+    if (!isDirty) return;
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
 
   const resizeTextarea = useCallback(() => {
     const textarea = textareaRef.current;
@@ -74,13 +105,52 @@ export function CommentThreadPanel({
     setReplyText(e.target.value);
   }
 
+  async function handleReply() {
+    if (!onReply || replyText.trim().length === 0) return;
+    setSubmitting(true);
+    try {
+      await onReply(replyText.trim());
+      setReplyText("");
+    } catch {
+      // Keep text on failure
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleResolve() {
+    if (!onResolve) return;
+    setSubmitting(true);
+    try {
+      await onResolve(replyText.trim());
+      setReplyText("");
+    } catch {
+      // Keep text on failure
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleReopen() {
+    if (!onReopen) return;
+    setSubmitting(true);
+    try {
+      await onReopen(replyText.trim());
+      setReplyText("");
+    } catch {
+      // Keep text on failure
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   const hasButtons = commentUrl || onRefresh;
 
   const buttons = hasButtons ? (
-    <div className="float-right flex gap-1 ml-2 mb-1">
+    <div className="float-right relative z-10 flex gap-1 ml-2 mb-1">
       {commentUrl && (
         <Button variant="outline" size="sm" className="h-6 px-2 text-xs" asChild>
-          <a href={commentUrl} target="_blank" rel="noopener noreferrer">
+          <a href={commentUrl} target="docreview-doc">
             Open
           </a>
         </Button>
@@ -119,21 +189,38 @@ export function CommentThreadPanel({
         style={{ width: "25%", overflow: "hidden" }}
       />
       <div className="mt-2 flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 px-3 text-xs"
-          disabled={replyText.trim().length === 0}
-        >
-          Reply
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 px-3 text-xs"
-        >
-          Resolve
-        </Button>
+        {resolved ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-3 text-xs"
+            disabled={replyText.trim().length === 0 || submitting}
+            onClick={handleReopen}
+          >
+            Reopen
+          </Button>
+        ) : (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-3 text-xs"
+              disabled={replyText.trim().length === 0 || submitting}
+              onClick={handleReply}
+            >
+              Reply
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-3 text-xs"
+              disabled={submitting}
+              onClick={handleResolve}
+            >
+              Resolve
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -192,10 +279,22 @@ export function CommentThreadPanel({
                   <span className="text-xs text-zinc-400">
                     {formatTime(reply.createdTime)}
                   </span>
+                  {reply.action === "resolve" && (
+                    <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-600">
+                      Resolved
+                    </span>
+                  )}
+                  {reply.action === "reopen" && (
+                    <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
+                      Reopened
+                    </span>
+                  )}
                 </div>
-                <p className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap">
-                  {reply.content}
-                </p>
+                {reply.content && (
+                  <p className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap">
+                    {reply.content}
+                  </p>
+                )}
               </div>
             ))}
           </div>

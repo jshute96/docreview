@@ -44,17 +44,10 @@ export function DocRow({ doc, allLabels, onUpdate }: DocRowProps) {
 
   return (
     <tr className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
-      <td className="py-1.5 pl-4 pr-2">
-        <Button variant="outline" size="sm" className="h-6 px-2 text-xs" asChild>
-          <a href={`/docs/${doc.id}`}>Review</a>
-        </Button>
-      </td>
-      <td className="py-1.5 pr-4">
+      <td className="py-1.5 pl-4 pr-4">
         <div className="flex flex-wrap items-center gap-2">
           <a
-            href={doc.driveUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={`/docs/${doc.id}`}
             className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline hover:text-blue-600 ${
               doc.isDeleted ? "line-through text-zinc-400" : "text-zinc-900"
             }`}
@@ -78,6 +71,9 @@ export function DocRow({ doc, allLabels, onUpdate }: DocRowProps) {
       <td className="py-1.5 pr-4 text-sm text-zinc-500">{lastModified}</td>
       <td className="py-1.5">
         <div className="flex items-center gap-1">
+          <Button variant="outline" size="sm" className="h-6 px-2 text-xs" asChild>
+            <a href={doc.driveUrl} target="_blank" rel="noopener noreferrer">Open</a>
+          </Button>
           <EditDocDialog doc={doc} allLabels={allLabels} onSave={onUpdate}>
             <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
               Edit

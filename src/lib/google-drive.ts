@@ -322,6 +322,7 @@ export interface ThreadReply {
   author: string;
   content: string;
   createdTime: string;
+  action?: "resolve" | "reopen";
 }
 
 // A comment thread on a document: the initial comment plus all replies.
@@ -372,13 +373,12 @@ export async function fetchThreadDetail(
   const allReplies = c.replies ?? [];
   const flags = deriveCommentFlags(c.author, allReplies);
 
-  const threadReplies: ThreadReply[] = allReplies
-    .filter((r) => !r.action)
-    .map((r) => ({
-      author: r.author?.displayName ?? "Unknown",
-      content: r.content ?? "",
-      createdTime: r.createdTime ?? "",
-    }));
+  const threadReplies: ThreadReply[] = allReplies.map((r) => ({
+    author: r.author?.displayName ?? "Unknown",
+    content: r.content ?? "",
+    createdTime: r.createdTime ?? "",
+    ...(r.action === "resolve" || r.action === "reopen" ? { action: r.action } : {}),
+  }));
 
   return {
     resolved: c.resolved === true,
@@ -420,13 +420,12 @@ export async function fetchAllThreads(
     for (const c of res.data.comments ?? []) {
       if (!c.id || c.content == null) continue;
 
-      const replies: ThreadReply[] = (c.replies ?? [])
-        .filter((r) => !r.action) // filter out resolve/reopen action replies
-        .map((r) => ({
-          author: r.author?.displayName ?? "Unknown",
-          content: r.content ?? "",
-          createdTime: r.createdTime ?? "",
-        }));
+      const replies: ThreadReply[] = (c.replies ?? []).map((r) => ({
+        author: r.author?.displayName ?? "Unknown",
+        content: r.content ?? "",
+        createdTime: r.createdTime ?? "",
+        ...(r.action === "resolve" || r.action === "reopen" ? { action: r.action } : {}),
+      }));
 
       threads.push({
         id: c.id,
@@ -445,6 +444,26 @@ export async function fetchAllThreads(
     `[Drive] comments.list ${googleDocId} (threads) → ${threads.length} threads`
   );
   return threads;
+}
+
+// Creates a reply on a Drive comment thread. Replying to a resolved thread
+// reopens it automatically. Pass resolve=true to resolve instead of reply.
+export async function replyToComment(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  googleDocId: string,
+  commentId: string,
+  content: string,
+  resolve?: boolean
+): Promise<void> {
+  const drive = google.drive({ version: "v3", auth });
+  const tag = resolve ? " (resolve)" : "";
+  console.log(`[Drive] replies.create${tag} ${googleDocId} comment=${commentId}`);
+  await drive.replies.create({
+    fileId: googleDocId,
+    commentId,
+    fields: "id",
+    requestBody: resolve ? { action: "resolve" } : { content },
+  });
 }
 
 export async function listRecentDocs(userId: string): Promise<DriveDoc[]> {

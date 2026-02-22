@@ -31,6 +31,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   const [threads, setThreads] = useState<CommentThread[]>([]);
   const [loadingThreads, setLoadingThreads] = useState(false);
   const [refreshingThread, setRefreshingThread] = useState(false);
+  const [hasDirtyReply, setHasDirtyReply] = useState(false);
   // Epoch ms of driveModifiedAt at the time threads were last fetched
   const fetchedModifiedMs = useRef<number | null>(null);
 
@@ -148,8 +149,76 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       }
       setExpanded(true);
     } else {
+      if (hasDirtyReply) {
+        toast.error("Clear or send the reply before closing");
+        return;
+      }
       setExpanded(false);
     }
+  }
+
+  async function handleReply(content: string) {
+    const res = await fetch(`/api/docs/${docId}/threads/reply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commentId: comment.googleCommentId, content }),
+    });
+    if (!res.ok) {
+      toast.error("Failed to post reply");
+      throw new Error("Failed");
+    }
+    const data = await res.json();
+    setThreads(data.threads);
+    onUpdate(data.comment);
+    fetchedModifiedMs.current = data.comment.driveModifiedAt
+      ? new Date(data.comment.driveModifiedAt).getTime()
+      : 0;
+    toast.success("Reply posted");
+  }
+
+  async function handleResolve(content: string) {
+    const res = await fetch(`/api/docs/${docId}/threads/reply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        commentId: comment.googleCommentId,
+        content: content || undefined,
+        resolve: true,
+      }),
+    });
+    if (!res.ok) {
+      toast.error("Failed to resolve comment");
+      throw new Error("Failed");
+    }
+    const data = await res.json();
+    setThreads(data.threads);
+    onUpdate(data.comment);
+    fetchedModifiedMs.current = data.comment.driveModifiedAt
+      ? new Date(data.comment.driveModifiedAt).getTime()
+      : 0;
+    toast.success(content ? "Replied and resolved" : "Comment resolved");
+  }
+
+  async function handleReopen(content: string) {
+    const res = await fetch(`/api/docs/${docId}/threads/reply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        commentId: comment.googleCommentId,
+        content: content || "",
+      }),
+    });
+    if (!res.ok) {
+      toast.error("Failed to reopen comment");
+      throw new Error("Failed");
+    }
+    const data = await res.json();
+    setThreads(data.threads);
+    onUpdate(data.comment);
+    fetchedModifiedMs.current = data.comment.driveModifiedAt
+      ? new Date(data.comment.driveModifiedAt).getTime()
+      : 0;
+    toast.success(content ? "Replied and reopened" : "Comment reopened");
   }
 
   async function updateStatus(status: "ACTIVE" | "ARCHIVED" | "MUTED") {
@@ -244,7 +313,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             className="h-6 px-2 text-xs"
             asChild
           >
-            <a href={commentUrl()} target="_blank" rel="noopener noreferrer">
+            <a href={commentUrl()} target="docreview-doc">
               Open
             </a>
           </Button>
@@ -307,7 +376,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
               <div className="flex justify-end gap-1 mb-2">
                 <Button variant="outline" size="sm" className="h-6 px-2 text-xs" asChild>
-                  <a href={commentUrl()} target="_blank" rel="noopener noreferrer">
+                  <a href={commentUrl()} target="docreview-doc">
                     Open
                   </a>
                 </Button>
@@ -344,9 +413,14 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             <CommentThreadPanel
               threads={threads}
               loading={loadingThreads}
+              resolved={comment.resolved}
               commentUrl={commentUrl()}
               onRefresh={refreshThread}
               refreshing={refreshingThread}
+              onReply={handleReply}
+              onResolve={handleResolve}
+              onReopen={handleReopen}
+              onDirtyChange={setHasDirtyReply}
             />
           )}
         </td>

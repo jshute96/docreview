@@ -9,12 +9,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Google({
       clientId: process.env.AUTH_GOOGLE_ID!,
       clientSecret: process.env.AUTH_GOOGLE_SECRET!,
+      // Safe with a single provider — only guards against cross-provider email collisions
+      allowDangerousEmailAccountLinking: true,
       authorization: {
         params: {
           access_type: "offline",
           prompt: "consent",
           scope:
-            "openid email profile https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/documents.readonly",
+            "openid email profile https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/documents.readonly",
         },
       },
     }),

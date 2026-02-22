@@ -126,7 +126,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
           <ManageLabelsDialog labels={labels} onLabelsChange={setLabels} onLabelDelete={handleLabelDelete} />
           <RefreshButton onRefresh={(newDocs) => setDocs(newDocs)} />
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={() => signOut({ callbackUrl: "/login" })}
           >
@@ -162,7 +162,6 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
           <table className="w-full">
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50">
-                <th className="w-px px-4 py-2.5" />
                 <ThButton col="title">Title</ThButton>
                 <ThButton col="comments">Comments</ThButton>
                 <ThButton col="lastModifiedInDrive">Last Modified</ThButton>

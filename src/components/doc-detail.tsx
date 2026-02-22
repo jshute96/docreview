@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import type { Comment } from "@prisma/client";
@@ -41,8 +40,8 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
   const [suggestionsOnly, setSuggestionsOnly] = useState(false);
   type SortCol = "driveCreatedAt" | "driveModifiedAt" | "replyCount" | "isMine" | "iParticipated" | "resolved";
   type SortDir = "asc" | "desc";
-  const [sortCol, setSortCol] = useState<SortCol>("driveCreatedAt");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [sortCol, setSortCol] = useState<SortCol>("driveModifiedAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   function handleSort(col: SortCol) {
     if (sortCol === col) {
@@ -130,14 +129,13 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
           <DocTypeIcon mimeType={doc.mimeType} className="h-5 w-5 flex-shrink-0 translate-y-[3px] mr-1" />
           <a
             href={doc.driveUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+            target="docreview-doc"
             className="text-zinc-900 hover:underline hover:text-blue-600"
           >{doc.title}</a>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/docs">Doc list</Link>
+            <a href="/docs">Doc list</a>
           </Button>
           <Button
             variant="outline"
