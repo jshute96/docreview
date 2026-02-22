@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { suppressingErrors } from "@/test-utils";
 
 vi.mock("@/auth", () => ({
   auth: vi.fn(),
@@ -100,10 +101,12 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
     mockListRecentDocs.mockRejectedValue(new Error("Drive unavailable"));
 
-    const res = await POST();
-    expect(res.status).toBe(502);
-    const data = await res.json();
-    expect(data.error).toMatch(/google drive/i);
+    await suppressingErrors(async () => {
+      const res = await POST();
+      expect(res.status).toBe(502);
+      const data = await res.json();
+      expect(data.error).toMatch(/google drive/i);
+    });
   });
 
   it("syncs docs and returns counts", async () => {

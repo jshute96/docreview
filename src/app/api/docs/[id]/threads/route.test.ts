@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { suppressingErrors } from "@/test-utils";
 
 vi.mock("@/auth", () => ({
   auth: vi.fn(),
@@ -158,9 +159,11 @@ describe("GET /api/docs/[id]/threads", () => {
     mockDoc.findUnique.mockResolvedValue(docRecord);
     mockGetDriveClient.mockRejectedValue(new Error("Drive error"));
 
-    const req = new NextRequest("http://localhost/api/docs/d1/threads");
-    const res = await GET(req, makeParams("d1"));
-    expect(res.status).toBe(502);
+    await suppressingErrors(async () => {
+      const req = new NextRequest("http://localhost/api/docs/d1/threads");
+      const res = await GET(req, makeParams("d1"));
+      expect(res.status).toBe(502);
+    });
   });
 });
 
@@ -412,11 +415,13 @@ describe("POST /api/docs/[id]/threads", () => {
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockRejectedValue(new Error("Drive error"));
 
-    const req = new NextRequest(
-      "http://localhost/api/docs/d1/threads?commentId=c1",
-      { method: "POST" }
-    );
-    const res = await POST(req, makeParams("d1"));
-    expect(res.status).toBe(502);
+    await suppressingErrors(async () => {
+      const req = new NextRequest(
+        "http://localhost/api/docs/d1/threads?commentId=c1",
+        { method: "POST" }
+      );
+      const res = await POST(req, makeParams("d1"));
+      expect(res.status).toBe(502);
+    });
   });
 });
