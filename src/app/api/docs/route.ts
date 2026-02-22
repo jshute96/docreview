@@ -45,6 +45,9 @@ async function syncComments(
           isMine: c.isMine,
           iParticipated: c.iParticipated,
           status,
+          driveCreatedAt: c.driveCreatedAt,
+          driveModifiedAt: c.driveModifiedAt,
+          replyCount: c.replyCount,
         },
       });
       processed++;
@@ -54,7 +57,13 @@ async function syncComments(
         // MUTED is sticky; only update Drive fields
         await prisma.comment.update({
           where: { id: existing.id },
-          data: { resolved: c.resolved, iParticipated: c.iParticipated },
+          data: {
+            resolved: c.resolved,
+            iParticipated: c.iParticipated,
+            driveCreatedAt: c.driveCreatedAt,
+            driveModifiedAt: c.driveModifiedAt,
+            replyCount: c.replyCount,
+          },
         });
         continue;
       }
@@ -70,6 +79,9 @@ async function syncComments(
           resolved: c.resolved,
           iParticipated: c.iParticipated,
           status,
+          driveCreatedAt: c.driveCreatedAt,
+          driveModifiedAt: c.driveModifiedAt,
+          replyCount: c.replyCount,
         },
       });
       processed++;
@@ -155,6 +167,7 @@ export async function POST() {
         existing.driveUrl !== doc.driveUrl ||
         existing.mimeType !== doc.mimeType ||
         existing.lastModifiedInDrive?.getTime() !== doc.lastModifiedInDrive?.getTime() ||
+        existing.owner !== doc.owner ||
         existing.isDeleted;
       if (changed) {
         await prisma.doc.update({
@@ -164,6 +177,8 @@ export async function POST() {
             driveUrl: doc.driveUrl,
             mimeType: doc.mimeType,
             lastModifiedInDrive: doc.lastModifiedInDrive,
+            owner: doc.owner,
+            createdTimeInDrive: doc.createdTimeInDrive,
             isDeleted: false,
           },
         });
@@ -179,6 +194,8 @@ export async function POST() {
           mimeType: doc.mimeType,
           role: doc.role,
           lastModifiedInDrive: doc.lastModifiedInDrive,
+          owner: doc.owner,
+          createdTimeInDrive: doc.createdTimeInDrive,
         },
       });
       added++;

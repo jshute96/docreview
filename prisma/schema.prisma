@@ -80,6 +80,8 @@ model Doc {
   status               String     @default("ACTIVE")    // ACTIVE | ARCHIVED
   isDeleted            Boolean    @default(false)
   lastModifiedInDrive  DateTime?
+  owner                String?
+  createdTimeInDrive   DateTime?
   addedAt              DateTime   @default(now())
   commentsLastSyncedAt DateTime?
   user                 User       @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -93,12 +95,15 @@ model Comment {
   id              String   @id @default(cuid())
   docId           String
   googleCommentId String
-  resolved        Boolean  @default(false)
-  isMine          Boolean  @default(false)
-  iParticipated   Boolean  @default(false)
-  status          String   @default("ACTIVE") // ACTIVE | ARCHIVED | MUTED
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  resolved        Boolean   @default(false)
+  isMine          Boolean   @default(false)
+  iParticipated   Boolean   @default(false)
+  status          String    @default("ACTIVE") // ACTIVE | ARCHIVED | MUTED
+  driveCreatedAt  DateTime?
+  driveModifiedAt DateTime?
+  replyCount      Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   doc             Doc      @relation(fields: [docId], references: [id], onDelete: Cascade)
 
   @@unique([docId, googleCommentId])

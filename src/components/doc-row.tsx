@@ -45,12 +45,17 @@ export function DocRow({ doc, allLabels, onUpdate, onArchive }: DocRowProps) {
     ? (() => {
         const d = new Date(doc.lastModifiedInDrive!);
         const pad = (n: number) => String(n).padStart(2, "0");
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
       })()
     : "—";
 
   return (
     <tr className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
+      <td className="py-1.5 pl-4 pr-2">
+        <Button variant="outline" size="sm" className="h-6 px-2 text-xs" asChild>
+          <a href={`/docs/${doc.id}`}>Review</a>
+        </Button>
+      </td>
       <td className="py-1.5 pr-4">
         <div className="flex flex-wrap items-center gap-2">
           <a

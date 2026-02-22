@@ -45,6 +45,8 @@ export interface DriveDoc {
   mimeType: string;
   role: "AUTHOR" | "REVIEWER";
   lastModifiedInDrive: Date | null;
+  createdTimeInDrive: Date | null;
+  owner: string | null;
 }
 
 // Returns the subset of googleDocIds that are deleted (trashed, permanently deleted, or access revoked).
@@ -82,6 +84,9 @@ export interface DriveComment {
   isMine: boolean;
   iParticipated: boolean;
   iResolvedIt: boolean;
+  driveCreatedAt: Date | null;
+  driveModifiedAt: Date | null;
+  replyCount: number;
 }
 
 export async function fetchComments(
@@ -102,7 +107,7 @@ export async function fetchComments(
     const res = await drive.comments.list({
       fileId: googleDocId,
       fields:
-        "nextPageToken, comments(id, resolved, author(me), replies(action, author(me)))",
+        "nextPageToken, comments(id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me)))",
       ...(sinceStr ? { startModifiedTime: sinceStr } : {}),
       ...(pageToken ? { pageToken } : {}),
     });
@@ -126,6 +131,9 @@ export async function fetchComments(
         isMine,
         iParticipated,
         iResolvedIt,
+        driveCreatedAt: c.createdTime ? new Date(c.createdTime) : null,
+        driveModifiedAt: c.modifiedTime ? new Date(c.modifiedTime) : null,
+        replyCount: replies.length,
       });
     }
 
@@ -154,7 +162,7 @@ export async function listRecentDocs(userId: string): Promise<DriveDoc[]> {
     const res = await drive.files.list({
       q: `(mimeType='application/vnd.google-apps.document' or mimeType='application/vnd.google-apps.spreadsheet' or mimeType='application/vnd.google-apps.presentation') and modifiedTime > '${modifiedAfter}' and trashed = false`,
       fields:
-        "nextPageToken, files(id, name, mimeType, webViewLink, modifiedTime, owners)",
+        "nextPageToken, files(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName))",
       pageSize: 100,
       pageToken,
     });
@@ -170,9 +178,9 @@ export async function listRecentDocs(userId: string): Promise<DriveDoc[]> {
         driveUrl: file.webViewLink ?? `https://docs.google.com/document/d/${file.id}/edit`,
         mimeType: file.mimeType ?? "",
         role: isOwner ? "AUTHOR" : "REVIEWER",
-        lastModifiedInDrive: file.modifiedTime
-          ? new Date(file.modifiedTime)
-          : null,
+        lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,
+        createdTimeInDrive: file.createdTime ? new Date(file.createdTime) : null,
+        owner: file.owners?.[0]?.displayName ?? null,
       });
     }
 

@@ -1,8 +1,18 @@
 # Refresh Flow
 
-When the user clicks **Refresh**, the client fires `POST /api/docs`, then immediately follows
-with `GET /api/docs?includeArchived=true` to reload the full list. The server-side POST does
-three things in sequence: sync the doc list from Drive, detect deletions, then sync comments.
+## Main Refresh (all docs)
+
+When the user clicks **Refresh** on the docs list, the client fires `POST /api/docs`, then
+immediately follows with `GET /api/docs?includeArchived=true` to reload the full list. The
+server-side POST does three things in sequence: sync the doc list from Drive, detect
+deletions, then sync comments.
+
+## Per-doc Refresh (detail page)
+
+The doc detail page has its own **Refresh** button that calls `POST /api/docs/[id]/refresh`.
+This syncs comments for only that one doc and returns the updated doc + comments in a single
+response — no separate GET needed. Useful for quickly checking a single doc without waiting
+for a full sync.
 
 ---
 
@@ -11,16 +21,17 @@ three things in sequence: sync the doc list from Drive, detect deletions, then s
 **Drive call:** `files.list` with a query that matches Docs, Sheets, and Slides modified in
 the last 30 days and not trashed. `pageSize: 100`; paginates until `nextPageToken` is absent.
 
-**Fields fetched:** `id, name, mimeType, webViewLink, modifiedTime, owners`
+**Fields fetched:** `id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName)`
 
 **Role detection:** `owners[].me === true` → `AUTHOR`; otherwise `REVIEWER`. This is Drive's
 own data about who owns the file, not something we infer.
 
 **Upsert logic:** for each file Drive returns:
 
-- **New doc (not in DB):** created with Drive-detected role. Default status is `ACTIVE`.
-- **Existing doc:** only `title`, `driveUrl`, `mimeType`, `lastModifiedInDrive`, and
-  `isDeleted` are updated — and only when at least one of these has actually changed, or
+- **New doc (not in DB):** created with Drive-detected role and `createdTimeInDrive` /
+  `owner`. Default status is `ACTIVE`.
+- **Existing doc:** `title`, `driveUrl`, `mimeType`, `lastModifiedInDrive`, `owner`,
+  `createdTimeInDrive`, and `isDeleted` are updated when at least one has changed or
   `isDeleted` was true (re-appeared in Drive means access was restored). `role`, `status`,
   and `labels` are never touched; they belong to the user.
 
@@ -58,7 +69,8 @@ Drive. If a doc re-appears in Drive (e.g., shared again), the upsert in Phase 1 
 ## Phase 3 — Comment Sync
 
 Comment threads are synced for every non-deleted doc after the doc list and deletion checks
-complete. All docs are processed in parallel (`Promise.all`).
+complete. All docs are processed in parallel (`Promise.all`). The per-doc refresh runs the
+same `syncComments` logic for a single doc.
 
 **Why not gate on file `modifiedTime`:** Drive does not update a file's `modifiedTime` when
 comments change, so we cannot use it as a signal.
@@ -67,6 +79,12 @@ comments change, so we cannot use it as a signal.
 passes this as `startModifiedTime`, so Drive only returns comments modified since the last
 sync. If nothing changed on a doc, the response is empty — the call is cheap.
 
+**Fields fetched per comment:** `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me))`
+
+**Fields stored per comment:** `driveCreatedAt`, `driveModifiedAt`, `replyCount` (= number
+of replies), plus the existing `resolved`, `isMine`, `iParticipated`, `iResolvedIt`. All are
+updated on both create and update paths, including the MUTED path.
+
 For full details on comment status logic (ACTIVE / ARCHIVED / MUTED, who-resolved-it
 detection, `isMine` / `iParticipated`), see [`comment-tracking.md`](./comment-tracking.md).
 
@@ -74,17 +92,18 @@ detection, `isMine` / `iParticipated`), see [`comment-tracking.md`](./comment-tr
 
 ## Phase 4 — UI Update (no page reload)
 
-After `POST /api/docs` returns, `RefreshButton` immediately calls
+**Main refresh:** after `POST /api/docs` returns, `RefreshButton` immediately calls
 `GET /api/docs?includeArchived=true` to fetch the full updated doc list (including archived
 docs, so the user's current filter state is respected by the client-side filter in `DocTable`
-rather than being silently dropped).
+rather than being silently dropped). The fresh list is passed to `DocTable` via the
+`onRefresh` callback, which calls `setDocs(newDocs)` directly.
 
-The fresh list is passed to `DocTable` via the `onRefresh` callback, which calls
-`setDocs(newDocs)` directly. No navigation, no server component re-render.
+**Per-doc refresh:** the `POST /api/docs/[id]/refresh` response includes the full updated doc
+with its comments array. `DocDetail` calls `setComments(updated.comments)` directly.
 
-The POST response includes summary counts (`added`, `updated`, `deleted`) which are shown in a
-toast: e.g., "Sync complete — 2 new, 1 updated". If nothing changed, the toast reads
-"no updates".
+The main POST response includes summary counts (`added`, `updated`, `deleted`, `comments`)
+which are shown in a toast: e.g., "Sync complete — 2 new, 1 updated". If nothing changed,
+the toast reads "no updates".
 
 ---
 

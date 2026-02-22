@@ -1,8 +1,13 @@
-import type { Doc, Label, DocLabel } from "@prisma/client";
+import type { Doc, Label, DocLabel, Comment } from "@prisma/client";
 
 export type DocWithLabels = Doc & {
   labels: (DocLabel & { label: Label })[];
   _count: { comments: number };
+};
+
+export type DocWithComments = Doc & {
+  labels: (DocLabel & { label: Label })[];
+  comments: Comment[];
 };
 
 // Augment NextAuth session to include user.id

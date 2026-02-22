@@ -1,0 +1,68 @@
+"use client";
+
+type ShowMode = "active" | "open" | "all";
+
+interface CommentFilterBarProps {
+  myThreadsFilter: boolean;
+  myCommentsFilter: boolean;
+  showMode: ShowMode;
+  onMyThreadsChange: (v: boolean) => void;
+  onMyCommentsChange: (v: boolean) => void;
+  onShowModeChange: (v: ShowMode) => void;
+}
+
+export function CommentFilterBar({
+  myThreadsFilter,
+  myCommentsFilter,
+  showMode,
+  onMyThreadsChange,
+  onMyCommentsChange,
+  onShowModeChange,
+}: CommentFilterBarProps) {
+  function toggleBtn(active: boolean, label: string, onClick: () => void) {
+    return (
+      <button
+        onClick={onClick}
+        className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+          active
+            ? "bg-zinc-800 text-white"
+            : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+        }`}
+      >
+        {label}
+      </button>
+    );
+  }
+
+  return (
+    <fieldset className="rounded-lg border border-zinc-200 px-4 py-2">
+      <legend className="px-1 text-xs font-medium text-zinc-400 uppercase tracking-wide">
+        Filters
+      </legend>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+
+        {toggleBtn(myThreadsFilter, "My threads", () => onMyThreadsChange(!myThreadsFilter))}
+        {toggleBtn(myCommentsFilter, "My comments", () => onMyCommentsChange(!myCommentsFilter))}
+
+        <div className="h-4 w-px bg-zinc-200" />
+
+        <div className="flex items-center gap-1">
+          {(["active", "open", "all"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => onShowModeChange(mode)}
+              className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+                showMode === mode
+                  ? "bg-zinc-800 text-white"
+                  : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+              }`}
+            >
+              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+            </button>
+          ))}
+        </div>
+
+      </div>
+    </fieldset>
+  );
+}
