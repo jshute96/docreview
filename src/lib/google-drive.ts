@@ -110,6 +110,22 @@ export interface DriveComment {
   replyCount: number;
 }
 
+// Derives ownership/participation flags from a Drive comment's author and replies.
+export function deriveCommentFlags(
+  author: { me?: boolean | null } | undefined | null,
+  replies: { action?: string | null; author?: { me?: boolean | null } | null }[]
+): { isMine: boolean; iParticipated: boolean; iResolvedIt: boolean } {
+  const isMine = author?.me === true;
+  const iParticipated = replies.some(
+    (r) => r.action !== "resolve" && r.author?.me === true
+  );
+  const lastResolveReply = [...replies]
+    .reverse()
+    .find((r) => r.action === "resolve");
+  const iResolvedIt = lastResolveReply?.author?.me === true;
+  return { isMine, iParticipated, iResolvedIt };
+}
+
 export async function fetchComments(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string,
@@ -137,21 +153,12 @@ export async function fetchComments(
     for (const c of items) {
       if (!c.id) continue;
       const replies = c.replies ?? [];
-      const isMine = c.author?.me === true;
-      const iParticipated = replies.some(
-        (r) => r.action !== "resolve" && r.author?.me === true
-      );
-      const lastResolveReply = [...replies]
-        .reverse()
-        .find((r) => r.action === "resolve");
-      const iResolvedIt = lastResolveReply?.author?.me === true;
+      const flags = deriveCommentFlags(c.author, replies);
 
       comments.push({
         id: c.id,
         resolved: c.resolved === true,
-        isMine,
-        iParticipated,
-        iResolvedIt,
+        ...flags,
         driveCreatedAt: c.createdTime ? new Date(c.createdTime) : null,
         driveModifiedAt: c.modifiedTime ? new Date(c.modifiedTime) : null,
         replyCount: replies.length,
@@ -308,6 +315,136 @@ export async function fetchSuggestionContent(
   }
 
   return result;
+}
+
+// A single reply within a comment thread (not the initial comment).
+export interface ThreadReply {
+  author: string;
+  content: string;
+  createdTime: string;
+}
+
+// A comment thread on a document: the initial comment plus all replies.
+// The top-level author/content/createdTime are the initial comment;
+// `replies` contains the subsequent responses.
+export interface CommentThread {
+  id: string;
+  author: string;
+  content: string;
+  createdTime: string;
+  resolved: boolean;
+  replies: ThreadReply[];
+}
+
+// Full Drive data for a single comment thread: sync metadata (for DB update)
+// plus the displayable thread content. Returned by fetchThreadDetail().
+export interface DriveThreadDetail {
+  resolved: boolean;
+  isMine: boolean;
+  iParticipated: boolean;
+  iResolvedIt: boolean;
+  driveCreatedAt: Date | null;
+  driveModifiedAt: Date | null;
+  replyCount: number;
+  thread: CommentThread;
+}
+
+// Fetches a single comment thread from Drive by ID, returning both
+// sync metadata and the full displayable thread (initial comment + replies).
+export async function fetchThreadDetail(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  googleDocId: string,
+  commentId: string
+): Promise<DriveThreadDetail | null> {
+  const drive = google.drive({ version: "v3", auth });
+  console.log(`[Drive] comments.get ${googleDocId} comment=${commentId}`);
+
+  const res = await drive.comments.get({
+    fileId: googleDocId,
+    commentId,
+    fields:
+      "id, resolved, content, createdTime, modifiedTime, author(me, displayName), replies(content, createdTime, action, author(me, displayName))",
+  });
+
+  const c = res.data;
+  if (!c.id || c.content == null) return null;
+
+  const allReplies = c.replies ?? [];
+  const flags = deriveCommentFlags(c.author, allReplies);
+
+  const threadReplies: ThreadReply[] = allReplies
+    .filter((r) => !r.action)
+    .map((r) => ({
+      author: r.author?.displayName ?? "Unknown",
+      content: r.content ?? "",
+      createdTime: r.createdTime ?? "",
+    }));
+
+  return {
+    resolved: c.resolved === true,
+    ...flags,
+    driveCreatedAt: c.createdTime ? new Date(c.createdTime) : null,
+    driveModifiedAt: c.modifiedTime ? new Date(c.modifiedTime) : null,
+    replyCount: allReplies.length,
+    thread: {
+      id: c.id,
+      author: c.author?.displayName ?? "Unknown",
+      content: c.content,
+      createdTime: c.createdTime ?? "",
+      resolved: c.resolved === true,
+      replies: threadReplies,
+    },
+  };
+}
+
+// Fetches all comment threads for a document from Drive (paginated).
+export async function fetchAllThreads(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  googleDocId: string
+): Promise<CommentThread[]> {
+  const drive = google.drive({ version: "v3", auth });
+  console.log(`[Drive] comments.list ${googleDocId} (threads)`);
+
+  const threads: CommentThread[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const res = await drive.comments.list({
+      fileId: googleDocId,
+      fields:
+        "nextPageToken, comments(id, resolved, content, createdTime, author(displayName), replies(content, createdTime, action, author(displayName)))",
+      pageSize: 100,
+      ...(pageToken ? { pageToken } : {}),
+    });
+
+    for (const c of res.data.comments ?? []) {
+      if (!c.id || c.content == null) continue;
+
+      const replies: ThreadReply[] = (c.replies ?? [])
+        .filter((r) => !r.action) // filter out resolve/reopen action replies
+        .map((r) => ({
+          author: r.author?.displayName ?? "Unknown",
+          content: r.content ?? "",
+          createdTime: r.createdTime ?? "",
+        }));
+
+      threads.push({
+        id: c.id,
+        author: c.author?.displayName ?? "Unknown",
+        content: c.content,
+        createdTime: c.createdTime ?? "",
+        resolved: c.resolved === true,
+        replies,
+      });
+    }
+
+    pageToken = res.data.nextPageToken ?? undefined;
+  } while (pageToken);
+
+  console.log(
+    `[Drive] comments.list ${googleDocId} (threads) → ${threads.length} threads`
+  );
+  return threads;
 }
 
 export async function listRecentDocs(userId: string): Promise<DriveDoc[]> {

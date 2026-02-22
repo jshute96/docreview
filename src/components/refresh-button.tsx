@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DocWithLabels } from "@/types";
 
@@ -39,7 +40,8 @@ export function RefreshButton({ onRefresh }: RefreshButtonProps) {
 
   return (
     <Button onClick={handleRefresh} disabled={loading} variant="outline" size="sm">
-      {loading ? "Refreshing…" : "Refresh"}
+      <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+      Refresh
     </Button>
   );
 }

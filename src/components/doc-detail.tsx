@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { RefreshCw } from "lucide-react";
 import type { Comment } from "@prisma/client";
 import type { DocWithComments } from "@/types";
 import type { SuggestionContent } from "@/lib/google-drive";
@@ -132,7 +133,8 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
           onClick={handleRefresh}
           disabled={refreshing}
         >
-          {refreshing ? "Syncing…" : "Refresh"}
+          <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
         </Button>
       </div>
 
