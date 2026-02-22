@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
+const VALID_ROLES = ["AUTHOR", "REVIEWER"];
+const VALID_STATUSES = ["ACTIVE", "ARCHIVED"];
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -51,11 +54,33 @@ export async function PATCH(
     labelIds?: string[];
   };
 
+  if (role !== undefined && !VALID_ROLES.includes(role)) {
+    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+  }
+  if (status !== undefined && !VALID_STATUSES.includes(status)) {
+    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  }
+
+  if (labelIds !== undefined) {
+    if (!Array.isArray(labelIds)) {
+      return NextResponse.json({ error: "Invalid labelIds" }, { status: 400 });
+    }
+    if (labelIds.length > 0) {
+      const ownedLabels = await prisma.label.findMany({
+        where: { id: { in: labelIds }, userId },
+        select: { id: true },
+      });
+      if (ownedLabels.length !== labelIds.length) {
+        return NextResponse.json({ error: "Invalid label" }, { status: 400 });
+      }
+    }
+  }
+
   const updated = await prisma.doc.update({
     where: { id },
     data: {
-      ...(role ? { role } : {}),
-      ...(status ? { status } : {}),
+      ...(role !== undefined ? { role } : {}),
+      ...(status !== undefined ? { status } : {}),
       ...(labelIds !== undefined
         ? {
             labels: {

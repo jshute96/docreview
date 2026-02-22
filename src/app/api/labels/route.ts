@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -31,9 +32,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
 
-  const label = await prisma.label.create({
-    data: { userId, name: name.trim(), color: color ?? null },
-  });
-
-  return NextResponse.json(label, { status: 201 });
+  try {
+    const label = await prisma.label.create({
+      data: { userId, name: name.trim(), color: color ?? null },
+    });
+    return NextResponse.json(label, { status: 201 });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return NextResponse.json({ error: "A label with that name already exists" }, { status: 409 });
+    }
+    throw err;
+  }
 }
