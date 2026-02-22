@@ -5,6 +5,7 @@ import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import { DocRow } from "@/components/doc-row";
 import { FilterBar } from "@/components/filter-bar";
+import { AddDocDialog } from "@/components/add-doc-dialog";
 import { ManageLabelsDialog } from "@/components/manage-labels-dialog";
 import { RefreshButton } from "@/components/refresh-button";
 import { signOut } from "next-auth/react";
@@ -46,6 +47,10 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
 
   function handleDocUpdate(updated: DocWithLabels) {
     setDocs((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+  }
+
+  function handleDocAdded(newDoc: DocWithLabels) {
+    setDocs((prev) => [newDoc, ...prev]);
   }
 
   function handleLabelDelete(id: string) {
@@ -118,6 +123,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-zinc-900">Your Docs</h1>
         <div className="flex items-center gap-2">
+          <AddDocDialog allLabels={labels} onDocAdded={handleDocAdded} />
           <ManageLabelsDialog labels={labels} onLabelsChange={setLabels} onLabelDelete={handleLabelDelete} />
           <RefreshButton onRefresh={(newDocs) => setDocs(newDocs)} />
           <Button

@@ -1,6 +1,17 @@
 import { google } from "googleapis";
 import { prisma } from "@/lib/prisma";
 
+export const SUPPORTED_MIME_TYPES = new Set([
+  "application/vnd.google-apps.document",
+  "application/vnd.google-apps.spreadsheet",
+  "application/vnd.google-apps.presentation",
+]);
+
+export function parseGoogleDocId(url: string): string | null {
+  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  return match?.[1] ?? null;
+}
+
 export async function getDriveClient(userId: string) {
   const account = await prisma.account.findFirst({
     where: { userId, provider: "google" },
