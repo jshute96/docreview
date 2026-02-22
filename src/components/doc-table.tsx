@@ -10,7 +10,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
-type SortCol = "title" | "lastModifiedInDrive";
+type SortCol = "title" | "lastModifiedInDrive" | "comments";
 type SortDir = "asc" | "desc";
 
 interface DocTableProps {
@@ -22,6 +22,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
   const [docs, setDocs] = useState<DocWithLabels[]>(initialDocs);
   const [labels, setLabels] = useState<Label[]>(initialLabels);
   const [showArchived, setShowArchived] = useState(false);
+  const [hasCommentsFilter, setHasCommentsFilter] = useState(false);
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [roleFilter, setRoleFilter] = useState<"AUTHOR" | "NOT_AUTHOR" | null>(null);
   const [selectedMimeTypes, setSelectedMimeTypes] = useState<string[]>([]);
@@ -33,7 +34,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortCol(col);
-      setSortDir(col === "lastModifiedInDrive" ? "desc" : "asc");
+      setSortDir(col === "lastModifiedInDrive" || col === "comments" ? "desc" : "asc");
     }
   }
 
@@ -67,6 +68,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
   const filteredDocs = docs
     .filter((doc) => {
       if (!showArchived && doc.status === "ARCHIVED") return false;
+      if (hasCommentsFilter && doc._count.comments === 0) return false;
       if (roleFilter === "AUTHOR" && doc.role !== "AUTHOR") return false;
       if (roleFilter === "NOT_AUTHOR" && doc.role === "AUTHOR") return false;
       if (selectedMimeTypes.length > 0 && !selectedMimeTypes.includes(doc.mimeType ?? "")) return false;
@@ -82,6 +84,8 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
       let cmp = 0;
       if (sortCol === "title") {
         cmp = a.title.localeCompare(b.title);
+      } else if (sortCol === "comments") {
+        cmp = a._count.comments - b._count.comments;
       } else {
         const aTime = a.lastModifiedInDrive ? new Date(a.lastModifiedInDrive).getTime() : 0;
         const bTime = b.lastModifiedInDrive ? new Date(b.lastModifiedInDrive).getTime() : 0;
@@ -129,10 +133,12 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
       <FilterBar
         labels={labels}
         showArchived={showArchived}
+        hasCommentsFilter={hasCommentsFilter}
         selectedLabelIds={selectedLabelIds}
         roleFilter={roleFilter}
         selectedMimeTypes={selectedMimeTypes}
         onShowArchivedChange={setShowArchived}
+        onHasCommentsFilterChange={setHasCommentsFilter}
         onLabelToggle={handleLabelToggle}
         onRoleFilterChange={setRoleFilter}
         onMimeTypeToggle={handleMimeTypeToggle}
@@ -150,6 +156,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50">
                 <ThButton col="title">Title</ThButton>
+                <ThButton col="comments">Comments</ThButton>
                 <ThButton col="lastModifiedInDrive">Last Modified</ThButton>
                 <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide text-left">
                   Actions

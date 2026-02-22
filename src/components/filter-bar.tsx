@@ -13,10 +13,12 @@ const DOC_TYPES = [
 interface FilterBarProps {
   labels: Label[];
   showArchived: boolean;
+  hasCommentsFilter: boolean;
   selectedLabelIds: string[];
   roleFilter: "AUTHOR" | "NOT_AUTHOR" | null;
   selectedMimeTypes: string[];
   onShowArchivedChange: (v: boolean) => void;
+  onHasCommentsFilterChange: (v: boolean) => void;
   onLabelToggle: (id: string) => void;
   onRoleFilterChange: (role: "AUTHOR" | "NOT_AUTHOR" | null) => void;
   onMimeTypeToggle: (mimeType: string) => void;
@@ -25,10 +27,12 @@ interface FilterBarProps {
 export function FilterBar({
   labels,
   showArchived,
+  hasCommentsFilter,
   selectedLabelIds,
   roleFilter,
   selectedMimeTypes,
   onShowArchivedChange,
+  onHasCommentsFilterChange,
   onLabelToggle,
   onRoleFilterChange,
   onMimeTypeToggle,
@@ -60,6 +64,22 @@ export function FilterBar({
               );
             })}
           </div>
+        </div>
+
+        <div className="h-4 w-px bg-zinc-200" />
+
+        {/* Has comments */}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => onHasCommentsFilterChange(!hasCommentsFilter)}
+            className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+              hasCommentsFilter
+                ? "bg-zinc-800 text-white"
+                : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+            }`}
+          >
+            Has comments
+          </button>
         </div>
 
         <div className="h-4 w-px bg-zinc-200" />

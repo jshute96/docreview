@@ -70,21 +70,38 @@ model Label {
 }
 
 model Doc {
-  id                  String     @id @default(cuid())
-  userId              String
-  googleDocId         String
-  title               String
-  driveUrl            String
-  mimeType            String?
-  role                String     @default("REVIEWER")  // AUTHOR | REVIEWER
-  status              String     @default("ACTIVE")    // ACTIVE | ARCHIVED
-  isDeleted           Boolean    @default(false)
-  lastModifiedInDrive DateTime?
-  addedAt             DateTime   @default(now())
-  user                User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  labels              DocLabel[]
+  id                   String     @id @default(cuid())
+  userId               String
+  googleDocId          String
+  title                String
+  driveUrl             String
+  mimeType             String?
+  role                 String     @default("REVIEWER")  // AUTHOR | REVIEWER
+  status               String     @default("ACTIVE")    // ACTIVE | ARCHIVED
+  isDeleted            Boolean    @default(false)
+  lastModifiedInDrive  DateTime?
+  addedAt              DateTime   @default(now())
+  commentsLastSyncedAt DateTime?
+  user                 User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  labels               DocLabel[]
+  comments             Comment[]
 
   @@unique([userId, googleDocId])
+}
+
+model Comment {
+  id              String   @id @default(cuid())
+  docId           String
+  googleCommentId String
+  resolved        Boolean  @default(false)
+  isMine          Boolean  @default(false)
+  iParticipated   Boolean  @default(false)
+  status          String   @default("ACTIVE") // ACTIVE | ARCHIVED | MUTED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  doc             Doc      @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@unique([docId, googleCommentId])
 }
 
 model DocLabel {

@@ -76,6 +76,68 @@ export async function findDeletedDocIds(
   return new Set(results.filter((r) => r.deleted).map((r) => r.id));
 }
 
+export interface DriveComment {
+  id: string;
+  resolved: boolean;
+  isMine: boolean;
+  iParticipated: boolean;
+  iResolvedIt: boolean;
+}
+
+export async function fetchComments(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  googleDocId: string,
+  since?: Date
+): Promise<DriveComment[]> {
+  const drive = google.drive({ version: "v3", auth });
+  const sinceStr = since ? since.toISOString() : undefined;
+  console.log(
+    `[Drive] comments.list ${googleDocId} (since ${sinceStr ?? "all"})`
+  );
+
+  const comments: DriveComment[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const res = await drive.comments.list({
+      fileId: googleDocId,
+      fields:
+        "nextPageToken, comments(id, resolved, author(me), replies(action, author(me)))",
+      ...(sinceStr ? { startModifiedTime: sinceStr } : {}),
+      ...(pageToken ? { pageToken } : {}),
+    });
+
+    const items = res.data.comments ?? [];
+    for (const c of items) {
+      if (!c.id) continue;
+      const replies = c.replies ?? [];
+      const isMine = c.author?.me === true;
+      const iParticipated = replies.some(
+        (r) => r.action !== "resolve" && r.author?.me === true
+      );
+      const lastResolveReply = [...replies]
+        .reverse()
+        .find((r) => r.action === "resolve");
+      const iResolvedIt = lastResolveReply?.author?.me === true;
+
+      comments.push({
+        id: c.id,
+        resolved: c.resolved === true,
+        isMine,
+        iParticipated,
+        iResolvedIt,
+      });
+    }
+
+    pageToken = res.data.nextPageToken ?? undefined;
+  } while (pageToken);
+
+  console.log(
+    `[Drive] comments.list ${googleDocId} (since ${sinceStr ?? "all"}) → ${comments.length} comments`
+  );
+  return comments;
+}
+
 export async function listRecentDocs(userId: string): Promise<DriveDoc[]> {
   const auth = await getDriveClient(userId);
   const drive = google.drive({ version: "v3", auth });

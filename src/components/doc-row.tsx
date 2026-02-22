@@ -74,6 +74,9 @@ export function DocRow({ doc, allLabels, onUpdate, onArchive }: DocRowProps) {
           ))}
         </div>
       </td>
+      <td className="py-1.5 pr-4 text-sm text-zinc-500">
+        {doc._count.comments > 0 ? doc._count.comments : ""}
+      </td>
       <td className="py-1.5 pr-4 text-sm text-zinc-500">{lastModified}</td>
       <td className="py-1.5">
         <div className="flex items-center gap-1">

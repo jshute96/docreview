@@ -39,7 +39,10 @@ export async function PATCH(
           }
         : {}),
     },
-    include: { labels: { include: { label: true } } },
+    include: {
+      labels: { include: { label: true } },
+      _count: { select: { comments: { where: { status: "ACTIVE" } } } },
+    },
   });
 
   return NextResponse.json(updated);

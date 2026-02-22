@@ -12,7 +12,10 @@ export default async function DocsPage() {
   const [docs, labels] = await Promise.all([
     prisma.doc.findMany({
       where: { userId },
-      include: { labels: { include: { label: true } } },
+      include: {
+        labels: { include: { label: true } },
+        _count: { select: { comments: { where: { status: "ACTIVE" } } } },
+      },
       orderBy: { lastModifiedInDrive: "desc" },
     }),
     prisma.label.findMany({
