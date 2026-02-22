@@ -3,3 +3,16 @@
   * Anchor links into the doc don't work
   * There's no timestamp-based detection of new ones or updates, so there might
     be excessive polling
+
+* /screenshot tool
+* Add screen
+* improve labels UI
+* show comment threads
+* reply to comments
+* resolve comments
+* hosting
+  * postgres
+  * cloud run
+  * deployment scripts
+* testing?
+
