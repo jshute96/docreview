@@ -123,6 +123,8 @@ export async function syncComments(
     where: { docId: doc.id, type: "SUGGESTION", resolved: false },
   });
   for (const s of activeSuggestions) {
+    // Drive API comment IDs starting with "AAAB" are system-generated anchors
+    // (e.g. bookmark or heading references), not user suggestions — skip them.
     if (s.googleCommentId.startsWith("AAAB")) continue;
     if (!liveDocsIds.has(s.googleCommentId)) {
       await prisma.comment.update({

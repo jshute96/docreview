@@ -16,7 +16,10 @@ export async function POST(req: NextRequest) {
   }
   const userId = session.user.id;
 
-  const body = await req.json();
+  let body;
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
   const { url, labelIds = [] } = body as { url: string; labelIds?: string[] };
 
   const fileId = parseGoogleDocId(url);

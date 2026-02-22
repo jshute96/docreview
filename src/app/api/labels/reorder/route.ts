@@ -9,7 +9,10 @@ export async function PATCH(req: NextRequest) {
   }
   const userId = session.user.id;
 
-  const body = await req.json();
+  let body;
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
   const { order } = body as { order?: string[] };
 
   if (!Array.isArray(order) || order.length === 0) {

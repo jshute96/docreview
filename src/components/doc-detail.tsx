@@ -10,16 +10,10 @@ import { DocTypeIcon } from "@/components/doc-type-icon";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
 import { Button } from "@/components/ui/button";
+import { formatDate } from "@/lib/utils";
 
 interface DocDetailProps {
   doc: DocWithComments;
-}
-
-function formatDate(d: Date | string | null): string {
-  if (!d) return "—";
-  const dt = new Date(d);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 }
 
 export function DocDetail({ doc: initialDoc }: DocDetailProps) {

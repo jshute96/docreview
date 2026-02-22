@@ -9,15 +9,15 @@ import { ROLE_COLORS } from "@/lib/role-colors";
 import { EditDocDialog } from "@/components/edit-doc-dialog";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { Button } from "@/components/ui/button";
+import { formatDate } from "@/lib/utils";
 
 interface DocRowProps {
   doc: DocWithLabels;
   allLabels: Label[];
   onUpdate: (updated: DocWithLabels) => void;
-  onArchive: (id: string) => void;
 }
 
-export function DocRow({ doc, allLabels, onUpdate, onArchive }: DocRowProps) {
+export function DocRow({ doc, allLabels, onUpdate }: DocRowProps) {
   const [archiving, setArchiving] = useState(false);
 
   async function handleArchive() {
@@ -32,7 +32,6 @@ export function DocRow({ doc, allLabels, onUpdate, onArchive }: DocRowProps) {
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithLabels = await res.json();
       onUpdate(updated);
-      if (newStatus === "ARCHIVED") onArchive(doc.id);
       toast.success(newStatus === "ARCHIVED" ? "Archived" : "Unarchived");
     } catch {
       toast.error("Failed to update status");
@@ -41,13 +40,7 @@ export function DocRow({ doc, allLabels, onUpdate, onArchive }: DocRowProps) {
     }
   }
 
-  const lastModified = doc.lastModifiedInDrive
-    ? (() => {
-        const d = new Date(doc.lastModifiedInDrive!);
-        const pad = (n: number) => String(n).padStart(2, "0");
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      })()
-    : "—";
+  const lastModified = formatDate(doc.lastModifiedInDrive);
 
   return (
     <tr className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">

@@ -59,48 +59,41 @@ export async function POST() {
 
   const driveDocIds = new Set(driveDocs.map((d) => d.googleDocId));
 
-  for (const doc of driveDocs) {
-    const existing = await prisma.doc.findUnique({
-      where: { userId_googleDocId: { userId, googleDocId: doc.googleDocId } },
-    });
+  // Pre-fetch existing doc IDs to distinguish adds from updates
+  const existingDocIds = new Set(
+    (await prisma.doc.findMany({
+      where: { userId },
+      select: { googleDocId: true },
+    })).map((d) => d.googleDocId)
+  );
 
-    if (existing) {
-      const changed =
-        existing.title !== doc.title ||
-        existing.driveUrl !== doc.driveUrl ||
-        existing.mimeType !== doc.mimeType ||
-        existing.lastModifiedInDrive?.getTime() !== doc.lastModifiedInDrive?.getTime() ||
-        existing.owner !== doc.owner ||
-        existing.isDeleted;
-      if (changed) {
-        await prisma.doc.update({
-          where: { id: existing.id },
-          data: {
-            title: doc.title,
-            driveUrl: doc.driveUrl,
-            mimeType: doc.mimeType,
-            lastModifiedInDrive: doc.lastModifiedInDrive,
-            owner: doc.owner,
-            createdTimeInDrive: doc.createdTimeInDrive,
-            isDeleted: false,
-          },
-        });
-        updated++;
-      }
+  for (const doc of driveDocs) {
+    await prisma.doc.upsert({
+      where: { userId_googleDocId: { userId, googleDocId: doc.googleDocId } },
+      create: {
+        userId,
+        googleDocId: doc.googleDocId,
+        title: doc.title,
+        driveUrl: doc.driveUrl,
+        mimeType: doc.mimeType,
+        role: doc.role,
+        lastModifiedInDrive: doc.lastModifiedInDrive,
+        owner: doc.owner,
+        createdTimeInDrive: doc.createdTimeInDrive,
+      },
+      update: {
+        title: doc.title,
+        driveUrl: doc.driveUrl,
+        mimeType: doc.mimeType,
+        lastModifiedInDrive: doc.lastModifiedInDrive,
+        owner: doc.owner,
+        createdTimeInDrive: doc.createdTimeInDrive,
+        isDeleted: false,
+      },
+    });
+    if (existingDocIds.has(doc.googleDocId)) {
+      updated++;
     } else {
-      await prisma.doc.create({
-        data: {
-          userId,
-          googleDocId: doc.googleDocId,
-          title: doc.title,
-          driveUrl: doc.driveUrl,
-          mimeType: doc.mimeType,
-          role: doc.role,
-          lastModifiedInDrive: doc.lastModifiedInDrive,
-          owner: doc.owner,
-          createdTimeInDrive: doc.createdTimeInDrive,
-        },
-      });
       added++;
     }
   }

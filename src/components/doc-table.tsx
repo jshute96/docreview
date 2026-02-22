@@ -204,7 +204,6 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
                   doc={doc}
                   allLabels={labels}
                   onUpdate={handleDocUpdate}
-                  onArchive={() => {}}
                 />
               ))}
             </tbody>

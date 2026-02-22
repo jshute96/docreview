@@ -23,10 +23,14 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const body = await req.json();
+  let body;
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
   const { status } = body as { status: "ACTIVE" | "ARCHIVED" | "MUTED" };
 
-  if (!["ACTIVE", "ARCHIVED", "MUTED"].includes(status)) {
+  const VALID_STATUSES = ["ACTIVE", "ARCHIVED", "MUTED"];
+  if (!VALID_STATUSES.includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 

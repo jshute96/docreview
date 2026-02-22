@@ -61,6 +61,7 @@ export function FilterBar({
                   key={mimeType}
                   onClick={() => onMimeTypeToggle(mimeType)}
                   title={label}
+                  aria-label={`Filter by ${label}`}
                   className={`rounded p-0.5 transition-opacity ${
                     active ? "opacity-100 ring-2 ring-zinc-400 ring-offset-1" : "opacity-35 hover:opacity-60"
                   }`}

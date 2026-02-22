@@ -34,16 +34,20 @@ export async function getDriveClient(userId: string) {
 
   // Persist refreshed tokens back to DB
   oauth2Client.on("tokens", async (tokens) => {
-    await prisma.account.update({
-      where: { id: account.id },
-      data: {
-        access_token: tokens.access_token ?? account.access_token,
-        refresh_token: tokens.refresh_token ?? account.refresh_token,
-        expires_at: tokens.expiry_date
-          ? Math.floor(tokens.expiry_date / 1000)
-          : account.expires_at,
-      },
-    });
+    try {
+      await prisma.account.update({
+        where: { id: account.id },
+        data: {
+          access_token: tokens.access_token ?? account.access_token,
+          refresh_token: tokens.refresh_token ?? account.refresh_token,
+          expires_at: tokens.expiry_date
+            ? Math.floor(tokens.expiry_date / 1000)
+            : account.expires_at,
+        },
+      });
+    } catch (err) {
+      console.error("[Auth] Failed to persist refreshed tokens:", err);
+    }
   });
 
   return oauth2Client;
@@ -79,9 +83,15 @@ export async function findDeletedDocIds(
         const deleted = res.data.trashed === true;
         console.log(`[Drive] files.get ${id} → ${deleted ? "deleted/trashed" : "ok"}`);
         return { id, deleted };
-      } catch {
-        console.log(`[Drive] files.get ${id} → not found (deleted)`);
-        return { id, deleted: true };
+      } catch (err: unknown) {
+        // Only treat 404/403 as deleted; skip transient errors (429, 5xx, network)
+        const code = (err as { code?: number | string })?.code;
+        if (code === 404 || code === "404" || code === 403 || code === "403") {
+          console.log(`[Drive] files.get ${id} → not found/access revoked`);
+          return { id, deleted: true };
+        }
+        console.error(`[Drive] files.get ${id} → transient error (skipping):`, err);
+        return { id, deleted: false };
       }
     })
   );

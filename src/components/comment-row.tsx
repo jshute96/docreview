@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { Comment } from "@prisma/client";
 import type { SuggestionContent } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
+import { formatDate } from "@/lib/utils";
 
 interface CommentRowProps {
   comment: Comment;
@@ -13,13 +14,6 @@ interface CommentRowProps {
   content?: string;
   suggestionContent?: SuggestionContent;
   onUpdate: (updated: Comment) => void;
-}
-
-function formatDate(d: Date | string | null): string {
-  if (!d) return "—";
-  const dt = new Date(d);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 }
 
 function splitContent(raw: string): { author: string | null; text: string } {
@@ -38,7 +32,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     window.open(url.toString(), "docreview-comment-window");
     // This intends to prevent focusing the newly opened window, or raising the
     // existing over top of the doc-review window.
-    // Unforutnately, it doesn't work in chrome.
+    // Unfortunately, it doesn't work in Chrome.
     window.focus();
   }
 
