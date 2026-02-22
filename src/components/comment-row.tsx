@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 interface CommentRowProps {
   comment: Comment;
   docId: string;
+  driveUrl: string;
   content?: string;
   onUpdate: (updated: Comment) => void;
 }
@@ -25,8 +26,19 @@ function splitContent(raw: string): { author: string | null; text: string } {
   return { author: raw.slice(0, sep), text: raw.slice(sep + 2) };
 }
 
-export function CommentRow({ comment, docId, content, onUpdate }: CommentRowProps) {
+export function CommentRow({ comment, docId, driveUrl, content, onUpdate }: CommentRowProps) {
   const [loading, setLoading] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
+  function openInDoc() {
+    const url = new URL(driveUrl);
+    url.searchParams.set("disco", comment.googleCommentId);
+    window.open(url.toString(), "docreview-comment-window");
+    // This intends to prevent focusing the newly opened window, or raising the
+    // existing over top of the doc-review window.
+    // Unforutnately, it doesn't work in chrome.
+    window.focus();
+  }
 
   async function updateStatus(status: "ACTIVE" | "ARCHIVED" | "MUTED") {
     setLoading(true);
@@ -57,10 +69,19 @@ export function CommentRow({ comment, docId, content, onUpdate }: CommentRowProp
 
   const cellPy = content ? "pt-1.5 pb-0" : "py-1.5";
   const { author, text } = content ? splitContent(content) : { author: null, text: "" };
+  const rowBg = hovered ? "bg-zinc-50" : "";
+  const hoverHandlers = {
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
+  };
 
   return (
     <>
-    <tr className={`hover:bg-zinc-50 transition-colors${content ? "" : " border-b border-zinc-100"}`}>
+    <tr
+      className={`${rowBg} transition-colors cursor-pointer${content ? "" : " border-b border-zinc-100"}`}
+      onClick={openInDoc}
+      {...hoverHandlers}
+    >
       <td className={`${cellPy} pl-4 pr-4 text-sm text-zinc-500 whitespace-nowrap`}>
         {formatDate(comment.driveCreatedAt)}
       </td>
@@ -96,7 +117,7 @@ export function CommentRow({ comment, docId, content, onUpdate }: CommentRowProp
         )}
       </td>
       <td className={`${cellPy} pr-4`}>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="outline"
             size="sm"
@@ -119,7 +140,11 @@ export function CommentRow({ comment, docId, content, onUpdate }: CommentRowProp
       </td>
     </tr>
     {content && (
-      <tr className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
+      <tr
+        className={`${rowBg} border-b border-zinc-100 transition-colors cursor-pointer`}
+        onClick={openInDoc}
+        {...hoverHandlers}
+      >
         <td colSpan={7} className="pt-0.5 pb-2 pl-4 pr-4 max-w-0 overflow-hidden">
           <p className="truncate text-sm text-zinc-400">
             {author && <span className="text-zinc-600">{author}: </span>}

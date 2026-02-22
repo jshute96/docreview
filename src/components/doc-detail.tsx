@@ -209,6 +209,7 @@ export function DocDetail({ doc }: DocDetailProps) {
                   key={comment.id}
                   comment={comment}
                   docId={doc.id}
+                  driveUrl={doc.driveUrl}
                   content={commentContent[comment.googleCommentId]}
                   onUpdate={handleCommentUpdate}
                 />
