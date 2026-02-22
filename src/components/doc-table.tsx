@@ -10,9 +10,8 @@ import { ManageLabelsDialog } from "@/components/manage-labels-dialog";
 import { RefreshButton } from "@/components/refresh-button";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-
-type SortCol = "title" | "lastModifiedInDrive" | "comments";
-type SortDir = "asc" | "desc";
+import { filterDocs, sortDocs } from "@/lib/doc-filters";
+import type { SortCol, SortDir } from "@/lib/doc-filters";
 
 interface DocTableProps {
   initialDocs: DocWithLabels[];
@@ -86,43 +85,18 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
     );
   }
 
-  const filteredDocs = docs
-    .filter((doc) => {
-      if (!showArchived && doc.status === "ARCHIVED") return false;
-      if (hasCommentsFilter && doc._count.comments === 0) return false;
-      if (roleFilter === "AUTHOR" && doc.role !== "AUTHOR") return false;
-      if (roleFilter === "NOT_AUTHOR" && doc.role === "AUTHOR") return false;
-      if (selectedMimeTypes.length > 0 && !selectedMimeTypes.includes(doc.mimeType ?? "")) return false;
-      if (
-        selectedLabelIds.length > 0 &&
-        !doc.labels.some((dl) => selectedLabelIds.includes(dl.labelId))
-      ) {
-        return false;
-      }
-      if (titleFilter) {
-        try {
-          const re = new RegExp(titleFilter, "i");
-          if (!re.test(doc.title)) return false;
-        } catch {
-          // invalid regex — fall back to plain substring match
-          if (!doc.title.toLowerCase().includes(titleFilter.toLowerCase())) return false;
-        }
-      }
-      return true;
-    })
-    .sort((a, b) => {
-      let cmp = 0;
-      if (sortCol === "title") {
-        cmp = a.title.localeCompare(b.title);
-      } else if (sortCol === "comments") {
-        cmp = a._count.comments - b._count.comments;
-      } else {
-        const aTime = a.lastModifiedInDrive ? new Date(a.lastModifiedInDrive).getTime() : 0;
-        const bTime = b.lastModifiedInDrive ? new Date(b.lastModifiedInDrive).getTime() : 0;
-        cmp = aTime - bTime;
-      }
-      return sortDir === "asc" ? cmp : -cmp;
-    });
+  const filteredDocs = sortDocs(
+    filterDocs(docs, {
+      showArchived,
+      hasCommentsFilter,
+      roleFilter,
+      selectedMimeTypes,
+      selectedLabelIds,
+      titleFilter,
+    }),
+    sortCol,
+    sortDir
+  );
 
   function SortIcon({ col }: { col: SortCol }) {
     if (sortCol !== col) return <span className="ml-1 text-zinc-300">↕</span>;

@@ -47,6 +47,13 @@ npm run dev -- -p 3001
 Fill in `.env` with your credentials before starting (see CLAUDE.md for details). Then visit
 `http://localhost:3000`, sign in with Google, and click **Refresh** to sync files from Drive.
 
+## Testing
+
+```bash
+npm test          # run all tests once
+npm run test:watch  # run tests in watch mode
+```
+
 ## After Schema Changes
 
 If the Prisma schema (`prisma/schema.prisma`) has changed, regenerate the Prisma client and
