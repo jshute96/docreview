@@ -123,8 +123,10 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
         <h1 className="text-xl font-semibold text-zinc-900">Your Docs</h1>
         <div className="flex items-center gap-2">
           <AddDocDialog allLabels={labels} onDocAdded={handleDocAdded} />
+          <RefreshButton mode="refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
+          <RefreshButton mode="full-refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
+          <RefreshButton mode="load" onRefresh={(newDocs) => setDocs(newDocs)} />
           <ManageLabelsDialog labels={labels} onLabelsChange={setLabels} onLabelDelete={handleLabelDelete} />
-          <RefreshButton onRefresh={(newDocs) => setDocs(newDocs)} />
           <Button
             variant="outline"
             size="sm"
@@ -154,7 +156,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
       {filteredDocs.length === 0 ? (
         <p className="py-12 text-center text-sm text-zinc-400">
           {docs.length === 0
-            ? 'No docs yet. Click "Refresh" to sync.'
+            ? 'No docs yet. Use "Add doc" or "Load from Drive" to add docs.'
             : "No docs match the current filters."}
         </p>
       ) : (

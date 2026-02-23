@@ -163,7 +163,7 @@ export function AddDocDialog({ allLabels, onDocAdded }: AddDocDialogProps) {
     >
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          Add
+          Add doc
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">

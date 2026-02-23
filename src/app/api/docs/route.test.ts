@@ -22,12 +22,17 @@ vi.mock("@/lib/google-drive", () => ({
 vi.mock("@/lib/sync-comments", () => ({
   syncComments: vi.fn(),
 }));
+vi.mock("@/lib/status", () => ({
+  getStatus: vi.fn(),
+  updateDriveTimestamp: vi.fn(),
+}));
 
 import { GET, POST } from "./route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { listRecentDocs, findDeletedDocIds, getDriveClient } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
+import { getStatus, updateDriveTimestamp } from "@/lib/status";
 
 const mockAuth = vi.mocked(auth);
 const mockDoc = prisma.doc as {
@@ -39,6 +44,8 @@ const mockListRecentDocs = vi.mocked(listRecentDocs);
 const mockFindDeletedDocIds = vi.mocked(findDeletedDocIds);
 const mockGetDriveClient = vi.mocked(getDriveClient);
 const mockSyncComments = vi.mocked(syncComments);
+const mockGetStatus = vi.mocked(getStatus);
+const mockUpdateDriveTimestamp = vi.mocked(updateDriveTimestamp);
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -90,10 +97,22 @@ describe("GET /api/docs", () => {
   });
 });
 
+function postRequest(mode?: "refresh" | "full-refresh" | "load") {
+  const url = mode
+    ? `http://localhost/api/docs?mode=${mode}`
+    : "http://localhost/api/docs";
+  return new NextRequest(url, { method: "POST" });
+}
+
 describe("POST /api/docs", () => {
+  beforeEach(() => {
+    mockGetStatus.mockResolvedValue(null);
+    mockUpdateDriveTimestamp.mockResolvedValue(undefined);
+  });
+
   it("returns 401 when not authenticated", async () => {
     mockAuth.mockResolvedValue(null);
-    const res = await POST();
+    const res = await POST(postRequest());
     expect(res.status).toBe(401);
   });
 
@@ -102,14 +121,14 @@ describe("POST /api/docs", () => {
     mockListRecentDocs.mockRejectedValue(new Error("Drive unavailable"));
 
     await suppressingErrors(async () => {
-      const res = await POST();
+      const res = await POST(postRequest());
       expect(res.status).toBe(502);
       const data = await res.json();
       expect(data.error).toMatch(/google drive/i);
     });
   });
 
-  it("syncs docs and returns counts", async () => {
+  it("syncs docs and returns counts (load mode)", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
@@ -130,13 +149,15 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds query
       .mockResolvedValueOnce([]) // missingDocs query (no docs missing from Drive)
-      .mockResolvedValueOnce([]); // activeDocs for comment sync
+      .mockResolvedValueOnce([]) // activeDocs for comment sync (scoped to Drive-returned docs)
+      .mockResolvedValueOnce([]); // archivedDocsWithActiveComments
     mockDoc.upsert.mockResolvedValue({});
     mockSyncComments.mockResolvedValue(0);
 
-    const res = await POST();
+    const res = await POST(postRequest("load"));
     expect(res.status).toBe(200);
     const data = await res.json();
+    expect(data.mode).toBe("load");
     expect(data.added).toBe(1);
     expect(data.updated).toBe(0);
     expect(data.deleted).toBe(0);
@@ -165,11 +186,12 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([]) // missingDocs
-      .mockResolvedValueOnce([]); // activeDocs for comment sync
+      .mockResolvedValueOnce([]) // activeDocs for comment sync (scoped to Drive-returned docs)
+      .mockResolvedValueOnce([]); // archivedDocsWithActiveComments
     mockDoc.upsert.mockResolvedValue({});
     mockSyncComments.mockResolvedValue(0);
 
-    const res = await POST();
+    const res = await POST(postRequest("load"));
     const data = await res.json();
     expect(data.added).toBe(0);
     expect(data.updated).toBe(1);
@@ -184,17 +206,87 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
       .mockResolvedValueOnce([{ id: "d1", googleDocId: "g1" }]) // missingDocs — one doc not in Drive
-      .mockResolvedValueOnce([]); // activeDocs for comment sync
+      .mockResolvedValueOnce([]) // activeDocs for comment sync (scoped to Drive-returned docs)
+      .mockResolvedValueOnce([]); // archivedDocsWithActiveComments
     mockFindDeletedDocIds.mockResolvedValue(new Set(["g1"]));
     mockDoc.update.mockResolvedValue({});
     mockSyncComments.mockResolvedValue(0);
 
-    const res = await POST();
+    const res = await POST(postRequest("load"));
     const data = await res.json();
     expect(data.deleted).toBe(1);
     expect(mockDoc.update).toHaveBeenCalledWith({
       where: { id: "d1" },
       data: { isDeleted: true },
     });
+  });
+
+  it("full-refresh mode syncs comments for all non-deleted docs", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
+    mockGetDriveClient.mockResolvedValue(driveAuth);
+    // Drive returns one doc (g1), but DB has two non-deleted docs (g1, g2)
+    mockListRecentDocs.mockResolvedValue([
+      {
+        googleDocId: "g1",
+        title: "Doc One",
+        driveUrl: "https://docs.google.com/document/d/g1/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "AUTHOR" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Owner",
+      },
+    ]);
+
+    const dbDoc1 = { id: "d1", googleDocId: "g1" };
+    const dbDoc2 = { id: "d2", googleDocId: "g2" };
+    mockDoc.findMany
+      .mockResolvedValueOnce([{ googleDocId: "g1" }, { googleDocId: "g2" }]) // existingDocIds
+      .mockResolvedValueOnce([dbDoc1, dbDoc2]) // activeDocs for comment sync (all non-deleted)
+      .mockResolvedValueOnce([]); // archivedDocsWithActiveComments
+    mockDoc.upsert.mockResolvedValue({});
+    mockSyncComments.mockResolvedValue(0);
+
+    const res = await POST(postRequest("full-refresh"));
+    const data = await res.json();
+    expect(data.mode).toBe("full-refresh");
+    expect(data.updated).toBe(1); // g1 updated, g2 not in Drive results so not upserted
+    expect(data.added).toBe(0); // g1 already existed, full-refresh skips new docs
+    // Full-refresh uses incremental timestamp
+    expect(mockGetStatus).toHaveBeenCalledWith("u1");
+    // Comment sync called for both docs (full-refresh syncs all)
+    expect(mockSyncComments).toHaveBeenCalledTimes(2);
+  });
+
+  it("refresh mode skips new docs", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
+    mockGetDriveClient.mockResolvedValue(driveAuth);
+    mockListRecentDocs.mockResolvedValue([
+      {
+        googleDocId: "g1",
+        title: "New Doc",
+        driveUrl: "https://docs.google.com/document/d/g1/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "AUTHOR" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Owner",
+      },
+    ]);
+
+    mockDoc.findMany
+      .mockResolvedValueOnce([]) // existingDocIds — g1 not in DB, so it's skipped in refresh
+      .mockResolvedValueOnce([]) // activeDocs for comment sync (scoped to Drive-returned docs)
+      .mockResolvedValueOnce([]); // archivedDocsWithActiveComments
+    mockSyncComments.mockResolvedValue(0);
+
+    const res = await POST(postRequest("refresh"));
+    const data = await res.json();
+    expect(data.mode).toBe("refresh");
+    expect(data.added).toBe(0);
+    expect(data.updated).toBe(0);
+    expect(mockDoc.upsert).not.toHaveBeenCalled();
   });
 });

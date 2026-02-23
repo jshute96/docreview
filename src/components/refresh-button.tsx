@@ -2,22 +2,26 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, CloudDownload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DocWithLabels } from "@/types";
 
 interface RefreshButtonProps {
+  mode: "refresh" | "full-refresh" | "load";
   onRefresh: (docs: DocWithLabels[]) => void;
 }
 
-export function RefreshButton({ onRefresh }: RefreshButtonProps) {
+export function RefreshButton({ mode, onRefresh }: RefreshButtonProps) {
   const [loading, setLoading] = useState(false);
 
-  async function handleRefresh() {
+  const Icon = mode === "load" ? CloudDownload : RefreshCw;
+  const label = mode === "refresh" ? "Refresh" : mode === "full-refresh" ? "Full Refresh" : "Load from Drive";
+
+  async function handleClick() {
     setLoading(true);
     try {
-      const syncRes = await fetch("/api/docs", { method: "POST" });
-      if (!syncRes.ok) throw new Error("Refresh failed");
+      const syncRes = await fetch(`/api/docs?mode=${mode}`, { method: "POST" });
+      if (!syncRes.ok) throw new Error("Sync failed");
       const data = await syncRes.json();
 
       const docsRes = await fetch("/api/docs?includeArchived=true");
@@ -25,12 +29,22 @@ export function RefreshButton({ onRefresh }: RefreshButtonProps) {
       const docs: DocWithLabels[] = await docsRes.json();
 
       onRefresh(docs);
-      const parts = [
-        data.added > 0 ? `${data.added} new` : "",
-        data.updated > 0 ? `${data.updated} updated` : "",
-        data.deleted > 0 ? `${data.deleted} deleted` : "",
-      ].filter(Boolean).join(", ");
-      toast.success(`Sync complete — ${parts || "no updates"}`, { duration: 8000 });
+
+      if (mode === "refresh" || mode === "full-refresh") {
+        const parts = [
+          data.updated > 0 ? `${data.updated} updated` : "",
+          data.unarchived > 0 ? `${data.unarchived} unarchived` : "",
+        ].filter(Boolean).join(", ");
+        const prefix = mode === "full-refresh" ? "Full refresh" : "Refresh";
+        toast.success(`${prefix} complete — ${parts || "no updates"}`, { duration: 8000 });
+      } else {
+        const parts = [
+          data.added > 0 ? `${data.added} new` : "",
+          data.updated > 0 ? `${data.updated} updated` : "",
+          data.deleted > 0 ? `${data.deleted} deleted` : "",
+        ].filter(Boolean).join(", ");
+        toast.success(`Sync complete — ${parts || "no updates"}`, { duration: 8000 });
+      }
     } catch {
       toast.error("Failed to sync with Google Drive");
     } finally {
@@ -39,9 +53,9 @@ export function RefreshButton({ onRefresh }: RefreshButtonProps) {
   }
 
   return (
-    <Button onClick={handleRefresh} disabled={loading} variant="outline" size="sm">
-      <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-      Refresh
+    <Button onClick={handleClick} disabled={loading} variant="outline" size="sm">
+      <Icon className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+      {label}
     </Button>
   );
 }

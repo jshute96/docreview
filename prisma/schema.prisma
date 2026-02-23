@@ -21,6 +21,7 @@ model User {
   sessions      Session[]
   docs          Doc[]
   labels        Label[]
+  status        Status?
 }
 
 model Account {
@@ -55,6 +56,13 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Status {
+  userId                   String    @id
+  lastDriveUpdateTimestamp  DateTime?
+  lastGmailUpdateTimestamp  DateTime?
+  user                     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // App models

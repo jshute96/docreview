@@ -77,20 +77,20 @@ export async function findDeletedDocIds(
 
   const results = await Promise.all(
     googleDocIds.map(async (id) => {
+      const t0 = Date.now();
       try {
-        console.log(`[Drive] files.get ${id}`);
         const res = await drive.files.get({ fileId: id, fields: "trashed" });
         const deleted = res.data.trashed === true;
-        console.log(`[Drive] files.get ${id} → ${deleted ? "deleted/trashed" : "ok"}`);
+        console.log(`[Drive] files.get ${id} → ${deleted ? "deleted/trashed" : "ok"} (${Date.now() - t0}ms)`);
         return { id, deleted };
       } catch (err: unknown) {
         // Only treat 404/403 as deleted; skip transient errors (429, 5xx, network)
         const code = (err as { code?: number | string })?.code;
         if (code === 404 || code === "404" || code === 403 || code === "403") {
-          console.log(`[Drive] files.get ${id} → not found/access revoked`);
+          console.log(`[Drive] files.get ${id} → not found/access revoked (${Date.now() - t0}ms)`);
           return { id, deleted: true };
         }
-        console.error(`[Drive] files.get ${id} → transient error (skipping):`, err);
+        console.error(`[Drive] files.get ${id} → transient error (skipping, ${Date.now() - t0}ms):`, err);
         return { id, deleted: false };
       }
     })
@@ -133,9 +133,7 @@ export async function fetchComments(
 ): Promise<DriveComment[]> {
   const drive = google.drive({ version: "v3", auth });
   const sinceStr = since ? since.toISOString() : undefined;
-  console.log(
-    `[Drive] comments.list ${googleDocId} (since ${sinceStr ?? "all"})`
-  );
+  const t0 = Date.now();
 
   const comments: DriveComment[] = [];
   let pageToken: string | undefined;
@@ -169,7 +167,7 @@ export async function fetchComments(
   } while (pageToken);
 
   console.log(
-    `[Drive] comments.list ${googleDocId} (since ${sinceStr ?? "all"}) → ${comments.length} comments`
+    `[Drive] comments.list ${googleDocId} (since ${sinceStr ?? "all"}) → ${comments.length} comments (${Date.now() - t0}ms)`
   );
   return comments;
 }
@@ -220,7 +218,7 @@ export async function fetchSuggestions(
   googleDocId: string
 ): Promise<DriveSuggestion[]> {
   const docs = google.docs({ version: "v1", auth });
-  console.log(`[Docs] documents.get ${googleDocId} (suggestions)`);
+  const t0 = Date.now();
 
   let res;
   try {
@@ -230,9 +228,10 @@ export async function fetchSuggestions(
       fields: "body(content(paragraph(elements(textRun(suggestedInsertionIds,suggestedDeletionIds)))))",
     });
   } catch (err) {
-    console.error(`[Docs] documents.get ${googleDocId} failed:`, err);
+    console.error(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
     return [];
   }
+  const elapsed = Date.now() - t0;
 
   const insertionIds = new Set<string>();
   const deletionIds = new Set<string>();
@@ -260,7 +259,7 @@ export async function fetchSuggestions(
     });
   }
 
-  console.log(`[Docs] documents.get ${googleDocId} → ${suggestions.length} suggestions`);
+  console.log(`[Docs] documents.get ${googleDocId} → ${suggestions.length} suggestions (${elapsed}ms)`);
   return suggestions;
 }
 
@@ -271,7 +270,7 @@ export async function fetchSuggestionContent(
   googleDocId: string
 ): Promise<Record<string, SuggestionContent>> {
   const docs = google.docs({ version: "v1", auth });
-  console.log(`[Docs] documents.get ${googleDocId} (suggestion content)`);
+  const t0 = Date.now();
 
   let res;
   try {
@@ -281,9 +280,10 @@ export async function fetchSuggestionContent(
       fields: "body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds)))))",
     });
   } catch (err) {
-    console.error(`[Docs] documents.get ${googleDocId} failed:`, err);
+    console.error(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
     return {};
   }
+  console.log(`[Docs] documents.get ${googleDocId} (suggestion content) (${Date.now() - t0}ms)`);
 
   const insertions: Record<string, string> = {};
   const deletions: Record<string, string> = {};
@@ -358,7 +358,7 @@ export async function fetchThreadDetail(
   commentId: string
 ): Promise<DriveThreadDetail | null> {
   const drive = google.drive({ version: "v3", auth });
-  console.log(`[Drive] comments.get ${googleDocId} comment=${commentId}`);
+  const t0 = Date.now();
 
   const res = await drive.comments.get({
     fileId: googleDocId,
@@ -366,6 +366,7 @@ export async function fetchThreadDetail(
     fields:
       "id, resolved, content, createdTime, modifiedTime, author(me, displayName), replies(content, createdTime, action, author(me, displayName))",
   });
+  console.log(`[Drive] comments.get ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
 
   const c = res.data;
   if (!c.id || c.content == null) return null;
@@ -403,7 +404,7 @@ export async function fetchAllThreads(
   googleDocId: string
 ): Promise<CommentThread[]> {
   const drive = google.drive({ version: "v3", auth });
-  console.log(`[Drive] comments.list ${googleDocId} (threads)`);
+  const t0 = Date.now();
 
   const threads: CommentThread[] = [];
   let pageToken: string | undefined;
@@ -441,7 +442,7 @@ export async function fetchAllThreads(
   } while (pageToken);
 
   console.log(
-    `[Drive] comments.list ${googleDocId} (threads) → ${threads.length} threads`
+    `[Drive] comments.list ${googleDocId} (threads) → ${threads.length} threads (${Date.now() - t0}ms)`
   );
   return threads;
 }
@@ -457,28 +458,28 @@ export async function replyToComment(
 ): Promise<void> {
   const drive = google.drive({ version: "v3", auth });
   const tag = resolve ? " (resolve)" : "";
-  console.log(`[Drive] replies.create${tag} ${googleDocId} comment=${commentId}`);
+  const t0 = Date.now();
   await drive.replies.create({
     fileId: googleDocId,
     commentId,
     fields: "id",
     requestBody: resolve ? { action: "resolve" } : { content },
   });
+  console.log(`[Drive] replies.create${tag} ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
 }
 
-export async function listRecentDocs(userId: string): Promise<DriveDoc[]> {
+export async function listRecentDocs(userId: string, since?: Date): Promise<DriveDoc[]> {
   const auth = await getDriveClient(userId);
   const drive = google.drive({ version: "v3", auth });
 
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const modifiedAfter = thirtyDaysAgo.toISOString();
+  const cutoff = since ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const modifiedAfter = cutoff.toISOString();
 
   const docs: DriveDoc[] = [];
   let pageToken: string | undefined;
 
   do {
-    console.log(`[Drive] files.list (recent docs${pageToken ? ", page " + pageToken.slice(0, 8) + "…" : ""})`);
+    const t0 = Date.now();
     const res = await drive.files.list({
       q: `(mimeType='application/vnd.google-apps.document' or mimeType='application/vnd.google-apps.spreadsheet' or mimeType='application/vnd.google-apps.presentation') and modifiedTime > '${modifiedAfter}' and trashed = false`,
       fields:
@@ -486,7 +487,7 @@ export async function listRecentDocs(userId: string): Promise<DriveDoc[]> {
       pageSize: 100,
       pageToken,
     });
-    console.log(`[Drive] files.list → ${res.data.files?.length ?? 0} files`);
+    console.log(`[Drive] files.list (recent docs${pageToken ? ", page " + pageToken.slice(0, 8) + "…" : ""}) → ${res.data.files?.length ?? 0} files (${Date.now() - t0}ms)`);
 
     const files = res.data.files ?? [];
     for (const file of files) {
