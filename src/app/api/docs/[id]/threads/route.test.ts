@@ -38,9 +38,9 @@ import {
   fetchAllThreads,
 } from "@/lib/google-drive";
 
-const mockAuth = vi.mocked(auth);
-const mockDoc = prisma.doc as { findUnique: ReturnType<typeof vi.fn> };
-const mockComment = prisma.comment as {
+const mockAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
+const mockDoc = prisma.doc as unknown as { findUnique: ReturnType<typeof vi.fn> };
+const mockComment = prisma.comment as unknown as {
   findFirst: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
 };
@@ -78,7 +78,7 @@ describe("GET /api/docs/[id]/threads", () => {
   });
 
   it("returns 404 when doc not found", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(null);
     const req = new NextRequest("http://localhost/api/docs/d1/threads");
     const res = await GET(req, makeParams("d1"));
@@ -86,7 +86,7 @@ describe("GET /api/docs/[id]/threads", () => {
   });
 
   it("returns 404 when doc belongs to another user", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ ...docRecord, userId: "other" });
     const req = new NextRequest("http://localhost/api/docs/d1/threads");
     const res = await GET(req, makeParams("d1"));
@@ -94,7 +94,7 @@ describe("GET /api/docs/[id]/threads", () => {
   });
 
   it("returns modifiedTime for checkOnly request", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
     mockCommentsGet.mockResolvedValue({ data: { modifiedTime: "2024-06-15T00:00:00Z" } });
@@ -109,7 +109,7 @@ describe("GET /api/docs/[id]/threads", () => {
   });
 
   it("returns single thread when commentId provided", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
     const thread = { id: "c1", author: "Alice", content: "Hi", createdTime: "", resolved: false, replies: [] };
@@ -128,7 +128,7 @@ describe("GET /api/docs/[id]/threads", () => {
   });
 
   it("returns empty threads when fetchThreadDetail returns null", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
     mockFetchThreadDetail.mockResolvedValue(null);
@@ -140,7 +140,7 @@ describe("GET /api/docs/[id]/threads", () => {
   });
 
   it("returns all threads when no commentId", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
     mockFetchAllThreads.mockResolvedValue([
@@ -155,7 +155,7 @@ describe("GET /api/docs/[id]/threads", () => {
   });
 
   it("returns 502 when Drive API fails", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     mockGetDriveClient.mockRejectedValue(new Error("Drive error"));
 
@@ -178,7 +178,7 @@ describe("POST /api/docs/[id]/threads", () => {
   });
 
   it("returns 404 when doc not found", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(null);
     const req = new NextRequest("http://localhost/api/docs/d1/threads", { method: "POST" });
     const res = await POST(req, makeParams("d1"));
@@ -186,7 +186,7 @@ describe("POST /api/docs/[id]/threads", () => {
   });
 
   it("returns 400 when commentId missing", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const req = new NextRequest("http://localhost/api/docs/d1/threads", { method: "POST" });
     const res = await POST(req, makeParams("d1"));
@@ -196,7 +196,7 @@ describe("POST /api/docs/[id]/threads", () => {
   });
 
   it("returns 404 when comment record not found", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     mockComment.findFirst.mockResolvedValue(null);
     const req = new NextRequest(
@@ -208,7 +208,7 @@ describe("POST /api/docs/[id]/threads", () => {
   });
 
   it("refreshes a comment and updates DB", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "c1",
@@ -238,7 +238,7 @@ describe("POST /api/docs/[id]/threads", () => {
   });
 
   it("auto-archives resolved comment when I resolved it", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "c1",
@@ -265,7 +265,7 @@ describe("POST /api/docs/[id]/threads", () => {
   });
 
   it("preserves MUTED status even when resolved by me", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "c1",
@@ -293,7 +293,7 @@ describe("POST /api/docs/[id]/threads", () => {
   });
 
   it("marks suggestion as resolved when no longer live", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "suggest.abc",
@@ -317,7 +317,7 @@ describe("POST /api/docs/[id]/threads", () => {
   });
 
   it("returns suggestion unchanged when still live", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "suggest.abc",
@@ -340,7 +340,7 @@ describe("POST /api/docs/[id]/threads", () => {
   });
 
   it("preserves MUTED status for resolved suggestion", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "suggest.abc",
@@ -363,7 +363,7 @@ describe("POST /api/docs/[id]/threads", () => {
   });
 
   it("skips suggestion check for non-Docs MIME type", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({
       ...docRecord,
       mimeType: "application/vnd.google-apps.spreadsheet",
@@ -387,7 +387,7 @@ describe("POST /api/docs/[id]/threads", () => {
   });
 
   it("returns 404 when fetchThreadDetail returns null", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "c1",
@@ -406,7 +406,7 @@ describe("POST /api/docs/[id]/threads", () => {
   });
 
   it("returns 502 when Drive API fails", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "c1",

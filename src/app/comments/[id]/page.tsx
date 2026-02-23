@@ -15,20 +15,26 @@ export default async function DocDetailPage({
 
   const { id } = await params;
 
-  const doc = await prisma.doc.findUnique({
-    where: { id },
-    include: {
-      labels: { include: { label: true } },
-      comments: { orderBy: { driveCreatedAt: "asc" } },
-    },
-  });
+  const [doc, allLabels] = await Promise.all([
+    prisma.doc.findUnique({
+      where: { id },
+      include: {
+        labels: { include: { label: true } },
+        comments: { orderBy: { driveCreatedAt: "asc" } },
+      },
+    }),
+    prisma.label.findMany({
+      where: { userId },
+      orderBy: { position: "asc" },
+    }),
+  ]);
 
   if (!doc || doc.userId !== userId) notFound();
 
   return (
     <div className="min-h-screen bg-zinc-50">
       <div className="px-4 py-8">
-        <DocDetail doc={doc as DocWithComments} />
+        <DocDetail doc={doc as DocWithComments} allLabels={allLabels} />
       </div>
     </div>
   );

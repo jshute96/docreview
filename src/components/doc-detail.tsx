@@ -3,10 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
-import type { Comment } from "@prisma/client";
-import type { DocWithComments } from "@/types";
+import type { Comment, Label } from "@prisma/client";
+import type { DocWithComments, DocWithLabels } from "@/types";
 import type { SuggestionContent } from "@/lib/google-drive";
 import { DocTypeIcon } from "@/components/doc-type-icon";
+import { LabelBadge } from "@/components/label-badge";
+import { EditDocDialog } from "@/components/edit-doc-dialog";
+import { ROLE_COLORS } from "@/lib/role-colors";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
 import { Button } from "@/components/ui/button";
@@ -14,11 +17,13 @@ import { formatDate } from "@/lib/utils";
 
 interface DocDetailProps {
   doc: DocWithComments;
+  allLabels: Label[];
 }
 
-export function DocDetail({ doc: initialDoc }: DocDetailProps) {
+export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
   const [doc, setDoc] = useState(initialDoc);
   const [comments, setComments] = useState<Comment[]>(initialDoc.comments);
+  const [archiving, setArchiving] = useState(false);
   const [commentContent, setCommentContent] = useState<Record<string, string>>({});
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
 
@@ -86,6 +91,30 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
       toast.error("Failed to sync comments");
     } finally {
       setRefreshing(false);
+    }
+  }
+
+  function handleEditSave(updated: DocWithLabels) {
+    setDoc((prev) => ({ ...prev, role: updated.role, labels: updated.labels, status: updated.status }));
+  }
+
+  async function handleArchive() {
+    setArchiving(true);
+    try {
+      const newStatus = doc.status === "ACTIVE" ? "ARCHIVED" : "ACTIVE";
+      const res = await fetch(`/api/docs/${doc.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const updated: DocWithLabels = await res.json();
+      setDoc((prev) => ({ ...prev, status: updated.status }));
+      toast.success(newStatus === "ARCHIVED" ? "Archived" : "Unarchived");
+    } catch {
+      toast.error("Failed to update status");
+    } finally {
+      setArchiving(false);
     }
   }
 
@@ -198,6 +227,38 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
             <span className="font-medium text-zinc-400">Modified:</span>{" "}
             {formatDate(doc.lastModifiedInDrive)}
           </span>
+          <span>
+            <span className="font-medium text-zinc-400">DocId:</span>{" "}
+            {doc.googleDocId}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-zinc-600">
+          <span className="font-medium text-zinc-400">Labels:</span>
+          {doc.role === "AUTHOR" && (
+            <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>
+              Author
+            </span>
+          )}
+          {doc.labels.map((dl) => (
+            <LabelBadge key={dl.labelId} label={dl.label} />
+          ))}
+          {doc.role !== "AUTHOR" && doc.labels.length === 0 && (
+            <span className="text-zinc-400">—</span>
+          )}
+          <EditDocDialog doc={doc as unknown as DocWithLabels} allLabels={allLabels} onSave={handleEditSave}>
+            <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
+              Edit
+            </Button>
+          </EditDocDialog>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={handleArchive}
+            disabled={archiving}
+          >
+            {doc.status === "ACTIVE" ? "Archive" : "Unarchive"}
+          </Button>
         </div>
       </div>
 

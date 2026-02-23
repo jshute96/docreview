@@ -34,8 +34,8 @@ import { listRecentDocs, findDeletedDocIds, getDriveClient } from "@/lib/google-
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveTimestamp } from "@/lib/status";
 
-const mockAuth = vi.mocked(auth);
-const mockDoc = prisma.doc as {
+const mockAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
+const mockDoc = prisma.doc as unknown as {
   findMany: ReturnType<typeof vi.fn>;
   upsert: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
@@ -60,7 +60,7 @@ describe("GET /api/docs", () => {
   });
 
   it("returns docs excluding archived by default", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const docs = [{ id: "d1", title: "Active Doc" }];
     mockDoc.findMany.mockResolvedValue(docs);
 
@@ -73,7 +73,7 @@ describe("GET /api/docs", () => {
   });
 
   it("includes archived when includeArchived=true", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findMany.mockResolvedValue([]);
 
     const req = new NextRequest("http://localhost/api/docs?includeArchived=true");
@@ -85,7 +85,7 @@ describe("GET /api/docs", () => {
   });
 
   it("filters by labelId", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findMany.mockResolvedValue([]);
 
     const req = new NextRequest("http://localhost/api/docs?labelId=l1&labelId=l2");
@@ -117,7 +117,7 @@ describe("POST /api/docs", () => {
   });
 
   it("returns 502 when Drive API fails", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockListRecentDocs.mockRejectedValue(new Error("Drive unavailable"));
 
     await suppressingErrors(async () => {
@@ -129,7 +129,7 @@ describe("POST /api/docs", () => {
   });
 
   it("syncs docs and returns counts (load mode)", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
     mockListRecentDocs.mockResolvedValue([
@@ -166,7 +166,7 @@ describe("POST /api/docs", () => {
   });
 
   it("counts updated docs when they already exist", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
     mockListRecentDocs.mockResolvedValue([
@@ -198,7 +198,7 @@ describe("POST /api/docs", () => {
   });
 
   it("marks deleted docs from Drive", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
     mockListRecentDocs.mockResolvedValue([]); // no docs from Drive
@@ -222,7 +222,7 @@ describe("POST /api/docs", () => {
   });
 
   it("full-refresh mode syncs comments for all non-deleted docs", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
     // Drive returns one doc (g1), but DB has two non-deleted docs (g1, g2)
@@ -260,7 +260,7 @@ describe("POST /api/docs", () => {
   });
 
   it("refresh mode skips new docs", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
     mockListRecentDocs.mockResolvedValue([

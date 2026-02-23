@@ -20,12 +20,12 @@ import { GET, PATCH } from "./route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
-const mockAuth = vi.mocked(auth);
-const mockDoc = prisma.doc as {
+const mockAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
+const mockDoc = prisma.doc as unknown as {
   findUnique: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
 };
-const mockLabel = prisma.label as {
+const mockLabel = prisma.label as unknown as {
   findMany: ReturnType<typeof vi.fn>;
 };
 
@@ -46,7 +46,7 @@ describe("GET /api/docs/[id]", () => {
   });
 
   it("returns 404 when doc not found", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(null);
     const req = new NextRequest("http://localhost/api/docs/d1");
     const res = await GET(req, makeParams("d1"));
@@ -54,7 +54,7 @@ describe("GET /api/docs/[id]", () => {
   });
 
   it("returns 404 when doc belongs to another user", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "other-user" });
     const req = new NextRequest("http://localhost/api/docs/d1");
     const res = await GET(req, makeParams("d1"));
@@ -62,7 +62,7 @@ describe("GET /api/docs/[id]", () => {
   });
 
   it("returns 200 with doc data for owner", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const doc = { id: "d1", userId: "u1", title: "Test", labels: [], comments: [] };
     mockDoc.findUnique.mockResolvedValue(doc);
     const req = new NextRequest("http://localhost/api/docs/d1");
@@ -91,7 +91,7 @@ describe("PATCH /api/docs/[id]", () => {
   });
 
   it("returns 404 when doc not found", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(null);
     const [req, params] = makePatchReq("d1", { role: "AUTHOR" });
     const res = await PATCH(req, params);
@@ -99,7 +99,7 @@ describe("PATCH /api/docs/[id]", () => {
   });
 
   it("returns 400 for invalid JSON", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
     const req = new NextRequest("http://localhost/api/docs/d1", {
       method: "PATCH",
@@ -113,7 +113,7 @@ describe("PATCH /api/docs/[id]", () => {
   });
 
   it("returns 400 for invalid role", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
     const [req, params] = makePatchReq("d1", { role: "INVALID" });
     const res = await PATCH(req, params);
@@ -123,7 +123,7 @@ describe("PATCH /api/docs/[id]", () => {
   });
 
   it("returns 400 for invalid status", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
     const [req, params] = makePatchReq("d1", { status: "DELETED" });
     const res = await PATCH(req, params);
@@ -133,7 +133,7 @@ describe("PATCH /api/docs/[id]", () => {
   });
 
   it("returns 400 for non-array labelIds", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
     const [req, params] = makePatchReq("d1", { labelIds: "not-array" });
     const res = await PATCH(req, params);
@@ -143,7 +143,7 @@ describe("PATCH /api/docs/[id]", () => {
   });
 
   it("returns 400 when labelIds include unowned label", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
     // Only 1 of 2 labels found → means one isn't owned by user
     mockLabel.findMany.mockResolvedValue([{ id: "l1" }]);
@@ -155,7 +155,7 @@ describe("PATCH /api/docs/[id]", () => {
   });
 
   it("returns 200 on successful role update", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
     const updatedDoc = { id: "d1", userId: "u1", role: "AUTHOR", labels: [], _count: { comments: 0 } };
     mockDoc.update.mockResolvedValue(updatedDoc);
@@ -167,7 +167,7 @@ describe("PATCH /api/docs/[id]", () => {
   });
 
   it("returns 200 on successful status update", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
     const updatedDoc = { id: "d1", userId: "u1", status: "ARCHIVED", labels: [], _count: { comments: 0 } };
     mockDoc.update.mockResolvedValue(updatedDoc);
@@ -179,7 +179,7 @@ describe("PATCH /api/docs/[id]", () => {
   });
 
   it("returns 200 on successful label update with empty array", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } } as Awaited<ReturnType<typeof auth>>);
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
     const updatedDoc = { id: "d1", userId: "u1", labels: [], _count: { comments: 0 } };
     mockDoc.update.mockResolvedValue(updatedDoc);

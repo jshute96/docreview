@@ -100,7 +100,7 @@ describe("filterDocs", () => {
     const docs = [
       makeDoc({
         title: "Labeled",
-        labels: [{ id: "dl1", docId: "d1", labelId: "L1", label: { id: "L1", userId: "u", name: "Bug", color: null, position: 0 } }] as DocWithLabels["labels"],
+        labels: [{ docId: "d1", labelId: "L1", label: { id: "L1", userId: "u", name: "Bug", color: null, position: 0 } }] as DocWithLabels["labels"],
       }),
       makeDoc({ title: "Unlabeled" }),
     ];
