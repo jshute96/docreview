@@ -102,6 +102,16 @@ The doc detail page provides three ways to narrow the comment table:
 All five data columns (Created, Modified, Responses, Mine, Replied, Status) are sortable.
 Modified shows "—" when it equals Created (i.e., no replies have been added).
 
+**Sort freezing on single-comment updates:** When you reply to, resolve, refresh, or
+otherwise modify a single comment, its `driveModifiedAt` changes. If the table re-sorted
+immediately, that row would jump to a new position — disorienting when you're mid-conversation.
+To prevent this, single-comment updates freeze the table order: rows stay where they are and
+the sort column icon switches to the unselected state (↕) to signal the displayed order may be
+stale. The frozen order is a snapshot of the positions from the last active sort, stored in a
+ref. Clicking any column header or the global **Refresh** button reactivates sorting and
+restores the sort icon. Comments that get filtered out (e.g., resolved while viewing "Open")
+still disappear; only the relative order of remaining rows is preserved.
+
 ---
 
 ## Suggestions

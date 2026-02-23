@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import type { Comment } from "@prisma/client";
@@ -42,8 +42,15 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
   type SortDir = "asc" | "desc";
   const [sortCol, setSortCol] = useState<SortCol>("driveModifiedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  // When a single comment is updated (reply, resolve, refresh), we freeze the
+  // table order so it doesn't jump around. Sort icons go unselected to signal
+  // the order may be stale. Clicking a column header or the global Refresh
+  // reactivates sorting.
+  const [sortActive, setSortActive] = useState(true);
+  const frozenOrderRef = useRef<Map<string, number>>(new Map());
 
   function handleSort(col: SortCol) {
+    setSortActive(true);
     if (sortCol === col) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
@@ -61,6 +68,7 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
       const updated: DocWithComments = await res.json();
       setDoc(updated);
       setComments(updated.comments);
+      setSortActive(true);
       void fetchContent();
       toast.success("Comments synced");
     } catch {
@@ -71,6 +79,7 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
   }
 
   function handleCommentUpdate(updated: Comment) {
+    setSortActive(false);
     setComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   }
 
@@ -84,6 +93,11 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
       return true;
     })
     .sort((a, b) => {
+      if (!sortActive) {
+        const aPos = frozenOrderRef.current.get(a.id) ?? Infinity;
+        const bPos = frozenOrderRef.current.get(b.id) ?? Infinity;
+        return aPos - bPos;
+      }
       let cmp = 0;
       if (sortCol === "driveCreatedAt" || sortCol === "driveModifiedAt") {
         const aTime = a[sortCol] ? new Date(a[sortCol]!).getTime() : 0;
@@ -97,8 +111,13 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
       return sortDir === "asc" ? cmp : -cmp;
     });
 
+  // Snapshot display order while sort is active so we can freeze it later
+  if (sortActive) {
+    frozenOrderRef.current = new Map(filteredComments.map((c, i) => [c.id, i]));
+  }
+
   function SortIcon({ col }: { col: SortCol }) {
-    if (sortCol !== col) return <span className="ml-1 text-zinc-300">↕</span>;
+    if (!sortActive || sortCol !== col) return <span className="ml-1 text-zinc-300">↕</span>;
     return <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
