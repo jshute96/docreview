@@ -55,19 +55,19 @@ describe("parseGoogleDocId", () => {
 });
 
 describe("deriveCommentFlags", () => {
-  it("returns isMine true when author.me is true", () => {
+  it("returns isThreadAuthor true when author.me is true", () => {
     const result = deriveCommentFlags({ me: true }, []);
-    expect(result.isMine).toBe(true);
+    expect(result.isThreadAuthor).toBe(true);
   });
 
-  it("returns isMine false when author.me is false", () => {
+  it("returns isThreadAuthor false when author.me is false", () => {
     const result = deriveCommentFlags({ me: false }, []);
-    expect(result.isMine).toBe(false);
+    expect(result.isThreadAuthor).toBe(false);
   });
 
-  it("returns isMine false when author is null", () => {
+  it("returns isThreadAuthor false when author is null", () => {
     const result = deriveCommentFlags(null, []);
-    expect(result.isMine).toBe(false);
+    expect(result.isThreadAuthor).toBe(false);
   });
 
   it("returns iParticipated true when a non-resolve reply is mine", () => {
@@ -77,11 +77,11 @@ describe("deriveCommentFlags", () => {
     expect(result.iParticipated).toBe(true);
   });
 
-  it("returns iParticipated false when only resolve reply is mine", () => {
+  it("returns iParticipated true when only resolve reply is mine", () => {
     const result = deriveCommentFlags({ me: false }, [
       { action: "resolve", author: { me: true } },
     ]);
-    expect(result.iParticipated).toBe(false);
+    expect(result.iParticipated).toBe(true);
   });
 
   it("returns iParticipated false when no replies are mine", () => {
@@ -116,8 +116,16 @@ describe("deriveCommentFlags", () => {
     expect(result.iResolvedIt).toBe(false);
   });
 
+  it("returns iParticipated true when thread author even with only others' replies", () => {
+    const result = deriveCommentFlags({ me: true }, [
+      { action: null, author: { me: false } },
+    ]);
+    expect(result.isThreadAuthor).toBe(true);
+    expect(result.iParticipated).toBe(true);
+  });
+
   it("handles empty replies array", () => {
     const result = deriveCommentFlags({ me: true }, []);
-    expect(result).toEqual({ isMine: true, iParticipated: false, iResolvedIt: false });
+    expect(result).toEqual({ isThreadAuthor: true, iParticipated: true, iResolvedIt: false });
   });
 });

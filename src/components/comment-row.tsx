@@ -271,18 +271,15 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         comment.replyCount > 0 ? comment.replyCount : ""
       )}
       {cell(`${cellPy} pr-4`,
-        !isSuggestion && comment.isMine && (
+        !isSuggestion && comment.isThreadAuthor ? (
           <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
             Mine
           </span>
-        )
-      )}
-      {cell(`${cellPy} pr-4`,
-        !isSuggestion && comment.iParticipated && (
+        ) : !isSuggestion && comment.iParticipated ? (
           <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700">
             Replied
           </span>
-        )
+        ) : null
       )}
       {cell(`${cellPy} pr-4`,
         comment.resolved ? (
@@ -334,7 +331,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         onClick={handleRowClick}
         {...hoverHandlers}
       >
-        <td colSpan={7} className="max-w-0 overflow-hidden">
+        <td colSpan={6} className="max-w-0 overflow-hidden">
           <div className={cellWrap} style={cellWrapStyle}>
             <div className="overflow-hidden min-h-0 pt-0.5 pb-2 pl-4 pr-4">
           {isSuggestion && !suggestionContent && comment.resolved ? (
@@ -365,7 +362,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     )}
     {hasBeenExpanded && (
       <tr className={`${expanded && !isExiting ? "border-b border-zinc-100" : ""}${isExiting ? " pointer-events-none" : ""}`}>
-        <td colSpan={7} className="p-0">
+        <td colSpan={6} className="p-0">
           <div
             className="grid transition-[grid-template-rows] duration-200 ease-out"
             style={{ gridTemplateRows: expanded && !isExiting ? "1fr" : "0fr" }}

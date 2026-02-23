@@ -71,7 +71,7 @@ export async function POST(
       where: { id: commentRecord.id },
       data: {
         resolved: data.resolved,
-        isMine: data.isMine,
+        isThreadAuthor: data.isThreadAuthor,
         iParticipated: data.iParticipated,
         ...(isMuted ? {} : { status }),
         driveCreatedAt: data.driveCreatedAt,

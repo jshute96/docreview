@@ -40,35 +40,18 @@ test user.
 
 ## Architecture
 
-**Auth flow:** `src/auth.ts` exports `{ handlers, auth, signIn, signOut }` from NextAuth v5.
-The `auth()` function works in both server components and API routes. `PrismaAdapter` persists
-sessions and OAuth tokens to SQLite. The `Account` table stores the Google `access_token` and
-`refresh_token` needed for Drive API calls.
+See `docs/*.md` for detailed architecture docs — keep them in sync with behavior changes:
+- `docs/refresh.md` — full refresh flow (Drive sync, deletion detection, comment sync, UI update)
+- `docs/comment-tracking.md` — comment status logic, unarchive rules, filter behavior
+- `docs/suggestions.md` — suggestion sync via Docs API, limitations
 
-**Google Drive sync:** `src/lib/google-drive.ts` reads tokens from the `Account` table, builds
-an `OAuth2Client`, and registers a `tokens` event to write refreshed tokens back to the DB.
-`listRecentDocs()` queries files modified in the last 30 days (Docs, Sheets, Slides) and
-auto-detects role: `owners[].me === true` → AUTHOR, else REVIEWER. `findDeletedDocIds()` runs
-parallel `files.get` calls to detect deletions; only ACTIVE docs are checked.
-
-**Data flow:** `POST /api/docs` calls `listRecentDocs()` and upserts results — new docs get
-default role/status, existing docs get title/URL/mimeType/lastModified updated (preserving
-user-set role/status/labels). After upserting, checks ACTIVE docs absent from Drive results and
-marks them `isDeleted = true`. `PATCH /api/docs/[id]` handles role, status, and label
-assignments in one call (labels replaced wholesale via `deleteMany` + `create`).
-
-**UI state:** `docs/page.tsx` is a server component that fetches initial data and passes it to
-`DocTable` (client component). All filter/sort state and optimistic doc list updates live in
-`DocTable`. After Drive sync, `RefreshButton` fetches the full updated doc list from
-`GET /api/docs?includeArchived=true` and calls `onRefresh` to update `DocTable` state directly
-— no page reload needed. Mutations in `DocRow` and `EditDocDialog` call the API then invoke
-`onUpdate` callbacks to update parent state.
-
-**Role colors:** Defined in `src/lib/role-colors.ts` and shared across `DocRow`,
-`EditDocDialog`, and `FilterBar`. Author = blue, Reviewer = violet.
+**Quick reference:**
+- Auth: `src/auth.ts` — NextAuth v5, `auth()` works in server components and API routes
+- Drive client: `src/lib/google-drive.ts` — OAuth2Client with auto-token-refresh
+- Comment sync: `src/lib/sync-comments.ts` — full-scan sync with smart unarchive
+- UI entry: `src/app/docs/page.tsx` (server) → `src/components/doc-table.tsx` (client)
+- Role colors: `src/lib/role-colors.ts` — Author = blue, Reviewer = violet
 
 **Schema notes:** SQLite doesn't support enums — `Doc.role` and `Doc.status` are `String`
-fields with string defaults (`"REVIEWER"`, `"ACTIVE"`). Valid values are `AUTHOR`/`REVIEWER`
-and `ACTIVE`/`ARCHIVED`. `Doc.isDeleted` (Boolean) marks files deleted/trashed/access-revoked
-in Drive. `Doc.mimeType` stores the Drive MIME type for icon display. Prisma 5 is pinned
-(Prisma 7 dropped `url = env(...)` support in schema.prisma).
+fields with string defaults (`"REVIEWER"`, `"ACTIVE"`). Prisma 5 is pinned (Prisma 7 dropped
+`url = env(...)` support in schema.prisma).

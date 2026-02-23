@@ -43,7 +43,7 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
   const [myCommentsFilter, setMyCommentsFilter] = useState(false);
   const [showMode, setShowMode] = useState<"active" | "open" | "all">("active");
   const [suggestionsOnly, setSuggestionsOnly] = useState(false);
-  type SortCol = "driveCreatedAt" | "driveModifiedAt" | "replyCount" | "isMine" | "iParticipated" | "resolved";
+  type SortCol = "driveCreatedAt" | "driveModifiedAt" | "replyCount" | "iParticipated" | "resolved";
   type SortDir = "asc" | "desc";
   const [sortCol, setSortCol] = useState<SortCol>("driveModifiedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -60,8 +60,8 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
     if (suggestionsOnly && c.type !== "SUGGESTION") return true;
     if (showMode === "active" && (c.status === "ARCHIVED" || c.status === "MUTED")) return true;
     if (showMode === "open" && c.resolved) return true;
-    if (myThreadsFilter && !c.isMine && !c.iParticipated) return true;
-    if (myCommentsFilter && !c.isMine) return true;
+    if (myThreadsFilter && !c.iParticipated) return true;
+    if (myCommentsFilter && !c.isThreadAuthor) return true;
     return false;
   }
 
@@ -296,8 +296,7 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
                 </th>
                 <ThButton col="driveModifiedAt">Modified</ThButton>
                 <ThButton col="replyCount">Responses</ThButton>
-                <ThButton col="isMine">Mine</ThButton>
-                <ThButton col="iParticipated">Replied</ThButton>
+                <ThButton col="iParticipated">Created</ThButton>
                 <ThButton col="resolved">Status</ThButton>
                 <th className="pr-4 py-2.5 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide">
                   Actions

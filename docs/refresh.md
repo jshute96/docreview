@@ -83,7 +83,7 @@ were dropped entirely.
 **Fields fetched per comment:** `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me))`
 
 **Fields stored per comment:** `driveCreatedAt`, `driveModifiedAt`, `replyCount` (= number
-of replies), plus `resolved`, `isMine`, `iParticipated`, `iResolvedIt`. All Drive API
+of replies), plus `resolved`, `isThreadAuthor`, `iParticipated`, `iResolvedIt`. All Drive API
 results are stored as `type: "COMMENT"`.
 
 **Suggestions via Docs API:** for Google Docs files, a second pass calls `documents.get`
@@ -92,8 +92,19 @@ with `suggest.xxx` IDs. Any previously-active suggestion no longer returned by t
 is marked resolved — this runs even when the Docs API returns zero suggestions.
 
 For full details on comment status logic (ACTIVE / ARCHIVED / MUTED, who-resolved-it
-detection, `isMine` / `iParticipated`), see [`comment-tracking.md`](./comment-tracking.md).
+detection, `isThreadAuthor` / `iParticipated`), see [`comment-tracking.md`](./comment-tracking.md).
 For the full picture on suggestions specifically, see [`suggestions.md`](./suggestions.md).
+
+---
+
+## Phase 3.5 — Smart Unarchive
+
+After comment sync completes, each doc's sync result includes a `shouldUnarchive` flag
+indicating whether meaningful new activity was detected. ARCHIVED docs are moved back to
+ACTIVE only when this flag is true — not merely because they have unresolved comments.
+
+See [Doc Unarchive Rules](./comment-tracking.md#doc-unarchive-rules) for the full logic
+(`isInteresting` check, MUTED handling, self-resolved exceptions).
 
 ---
 

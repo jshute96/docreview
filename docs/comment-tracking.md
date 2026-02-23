@@ -20,8 +20,8 @@ filter and sort controls.
 | Field | Source | Description |
 |-------|--------|-------------|
 | `resolved` | Drive | Whether the thread is marked resolved |
-| `isMine` | Drive | I created the original comment |
-| `iParticipated` | Drive | I replied to this thread (non-resolve reply) |
+| `isThreadAuthor` | Drive | I created the original comment |
+| `iParticipated` | Drive | I'm involved in this thread (authored it or replied, including resolve actions) |
 | `iResolvedIt` | Drive | I was the one who resolved it |
 | `driveCreatedAt` | Drive | When the comment was originally created |
 | `driveModifiedAt` | Drive | When the comment (or any reply) was last modified |
@@ -86,6 +86,40 @@ reminded each refresh.
 
 ---
 
+## Doc Unarchive Rules
+
+When a doc has been archived by the user, it should only resurface if there's **new meaningful
+activity** during the current sync — not just because an old unresolved comment exists.
+
+During `syncComments`, a `shouldUnarchive` flag is tracked. An ARCHIVED doc moves back to
+ACTIVE only when this flag is set. Activity is evaluated using an `isInteresting` check:
+
+```ts
+const isInteresting = !(c.resolved && c.iResolvedIt) && (
+  doc.role === "AUTHOR" || c.iParticipated
+);
+```
+
+A comment is interesting if I'm the doc author or a participant in the thread, unless I
+resolved it myself. This replaces the previous XOR check (`isMine !== doc.role === "AUTHOR"`)
+with a simpler model: "does this activity concern me?"
+
+**New comment** (not previously in DB):
+- If `isInteresting` → unarchive.
+- Doc author sees all new threads; participants see threads they're involved in.
+
+**New replies on existing thread** (`replyCount` increased):
+- If the thread is not MUTED and `isInteresting` → unarchive.
+
+**New suggestion** (not previously in DB):
+- Unarchive only when `doc.role === "AUTHOR"` (new suggestions on my docs).
+- Suggestions have `isThreadAuthor=false` and `iParticipated=false`, so `isInteresting`
+  doesn't apply — the check is explicit.
+
+**MUTED threads**: never trigger unarchive, regardless of new activity.
+
+---
+
 ## Detail Page Filters
 
 The doc detail page provides three ways to narrow the comment table:
@@ -96,8 +130,8 @@ The doc detail page provides three ways to narrow the comment table:
 - **All** — every comment, including archived and muted
 
 **Toggle filters** (AND-combined with show mode):
-- **My threads** — keep only `isMine || iParticipated`
-- **My comments** — keep only `isMine`
+- **My threads** — keep only `iParticipated` (since `isThreadAuthor` implies `iParticipated`)
+- **My comments** — keep only `isThreadAuthor`
 
 All five data columns (Created, Modified, Responses, Mine, Replied, Status) are sortable.
 Modified shows "—" when it equals Created (i.e., no replies have been added).
@@ -137,14 +171,15 @@ their own sync logic. They are displayed in the comment table and can be filtere
 
 ---
 
-## "I Participated" and Reply Count Detection
+## Participation and Reply Count Detection
 
 Each comment object includes author info and a list of replies. The replies array is fetched
 once and used for three derived fields:
 
-- **`isMine`** — `comment.author.me === true`: I created this thread.
-- **`iParticipated`** — at least one reply has `author.me === true` AND `action` is not
-  `"resolve"` (i.e., a substantive reply, not just a resolve action).
+- **`isThreadAuthor`** — `comment.author.me === true`: I created this thread.
+- **`iParticipated`** — `isThreadAuthor || replies.some(r => r.author?.me === true)`:
+  Am I involved in this thread at all? Includes thread authorship, substantive replies,
+  and resolve actions.
 - **`iResolvedIt`** — find the last reply where `action === "resolve"`; true if
   `author.me === true`.
 - **`replyCount`** — `replies.length`: total number of replies to the original comment,

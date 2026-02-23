@@ -82,10 +82,10 @@ timestamp (falling back to the current time if that is null). This is a rough
 approximation — the suggestion may have been created before or after that timestamp.
 `driveModifiedAt` remains `null` and shows "—" in the UI.
 
-### No isMine / iParticipated
+### No isThreadAuthor / iParticipated
 
 Authorship and reply participation come from Drive API comment data. Suggestion records
-have `isMine: false` and `iParticipated: false` by default. The "My threads" and "My
+have `isThreadAuthor: false` and `iParticipated: false` by default. The "My threads" and "My
 comments" filters have no effect on suggestions.
 
 ### Suggestion text content

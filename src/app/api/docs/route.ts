@@ -151,24 +151,18 @@ export async function POST(req: NextRequest) {
     : await prisma.doc.findMany({
         where: { userId, isDeleted: false, googleDocId: { in: [...driveDocIds] } },
       });
-  const commentCounts = await Promise.all(
+  const syncResults = await Promise.all(
     activeDocs.map((doc) => syncComments(doc, driveAuth))
   );
-  const comments = commentCounts.reduce((sum, n) => sum + n, 0);
+  const comments = syncResults.reduce((sum, r) => sum + r.created, 0);
 
-  // Unarchive any ARCHIVED docs that now have ACTIVE comments
+  // Unarchive ARCHIVED docs only when syncComments detected meaningful new activity
   let unarchived = 0;
-  const archivedDocsWithActiveComments = await prisma.doc.findMany({
-    where: {
-      userId,
-      status: "ARCHIVED",
-      isDeleted: false,
-      comments: { some: { status: "ACTIVE" } },
-    },
-  });
-  for (const doc of archivedDocsWithActiveComments) {
-    await prisma.doc.update({ where: { id: doc.id }, data: { status: "ACTIVE" } });
-    unarchived++;
+  for (let i = 0; i < activeDocs.length; i++) {
+    if (activeDocs[i].status === "ARCHIVED" && syncResults[i].shouldUnarchive) {
+      await prisma.doc.update({ where: { id: activeDocs[i].id }, data: { status: "ACTIVE" } });
+      unarchived++;
+    }
   }
 
   // Save sync timestamp (captured before the Drive scan to avoid race conditions)

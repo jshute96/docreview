@@ -114,7 +114,7 @@ describe("GET /api/docs/[id]/threads", () => {
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
     const thread = { id: "c1", author: "Alice", content: "Hi", createdTime: "", resolved: false, replies: [] };
     mockFetchThreadDetail.mockResolvedValue({
-      resolved: false, isMine: true, iParticipated: false, iResolvedIt: false,
+      resolved: false, isThreadAuthor: true, iParticipated: false, iResolvedIt: false,
       driveCreatedAt: null, driveModifiedAt: null, replyCount: 0,
       thread,
     });
@@ -219,11 +219,11 @@ describe("POST /api/docs/[id]/threads", () => {
 
     const thread = { id: "c1", author: "Alice", content: "Hi", createdTime: "", resolved: false, replies: [] };
     mockFetchThreadDetail.mockResolvedValue({
-      resolved: false, isMine: true, iParticipated: false, iResolvedIt: false,
+      resolved: false, isThreadAuthor: true, iParticipated: false, iResolvedIt: false,
       driveCreatedAt: new Date("2024-06-01"), driveModifiedAt: new Date("2024-06-10"),
       replyCount: 2, thread,
     });
-    const updatedComment = { ...commentRecord, isMine: true, replyCount: 2 };
+    const updatedComment = { ...commentRecord, isThreadAuthor: true, replyCount: 2 };
     mockComment.update.mockResolvedValue(updatedComment);
 
     const req = new NextRequest(
@@ -233,7 +233,7 @@ describe("POST /api/docs/[id]/threads", () => {
     const res = await POST(req, makeParams("d1"));
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.comment.isMine).toBe(true);
+    expect(data.comment.isThreadAuthor).toBe(true);
     expect(data.threads).toHaveLength(1);
   });
 
@@ -249,7 +249,7 @@ describe("POST /api/docs/[id]/threads", () => {
 
     const thread = { id: "c1", author: "Me", content: "Done", createdTime: "", resolved: true, replies: [] };
     mockFetchThreadDetail.mockResolvedValue({
-      resolved: true, isMine: true, iParticipated: false, iResolvedIt: true,
+      resolved: true, isThreadAuthor: true, iParticipated: false, iResolvedIt: true,
       driveCreatedAt: null, driveModifiedAt: null, replyCount: 0, thread,
     });
     mockComment.update.mockResolvedValue({ ...commentRecord, resolved: true, status: "ARCHIVED" });
@@ -275,7 +275,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
 
     mockFetchThreadDetail.mockResolvedValue({
-      resolved: true, isMine: false, iParticipated: true, iResolvedIt: true,
+      resolved: true, isThreadAuthor: false, iParticipated: true, iResolvedIt: true,
       driveCreatedAt: null, driveModifiedAt: null, replyCount: 1,
       thread: { id: "c1", author: "X", content: "y", createdTime: "", resolved: true, replies: [] },
     });

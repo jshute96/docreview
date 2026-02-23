@@ -107,7 +107,7 @@ model Comment {
   type            String    @default("COMMENT")  // COMMENT | SUGGESTION
   suggestionType  String?                         // INSERT | DELETE | EDIT
   resolved        Boolean   @default(false)
-  isMine          Boolean   @default(false)
+  isThreadAuthor  Boolean   @default(false)
   iParticipated   Boolean   @default(false)
   status          String    @default("ACTIVE")    // ACTIVE | ARCHIVED | MUTED
   driveCreatedAt  DateTime?

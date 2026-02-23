@@ -6,17 +6,17 @@ const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 
 // Syncs all comments and suggestions for a single doc. Always does a full scan —
 // Drive API's startModifiedTime filter silently excludes suggestions.
-// Returns the number of new comment records created.
+// Returns the number of new comment records created and whether the doc should be unarchived.
 export async function syncComments(
   doc: Doc,
   driveAuth: Awaited<ReturnType<typeof getDriveClient>>
-): Promise<number> {
+): Promise<{ created: number; shouldUnarchive: boolean }> {
   let comments;
   try {
     comments = await fetchComments(driveAuth, doc.googleDocId);
   } catch (err) {
     console.error(`[Comments] failed for ${doc.googleDocId}:`, err);
-    return 0;
+    return { created: 0, shouldUnarchive: false };
   }
 
   // All Drive API results are regular comments. Suggestions come exclusively from Docs API.
@@ -30,11 +30,18 @@ export async function syncComments(
   }
 
   let created = 0;
+  let shouldUnarchive = false;
 
   for (const c of comments) {
     const existing = await prisma.comment.findUnique({
       where: { docId_googleCommentId: { docId: doc.id, googleCommentId: c.id } },
     });
+
+    // Activity is interesting if I'm the doc author or a participant in the thread,
+    // unless I resolved it myself.
+    const isInteresting = !(c.resolved && c.iResolvedIt) && (
+      doc.role === "AUTHOR" || c.iParticipated
+    );
 
     if (!existing) {
       const status = c.resolved ? "ARCHIVED" : "ACTIVE";
@@ -44,7 +51,7 @@ export async function syncComments(
           googleCommentId: c.id,
           type: "COMMENT",
           resolved: c.resolved,
-          isMine: c.isMine,
+          isThreadAuthor: c.isThreadAuthor,
           iParticipated: c.iParticipated,
           status,
           driveCreatedAt: c.driveCreatedAt,
@@ -53,6 +60,7 @@ export async function syncComments(
         },
       });
       created++;
+      if (isInteresting) shouldUnarchive = true;
     } else {
       if (existing.status === "MUTED") {
         await prisma.comment.update({
@@ -66,6 +74,10 @@ export async function syncComments(
           },
         });
         continue;
+      }
+      // Existing comment with new replies: check for unarchive
+      if (c.replyCount > existing.replyCount) {
+        if (existing.status !== "MUTED" && isInteresting) shouldUnarchive = true;
       }
       const status = c.resolved && c.iResolvedIt ? "ARCHIVED" : "ACTIVE";
       await prisma.comment.update({
@@ -87,7 +99,7 @@ export async function syncComments(
     data: { commentsLastSyncedAt: new Date() },
   });
 
-  if (doc.mimeType !== DOCS_MIME_TYPE) return created;
+  if (doc.mimeType !== DOCS_MIME_TYPE) return { created, shouldUnarchive };
 
   // Docs API sync: ensures ALL pending suggestions are tracked.
   const existingSuggestionIds = new Set(
@@ -115,7 +127,12 @@ export async function syncComments(
         suggestionType: s.suggestionType,
       },
     });
-    if (!existingSuggestionIds.has(s.id)) created++;
+    if (!existingSuggestionIds.has(s.id)) {
+      created++;
+      // New suggestion: unarchive if I'm the doc author (suggestions have
+      // isThreadAuthor=false and iParticipated=false)
+      if (doc.role === "AUTHOR") shouldUnarchive = true;
+    }
   }
 
   // Mark suggest.xxx suggestions no longer in the document as resolved.
@@ -134,5 +151,5 @@ export async function syncComments(
     }
   }
 
-  return created;
+  return { created, shouldUnarchive };
 }

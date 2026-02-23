@@ -10,6 +10,7 @@
 * gmail scan
 * dialog box for filtering what to Load from Drive
 * add/remove labels from multiple docs (multi-select or filtered view)
+* Mute state on docs
 
 * hosting
   * postgres

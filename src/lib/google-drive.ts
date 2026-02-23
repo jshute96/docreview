@@ -102,7 +102,7 @@ export async function findDeletedDocIds(
 export interface DriveComment {
   id: string;
   resolved: boolean;
-  isMine: boolean;
+  isThreadAuthor: boolean;
   iParticipated: boolean;
   iResolvedIt: boolean;
   driveCreatedAt: Date | null;
@@ -114,16 +114,16 @@ export interface DriveComment {
 export function deriveCommentFlags(
   author: { me?: boolean | null } | undefined | null,
   replies: { action?: string | null; author?: { me?: boolean | null } | null }[]
-): { isMine: boolean; iParticipated: boolean; iResolvedIt: boolean } {
-  const isMine = author?.me === true;
-  const iParticipated = replies.some(
-    (r) => r.action !== "resolve" && r.author?.me === true
+): { isThreadAuthor: boolean; iParticipated: boolean; iResolvedIt: boolean } {
+  const isThreadAuthor = author?.me === true;
+  const iParticipated = isThreadAuthor || replies.some(
+    (r) => r.author?.me === true
   );
   const lastResolveReply = [...replies]
     .reverse()
     .find((r) => r.action === "resolve");
   const iResolvedIt = lastResolveReply?.author?.me === true;
-  return { isMine, iParticipated, iResolvedIt };
+  return { isThreadAuthor, iParticipated, iResolvedIt };
 }
 
 export async function fetchComments(
@@ -341,7 +341,7 @@ export interface CommentThread {
 // plus the displayable thread content. Returned by fetchThreadDetail().
 export interface DriveThreadDetail {
   resolved: boolean;
-  isMine: boolean;
+  isThreadAuthor: boolean;
   iParticipated: boolean;
   iResolvedIt: boolean;
   driveCreatedAt: Date | null;
