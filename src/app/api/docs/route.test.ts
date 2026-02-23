@@ -248,21 +248,21 @@ describe("POST /api/docs", () => {
     const data = await res.json();
     expect(data.mode).toBe("full-refresh");
     expect(data.updated).toBe(1); // g1 updated, g2 not in Drive results so not upserted
-    expect(data.added).toBe(0); // g1 already existed, full-refresh skips new docs
+    expect(data.added).toBe(0); // g1 already existed in DB
     // Full-refresh uses incremental timestamp
     expect(mockGetStatus).toHaveBeenCalledWith("u1");
     // Comment sync called for both docs (full-refresh syncs all)
     expect(mockSyncComments).toHaveBeenCalledTimes(2);
   });
 
-  it("refresh mode skips new docs", async () => {
+  it("full-refresh mode auto-adds new AUTHOR docs", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
     mockListRecentDocs.mockResolvedValue([
       {
         googleDocId: "g1",
-        title: "New Doc",
+        title: "My New Doc",
         driveUrl: "https://docs.google.com/document/d/g1/edit",
         mimeType: "application/vnd.google-apps.document",
         role: "AUTHOR" as const,
@@ -273,8 +273,68 @@ describe("POST /api/docs", () => {
     ]);
 
     mockDoc.findMany
-      .mockResolvedValueOnce([]) // existingDocIds — g1 not in DB, so it's skipped in refresh
-      .mockResolvedValueOnce([]); // activeDocs for comment sync (scoped to Drive-returned docs)
+      .mockResolvedValueOnce([]) // existingDocIds — g1 not in DB
+      .mockResolvedValueOnce([]); // activeDocs for comment sync (all non-deleted)
+    mockDoc.upsert.mockResolvedValue({});
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+
+    const res = await POST(postRequest("full-refresh"));
+    const data = await res.json();
+    expect(data.mode).toBe("full-refresh");
+    expect(data.added).toBe(1);
+    expect(mockDoc.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("refresh mode auto-adds new AUTHOR docs", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
+    mockGetDriveClient.mockResolvedValue(driveAuth);
+    mockListRecentDocs.mockResolvedValue([
+      {
+        googleDocId: "g1",
+        title: "My New Doc",
+        driveUrl: "https://docs.google.com/document/d/g1/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "AUTHOR" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Owner",
+      },
+    ]);
+
+    mockDoc.findMany
+      .mockResolvedValueOnce([]) // existingDocIds — g1 not in DB
+      .mockResolvedValueOnce([]); // activeDocs for comment sync
+    mockDoc.upsert.mockResolvedValue({});
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+
+    const res = await POST(postRequest("refresh"));
+    const data = await res.json();
+    expect(data.mode).toBe("refresh");
+    expect(data.added).toBe(1);
+    expect(mockDoc.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("refresh mode skips new REVIEWER docs", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
+    mockGetDriveClient.mockResolvedValue(driveAuth);
+    mockListRecentDocs.mockResolvedValue([
+      {
+        googleDocId: "g1",
+        title: "Someone Else's Doc",
+        driveUrl: "https://docs.google.com/document/d/g1/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "REVIEWER" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Someone",
+      },
+    ]);
+
+    mockDoc.findMany
+      .mockResolvedValueOnce([]) // existingDocIds — g1 not in DB, skipped as REVIEWER
+      .mockResolvedValueOnce([]); // activeDocs for comment sync
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
 
     const res = await POST(postRequest("refresh"));

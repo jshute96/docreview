@@ -85,8 +85,8 @@ export async function POST(req: NextRequest) {
     console.log(`[Sync] Doc found: ${doc.title} (${doc.googleDocId})`);
     const isExisting = existingDocIds.has(doc.googleDocId);
 
-    // Refresh/full-refresh mode: skip new docs — only update metadata for docs already in DB
-    if ((mode === "refresh" || mode === "full-refresh") && !isExisting) continue;
+    // Refresh/full-refresh: auto-add new docs I authored; skip other new docs
+    if ((mode === "refresh" || mode === "full-refresh") && !isExisting && doc.role !== "AUTHOR") continue;
 
     await prisma.doc.upsert({
       where: { userId_googleDocId: { userId, googleDocId: doc.googleDocId } },

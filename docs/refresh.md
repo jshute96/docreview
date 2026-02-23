@@ -29,8 +29,12 @@ own data about who owns the file, not something we infer.
 
 **Upsert logic:** for each file Drive returns:
 
-- **New doc (not in DB):** created with Drive-detected role and `createdTimeInDrive` /
-  `owner`. Default status is `ACTIVE`.
+- **New AUTHOR doc (not in DB, user owns it):** created with `role: "AUTHOR"` and
+  `createdTimeInDrive` / `owner`. Default status is `ACTIVE`. This happens in all modes
+  (load, refresh, full-refresh) so authored docs are auto-tracked.
+- **New REVIEWER doc (not in DB, someone else owns it):** only added during **load** mode
+  (initial page load). Refresh and full-refresh skip these — reviewer docs must already be
+  tracked in the DB or added manually via `/api/docs/add`.
 - **Existing doc:** `title`, `driveUrl`, `mimeType`, `lastModifiedInDrive`, `owner`,
   `createdTimeInDrive`, and `isDeleted` are updated when at least one has changed or
   `isDeleted` was true (re-appeared in Drive means access was restored). `role`, `status`,

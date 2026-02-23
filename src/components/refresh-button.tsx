@@ -32,6 +32,7 @@ export function RefreshButton({ mode, onRefresh }: RefreshButtonProps) {
 
       if (mode === "refresh" || mode === "full-refresh") {
         const parts = [
+          data.added > 0 ? `${data.added} new` : "",
           data.updated > 0 ? `${data.updated} updated` : "",
           data.unarchived > 0 ? `${data.unarchived} unarchived` : "",
         ].filter(Boolean).join(", ");
