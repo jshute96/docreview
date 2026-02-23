@@ -47,7 +47,7 @@ export function DocRow({ doc, allLabels, onUpdate }: DocRowProps) {
       <td className="py-1.5 pl-4 pr-4">
         <div className="flex flex-wrap items-center gap-2">
           <a
-            href={`/docs/${doc.id}`}
+            href={`/comments/${doc.id}`}
             className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline hover:text-blue-600 ${
               doc.isDeleted ? "line-through text-zinc-400" : "text-zinc-900"
             }`}
