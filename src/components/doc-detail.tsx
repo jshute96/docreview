@@ -48,6 +48,17 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
   // reactivates sorting.
   const [sortActive, setSortActive] = useState(true);
   const frozenOrderRef = useRef<Map<string, number>>(new Map());
+  // IDs of comments animating out (slide collapse) before removal from the filtered list
+  const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
+
+  function wouldBeFilteredOut(c: Comment): boolean {
+    if (suggestionsOnly && c.type !== "SUGGESTION") return true;
+    if (showMode === "active" && (c.status === "ARCHIVED" || c.status === "MUTED")) return true;
+    if (showMode === "open" && c.resolved) return true;
+    if (myThreadsFilter && !c.isMine && !c.iParticipated) return true;
+    if (myCommentsFilter && !c.isMine) return true;
+    return false;
+  }
 
   function handleSort(col: SortCol) {
     setSortActive(true);
@@ -80,18 +91,22 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
 
   function handleCommentUpdate(updated: Comment) {
     setSortActive(false);
+    if (wouldBeFilteredOut(updated)) {
+      setExitingIds((prev) => new Set(prev).add(updated.id));
+      setTimeout(() => {
+        setExitingIds((prev) => {
+          if (!prev.has(updated.id)) return prev;
+          const next = new Set(prev);
+          next.delete(updated.id);
+          return next;
+        });
+      }, 200);
+    }
     setComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   }
 
   const filteredComments = comments
-    .filter((c) => {
-      if (suggestionsOnly && c.type !== "SUGGESTION") return false;
-      if (showMode === "active" && (c.status === "ARCHIVED" || c.status === "MUTED")) return false;
-      if (showMode === "open" && c.resolved) return false;
-      if (myThreadsFilter && !c.isMine && !c.iParticipated) return false;
-      if (myCommentsFilter && !c.isMine) return false;
-      return true;
-    })
+    .filter((c) => exitingIds.has(c.id) || !wouldBeFilteredOut(c))
     .sort((a, b) => {
       if (!sortActive) {
         const aPos = frozenOrderRef.current.get(a.id) ?? Infinity;
@@ -238,6 +253,7 @@ export function DocDetail({ doc: initialDoc }: DocDetailProps) {
                   content={comment.type === "COMMENT" ? commentContent[comment.googleCommentId] : undefined}
                   suggestionContent={comment.type === "SUGGESTION" ? suggestionContent[comment.googleCommentId] : undefined}
                   onUpdate={handleCommentUpdate}
+                  isExiting={exitingIds.has(comment.id)}
                 />
               ))}
             </tbody>
