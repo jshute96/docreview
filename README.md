@@ -10,18 +10,22 @@ A personal tool for tracking Google Docs review status, comments, and suggestion
 
 ## Setup
 
-1. **Install dependencies** (each checkout needs its own node_modules):
+1. **nvm setup** (if not set up in .profile / .bashrc)
    ```bash
    . /home/jshute/.nvm/nvm.sh && nvm use 20
+   ```
+
+2. **Install dependencies** (each checkout needs its own node_modules):
+   ```bash
    npm install
    ```
 
-2. **Create a PostgreSQL database:**
+3. **Create a PostgreSQL database:**
    ```bash
    createdb docreview
    ```
 
-3. **Configure `.env`:**
+4. **Configure `.env`:**
    ```
    DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/docreview"
    AUTH_SECRET="..."         # generate with: npx auth secret
@@ -29,19 +33,19 @@ A personal tool for tracking Google Docs review status, comments, and suggestion
    AUTH_GOOGLE_SECRET="..."
    ```
 
-4. **Google Cloud setup:**
+5. **Google Cloud setup:**
    - Create an OAuth 2.0 client (Web application type)
    - Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
    - Enable the **Google Drive API** and **Google Docs API**
    - Configure OAuth consent screen with `drive` and `documents.readonly` scopes
    - Add your Google account as a test user
 
-5. **Initialize the database:**
+6. **Initialize the database:**
    ```bash
    npx prisma migrate dev
    ```
 
-6. **Start the dev server:**
+7. **Start the dev server:**
    ```bash
    npm run dev
    ```
@@ -93,7 +97,7 @@ npx prisma studio
 psql docreview
 
 # Raw SQL via Prisma (no psql required)
-echo "SELECT title, role, status FROM \"Doc\";" | npx prisma db execute --stdin
+echo "SELECT title, role, status FROM docs;" | npx prisma db execute --stdin
 ```
 
 ## Commands

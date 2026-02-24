@@ -5,10 +5,7 @@ repository. See `README.md` for setup instructions and available commands.
 
 ## Running Commands
 
-Node 20 is required. Always source nvm before running any command:
-```bash
-. /home/jshute/.nvm/nvm.sh && nvm use 20
-```
+Node 20 is required (provided by nvm via `~/.profile`).
 
 After any schema change, restart the dev server — Next.js holds the Prisma client in memory
 and won't pick up the regenerated client until restart.
