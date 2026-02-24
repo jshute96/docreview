@@ -42,3 +42,5 @@ dropped `url = env(...)` support in schema.prisma).
 - Where code has subtle or suprising logic, add comments to explain it.
 - Ask for human review before making database schema changes or manual data updates.
 - `README.md` has setup and debugging commands. Keep that up to date.
+- Don't run DDL or DML (updates or alters) on postgres without asking me.
+  You can only run queries and other readonly commands.

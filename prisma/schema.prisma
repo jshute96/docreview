@@ -15,21 +15,23 @@ model User {
   id            String    @id @default(cuid())
   name          String?
   email         String?   @unique
-  emailVerified DateTime?
+  emailVerified DateTime? @map("email_verified")
   image         String?
   accounts      Account[]
   sessions      Session[]
   docs          Doc[]
   labels        Label[]
   status        Status?
+
+  @@map("users")
 }
 
 model Account {
   id                String  @id @default(cuid())
-  userId            String
+  userId            String  @map("user_id")
   type              String
   provider          String
-  providerAccountId String
+  providerAccountId String  @map("provider_account_id")
   refresh_token     String?
   access_token      String?
   expires_at        Int?
@@ -40,14 +42,17 @@ model Account {
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@map("accounts")
 }
 
 model Session {
   id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
 }
 
 model VerificationToken {
@@ -56,47 +61,60 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+  @@map("verification_tokens")
 }
 
 model Status {
-  userId                   String    @id
-  lastDriveUpdateTimestamp  DateTime?
-  lastGmailUpdateTimestamp  DateTime?
+  userId                   String    @id @map("user_id")
+  lastDriveUpdateTimestamp  DateTime? @map("last_drive_update_timestamp")
+  lastGmailUpdateTimestamp  DateTime? @map("last_gmail_update_timestamp")
   user                     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("statuses")
 }
 
 // Enums
 enum DocRole {
   AUTHOR
   REVIEWER
+
+  @@map("doc_role")
 }
 
 enum DocStatus {
   ACTIVE
   ARCHIVED
+
+  @@map("doc_status")
 }
 
 enum CommentType {
   COMMENT
   SUGGESTION
+
+  @@map("comment_type")
 }
 
 enum SuggestionType {
   INSERT
   DELETE
   EDIT
+
+  @@map("suggestion_type")
 }
 
 enum CommentStatus {
   ACTIVE
   ARCHIVED
   MUTED
+
+  @@map("comment_status")
 }
 
 // App models
 model Label {
   id     String     @id @default(cuid())
-  userId String
+  userId String     @map("user_id")
   name   String
   color  String?
   position Int      @default(0)
@@ -104,55 +122,59 @@ model Label {
   docs   DocLabel[]
 
   @@unique([userId, name])
+  @@map("labels")
 }
 
 model Doc {
   id                   String     @id @default(cuid())
-  userId               String
-  googleDocId          String
+  userId               String     @map("user_id")
+  googleDocId          String     @map("google_doc_id")
   title                String
-  driveUrl             String
-  mimeType             String?
+  driveUrl             String     @map("drive_url")
+  mimeType             String?    @map("mime_type")
   role                 DocRole    @default(REVIEWER)
   status               DocStatus  @default(ACTIVE)
-  isDeleted            Boolean    @default(false)
-  lastModifiedInDrive  DateTime?
+  isDeleted            Boolean    @default(false) @map("is_deleted")
+  lastModifiedInDrive  DateTime?  @map("last_modified_in_drive")
   owner                String?
-  createdTimeInDrive   DateTime?
-  addedAt              DateTime   @default(now())
-  commentsLastSyncedAt DateTime?
+  createdTimeInDrive   DateTime?  @map("created_time_in_drive")
+  addedAt              DateTime   @default(now()) @map("added_at")
+  commentsLastSyncedAt DateTime?  @map("comments_last_synced_at")
   user                 User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   labels               DocLabel[]
   comments             Comment[]
 
   @@unique([userId, googleDocId])
+  @@map("docs")
 }
 
 model Comment {
   id              String         @id @default(cuid())
-  docId           String
-  googleCommentId String
+  docId           String         @map("doc_id")
+  googleCommentId String         @map("google_comment_id")
   type            CommentType    @default(COMMENT)
-  suggestionType  SuggestionType?
+  suggestionType  SuggestionType? @map("suggestion_type")
   resolved        Boolean        @default(false)
-  isThreadAuthor  Boolean        @default(false)
-  iParticipated   Boolean        @default(false)
+  isThreadAuthor  Boolean        @default(false) @map("is_thread_author")
+  iParticipated   Boolean        @default(false) @map("i_participated")
   status          CommentStatus  @default(ACTIVE)
-  driveCreatedAt  DateTime?
-  driveModifiedAt DateTime?
-  replyCount      Int            @default(0)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  driveCreatedAt  DateTime?      @map("drive_created_at")
+  driveModifiedAt DateTime?      @map("drive_modified_at")
+  replyCount      Int            @default(0) @map("reply_count")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
   doc             Doc            @relation(fields: [docId], references: [id], onDelete: Cascade)
 
   @@unique([docId, googleCommentId])
+  @@map("comments")
 }
 
 model DocLabel {
-  docId   String
-  labelId String
+  docId   String @map("doc_id")
+  labelId String @map("label_id")
   doc     Doc    @relation(fields: [docId], references: [id], onDelete: Cascade)
   label   Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
 
   @@id([docId, labelId])
+  @@map("doc_labels")
 }
