@@ -1,17 +1,58 @@
 # Docreview
 
-A personal Google Workspace file tracking tool. Syncs Docs, Sheets, and Slides from Google
-Drive and lets you track custom metadata: role (Author/Reviewer), status (Active/Archived),
-and labels.
+A personal tool for tracking Google Docs review status, comments, and suggestions via the Google Drive API.
+
+## Prerequisites
+
+- **Node.js 20+** (via nvm recommended)
+- **PostgreSQL 14+**
+- **Google Cloud project** with OAuth 2.0 credentials and Drive API enabled
+
+## Setup
+
+1. **Install dependencies** (each checkout needs its own node_modules):
+   ```bash
+   . /home/jshute/.nvm/nvm.sh && nvm use 20
+   npm install
+   ```
+
+2. **Create a PostgreSQL database:**
+   ```bash
+   createdb docreview
+   ```
+
+3. **Configure `.env`:**
+   ```
+   DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/docreview"
+   AUTH_SECRET="..."         # generate with: npx auth secret
+   AUTH_GOOGLE_ID="..."
+   AUTH_GOOGLE_SECRET="..."
+   ```
+
+4. **Google Cloud setup:**
+   - Create an OAuth 2.0 client (Web application type)
+   - Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+   - Enable the **Google Drive API** and **Google Docs API**
+   - Configure OAuth consent screen with `drive` and `documents.readonly` scopes
+   - Add your Google account as a test user
+
+5. **Initialize the database:**
+   ```bash
+   npx prisma migrate dev
+   ```
+
+6. **Start the dev server:**
+   ```bash
+   npm run dev
+   ```
+   Visit `http://localhost:3000`, sign in with Google, and click **Refresh** to sync files
+   from Drive.
 
 ## Running
 
 ```bash
-. /home/jshute/.nvm/nvm.sh && nvm use 20
 npm run dev
 ```
-
-Visit `http://localhost:3000`.
 
 To run a second instance (e.g. from a separate checkout), use the `-p` flag:
 
@@ -19,38 +60,10 @@ To run a second instance (e.g. from a separate checkout), use the `-p` flag:
 npm run dev -- -p 3001
 ```
 
-To share the database with another checkout, set the database path in `.env`:
-
-```
-DATABASE_URL="file:/home/jshute/dev/docreview/prisma/prisma/dev.db"
-```
-
----
-
-## Setup
-
-```bash
-# Install dependencies (each checkout needs its own node_modules)
-. /home/jshute/.nvm/nvm.sh && nvm use 20
-npm install
-
-# Create the database
-npx prisma migrate dev
-
-# Start the dev server
-npm run dev
-
-# Start server on a specific port.
-npm run dev -- -p 3001
-```
-
-Fill in `.env` with your credentials before starting (see CLAUDE.md for details). Then visit
-`http://localhost:3000`, sign in with Google, and click **Refresh** to sync files from Drive.
-
 ## Testing
 
 ```bash
-npm test          # run all tests once
+npm test            # run all tests once
 npm run test:watch  # run tests in watch mode
 ```
 
@@ -76,9 +89,33 @@ npx prisma migrate dev
 # Visual browser UI
 npx prisma studio
 
-# Raw SQL (if sqlite3 is installed)
-sqlite3 prisma/prisma/dev.db
+# Raw SQL via psql
+psql docreview
 
-# Raw SQL via Prisma (no sqlite3 required)
-echo "SELECT title, role, status FROM Doc;" | npx prisma db execute --stdin
+# Raw SQL via Prisma (no psql required)
+echo "SELECT title, role, status FROM \"Doc\";" | npx prisma db execute --stdin
 ```
+
+## Commands
+
+```bash
+npm run dev       # start dev server at http://localhost:3000
+npm run build     # production build (also runs type checking)
+npm run lint      # ESLint
+npm run test      # run tests
+npx tsc --noEmit  # type check without building
+
+npx prisma migrate dev --name <name>  # create and apply a migration
+npx prisma studio                     # open DB browser at http://localhost:5555
+npx prisma generate                   # regenerate client after schema changes
+```
+
+## Architecture
+
+- **Auth:** NextAuth v5 with Google OAuth (`src/auth.ts`)
+- **Database:** PostgreSQL via Prisma 5 (`prisma/schema.prisma`)
+- **Drive sync:** Google Drive API v3 (`src/lib/google-drive.ts`)
+- **Comment sync:** Full-scan sync with smart unarchive (`src/lib/sync-comments.ts`)
+- **UI:** Next.js App Router — server component entry (`src/app/docs/page.tsx`) with client-side table (`src/components/doc-table.tsx`)
+
+See `docs/*.md` for detailed architecture documentation.

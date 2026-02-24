@@ -11,9 +11,12 @@
 * dialog box for filtering what to Load from Drive
 * add/remove labels from multiple docs (multi-select or filtered view)
 * Mute state on docs
+* Track what comments I've seen, and show the new ones in a different color
+* Three-state label filtering
+* UI: merge label filter with other state filtering
+* Search/filter box on comments/ view.
 
 * hosting
-  * postgres
   * cloud run
   * deployment scripts
 * testing?

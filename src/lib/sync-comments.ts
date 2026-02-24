@@ -77,7 +77,8 @@ export async function syncComments(
       }
       // Existing comment with new replies: check for unarchive
       if (c.replyCount > existing.replyCount) {
-        if (existing.status !== "MUTED" && isInteresting) shouldUnarchive = true;
+        // MUTED comments already handled above (early continue), so status is ACTIVE or ARCHIVED here
+        if (isInteresting) shouldUnarchive = true;
       }
       const status = c.resolved && c.iResolvedIt ? "ARCHIVED" : "ACTIVE";
       await prisma.comment.update({

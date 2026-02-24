@@ -1,42 +1,17 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this
-repository.
+repository. See `README.md` for setup instructions and available commands.
 
-## Commands
+## Running Commands
 
 Node 20 is required. Always source nvm before running any command:
 ```bash
 . /home/jshute/.nvm/nvm.sh && nvm use 20
 ```
 
-```bash
-npm run dev       # start dev server at http://localhost:3000
-npm run build     # production build (also runs type checking)
-npm run lint      # ESLint
-npx tsc --noEmit  # type check without building
-
-npx prisma migrate dev --name <name>  # create and apply a migration
-npx prisma studio                     # open DB browser at http://localhost:5555
-npx prisma generate                   # regenerate client after schema changes
-```
-
 After any schema change, restart the dev server — Next.js holds the Prisma client in memory
 and won't pick up the regenerated client until restart.
-
-## Environment
-
-`.env` requires:
-```
-DATABASE_URL="file:./prisma/dev.db"
-AUTH_SECRET="..."         # generate with: npx auth secret
-AUTH_GOOGLE_ID="..."
-AUTH_GOOGLE_SECRET="..."
-```
-
-Google Cloud: OAuth redirect URI must be `http://localhost:3000/api/auth/callback/google`.
-Drive API and `drive.readonly` scope must be enabled. Your Google account must be added as a
-test user.
 
 ## Architecture
 
@@ -52,6 +27,18 @@ See `docs/*.md` for detailed architecture docs — keep them in sync with behavi
 - UI entry: `src/app/docs/page.tsx` (server) → `src/components/doc-table.tsx` (client)
 - Role colors: `src/lib/role-colors.ts` — Author = blue, Reviewer = violet
 
-**Schema notes:** SQLite doesn't support enums — `Doc.role` and `Doc.status` are `String`
-fields with string defaults (`"REVIEWER"`, `"ACTIVE"`). Prisma 5 is pinned (Prisma 7 dropped
-`url = env(...)` support in schema.prisma).
+**Schema notes:** PostgreSQL is required. Enum types are used for `Doc.role`, `Doc.status`,
+`Comment.type`, `Comment.suggestionType`, and `Comment.status`. Prisma 5 is pinned (Prisma 7
+dropped `url = env(...)` support in schema.prisma).
+
+## Rules
+
+- `docs/` has design docs.
+  - This includes docs on any areas with non-trival logic or behavior.
+  - Consult these docs as needed, and keep them up to date, describing the intended
+    behavior in any non-trival cases.
+- Run tests before commit code.
+- Write tests to cover all logic, where reasonable.
+- Where code has subtle or suprising logic, add comments to explain it.
+- Ask for human review before making database schema changes or manual data updates.
+- `README.md` has setup and debugging commands. Keep that up to date.

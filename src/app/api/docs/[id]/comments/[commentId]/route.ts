@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { CommentStatus } from "@prisma/client";
 
 export async function PATCH(
   req: NextRequest,
@@ -27,9 +28,9 @@ export async function PATCH(
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const { status } = body as { status: "ACTIVE" | "ARCHIVED" | "MUTED" };
+  const { status } = body as { status: CommentStatus };
 
-  const VALID_STATUSES = ["ACTIVE", "ARCHIVED", "MUTED"];
+  const VALID_STATUSES: string[] = Object.values(CommentStatus);
   if (!VALID_STATUSES.includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }

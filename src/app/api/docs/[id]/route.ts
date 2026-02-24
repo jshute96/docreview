@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { DocRole, DocStatus } from "@prisma/client";
 
-const VALID_ROLES = ["AUTHOR", "REVIEWER"];
-const VALID_STATUSES = ["ACTIVE", "ARCHIVED"];
+const VALID_ROLES: string[] = Object.values(DocRole);
+const VALID_STATUSES: string[] = Object.values(DocStatus);
 
 export async function GET(
   _req: NextRequest,
@@ -52,8 +53,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
   const { role, status, labelIds } = body as {
-    role?: string;
-    status?: string;
+    role?: DocRole;
+    status?: DocStatus;
     labelIds?: string[];
   };
 

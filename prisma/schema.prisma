@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -65,6 +65,34 @@ model Status {
   user                     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// Enums
+enum DocRole {
+  AUTHOR
+  REVIEWER
+}
+
+enum DocStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum CommentType {
+  COMMENT
+  SUGGESTION
+}
+
+enum SuggestionType {
+  INSERT
+  DELETE
+  EDIT
+}
+
+enum CommentStatus {
+  ACTIVE
+  ARCHIVED
+  MUTED
+}
+
 // App models
 model Label {
   id     String     @id @default(cuid())
@@ -85,8 +113,8 @@ model Doc {
   title                String
   driveUrl             String
   mimeType             String?
-  role                 String     @default("REVIEWER")  // AUTHOR | REVIEWER
-  status               String     @default("ACTIVE")    // ACTIVE | ARCHIVED
+  role                 DocRole    @default(REVIEWER)
+  status               DocStatus  @default(ACTIVE)
   isDeleted            Boolean    @default(false)
   lastModifiedInDrive  DateTime?
   owner                String?
@@ -101,21 +129,21 @@ model Doc {
 }
 
 model Comment {
-  id              String    @id @default(cuid())
+  id              String         @id @default(cuid())
   docId           String
   googleCommentId String
-  type            String    @default("COMMENT")  // COMMENT | SUGGESTION
-  suggestionType  String?                         // INSERT | DELETE | EDIT
-  resolved        Boolean   @default(false)
-  isThreadAuthor  Boolean   @default(false)
-  iParticipated   Boolean   @default(false)
-  status          String    @default("ACTIVE")    // ACTIVE | ARCHIVED | MUTED
+  type            CommentType    @default(COMMENT)
+  suggestionType  SuggestionType?
+  resolved        Boolean        @default(false)
+  isThreadAuthor  Boolean        @default(false)
+  iParticipated   Boolean        @default(false)
+  status          CommentStatus  @default(ACTIVE)
   driveCreatedAt  DateTime?
   driveModifiedAt DateTime?
-  replyCount      Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  doc             Doc       @relation(fields: [docId], references: [id], onDelete: Cascade)
+  replyCount      Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  doc             Doc            @relation(fields: [docId], references: [id], onDelete: Cascade)
 
   @@unique([docId, googleCommentId])
 }
