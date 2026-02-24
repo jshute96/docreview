@@ -1,6 +1,6 @@
 import type { DocWithLabels } from "@/types";
 
-export type SortCol = "title" | "lastModifiedInDrive" | "comments";
+export type SortCol = "title" | "lastModifiedInDrive" | "watched" | "open";
 export type SortDir = "asc" | "desc";
 
 export interface FilterOptions {
@@ -18,7 +18,7 @@ export function filterDocs(
 ): DocWithLabels[] {
   return docs.filter((doc) => {
     if (!opts.showArchived && doc.status === "ARCHIVED") return false;
-    if (opts.hasCommentsFilter && doc._count.comments === 0) return false;
+    if (opts.hasCommentsFilter && doc._count.openComments === 0) return false;
     if (opts.roleFilter === "AUTHOR" && doc.role !== "AUTHOR") return false;
     if (opts.roleFilter === "NOT_AUTHOR" && doc.role === "AUTHOR") return false;
     if (
@@ -54,8 +54,10 @@ export function sortDocs(
     let cmp = 0;
     if (col === "title") {
       cmp = a.title.localeCompare(b.title);
-    } else if (col === "comments") {
-      cmp = a._count.comments - b._count.comments;
+    } else if (col === "watched") {
+      cmp = a._count.watchedComments - b._count.watchedComments;
+    } else if (col === "open") {
+      cmp = a._count.openComments - b._count.openComments;
     } else {
       const aTime = a.lastModifiedInDrive
         ? new Date(a.lastModifiedInDrive).getTime()

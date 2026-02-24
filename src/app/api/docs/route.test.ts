@@ -61,7 +61,7 @@ describe("GET /api/docs", () => {
 
   it("returns docs excluding archived by default", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    const docs = [{ id: "d1", title: "Active Doc" }];
+    const docs = [{ id: "d1", title: "Active Doc", comments: [] }];
     mockDoc.findMany.mockResolvedValue(docs);
 
     const req = new NextRequest("http://localhost/api/docs");

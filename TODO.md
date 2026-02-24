@@ -6,7 +6,7 @@
 
 * Make refresh on a doc faster, and probably cheaper, by doing fewer API calls.
 * Use last comments sync timestamp during doc refresh
-* Split comment count in active / open
+* If someone else resolves my thread, that comment should stay active/watched?
 * gmail scan
 * dialog box for filtering what to Load from Drive
 * add/remove labels from multiple docs (multi-select or filtered view)

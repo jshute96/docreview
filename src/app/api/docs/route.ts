@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { listRecentDocs, findDeletedDocIds, getDriveClient } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveTimestamp } from "@/lib/status";
+import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
   const includeArchived = searchParams.get("includeArchived") === "true";
   const labelIds = searchParams.getAll("labelId");
 
-  const docs = await prisma.doc.findMany({
+  const rawDocs = await prisma.doc.findMany({
     where: {
       userId,
       ...(includeArchived ? {} : { status: "ACTIVE" }),
@@ -24,14 +25,11 @@ export async function GET(req: NextRequest) {
         ? { labels: { some: { labelId: { in: labelIds } } } }
         : {}),
     },
-    include: {
-      labels: { include: { label: true } },
-      _count: { select: { comments: { where: { status: "ACTIVE" } } } },
-    },
+    include: docWithCountsInclude,
     orderBy: { lastModifiedInDrive: "desc" },
   });
 
-  return NextResponse.json(docs);
+  return NextResponse.json(rawDocs.map(withCommentCounts));
 }
 
 export async function POST(req: NextRequest) {

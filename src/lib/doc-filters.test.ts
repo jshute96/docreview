@@ -19,7 +19,7 @@ function makeDoc(overrides: Partial<DocWithLabels> & { title: string }): DocWith
     createdTimeInDrive: overrides.createdTimeInDrive ?? null,
     owner: overrides.owner ?? null,
     labels: overrides.labels ?? [],
-    _count: overrides._count ?? { comments: 0 },
+    _count: overrides._count ?? { watchedComments: 0, openComments: 0 },
   } as DocWithLabels;
 }
 
@@ -54,8 +54,8 @@ describe("filterDocs", () => {
 
   it("filters by hasComments", () => {
     const docs = [
-      makeDoc({ title: "NoComments", _count: { comments: 0 } }),
-      makeDoc({ title: "HasComments", _count: { comments: 3 } }),
+      makeDoc({ title: "NoComments", _count: { watchedComments: 0, openComments: 0 } }),
+      makeDoc({ title: "HasComments", _count: { watchedComments: 1, openComments: 3 } }),
     ];
     const result = filterDocs(docs, { ...defaultOpts, hasCommentsFilter: true });
     expect(result).toHaveLength(1);
@@ -174,23 +174,43 @@ describe("sortDocs", () => {
     expect(result.map((d) => d.title)).toEqual(["Charlie", "Bravo", "Alpha"]);
   });
 
-  it("sorts by comments ascending", () => {
+  it("sorts by watched comments ascending", () => {
     const docs = [
-      makeDoc({ title: "Many", _count: { comments: 10 } }),
-      makeDoc({ title: "Few", _count: { comments: 1 } }),
-      makeDoc({ title: "None", _count: { comments: 0 } }),
+      makeDoc({ title: "Many", _count: { watchedComments: 5, openComments: 10 } }),
+      makeDoc({ title: "Few", _count: { watchedComments: 1, openComments: 3 } }),
+      makeDoc({ title: "None", _count: { watchedComments: 0, openComments: 2 } }),
     ];
-    const result = sortDocs(docs, "comments", "asc");
+    const result = sortDocs(docs, "watched", "asc");
     expect(result.map((d) => d.title)).toEqual(["None", "Few", "Many"]);
   });
 
-  it("sorts by comments descending", () => {
+  it("sorts by watched comments descending", () => {
     const docs = [
-      makeDoc({ title: "None", _count: { comments: 0 } }),
-      makeDoc({ title: "Many", _count: { comments: 10 } }),
-      makeDoc({ title: "Few", _count: { comments: 1 } }),
+      makeDoc({ title: "None", _count: { watchedComments: 0, openComments: 2 } }),
+      makeDoc({ title: "Many", _count: { watchedComments: 5, openComments: 10 } }),
+      makeDoc({ title: "Few", _count: { watchedComments: 1, openComments: 3 } }),
     ];
-    const result = sortDocs(docs, "comments", "desc");
+    const result = sortDocs(docs, "watched", "desc");
+    expect(result.map((d) => d.title)).toEqual(["Many", "Few", "None"]);
+  });
+
+  it("sorts by open comments ascending", () => {
+    const docs = [
+      makeDoc({ title: "Many", _count: { watchedComments: 5, openComments: 10 } }),
+      makeDoc({ title: "Few", _count: { watchedComments: 0, openComments: 1 } }),
+      makeDoc({ title: "None", _count: { watchedComments: 0, openComments: 0 } }),
+    ];
+    const result = sortDocs(docs, "open", "asc");
+    expect(result.map((d) => d.title)).toEqual(["None", "Few", "Many"]);
+  });
+
+  it("sorts by open comments descending", () => {
+    const docs = [
+      makeDoc({ title: "None", _count: { watchedComments: 0, openComments: 0 } }),
+      makeDoc({ title: "Many", _count: { watchedComments: 5, openComments: 10 } }),
+      makeDoc({ title: "Few", _count: { watchedComments: 0, openComments: 1 } }),
+    ];
+    const result = sortDocs(docs, "open", "desc");
     expect(result.map((d) => d.title)).toEqual(["Many", "Few", "None"]);
   });
 

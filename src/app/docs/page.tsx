@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { DocTable } from "@/components/doc-table";
+import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 import type { DocWithLabels } from "@/types";
 
 export default async function DocsPage() {
@@ -9,13 +10,10 @@ export default async function DocsPage() {
   if (!session?.user?.id) redirect("/login");
   const userId = session.user.id;
 
-  const [docs, labels] = await Promise.all([
+  const [rawDocs, labels] = await Promise.all([
     prisma.doc.findMany({
       where: { userId },
-      include: {
-        labels: { include: { label: true } },
-        _count: { select: { comments: { where: { status: "ACTIVE" } } } },
-      },
+      include: docWithCountsInclude,
       orderBy: { lastModifiedInDrive: "desc" },
     }),
     prisma.label.findMany({
@@ -23,6 +21,8 @@ export default async function DocsPage() {
       orderBy: { position: "asc" },
     }),
   ]);
+
+  const docs = rawDocs.map(withCommentCounts);
 
   return (
     <div className="min-h-screen bg-zinc-50">

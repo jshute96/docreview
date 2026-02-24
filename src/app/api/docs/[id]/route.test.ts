@@ -157,7 +157,7 @@ describe("PATCH /api/docs/[id]", () => {
   it("returns 200 on successful role update", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
-    const updatedDoc = { id: "d1", userId: "u1", role: "AUTHOR", labels: [], _count: { comments: 0 } };
+    const updatedDoc = { id: "d1", userId: "u1", role: "AUTHOR", labels: [], comments: [] };
     mockDoc.update.mockResolvedValue(updatedDoc);
     const [req, params] = makePatchReq("d1", { role: "AUTHOR" });
     const res = await PATCH(req, params);
@@ -169,7 +169,7 @@ describe("PATCH /api/docs/[id]", () => {
   it("returns 200 on successful status update", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
-    const updatedDoc = { id: "d1", userId: "u1", status: "ARCHIVED", labels: [], _count: { comments: 0 } };
+    const updatedDoc = { id: "d1", userId: "u1", status: "ARCHIVED", labels: [], comments: [] };
     mockDoc.update.mockResolvedValue(updatedDoc);
     const [req, params] = makePatchReq("d1", { status: "ARCHIVED" });
     const res = await PATCH(req, params);
@@ -181,7 +181,7 @@ describe("PATCH /api/docs/[id]", () => {
   it("returns 200 on successful label update with empty array", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
-    const updatedDoc = { id: "d1", userId: "u1", labels: [], _count: { comments: 0 } };
+    const updatedDoc = { id: "d1", userId: "u1", labels: [], comments: [] };
     mockDoc.update.mockResolvedValue(updatedDoc);
     const [req, params] = makePatchReq("d1", { labelIds: [] });
     const res = await PATCH(req, params);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DocRole, DocStatus } from "@prisma/client";
+import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 
 const VALID_ROLES: string[] = Object.values(DocRole);
 const VALID_STATUSES: string[] = Object.values(DocStatus);
@@ -94,11 +95,8 @@ export async function PATCH(
           }
         : {}),
     },
-    include: {
-      labels: { include: { label: true } },
-      _count: { select: { comments: { where: { status: "ACTIVE" } } } },
-    },
+    include: docWithCountsInclude,
   });
 
-  return NextResponse.json(updated);
+  return NextResponse.json(withCommentCounts(updated));
 }

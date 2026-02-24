@@ -65,8 +65,17 @@ export function DocRow({ doc, allLabels, onUpdate }: DocRowProps) {
           ))}
         </div>
       </td>
-      <td className="py-1.5 pr-4 text-sm text-zinc-500">
-        {doc._count.comments > 0 ? doc._count.comments : ""}
+      <td className="py-1.5 px-4 text-sm text-zinc-500">
+        {/*<!-- translate-x-2 is manual tuning to line up the column nicely */}
+        <div className="mx-auto w-8 text-right -translate-x-2">
+          {doc._count.watchedComments > 0 ? doc._count.watchedComments : ""}
+        </div>
+      </td>
+      <td className="py-1.5 px-4 text-sm text-zinc-500">
+        {/*<!-- translate-x-3 is manual tuning to line up the column nicely */}
+        <div className="mx-auto w-8 text-right -translate-x-3">
+          {doc._count.openComments > 0 ? doc._count.openComments : ""}
+        </div>
       </td>
       <td className="py-1.5 pr-4 text-sm text-zinc-500">{lastModified}</td>
       <td className="py-1.5">

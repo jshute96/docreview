@@ -8,6 +8,7 @@ import {
 } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { google } from "googleapis";
+import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -89,11 +90,8 @@ export async function POST(req: NextRequest) {
 
   const result = await prisma.doc.findUnique({
     where: { id: doc.id },
-    include: {
-      labels: { include: { label: true } },
-      _count: { select: { comments: { where: { status: "ACTIVE" } } } },
-    },
+    include: docWithCountsInclude,
   });
 
-  return NextResponse.json(result, { status: 201 });
+  return NextResponse.json(result ? withCommentCounts(result) : result, { status: 201 });
 }

@@ -50,7 +50,7 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortCol(col);
-      setSortDir(col === "lastModifiedInDrive" || col === "comments" ? "desc" : "asc");
+      setSortDir(col === "lastModifiedInDrive" || col === "watched" || col === "open" ? "desc" : "asc");
     }
   }
 
@@ -103,9 +103,9 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
     return <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
-  function ThButton({ col, children }: { col: SortCol; children: React.ReactNode }) {
+  function ThButton({ col, rowSpan, children }: { col: SortCol; rowSpan?: number; children: React.ReactNode }) {
     return (
-      <th className="px-4 py-2.5 text-left">
+      <th className="px-4 py-2.5 text-left" rowSpan={rowSpan}>
         <button
           onClick={() => handleSort(col)}
           className="flex items-center text-xs font-medium text-zinc-500 uppercase tracking-wide hover:text-zinc-800"
@@ -163,13 +163,19 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
         <div className="overflow-x-auto rounded-lg border border-zinc-200">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-zinc-200 bg-zinc-50">
-                <ThButton col="title">Title</ThButton>
-                <ThButton col="comments">Comments</ThButton>
-                <ThButton col="lastModifiedInDrive">Last Modified</ThButton>
-                <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide text-left">
+              <tr className="border-b border-zinc-100 bg-zinc-50">
+                <ThButton col="title" rowSpan={2}>Title</ThButton>
+                <th colSpan={2} className="px-4 pt-2 pb-0 text-center text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                  Comments
+                </th>
+                <ThButton col="lastModifiedInDrive" rowSpan={2}>Last Modified</ThButton>
+                <th rowSpan={2} className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide text-left">
                   Actions
                 </th>
+              </tr>
+              <tr className="border-b border-zinc-200 bg-zinc-50">
+                <ThButton col="watched">Watched</ThButton>
+                <ThButton col="open">Open</ThButton>
               </tr>
             </thead>
             <tbody className="bg-white">
