@@ -1,8 +1,32 @@
 "use client";
 
+import { useCallback, useRef } from "react";
 import type { TriState } from "@/lib/tri-state";
 import { cycleTriState } from "@/lib/tri-state";
 import { contrastText } from "@/lib/utils";
+
+// ---------------------------------------------------------------------------
+// useTriStateCycle — slow-click-to-reset behavior
+// If >500ms has elapsed since the last click and the filter is active (include
+// or exclude), reset straight to "off" instead of cycling to the next state.
+// This prevents accidental cycling when the user just wants to turn it off.
+// ---------------------------------------------------------------------------
+
+const SLOW_CLICK_MS = 500;
+
+function useTriStateCycle(value: TriState, onChange: (v: TriState) => void) {
+  const lastClickRef = useRef(0);
+  return useCallback(() => {
+    const now = Date.now();
+    const elapsed = now - lastClickRef.current;
+    lastClickRef.current = now;
+    if (value !== "off" && elapsed > SLOW_CLICK_MS) {
+      onChange("off");
+    } else {
+      onChange(cycleTriState(value));
+    }
+  }, [value, onChange]);
+}
 
 // ---------------------------------------------------------------------------
 // DiagonalStrike — diagonal line overlay (top-left → bottom-right)
@@ -67,9 +91,10 @@ export function TriStateButton({
   colors,
   className = "",
 }: TriStateButtonProps) {
+  const handleClick = useTriStateCycle(value, onChange);
   return (
     <button
-      onClick={() => onChange(cycleTriState(value))}
+      onClick={handleClick}
       className={`relative overflow-hidden px-2 py-0.5 text-xs font-medium transition-colors ${colors[value]} ${className}`}
     >
       {label}
@@ -97,6 +122,7 @@ export function TriStateIconButton({
   iconColor,
   children,
 }: TriStateIconButtonProps) {
+  const handleClick = useTriStateCycle(value, onChange);
   const stateClass =
     value === "include"
       ? "opacity-100 ring-2 ring-zinc-400 ring-offset-1"
@@ -106,7 +132,7 @@ export function TriStateIconButton({
 
   return (
     <button
-      onClick={() => onChange(cycleTriState(value))}
+      onClick={handleClick}
       title={title}
       aria-label={`Filter by ${title}`}
       className={`relative overflow-hidden rounded p-0.5 transition-opacity ${stateClass}`}
@@ -134,6 +160,7 @@ export function TriStateLabelButton({
   value,
   onChange,
 }: TriStateLabelButtonProps) {
+  const handleClick = useTriStateCycle(value, onChange);
   const bg = color ?? "#e4e4e7";
   const stateClass =
     value === "include"
@@ -144,7 +171,7 @@ export function TriStateLabelButton({
 
   return (
     <button
-      onClick={() => onChange(cycleTriState(value))}
+      onClick={handleClick}
       className={`relative overflow-hidden rounded-full px-2 py-0.5 text-xs font-medium transition-opacity ${stateClass}`}
       style={{ backgroundColor: bg, color: contrastText(bg) }}
     >
