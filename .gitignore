@@ -45,3 +45,4 @@ scripts/data-export.json
 
 # claude code
 .claude/
+.gemini/

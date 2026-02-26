@@ -20,10 +20,17 @@ A personal tool for tracking Google Docs review status, comments, and suggestion
    npm install
    ```
 
-3. **Create a PostgreSQL database:**
-   ```bash
-   createdb docreview
-   ```
+3. **Google Cloud setup:**
+   - Enabled APIs & Services:
+     - Enable the **Google Drive API** and **Google Docs API** in 
+   - OAuth consent screen:
+     - Client:
+        - Create an OAuth 2.0 client (Web application type)
+        - Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+     - Data Access:
+        - Add `drive` and `documents.readonly` scopes
+      - Audience:
+        - Set to External and add your Google account as a test user
 
 4. **Configure `.env`:**
    ```
@@ -33,24 +40,36 @@ A personal tool for tracking Google Docs review status, comments, and suggestion
    AUTH_GOOGLE_SECRET="..."
    ```
 
-5. **Google Cloud setup:**
-   - Create an OAuth 2.0 client (Web application type)
-   - Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
-   - Enable the **Google Drive API** and **Google Docs API**
-   - Configure OAuth consent screen with `drive` and `documents.readonly` scopes
-   - Add your Google account as a test user
+5. **Set up postgres**
+   ```bash
+   sudo apt install postgresql
 
-6. **Initialize the database:**
+   sudo -u postgres psql
+
+   # or if that doesn't work:
+   sudo -i
+   sudo postgres psql
+
+   # Then in psql, as the postgres user:
+   create user USER WITH PASSWORD "...";
+   alter user USER CREATEDB;
+   ```
+
+6. **Create a PostgreSQL database:**
+   ```bash
+   createdb docreview
+   ```
+
+7. **Initialize the database:**
    ```bash
    npx prisma migrate dev
    ```
 
-7. **Start the dev server:**
+8. **Start the dev server:**
    ```bash
    npm run dev
    ```
-   Visit `http://localhost:3000`, sign in with Google, and click **Refresh** to sync files
-   from Drive.
+   Visit `http://localhost:3000` and sign in with Google.
 
 ## Offline Mode
 
