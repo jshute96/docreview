@@ -24,16 +24,16 @@ function makeDoc(overrides: Partial<DocWithLabels> & { title: string }): DocWith
 }
 
 const defaultOpts: FilterOptions = {
-  showArchived: false,
-  hasCommentsFilter: false,
-  roleFilter: null,
-  selectedMimeTypes: [],
-  selectedLabelIds: [],
+  isActive: "include",
+  hasComments: "off",
+  isAuthor: "off",
+  mimeTypes: {},
+  labels: {},
   titleFilter: "",
 };
 
 describe("filterDocs", () => {
-  it("hides archived docs by default", () => {
+  it("hides archived docs by default (isActive: include)", () => {
     const docs = [
       makeDoc({ title: "Active", status: "ACTIVE" }),
       makeDoc({ title: "Archived", status: "ARCHIVED" }),
@@ -43,46 +43,66 @@ describe("filterDocs", () => {
     expect(result[0].title).toBe("Active");
   });
 
-  it("shows archived docs when showArchived is true", () => {
+  it("shows all docs when isActive is off", () => {
     const docs = [
       makeDoc({ title: "Active", status: "ACTIVE" }),
       makeDoc({ title: "Archived", status: "ARCHIVED" }),
     ];
-    const result = filterDocs(docs, { ...defaultOpts, showArchived: true });
+    const result = filterDocs(docs, { ...defaultOpts, isActive: "off" });
     expect(result).toHaveLength(2);
   });
 
-  it("filters by hasComments", () => {
+  it("shows only archived docs when isActive is exclude", () => {
+    const docs = [
+      makeDoc({ title: "Active", status: "ACTIVE" }),
+      makeDoc({ title: "Archived", status: "ARCHIVED" }),
+    ];
+    const result = filterDocs(docs, { ...defaultOpts, isActive: "exclude" });
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe("Archived");
+  });
+
+  it("filters by hasComments include (only with comments)", () => {
     const docs = [
       makeDoc({ title: "NoComments", _count: { watchedComments: 0, openComments: 0 } }),
       makeDoc({ title: "HasComments", _count: { watchedComments: 1, openComments: 3 } }),
     ];
-    const result = filterDocs(docs, { ...defaultOpts, hasCommentsFilter: true });
+    const result = filterDocs(docs, { ...defaultOpts, hasComments: "include" });
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe("HasComments");
   });
 
-  it("filters by role AUTHOR", () => {
+  it("filters by hasComments exclude (only without comments)", () => {
+    const docs = [
+      makeDoc({ title: "NoComments", _count: { watchedComments: 0, openComments: 0 } }),
+      makeDoc({ title: "HasComments", _count: { watchedComments: 1, openComments: 3 } }),
+    ];
+    const result = filterDocs(docs, { ...defaultOpts, hasComments: "exclude" });
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe("NoComments");
+  });
+
+  it("filters by isAuthor include (AUTHOR only)", () => {
     const docs = [
       makeDoc({ title: "Author", role: "AUTHOR" }),
       makeDoc({ title: "Reviewer", role: "REVIEWER" }),
     ];
-    const result = filterDocs(docs, { ...defaultOpts, roleFilter: "AUTHOR" });
+    const result = filterDocs(docs, { ...defaultOpts, isAuthor: "include" });
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe("Author");
   });
 
-  it("filters by role NOT_AUTHOR", () => {
+  it("filters by isAuthor exclude (non-AUTHOR only)", () => {
     const docs = [
       makeDoc({ title: "Author", role: "AUTHOR" }),
       makeDoc({ title: "Reviewer", role: "REVIEWER" }),
     ];
-    const result = filterDocs(docs, { ...defaultOpts, roleFilter: "NOT_AUTHOR" });
+    const result = filterDocs(docs, { ...defaultOpts, isAuthor: "exclude" });
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe("Reviewer");
   });
 
-  it("filters by MIME type", () => {
+  it("filters by MIME type include", () => {
     const docs = [
       makeDoc({ title: "Doc", mimeType: "application/vnd.google-apps.document" }),
       makeDoc({ title: "Sheet", mimeType: "application/vnd.google-apps.spreadsheet" }),
@@ -90,13 +110,46 @@ describe("filterDocs", () => {
     ];
     const result = filterDocs(docs, {
       ...defaultOpts,
-      selectedMimeTypes: ["application/vnd.google-apps.spreadsheet"],
+      mimeTypes: { "application/vnd.google-apps.spreadsheet": "include" },
     });
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe("Sheet");
   });
 
-  it("filters by label IDs", () => {
+  it("filters by MIME type exclude", () => {
+    const docs = [
+      makeDoc({ title: "Doc", mimeType: "application/vnd.google-apps.document" }),
+      makeDoc({ title: "Sheet", mimeType: "application/vnd.google-apps.spreadsheet" }),
+      makeDoc({ title: "Slide", mimeType: "application/vnd.google-apps.presentation" }),
+    ];
+    const result = filterDocs(docs, {
+      ...defaultOpts,
+      mimeTypes: { "application/vnd.google-apps.spreadsheet": "exclude" },
+    });
+    expect(result).toHaveLength(2);
+    expect(result.map((d) => d.title)).toEqual(["Doc", "Slide"]);
+  });
+
+  it("filters by MIME type include and exclude simultaneously", () => {
+    const docs = [
+      makeDoc({ title: "Doc", mimeType: "application/vnd.google-apps.document" }),
+      makeDoc({ title: "Sheet", mimeType: "application/vnd.google-apps.spreadsheet" }),
+      makeDoc({ title: "Slide", mimeType: "application/vnd.google-apps.presentation" }),
+    ];
+    const result = filterDocs(docs, {
+      ...defaultOpts,
+      mimeTypes: {
+        "application/vnd.google-apps.document": "include",
+        "application/vnd.google-apps.presentation": "include",
+        "application/vnd.google-apps.spreadsheet": "exclude",
+      },
+    });
+    // include filters to Doc + Slide, exclude removes Sheet (already not in include set)
+    expect(result).toHaveLength(2);
+    expect(result.map((d) => d.title)).toEqual(["Doc", "Slide"]);
+  });
+
+  it("filters by label include", () => {
     const docs = [
       makeDoc({
         title: "Labeled",
@@ -106,10 +159,58 @@ describe("filterDocs", () => {
     ];
     const result = filterDocs(docs, {
       ...defaultOpts,
-      selectedLabelIds: ["L1"],
+      labels: { L1: "include" },
     });
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe("Labeled");
+  });
+
+  it("filters by label exclude", () => {
+    const docs = [
+      makeDoc({
+        title: "Labeled",
+        labels: [{ docId: "d1", labelId: "L1", label: { id: "L1", userId: "u", name: "Bug", color: null, position: 0 } }] as DocWithLabels["labels"],
+      }),
+      makeDoc({ title: "Unlabeled" }),
+    ];
+    const result = filterDocs(docs, {
+      ...defaultOpts,
+      labels: { L1: "exclude" },
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe("Unlabeled");
+  });
+
+  it("filters by label include and exclude simultaneously", () => {
+    const docs = [
+      makeDoc({
+        title: "HasBug",
+        labels: [{ docId: "d1", labelId: "L1", label: { id: "L1", userId: "u", name: "Bug", color: null, position: 0 } }] as DocWithLabels["labels"],
+      }),
+      makeDoc({
+        title: "HasFeature",
+        labels: [{ docId: "d2", labelId: "L2", label: { id: "L2", userId: "u", name: "Feature", color: null, position: 1 } }] as DocWithLabels["labels"],
+      }),
+      makeDoc({
+        title: "HasBoth",
+        labels: [
+          { docId: "d3", labelId: "L1", label: { id: "L1", userId: "u", name: "Bug", color: null, position: 0 } },
+          { docId: "d3", labelId: "L2", label: { id: "L2", userId: "u", name: "Feature", color: null, position: 1 } },
+        ] as DocWithLabels["labels"],
+      }),
+      makeDoc({ title: "NoLabels" }),
+    ];
+    const result = filterDocs(docs, {
+      ...defaultOpts,
+      labels: { L1: "include", L2: "exclude" },
+    });
+    // Must have L1 (include OR) AND must not have L2 (exclude)
+    // HasBug: has L1, no L2 → pass
+    // HasFeature: no L1 → fail include
+    // HasBoth: has L1, has L2 → fail exclude
+    // NoLabels: no L1 → fail include
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe("HasBug");
   });
 
   it("filters by title regex", () => {

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
+import type { TriState } from "@/lib/tri-state";
 import { DocRow } from "@/components/doc-row";
 import { FilterBar } from "@/components/filter-bar";
 import { AddDocDialog } from "@/components/add-doc-dialog";
@@ -36,11 +37,12 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
       }))
     );
   }
-  const [showArchived, setShowArchived] = useState(false);
-  const [hasCommentsFilter, setHasCommentsFilter] = useState(false);
-  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
-  const [roleFilter, setRoleFilter] = useState<"AUTHOR" | "NOT_AUTHOR" | null>(null);
-  const [selectedMimeTypes, setSelectedMimeTypes] = useState<string[]>([]);
+
+  const [isActive, setIsActive] = useState<TriState>("include");
+  const [hasComments, setHasComments] = useState<TriState>("off");
+  const [isAuthor, setIsAuthor] = useState<TriState>("off");
+  const [mimeTypes, setMimeTypes] = useState<Record<string, TriState>>({});
+  const [labelsFilter, setLabelsFilter] = useState<Record<string, TriState>>({});
   const [titleFilter, setTitleFilter] = useState("");
   const [sortCol, setSortCol] = useState<SortCol>("lastModifiedInDrive");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -54,10 +56,19 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
     }
   }
 
-  function handleLabelToggle(id: string) {
-    setSelectedLabelIds((prev) =>
-      prev.includes(id) ? prev.filter((l) => l !== id) : [...prev, id]
-    );
+  function handleTriStateChange(
+    setter: React.Dispatch<React.SetStateAction<Record<string, TriState>>>,
+    key: string,
+    value: TriState
+  ) {
+    setter((prev) => {
+      // Remove entry when cycling back to off to keep state clean
+      if (value === "off") {
+        const { [key]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [key]: value };
+    });
   }
 
   function handleDocUpdate(updated: DocWithLabels) {
@@ -76,22 +87,19 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
         labels: d.labels.filter((dl) => dl.labelId !== id),
       }))
     );
-    setSelectedLabelIds((prev) => prev.filter((l) => l !== id));
-  }
-
-  function handleMimeTypeToggle(mimeType: string) {
-    setSelectedMimeTypes((prev) =>
-      prev.includes(mimeType) ? prev.filter((m) => m !== mimeType) : [...prev, mimeType]
-    );
+    setLabelsFilter((prev) => {
+      const { [id]: _, ...rest } = prev;
+      return rest;
+    });
   }
 
   const filteredDocs = sortDocs(
     filterDocs(docs, {
-      showArchived,
-      hasCommentsFilter,
-      roleFilter,
-      selectedMimeTypes,
-      selectedLabelIds,
+      isActive,
+      hasComments,
+      isAuthor,
+      mimeTypes,
+      labels: labelsFilter,
       titleFilter,
     }),
     sortCol,
@@ -139,17 +147,17 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
 
       <FilterBar
         labels={labels}
-        showArchived={showArchived}
-        hasCommentsFilter={hasCommentsFilter}
-        selectedLabelIds={selectedLabelIds}
-        roleFilter={roleFilter}
-        selectedMimeTypes={selectedMimeTypes}
+        isActive={isActive}
+        hasComments={hasComments}
+        isAuthor={isAuthor}
+        mimeTypes={mimeTypes}
+        labelsFilter={labelsFilter}
         titleFilter={titleFilter}
-        onShowArchivedChange={setShowArchived}
-        onHasCommentsFilterChange={setHasCommentsFilter}
-        onLabelToggle={handleLabelToggle}
-        onRoleFilterChange={setRoleFilter}
-        onMimeTypeToggle={handleMimeTypeToggle}
+        onIsActiveChange={setIsActive}
+        onHasCommentsChange={setHasComments}
+        onIsAuthorChange={setIsAuthor}
+        onMimeTypeChange={(mt, v) => handleTriStateChange(setMimeTypes, mt, v)}
+        onLabelChange={(id, v) => handleTriStateChange(setLabelsFilter, id, v)}
         onTitleFilterChange={setTitleFilter}
       />
 

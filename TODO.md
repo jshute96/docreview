@@ -12,7 +12,6 @@
 * add/remove labels from multiple docs (multi-select or filtered view)
 * Mute state on docs
 * Track what comments I've seen, and show the new ones in a different color
-* Three-state label filtering
 * UI: merge label filter with other state filtering
 * Search/filter box on comments/ view.
 
@@ -24,3 +23,5 @@
 * chrome plugin for adding a doc
 * chrome plugin for scrolling to comments in the doc window without reloading
 
+* cosmetic
+  * better visual for the cross-out filter buttons

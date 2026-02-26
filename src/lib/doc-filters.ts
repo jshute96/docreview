@@ -1,14 +1,16 @@
 import type { DocWithLabels } from "@/types";
+import type { TriState } from "./tri-state";
+import { partitionTriState } from "./tri-state";
 
 export type SortCol = "title" | "lastModifiedInDrive" | "watched" | "open";
 export type SortDir = "asc" | "desc";
 
 export interface FilterOptions {
-  showArchived: boolean;
-  hasCommentsFilter: boolean;
-  roleFilter: "AUTHOR" | "NOT_AUTHOR" | null;
-  selectedMimeTypes: string[];
-  selectedLabelIds: string[];
+  isActive: TriState;
+  hasComments: TriState;
+  isAuthor: TriState;
+  mimeTypes: Record<string, TriState>;
+  labels: Record<string, TriState>;
   titleFilter: string;
 }
 
@@ -16,21 +18,43 @@ export function filterDocs(
   docs: DocWithLabels[],
   opts: FilterOptions
 ): DocWithLabels[] {
+  const mime = partitionTriState(opts.mimeTypes);
+  const lbl = partitionTriState(opts.labels);
+
   return docs.filter((doc) => {
-    if (!opts.showArchived && doc.status === "ARCHIVED") return false;
-    if (opts.hasCommentsFilter && doc._count.openComments === 0) return false;
-    if (opts.roleFilter === "AUTHOR" && doc.role !== "AUTHOR") return false;
-    if (opts.roleFilter === "NOT_AUTHOR" && doc.role === "AUTHOR") return false;
+    // isActive: include = active only, exclude = archived only, off = all
+    if (opts.isActive === "include" && doc.status === "ARCHIVED") return false;
+    if (opts.isActive === "exclude" && doc.status !== "ARCHIVED") return false;
+
+    // hasComments: include = only with comments, exclude = only without
+    if (opts.hasComments === "include" && doc._count.openComments === 0)
+      return false;
+    if (opts.hasComments === "exclude" && doc._count.openComments > 0)
+      return false;
+
+    // isAuthor: include = AUTHOR only, exclude = non-AUTHOR only
+    if (opts.isAuthor === "include" && doc.role !== "AUTHOR") return false;
+    if (opts.isAuthor === "exclude" && doc.role === "AUTHOR") return false;
+
+    // mimeTypes: include = must match one (OR), exclude = must not match any
+    const docMime = doc.mimeType ?? "";
+    if (mime.include.length > 0 && !mime.include.includes(docMime))
+      return false;
+    if (mime.exclude.length > 0 && mime.exclude.includes(docMime)) return false;
+
+    // labels: include = must have at least one (OR), exclude = must not have any
     if (
-      opts.selectedMimeTypes.length > 0 &&
-      !opts.selectedMimeTypes.includes(doc.mimeType ?? "")
+      lbl.include.length > 0 &&
+      !doc.labels.some((dl) => lbl.include.includes(dl.labelId))
     )
       return false;
     if (
-      opts.selectedLabelIds.length > 0 &&
-      !doc.labels.some((dl) => opts.selectedLabelIds.includes(dl.labelId))
+      lbl.exclude.length > 0 &&
+      doc.labels.some((dl) => lbl.exclude.includes(dl.labelId))
     )
       return false;
+
+    // titleFilter: regex with substring fallback
     if (opts.titleFilter) {
       try {
         const re = new RegExp(opts.titleFilter, "i");
