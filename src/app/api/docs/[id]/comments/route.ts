@@ -21,13 +21,25 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const driveAuth = await getDriveClient(userId);
-  const commentContent = await fetchCommentContent(driveAuth, doc.googleDocId);
-
-  let suggestions: Record<string, { insertedText: string; deletedText: string }> = {};
-  if (doc.mimeType === DOCS_MIME_TYPE) {
-    suggestions = await fetchSuggestionContent(driveAuth, doc.googleDocId);
+  let driveAuth;
+  try {
+    driveAuth = await getDriveClient(userId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to connect to Google Drive";
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 
-  return NextResponse.json({ comments: commentContent, suggestions });
+  try {
+    const commentContent = await fetchCommentContent(driveAuth, doc.googleDocId);
+
+    let suggestions: Record<string, { insertedText: string; deletedText: string }> = {};
+    if (doc.mimeType === DOCS_MIME_TYPE) {
+      suggestions = await fetchSuggestionContent(driveAuth, doc.googleDocId);
+    }
+
+    return NextResponse.json({ comments: commentContent, suggestions });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to fetch comment content";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 }

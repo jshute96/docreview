@@ -24,6 +24,9 @@ See `docs/*.md` for detailed architecture docs — keep them in sync with behavi
 - UI entry: `src/app/docs/page.tsx` (server) → `src/components/doc-table.tsx` (client)
 - Role colors: `src/lib/role-colors.ts` — Author = blue, Reviewer = violet
 
+**Offline mode:** `OFFLINE_MODE=true` disables Google OAuth/API — see `src/lib/offline.ts`.
+Uses CredentialsProvider + JWT sessions. `getDriveClient()` throws `OfflineModeError`.
+
 **Schema notes:** PostgreSQL is required. Enum types are used for `Doc.role`, `Doc.status`,
 `Comment.type`, `Comment.suggestionType`, and `Comment.status`. Prisma 5 is pinned (Prisma 7
 dropped `url = env(...)` support in schema.prisma).

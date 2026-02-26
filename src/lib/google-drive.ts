@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import { prisma } from "@/lib/prisma";
+import { OFFLINE_MODE, OfflineModeError } from "@/lib/offline";
 
 export const SUPPORTED_MIME_TYPES = new Set([
   "application/vnd.google-apps.document",
@@ -13,6 +14,8 @@ export function parseGoogleDocId(url: string): string | null {
 }
 
 export async function getDriveClient(userId: string) {
+  if (OFFLINE_MODE) throw new OfflineModeError("getDriveClient");
+
   const account = await prisma.account.findFirst({
     where: { userId, provider: "google" },
   });

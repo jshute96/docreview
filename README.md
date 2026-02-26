@@ -52,6 +52,30 @@ A personal tool for tracking Google Docs review status, comments, and suggestion
    Visit `http://localhost:3000`, sign in with Google, and click **Refresh** to sync files
    from Drive.
 
+## Offline Mode
+
+Run without Google OAuth credentials (useful for UI development, testing, or CI):
+
+```bash
+npm run dev:offline
+```
+
+Or equivalently: `OFFLINE_MODE=true npm run dev` or set `OFFLINE_MODE=true` in `.env`.
+
+In offline mode, login uses a local credentials provider (no Google account needed). All
+Google Drive/Docs API calls return 502 errors. Labels, doc metadata, filtering, and sorting
+all work normally with whatever data is in the database.
+
+To access your existing data, pass your user ID so the offline session impersonates that user:
+
+```bash
+OFFLINE_USER_ID=<your-user-id> npm run dev:offline
+```
+
+You can find your user ID with: `echo 'SELECT id, name FROM users;' | npx prisma db execute --stdin`
+
+Without `OFFLINE_USER_ID`, a standalone "Offline User" is created (empty state).
+
 ## Running
 
 ```bash
