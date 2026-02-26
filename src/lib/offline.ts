@@ -20,3 +20,8 @@ export const FALLBACK_OFFLINE_USER = {
   email: "offline@localhost",
   name: "Offline User",
 } as const;
+
+export function getExpectedOfflineId() {
+  if (!OFFLINE_MODE) return null;
+  return OFFLINE_USER_ID ?? FALLBACK_OFFLINE_USER.id;
+}

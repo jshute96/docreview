@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { listRecentDocs, findDeletedDocIds, getDriveClient } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
@@ -7,7 +7,7 @@ import { getStatus, updateDriveTimestamp } from "@/lib/status";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
+  const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
+  const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

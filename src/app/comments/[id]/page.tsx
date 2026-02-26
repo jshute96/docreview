@@ -1,7 +1,7 @@
-import { auth } from "@/auth";
 import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { DocDetail } from "@/components/doc-detail";
+import { requireAuth } from "@/lib/auth-utils";
 import type { DocWithComments } from "@/types";
 
 export default async function DocDetailPage({
@@ -9,11 +9,9 @@ export default async function DocDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-  const userId = session.user.id;
-
   const { id } = await params;
+  const session = await requireAuth();
+  const userId = session.user.id;
 
   const [doc, allLabels] = await Promise.all([
     prisma.doc.findUnique({

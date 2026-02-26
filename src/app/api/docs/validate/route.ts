@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import {
   getDriveClient,
@@ -9,7 +9,7 @@ import {
 import { google } from "googleapis";
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
+  const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

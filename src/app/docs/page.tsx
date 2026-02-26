@@ -1,13 +1,12 @@
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { DocTable } from "@/components/doc-table";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
+import { OFFLINE_MODE } from "@/lib/offline";
+import { requireAuth } from "@/lib/auth-utils";
 import type { DocWithLabels } from "@/types";
 
 export default async function DocsPage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  const session = await requireAuth();
   const userId = session.user.id;
 
   const [rawDocs, labels] = await Promise.all([
@@ -30,6 +29,7 @@ export default async function DocsPage() {
         <DocTable
           initialDocs={docs as DocWithLabels[]}
           initialLabels={labels}
+          isOffline={OFFLINE_MODE}
         />
       </div>
     </div>

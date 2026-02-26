@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { CommentStatus } from "@prisma/client";
 
@@ -7,7 +7,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; commentId: string }> }
 ) {
-  const session = await auth();
+  const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

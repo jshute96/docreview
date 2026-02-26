@@ -11,17 +11,17 @@ const offlineProviders = [
     name: "Offline",
     credentials: {},
     async authorize() {
-      // If OFFLINE_USER_ID is set, impersonate that existing user
+      // If OFFLINE_USER_ID is set, impersonate (and create if missing) that user
       if (OFFLINE_USER_ID) {
-        const user = await prisma.user.findUnique({
+        return await prisma.user.upsert({
           where: { id: OFFLINE_USER_ID },
+          update: {},
+          create: {
+            id: OFFLINE_USER_ID,
+            email: `${OFFLINE_USER_ID}@localhost`,
+            name: OFFLINE_USER_ID,
+          },
         });
-        if (!user) {
-          throw new Error(
-            `OFFLINE_USER_ID="${OFFLINE_USER_ID}" not found in database`
-          );
-        }
-        return user;
       }
 
       // Otherwise create/use a standalone offline user

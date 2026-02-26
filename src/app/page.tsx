@@ -1,11 +1,11 @@
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { getValidSession } from "@/lib/auth-utils";
 
 export default async function Home() {
-  const session = await auth();
+  const session = await getValidSession();
   if (session) {
     redirect("/docs");
-  } else {
-    redirect("/login");
   }
+
+  redirect("/login");
 }

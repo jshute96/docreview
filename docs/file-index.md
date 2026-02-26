@@ -35,6 +35,7 @@ One-line descriptions of every source file, grouped by layer.
 | File | Description |
 |------|-------------|
 | `doc-table.tsx` | Main doc list view (client) — filter state, sort state, renders FilterBar + DocRows |
+| `auto-signin.tsx` | Client component for seamless offline authentication |
 | `doc-row.tsx` | Single doc row in the table — title, comment counts, labels, archive/edit/open buttons |
 | `doc-detail.tsx` | Single doc detail view (client) — metadata panel, comment filters, comment table |
 | `filter-bar.tsx` | Doc list filter bar — tri-state buttons for type/author/labels/active/comments + title regex |
@@ -61,6 +62,7 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 | File | Description |
 |------|-------------|
 | `google-drive.ts` | Google Drive/Docs API client — OAuth2 with token refresh, comment fetching, suggestion parsing, thread detail, reply/resolve, file listing |
+| `auth-utils.ts` | Centralized authentication helpers for Server Components and API routes |
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates DB records, computes unarchive signals |
 | `doc-filters.ts` | Client-side doc filtering (tri-state logic for active/comments/author/mimeType/labels/title regex) and sorting |
 | `doc-queries.ts` | Shared Prisma include clause + transform for computing watched/open comment counts without loading full comment data |

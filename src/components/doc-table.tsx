@@ -17,9 +17,10 @@ import type { SortCol, SortDir } from "@/lib/doc-filters";
 interface DocTableProps {
   initialDocs: DocWithLabels[];
   initialLabels: Label[];
+  isOffline?: boolean;
 }
 
-export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
+export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProps) {
   const [docs, setDocs] = useState<DocWithLabels[]>(initialDocs);
   const [labels, setLabelsRaw] = useState<Label[]>(initialLabels);
 
@@ -139,6 +140,8 @@ export function DocTable({ initialDocs, initialLabels }: DocTableProps) {
             variant="outline"
             size="sm"
             onClick={() => signOut({ callbackUrl: "/login" })}
+            disabled={isOffline}
+            className={isOffline ? "opacity-50 cursor-not-allowed" : ""}
           >
             Sign out
           </Button>
