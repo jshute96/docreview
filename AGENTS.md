@@ -25,17 +25,27 @@ Uses CredentialsProvider + JWT sessions. `getDriveClient()` throws `OfflineModeE
 `Comment.type`, `Comment.suggestionType`, and `Comment.status`. Prisma 5 is pinned (Prisma 7
 dropped `url = env(...)` support in schema.prisma).
 
-## Rules
+## Workflow Rules
 
-- `docs/` has design docs.
-  - This includes docs on any areas with non-trival logic or behavior.
-  - Consult these docs as needed, and keep them up to date, describing the intended
-    behavior in any non-trival cases.
-  - Update `docs/file-index.md` when adding, renaming, or removing source files.
-- Run tests before commit code.
-- Write tests to cover all logic, where reasonable.
-- Where code has subtle or suprising logic, add comments to explain it.
-- Ask for human review before making database schema changes or manual data updates.
-- `README.md` has setup and debugging commands. Keep that up to date.
-- Don't run DDL or DML (updates or alters) on postgres without asking me.
-  You can only run queries and other readonly commands.
+- **Documentation**: Keep `docs/*.md` design documents in sync with behavioral changes. Update `docs/file-index.md` when adding, renaming, or removing source files.
+- **Database Safety**: Ask for human review before making database schema changes or manual data updates. Never run DDL or DML (updates/alters) directly on PostgreSQL; use Prisma migrations or ask for permission to run read-only queries.
+- **Commit Preparation**: 
+  - Run `npm test` before committing code.
+  - Ensure `README.md` is updated if setup or debugging commands change.
+
+## Development Conventions
+
+### Authentication & Authorization
+- **Consistency**: Always use `getValidSession()` or `requireAuth()` from `src/lib/auth-utils.ts` instead of raw `auth()` calls to ensure consistency between online and offline modes.
+- **Server Components**: For protected pages in the App Router, call `requireAuth()` at the top of the Server Component.
+
+### Database
+- **Prisma**: Prisma 5 is pinned; do not upgrade to Prisma 7 without verifying support for `url = env(...)` in the schema.
+- **State**: Schema changes or regeneration of the Prisma client require a dev server restart, as Next.js holds the client in memory.
+
+### Testing
+- **Coverage**: Write tests for all non-trivial logic.
+- **Mocks**: Mock the Prisma client using the provided `src/lib/__mocks__/prisma.ts`.
+
+### Code Logic
+- **Documentation**: Where code has subtle or surprising logic, add comments to explain the "why" and intended behavior.

@@ -1,6 +1,15 @@
 # Docreview
 
-A personal tool for tracking Google Docs review status, comments, and suggestions via the Google Drive API.
+A personal tool for tracking Google Docs, Sheets, and Slides review 
+status, comments, and suggestions via the Google Drive API.
+
+## Tech Stack
+
+- **Framework:** Next.js 16 (App Router) with React 19
+- **Styling:** Tailwind CSS 4 with Shadcn/UI primitives
+- **Database:** PostgreSQL managed via Prisma 5
+- **Authentication:** NextAuth.js v5 with Google OAuth
+- **APIs:** Google Drive API v3 and Google Docs API v1
 
 ## Prerequisites
 
@@ -150,10 +159,11 @@ npx prisma generate                   # regenerate client after schema changes
 
 ## Architecture
 
-- **Auth:** NextAuth v5 with Google OAuth (`src/auth.ts`)
-- **Database:** PostgreSQL via Prisma 5 (`prisma/schema.prisma`)
-- **Drive sync:** Google Drive API v3 (`src/lib/google-drive.ts`)
-- **Comment sync:** Full-scan sync with smart unarchive (`src/lib/sync-comments.ts`)
-- **UI:** Next.js App Router — server component entry (`src/app/docs/page.tsx`) with client-side table (`src/components/doc-table.tsx`)
+- **Auth:** NextAuth.js v5 with Google OAuth. Always use `getValidSession()` or `requireAuth()` from `src/lib/auth-utils.ts` for consistency between online and offline modes.
+- **Database:** PostgreSQL via Prisma 5 (`prisma/schema.prisma`).
+- **Pages:** Server Components (e.g., `src/app/docs/page.tsx`) handle initial data fetching.
+- **UI Components:** Client-side React state for interactive filtering and sorting (e.g., `src/components/doc-table.tsx`).
+- **API Layer:** Next.js API routes (`src/app/api/...`) handle actions like syncing and label updates.
+- **Sync Engine:** `src/lib/sync-comments.ts` coordinates fetching comments and suggestions from Google APIs and syncing them with the local database.
 
 See `docs/*.md` for detailed architecture documentation.
