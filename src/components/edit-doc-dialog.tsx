@@ -73,7 +73,7 @@ export function EditDocDialog({
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle className="line-clamp-1">{doc.title}</DialogTitle>
+          <DialogTitle className="line-clamp-1">Edit Document Labels</DialogTitle>
         </DialogHeader>
 
         <div className="mt-2 flex flex-col gap-4">
@@ -84,6 +84,7 @@ export function EditDocDialog({
             <div className="flex gap-2">
               <button
                 onClick={() => setRole(role === "AUTHOR" ? "REVIEWER" : "AUTHOR")}
+                title="You are an author of this document"
                 className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                   role === "AUTHOR"
                     ? ROLE_COLORS.AUTHOR.activeFilter
