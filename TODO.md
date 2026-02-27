@@ -12,9 +12,10 @@
 * add/remove labels from multiple docs (multi-select or filtered view)
 * Mute state on docs
 * Track what comments I've seen, and show the new ones in a different color
-* UI: merge label filter with other state filtering
-* Search/filter box on comments/ view.
+* Expand all / collapse all on comments page
 * keyboard shortcuts
+* consider saving loaded comments
+* consider preloading comments earlier (maybe from docs page too)
 
 * hosting
   * cloud run

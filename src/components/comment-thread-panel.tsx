@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { RefreshCw } from "lucide-react";
 import type { CommentThread } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
+import { highlightText } from "@/lib/highlight";
 
 function formatTime(iso: string): string {
   if (!iso) return "";
@@ -28,6 +29,7 @@ interface CommentThreadPanelProps {
   onResolve?: (content: string) => Promise<void>;
   onReopen?: (content: string) => Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
+  searchFilter?: string;
 }
 
 export function CommentThreadPanel({
@@ -41,6 +43,7 @@ export function CommentThreadPanel({
   onResolve,
   onReopen,
   onDirtyChange,
+  searchFilter,
 }: CommentThreadPanelProps) {
   const [replyText, setReplyText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -271,7 +274,7 @@ export function CommentThreadPanel({
               )}
             </div>
             <p className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap">
-              {thread.content}
+              {highlightText(thread.content, searchFilter ?? "")}
             </p>
 
             {thread.replies.map((reply, i) => (
@@ -296,7 +299,7 @@ export function CommentThreadPanel({
                 </div>
                 {reply.content && (
                   <p className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap">
-                    {reply.content}
+                    {highlightText(reply.content, searchFilter ?? "")}
                   </p>
                 )}
               </div>

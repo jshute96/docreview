@@ -6,10 +6,12 @@ interface CommentFilterBarProps {
   myCommentsFilter: boolean;
   showMode: ShowMode;
   suggestionsOnly: boolean;
+  searchFilter: string;
   onMyThreadsChange: (v: boolean) => void;
   onMyCommentsChange: (v: boolean) => void;
   onShowModeChange: (v: ShowMode) => void;
   onSuggestionsOnlyChange: (v: boolean) => void;
+  onSearchFilterChange: (v: string) => void;
 }
 
 export function CommentFilterBar({
@@ -17,10 +19,12 @@ export function CommentFilterBar({
   myCommentsFilter,
   showMode,
   suggestionsOnly,
+  searchFilter,
   onMyThreadsChange,
   onMyCommentsChange,
   onShowModeChange,
   onSuggestionsOnlyChange,
+  onSearchFilterChange,
 }: CommentFilterBarProps) {
   function toggleBtn(active: boolean, label: string, onClick: () => void, title?: string) {
     return (
@@ -43,6 +47,7 @@ export function CommentFilterBar({
       <legend className="px-1 text-xs font-medium text-zinc-400 uppercase tracking-wide">
         Filters
       </legend>
+      <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
 
         {toggleBtn(myThreadsFilter, "My threads", () => onMyThreadsChange(!myThreadsFilter), "Threads I participated in")}
@@ -68,6 +73,18 @@ export function CommentFilterBar({
           ))}
         </div>
 
+      </div>
+
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-zinc-400">Search</span>
+        <input
+          type="text"
+          value={searchFilter}
+          onChange={(e) => onSearchFilterChange(e.target.value)}
+          placeholder="regex filter…"
+          className="rounded border border-zinc-200 bg-white px-2 py-0.5 text-xs text-zinc-700 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none w-90"
+        />
+      </div>
       </div>
     </fieldset>
   );

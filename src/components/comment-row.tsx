@@ -7,6 +7,7 @@ import type { Comment } from "@prisma/client";
 import type { CommentThread, SuggestionContent } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
 import { CommentThreadPanel } from "@/components/comment-thread-panel";
+import { highlightText } from "@/lib/highlight";
 import { formatDate } from "@/lib/utils";
 
 interface CommentRowProps {
@@ -16,7 +17,9 @@ interface CommentRowProps {
   content?: string;
   suggestionContent?: SuggestionContent;
   onUpdate: (updated: Comment) => void;
+  onThreadText?: (googleCommentId: string, text: string) => void;
   isExiting?: boolean;
+  searchFilter?: string;
 }
 
 function splitContent(raw: string): { author: string | null; text: string } {
@@ -25,7 +28,7 @@ function splitContent(raw: string): { author: string | null; text: string } {
   return { author: raw.slice(0, sep), text: raw.slice(sep + 2) };
 }
 
-export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, onUpdate, isExiting }: CommentRowProps) {
+export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, onUpdate, onThreadText, isExiting, searchFilter }: CommentRowProps) {
   const [loading, setLoading] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -48,8 +51,22 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     return url.toString();
   }
 
+  // Safe to close over onThreadText: it's a useCallback([]) in doc-detail.tsx
+  function reportThreadText(threads: CommentThread[]) {
+    if (!onThreadText) return;
+    const parts: string[] = [];
+    for (const t of threads) {
+      parts.push(t.content);
+      for (const r of t.replies) {
+        if (r.content) parts.push(r.content);
+      }
+    }
+    onThreadText(comment.googleCommentId, parts.join("\n"));
+  }
+
   function applyThreadUpdate(data: { threads: CommentThread[]; comment: Comment }) {
     setThreads(data.threads);
+    reportThreadText(data.threads);
     onUpdate(data.comment);
     fetchedModifiedMs.current = data.comment.driveModifiedAt
       ? new Date(data.comment.driveModifiedAt).getTime()
@@ -64,6 +81,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       setThreads(data.threads);
+      reportThreadText(data.threads);
       fetchedModifiedMs.current = currentModifiedMs;
     } catch {
       toast.error("Failed to load comment thread");
@@ -343,19 +361,19 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             <p className="truncate text-sm text-zinc-400">
               <span className="text-zinc-500">{suggestionLabel}: </span>
               {(comment.suggestionType === "EDIT" || comment.suggestionType === "DELETE") && (
-                <span className="line-through text-red-400">{suggestionContent.deletedText}</span>
+                <span className="line-through text-red-400">{highlightText(suggestionContent.deletedText, searchFilter ?? "")}</span>
               )}
               {comment.suggestionType === "EDIT" && (
                 <span className="text-zinc-400"> → </span>
               )}
               {(comment.suggestionType === "EDIT" || comment.suggestionType === "INSERT") && (
-                <span className="text-zinc-600">{suggestionContent.insertedText}</span>
+                <span className="text-zinc-600">{highlightText(suggestionContent.insertedText, searchFilter ?? "")}</span>
               )}
             </p>
           ) : (
             <p className="truncate text-sm text-zinc-400">
-              {author && <span className="text-zinc-600">{author}: </span>}
-              {text}
+              {author && <span className="text-zinc-600">{highlightText(author, searchFilter ?? "")}: </span>}
+              {highlightText(text, searchFilter ?? "")}
             </p>
           )}
             </div>
@@ -395,13 +413,13 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                     <div className="mb-3 text-sm whitespace-pre-wrap">
                       <span className="text-zinc-500">{suggestionLabel}: </span>
                       {(comment.suggestionType === "EDIT" || comment.suggestionType === "DELETE") && (
-                        <span className="line-through text-red-400">{suggestionContent.deletedText}</span>
+                        <span className="line-through text-red-400">{highlightText(suggestionContent.deletedText, searchFilter ?? "")}</span>
                       )}
                       {comment.suggestionType === "EDIT" && (
                         <span className="text-zinc-400"> → </span>
                       )}
                       {(comment.suggestionType === "EDIT" || comment.suggestionType === "INSERT") && (
-                        <span className="text-zinc-600">{suggestionContent.insertedText}</span>
+                        <span className="text-zinc-600">{highlightText(suggestionContent.insertedText, searchFilter ?? "")}</span>
                       )}
                     </div>
                   )}
@@ -421,6 +439,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   onResolve={handleResolve}
                   onReopen={handleReopen}
                   onDirtyChange={setHasDirtyReply}
+                  searchFilter={searchFilter}
                 />
               )}
             </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import type { Comment, Label } from "@prisma/client";
@@ -26,6 +26,11 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
   const [archiving, setArchiving] = useState(false);
   const [commentContent, setCommentContent] = useState<Record<string, string>>({});
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
+  // Thread text reported by CommentRow when threads are fetched (includes replies)
+  const [threadText, setThreadText] = useState<Record<string, string>>({});
+  const handleThreadText = useCallback((googleCommentId: string, text: string) => {
+    setThreadText((prev) => prev[googleCommentId] === text ? prev : { ...prev, [googleCommentId]: text });
+  }, []);
 
   async function fetchContent() {
     try {
@@ -43,6 +48,7 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
   const [myCommentsFilter, setMyCommentsFilter] = useState(false);
   const [showMode, setShowMode] = useState<"active" | "open" | "all">("active");
   const [suggestionsOnly, setSuggestionsOnly] = useState(false);
+  const [searchFilter, setSearchFilter] = useState("");
   type SortCol = "driveCreatedAt" | "driveModifiedAt" | "replyCount" | "iParticipated" | "resolved";
   type SortDir = "asc" | "desc";
   const [sortCol, setSortCol] = useState<SortCol>("driveModifiedAt");
@@ -136,6 +142,19 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
 
   const filteredComments = comments
     .filter((c) => exitingIds.has(c.id) || !wouldBeFilteredOut(c))
+    .filter((c) => {
+      if (!searchFilter) return true;
+      const text = commentContent[c.googleCommentId] ?? "";
+      const sug = suggestionContent[c.googleCommentId];
+      const sugText = sug ? `${sug.deletedText} ${sug.insertedText}` : "";
+      const threads = threadText[c.googleCommentId] ?? "";
+      const combined = `${text} ${sugText} ${threads}`;
+      try {
+        return new RegExp(searchFilter, "i").test(combined);
+      } catch {
+        return combined.toLowerCase().includes(searchFilter.toLowerCase());
+      }
+    })
     .sort((a, b) => {
       if (!sortActive) {
         const aPos = frozenOrderRef.current.get(a.id) ?? Infinity;
@@ -272,10 +291,12 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
         myCommentsFilter={myCommentsFilter}
         showMode={showMode}
         suggestionsOnly={suggestionsOnly}
+        searchFilter={searchFilter}
         onMyThreadsChange={setMyThreadsFilter}
         onMyCommentsChange={setMyCommentsFilter}
         onShowModeChange={setShowMode}
         onSuggestionsOnlyChange={setSuggestionsOnly}
+        onSearchFilterChange={setSearchFilter}
       />
 
       {/* Comment table */}
@@ -318,7 +339,9 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
                   content={comment.type === "COMMENT" ? commentContent[comment.googleCommentId] : undefined}
                   suggestionContent={comment.type === "SUGGESTION" ? suggestionContent[comment.googleCommentId] : undefined}
                   onUpdate={handleCommentUpdate}
+                  onThreadText={handleThreadText}
                   isExiting={exitingIds.has(comment.id)}
+                  searchFilter={searchFilter}
                 />
               ))}
             </tbody>
