@@ -47,5 +47,8 @@ dropped `url = env(...)` support in schema.prisma).
 - **Coverage**: Write tests for all non-trivial logic.
 - **Mocks**: Mock the Prisma client using the provided `src/lib/__mocks__/prisma.ts`.
 
+### UI Controls
+- **Tooltips**: All buttons, filter controls, and column headings should have a `title` attribute providing a brief description of what the control does. When adding new controls, always include a tooltip. For toggle buttons with two states (e.g., Archive/Unarchive), use a dynamic title that reflects the current action.
+
 ### Code Logic
 - **Documentation**: Where code has subtle or surprising logic, add comments to explain the "why" and intended behavior.

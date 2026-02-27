@@ -162,7 +162,7 @@ export function AddDocDialog({ allLabels, onDocAdded }: AddDocDialogProps) {
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" title="Add a Google Drive document by URL">
           Add doc
         </Button>
       </DialogTrigger>

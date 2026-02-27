@@ -112,11 +112,12 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
     return <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
-  function ThButton({ col, rowSpan, children }: { col: SortCol; rowSpan?: number; children: React.ReactNode }) {
+  function ThButton({ col, rowSpan, title, children }: { col: SortCol; rowSpan?: number; title?: string; children: React.ReactNode }) {
     return (
       <th className="px-4 py-2.5 text-left" rowSpan={rowSpan}>
         <button
           onClick={() => handleSort(col)}
+          title={title}
           className="flex items-center text-xs font-medium text-zinc-500 uppercase tracking-wide hover:text-zinc-800"
         >
           {children}
@@ -141,6 +142,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
             size="sm"
             onClick={() => signOut({ callbackUrl: "/login" })}
             disabled={isOffline}
+            title="Sign out of your account"
             className={isOffline ? "opacity-50 cursor-not-allowed" : ""}
           >
             Sign out
@@ -175,18 +177,18 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
           <table className="w-full">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50">
-                <ThButton col="title" rowSpan={2}>Title</ThButton>
+                <ThButton col="title" rowSpan={2} title="Document title">Title</ThButton>
                 <th colSpan={2} className="px-4 pt-2 pb-0 text-center text-xs font-medium text-zinc-500 uppercase tracking-wide">
                   Comments
                 </th>
-                <ThButton col="lastModifiedInDrive" rowSpan={2}>Last Modified</ThButton>
+                <ThButton col="lastModifiedInDrive" rowSpan={2} title="Last change time">Last Modified</ThButton>
                 <th rowSpan={2} className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide text-left">
                   Actions
                 </th>
               </tr>
               <tr className="border-b border-zinc-200 bg-zinc-50">
-                <ThButton col="watched">Watched</ThButton>
-                <ThButton col="open">Open</ThButton>
+                <ThButton col="watched" title="Comments in my threads and my docs">Watched</ThButton>
+                <ThButton col="open" title="All open comments">Open</ThButton>
               </tr>
             </thead>
             <tbody className="bg-white">

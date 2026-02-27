@@ -15,7 +15,6 @@
 * UI: merge label filter with other state filtering
 * Search/filter box on comments/ view.
 * keyboard shortcuts
-* tooltips on all the buttons, columns, etc
 
 * hosting
   * cloud run

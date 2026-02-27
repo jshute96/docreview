@@ -238,7 +238,7 @@ export function ManageLabelsDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" title="Create or edit labels">
           Manage Labels
         </Button>
       </DialogTrigger>

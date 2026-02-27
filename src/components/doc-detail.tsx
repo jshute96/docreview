@@ -165,11 +165,12 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
     return <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
-  function ThButton({ col, children }: { col: SortCol; children: React.ReactNode }) {
+  function ThButton({ col, title, children }: { col: SortCol; title?: string; children: React.ReactNode }) {
     return (
       <th className="py-2.5 pr-4 text-left">
         <button
           onClick={() => handleSort(col)}
+          title={title}
           className="flex items-center text-xs font-medium text-zinc-500 uppercase tracking-wide hover:text-zinc-800"
         >
           {children}
@@ -193,11 +194,12 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
           <a
             href={doc.driveUrl}
             target="docreview-doc"
+            title="Open document"
             className="text-zinc-900 hover:underline hover:text-blue-600"
           >{doc.title}</a>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" title="Back to the document list" asChild>
             <a href="/docs">Doc list</a>
           </Button>
           <Button
@@ -205,6 +207,7 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
             size="sm"
             onClick={handleRefresh}
             disabled={refreshing}
+            title="Refresh comments"
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
@@ -235,7 +238,7 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
         <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-zinc-600">
           <span className="font-medium text-zinc-400">Labels:</span>
           {doc.role === "AUTHOR" && (
-            <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>
+            <span title="You are an author of this document" className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>
               Author
             </span>
           )}
@@ -246,7 +249,7 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
             <span className="text-zinc-400">—</span>
           )}
           <EditDocDialog doc={doc as unknown as DocWithLabels} allLabels={allLabels} onSave={handleEditSave}>
-            <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
+            <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit document properties and labels">
               Edit
             </Button>
           </EditDocDialog>
@@ -254,6 +257,7 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
             variant="outline"
             size="sm"
             className="h-6 px-2 text-xs"
+            title={doc.status === "ACTIVE" ? "Hide this document in document list" : "Unhide this document in document list"}
             onClick={handleArchive}
             disabled={archiving}
           >
@@ -289,15 +293,16 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
                 <th className="pl-4 py-2.5 pr-4 text-left">
                   <button
                     onClick={() => handleSort("driveCreatedAt")}
+                    title="Thread creation time"
                     className="flex items-center text-xs font-medium text-zinc-500 uppercase tracking-wide hover:text-zinc-800"
                   >
                     Created<SortIcon col="driveCreatedAt" />
                   </button>
                 </th>
-                <ThButton col="driveModifiedAt">Modified</ThButton>
-                <ThButton col="replyCount">Responses</ThButton>
-                <ThButton col="iParticipated">Created</ThButton>
-                <ThButton col="resolved">Status</ThButton>
+                <ThButton col="driveModifiedAt" title="Thread last-modified time">Modified</ThButton>
+                <ThButton col="replyCount" title="Number of replies">Responses</ThButton>
+                <ThButton col="iParticipated" title="Whether I created or replied">Created</ThButton>
+                <ThButton col="resolved" title="Whether comment is open or resolved">Status</ThButton>
                 <th className="pr-4 py-2.5 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide">
                   Actions
                 </th>

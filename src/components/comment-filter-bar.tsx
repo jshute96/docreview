@@ -22,10 +22,11 @@ export function CommentFilterBar({
   onShowModeChange,
   onSuggestionsOnlyChange,
 }: CommentFilterBarProps) {
-  function toggleBtn(active: boolean, label: string, onClick: () => void) {
+  function toggleBtn(active: boolean, label: string, onClick: () => void, title?: string) {
     return (
       <button
         onClick={onClick}
+        title={title}
         className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
           active
             ? "bg-zinc-800 text-white"
@@ -44,9 +45,9 @@ export function CommentFilterBar({
       </legend>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
 
-        {toggleBtn(myThreadsFilter, "My threads", () => onMyThreadsChange(!myThreadsFilter))}
-        {toggleBtn(myCommentsFilter, "My comments", () => onMyCommentsChange(!myCommentsFilter))}
-        {toggleBtn(suggestionsOnly, "Suggestions", () => onSuggestionsOnlyChange(!suggestionsOnly))}
+        {toggleBtn(myThreadsFilter, "My threads", () => onMyThreadsChange(!myThreadsFilter), "Threads I participated in")}
+        {toggleBtn(myCommentsFilter, "My comments", () => onMyCommentsChange(!myCommentsFilter), "Threads I started")}
+        {toggleBtn(suggestionsOnly, "Suggestions", () => onSuggestionsOnlyChange(!suggestionsOnly), "Show suggestions")}
 
         <div className="h-4 w-px bg-zinc-200" />
 
@@ -55,6 +56,7 @@ export function CommentFilterBar({
             <button
               key={mode}
               onClick={() => onShowModeChange(mode)}
+              title={{ active: "Show unarchived comments", open: "Show all unresolved comments", all: "Show all comments including resolved" }[mode]}
               className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
                 showMode === mode
                   ? "bg-zinc-800 text-white"

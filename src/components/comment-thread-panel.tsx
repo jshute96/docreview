@@ -149,7 +149,7 @@ export function CommentThreadPanel({
   const buttons = hasButtons ? (
     <div className="float-right relative z-10 flex gap-1 ml-2 mb-1">
       {commentUrl && (
-        <Button variant="outline" size="sm" className="h-6 px-2 text-xs" asChild>
+        <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Open the document at this comment" asChild>
           <a href={commentUrl} target="docreview-doc">
             Open
           </a>
@@ -160,6 +160,7 @@ export function CommentThreadPanel({
           variant="outline"
           size="sm"
           className="h-6 px-2 text-xs"
+          title="Refresh this thread"
           onClick={onRefresh}
           disabled={refreshing}
         >
@@ -194,6 +195,7 @@ export function CommentThreadPanel({
             variant="outline"
             size="sm"
             className="h-7 px-3 text-xs"
+            title="Reopen this resolved comment"
             disabled={replyText.trim().length === 0 || submitting}
             onClick={handleReopen}
           >
@@ -205,6 +207,7 @@ export function CommentThreadPanel({
               variant="outline"
               size="sm"
               className="h-7 px-3 text-xs"
+              title="Reply to this comment"
               disabled={replyText.trim().length === 0 || submitting}
               onClick={handleReply}
             >
@@ -214,6 +217,7 @@ export function CommentThreadPanel({
               variant="outline"
               size="sm"
               className="h-7 px-3 text-xs"
+              title="Mark this comment as resolved"
               disabled={submitting}
               onClick={handleResolve}
             >

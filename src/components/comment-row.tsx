@@ -272,22 +272,22 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       )}
       {cell(`${cellPy} pr-4`,
         !isSuggestion && comment.isThreadAuthor ? (
-          <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
+          <span title="You started this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
             Mine
           </span>
         ) : !isSuggestion && comment.iParticipated ? (
-          <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700">
+          <span title="You replied in this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700">
             Replied
           </span>
         ) : null
       )}
       {cell(`${cellPy} pr-4`,
         comment.resolved ? (
-          <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-zinc-100 text-zinc-500">
+          <span title="This comment has been resolved" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-zinc-100 text-zinc-500">
             Resolved
           </span>
         ) : (
-          <span className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700">
+          <span title="This comment is unresolved" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700">
             Open
           </span>
         )
@@ -298,6 +298,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             variant="outline"
             size="sm"
             className="h-6 px-2 text-xs"
+            title="Open the document at this comment"
             asChild
           >
             <a href={commentUrl()} target="docreview-doc">
@@ -308,6 +309,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             variant="outline"
             size="sm"
             className="h-6 px-2 text-xs"
+            title={isArchived ? "Unhide this comment" : "Hide this comment"}
             onClick={() => updateStatus(isArchived ? "ACTIVE" : "ARCHIVED")}
             disabled={loading}
           >
@@ -317,6 +319,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             variant="outline"
             size="sm"
             className="h-6 px-2 text-xs"
+            title={isMuted ? "Permanently hidden — click to unhide" : "Permanently hide this comment"}
             onClick={() => updateStatus(isMuted ? "ACTIVE" : "MUTED")}
             disabled={loading}
           >
@@ -371,7 +374,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
               {isSuggestion ? (
                 <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
                   <div className="flex justify-end gap-1 mb-2">
-                    <Button variant="outline" size="sm" className="h-6 px-2 text-xs" asChild>
+                    <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Open the document at this comment" asChild>
                       <a href={commentUrl()} target="docreview-doc">
                         Open
                       </a>
@@ -380,6 +383,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                       variant="outline"
                       size="sm"
                       className="h-6 px-2 text-xs"
+                      title="Refresh this thread"
                       onClick={refreshSuggestion}
                       disabled={refreshingThread}
                     >

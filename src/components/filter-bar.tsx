@@ -79,6 +79,7 @@ export function FilterBar({
           onChange={onIsAuthorChange}
           colors={TRISTATE_COLORS.author}
           className="rounded-full"
+          title="Docs that have the Author tag"
         />
 
         <div className="h-4 w-px bg-zinc-200" />
@@ -92,6 +93,7 @@ export function FilterBar({
               color={label.color}
               value={labelsFilter[label.id] ?? "off"}
               onChange={(v) => onLabelChange(label.id, v)}
+              title="Filter by label"
             />
           ))}
         </div>
@@ -105,6 +107,7 @@ export function FilterBar({
           onChange={onIsActiveChange}
           colors={TRISTATE_COLORS.author}
           className="rounded"
+          title="Active (unarchived) docs"
         />
 
         <div className="h-4 w-px bg-zinc-200" />
@@ -116,6 +119,7 @@ export function FilterBar({
           onChange={onHasCommentsChange}
           colors={TRISTATE_COLORS.author}
           className="rounded"
+          title="With open comments"
         />
 
       </div>
@@ -126,6 +130,7 @@ export function FilterBar({
           type="text"
           value={titleFilter}
           onChange={(e) => onTitleFilterChange(e.target.value)}
+          title="Filter by regular expression"
           placeholder="regex filter…"
           className="rounded border border-zinc-200 bg-white px-2 py-0.5 text-xs text-zinc-700 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none w-90"
         />

@@ -16,6 +16,7 @@ export function RefreshButton({ mode, onRefresh }: RefreshButtonProps) {
 
   const Icon = mode === "load" ? CloudDownload : RefreshCw;
   const label = mode === "refresh" ? "Refresh" : mode === "full-refresh" ? "Full Refresh" : "Load from Drive";
+  const tooltip = mode === "refresh" ? "Refresh comment counts" : mode === "full-refresh" ? "Re-fetch comment data from Google Drive for all documents" : "Import recent documents from Google Drive";
 
   async function handleClick() {
     setLoading(true);
@@ -54,7 +55,7 @@ export function RefreshButton({ mode, onRefresh }: RefreshButtonProps) {
   }
 
   return (
-    <Button onClick={handleClick} disabled={loading} variant="outline" size="sm">
+    <Button onClick={handleClick} disabled={loading} variant="outline" size="sm" title={tooltip}>
       <Icon className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
       {label}
     </Button>

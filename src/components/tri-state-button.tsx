@@ -82,6 +82,7 @@ interface TriStateButtonProps {
   onChange: (next: TriState) => void;
   colors: TriStateColorConfig;
   className?: string;
+  title?: string;
 }
 
 export function TriStateButton({
@@ -90,11 +91,13 @@ export function TriStateButton({
   onChange,
   colors,
   className = "",
+  title,
 }: TriStateButtonProps) {
   const handleClick = useTriStateCycle(value, onChange);
   return (
     <button
       onClick={handleClick}
+      title={title}
       className={`relative overflow-hidden px-2 py-0.5 text-xs font-medium transition-colors ${colors[value]} ${className}`}
     >
       {label}
@@ -152,6 +155,7 @@ interface TriStateLabelButtonProps {
   color: string | null;
   value: TriState;
   onChange: (next: TriState) => void;
+  title?: string;
 }
 
 export function TriStateLabelButton({
@@ -159,6 +163,7 @@ export function TriStateLabelButton({
   color,
   value,
   onChange,
+  title,
 }: TriStateLabelButtonProps) {
   const handleClick = useTriStateCycle(value, onChange);
   const bg = color ?? "#e4e4e7";
@@ -172,6 +177,7 @@ export function TriStateLabelButton({
   return (
     <button
       onClick={handleClick}
+      title={title}
       className={`relative overflow-hidden rounded-full px-2 py-0.5 text-xs font-medium transition-opacity ${stateClass}`}
       style={{ backgroundColor: bg, color: contrastText(bg) }}
     >

@@ -48,6 +48,7 @@ export function DocRow({ doc, allLabels, onUpdate }: DocRowProps) {
         <div className="flex flex-wrap items-center gap-2">
           <a
             href={`/comments/${doc.id}`}
+            title="Open document comments page"
             className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline hover:text-blue-600 ${
               doc.isDeleted ? "line-through text-zinc-400" : "text-zinc-900"
             }`}
@@ -56,7 +57,7 @@ export function DocRow({ doc, allLabels, onUpdate }: DocRowProps) {
             {doc.title}
           </a>
           {doc.role === "AUTHOR" && (
-            <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>
+            <span title="You are an author of this document" className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>
               Author
             </span>
           )}
@@ -80,11 +81,11 @@ export function DocRow({ doc, allLabels, onUpdate }: DocRowProps) {
       <td className="py-1.5 pr-4 text-sm text-zinc-500">{lastModified}</td>
       <td className="py-1.5">
         <div className="flex items-center gap-1">
-          <Button variant="outline" size="sm" className="h-6 px-2 text-xs" asChild>
+          <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Open this document" asChild>
             <a href={doc.driveUrl} target="_blank" rel="noopener noreferrer">Open</a>
           </Button>
           <EditDocDialog doc={doc} allLabels={allLabels} onSave={onUpdate}>
-            <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
+            <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit document properties and labels">
               Edit
             </Button>
           </EditDocDialog>
@@ -92,6 +93,7 @@ export function DocRow({ doc, allLabels, onUpdate }: DocRowProps) {
             variant="outline"
             size="sm"
             className="h-6 px-2 text-xs"
+            title={doc.status === "ACTIVE" ? "Hide this document" : "Unhide this document"}
             onClick={handleArchive}
             disabled={archiving}
           >
