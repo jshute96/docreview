@@ -16,8 +16,6 @@
 * keyboard shortcuts
 * consider saving loaded comments
 * consider preloading comments earlier (maybe from docs page too)
-* add notes along with labels
-  - display in docs and comments page
 
 * hosting
   * cloud run
@@ -46,3 +44,5 @@
 
 * cosmetic
   * better visual for the cross-out filter buttons
+  * tooltip display for longer notes
+  * editable notes box inline on the comments page?

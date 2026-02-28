@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 import type { CommentThread } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
 import { highlightText } from "@/lib/highlight";
+import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 
 function formatTime(iso: string): string {
   if (!iso) return "";
@@ -189,7 +190,7 @@ export function CommentThreadPanel({
         onChange={handleChange}
         placeholder="Reply..."
         rows={1}
-        className="block resize-none rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+        className={TEXTAREA_CLASSES}
         style={{ width: "25%", overflow: "hidden" }}
       />
       <div className="mt-2 flex gap-2">

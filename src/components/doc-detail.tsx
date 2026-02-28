@@ -101,7 +101,7 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
   }
 
   function handleEditSave(updated: DocWithLabels) {
-    setDoc((prev) => ({ ...prev, role: updated.role, labels: updated.labels, status: updated.status }));
+    setDoc((prev) => ({ ...prev, role: updated.role, labels: updated.labels, status: updated.status, notes: updated.notes }));
   }
 
   async function handleArchive() {
@@ -268,7 +268,7 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
             <span className="text-zinc-400">—</span>
           )}
           <EditDocDialog doc={doc as unknown as DocWithLabels} allLabels={allLabels} onSave={handleEditSave}>
-            <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit document properties and labels">
+            <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit document labels and notes">
               Edit
             </Button>
           </EditDocDialog>
@@ -283,6 +283,17 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
             {doc.status === "ACTIVE" ? "Archive" : "Unarchive"}
           </Button>
         </div>
+        {doc.notes?.trim() && (
+          <div className="flex gap-2 mt-2 text-sm text-zinc-600">
+            <span className="font-medium text-zinc-400 flex-shrink-0 pt-1">Notes:</span>
+            <textarea
+              readOnly
+              value={doc.notes}
+              rows={Math.min(doc.notes.split("\n").length, 10)}
+              className="flex-1 resize-none rounded border border-zinc-200 bg-zinc-50 px-3 py-1 text-sm text-zinc-700 focus:outline-none max-h-[200px] overflow-y-auto"
+            />
+          </div>
+        )}
       </div>
 
       {/* Filters */}

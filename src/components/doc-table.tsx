@@ -198,6 +198,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
                   doc={doc}
                   allLabels={labels}
                   onUpdate={handleDocUpdate}
+                  searchFilter={titleFilter}
                 />
               ))}
             </tbody>

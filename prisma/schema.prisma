@@ -136,6 +136,7 @@ model Doc {
   status               DocStatus  @default(ACTIVE)
   isDeleted            Boolean    @default(false) @map("is_deleted")
   lastModifiedInDrive  DateTime?  @map("last_modified_in_drive")
+  notes                String?    @map("notes")
   owner                String?
   createdTimeInDrive   DateTime?  @map("created_time_in_drive")
   addedAt              DateTime   @default(now()) @map("added_at")

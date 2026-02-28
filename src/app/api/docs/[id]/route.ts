@@ -53,10 +53,11 @@ export async function PATCH(
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const { role, status, labelIds } = body as {
+  const { role, status, labelIds, notes } = body as {
     role?: DocRole;
     status?: DocStatus;
     labelIds?: string[];
+    notes?: string | null;
   };
 
   if (role !== undefined && !VALID_ROLES.includes(role)) {
@@ -86,6 +87,7 @@ export async function PATCH(
     data: {
       ...(role !== undefined ? { role } : {}),
       ...(status !== undefined ? { status } : {}),
+      ...(notes !== undefined ? { notes: notes || null } : {}),
       ...(labelIds !== undefined
         ? {
             labels: {
