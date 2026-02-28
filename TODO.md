@@ -16,6 +16,8 @@
 * keyboard shortcuts
 * consider saving loaded comments
 * consider preloading comments earlier (maybe from docs page too)
+* add notes along with labels
+  - display in docs and comments page
 
 * hosting
   * cloud run
@@ -24,12 +26,20 @@
 * offline mode - run with a database but no API login
     * can the agent use this autonomously in a browser to test?
 
-* chrome plugin for adding a doc
-* chrome plugin for scrolling to comments in the doc window without reloading
+* add a doc I'm requesting permission to
+  * record notes about where it came from, when I asked permission
+  * built-in tag for PermissionPending, transition when I get permission
+
+* chrome plugin
+  * add a doc
+  * capture linked-from notes when requesting permission
+  * scroll to comments in the doc window without reloading
 
 * sandbox test environment
 * snapshot database and simulated or recorded google APIs
 * demo version with some fake docs or a starting snapshot
+
+* embedded pgvector index for semantic search on docs, titles, comments
 
 * can we open the doc diff viewer
 * can we find a way to open diffs between timestamps we choose?
