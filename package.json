@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:offline": "OFFLINE_MODE=true next dev",
+    "dev": "node scripts/check-db.mjs && next dev",
+    "dev:offline": "node scripts/check-db.mjs && OFFLINE_MODE=true next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
