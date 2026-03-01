@@ -37,6 +37,7 @@ export async function syncComments(
   }
 
   let created = 0;
+  let updatedCount = 0;
   let shouldUnarchive = false;
 
   for (const c of comments) {
@@ -80,6 +81,7 @@ export async function syncComments(
             replyCount: c.replyCount,
           },
         });
+        updatedCount++;
         continue;
       }
       // Existing comment with new replies: check for unarchive
@@ -99,6 +101,7 @@ export async function syncComments(
           replyCount: c.replyCount,
         },
       });
+      updatedCount++;
     }
   }
 
@@ -107,11 +110,17 @@ export async function syncComments(
     data: { commentsLastSyncedAt: new Date() },
   });
 
-  if (doc.mimeType !== DOCS_MIME_TYPE) return { created, shouldUnarchive };
+  if (doc.mimeType !== DOCS_MIME_TYPE) {
+    console.log(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated${shouldUnarchive ? " → unarchive" : ""}`);
+    return { created, shouldUnarchive };
+  }
 
   // If the Docs API fetch failed, skip suggestion sync entirely — we can't
   // tell which suggestions are still live, so resolving absent ones would be wrong.
-  if (suggestionFetchFailed) return { created, shouldUnarchive, transientError: true };
+  if (suggestionFetchFailed) {
+    console.log(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated (suggestions skipped: fetch failed)`);
+    return { created, shouldUnarchive, transientError: true };
+  }
 
   // Docs API sync: ensures ALL pending suggestions are tracked.
   const existingSuggestionIds = new Set(
@@ -148,6 +157,7 @@ export async function syncComments(
   }
 
   // Mark suggest.xxx suggestions no longer in the document as resolved.
+  let suggestionsResolved = 0;
   const activeSuggestions = await prisma.comment.findMany({
     where: { docId: doc.id, type: "SUGGESTION", resolved: false },
   });
@@ -160,8 +170,10 @@ export async function syncComments(
         where: { id: s.id },
         data: { resolved: true, status: s.status === "ACTIVE" ? "ARCHIVED" : s.status },
       });
+      suggestionsResolved++;
     }
   }
 
+  console.log(`[Comments] ${doc.googleDocId}: ${comments.length} comments from Drive, ${created} new, ${updatedCount} updated; ${docsSuggestionsForSync.length} suggestions (${suggestionsResolved} resolved)${shouldUnarchive ? " → unarchive" : ""}`);
   return { created, shouldUnarchive };
 }

@@ -18,21 +18,23 @@ vi.mock("@/lib/google-drive", () => ({
   listRecentDocs: vi.fn(),
   findDeletedDocIds: vi.fn(),
   getDriveClient: vi.fn(),
+  getChangesStartPageToken: vi.fn(),
+  listChanges: vi.fn(),
 }));
 vi.mock("@/lib/sync-comments", () => ({
   syncComments: vi.fn(),
 }));
 vi.mock("@/lib/status", () => ({
   getStatus: vi.fn(),
-  updateDriveTimestamp: vi.fn(),
+  updateDriveChangesToken: vi.fn(),
 }));
 
 import { GET, POST } from "./route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { listRecentDocs, findDeletedDocIds, getDriveClient } from "@/lib/google-drive";
+import { listRecentDocs, findDeletedDocIds, getDriveClient, getChangesStartPageToken, listChanges } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
-import { getStatus, updateDriveTimestamp } from "@/lib/status";
+import { getStatus, updateDriveChangesToken } from "@/lib/status";
 
 const mockAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
 const mockDoc = prisma.doc as unknown as {
@@ -43,9 +45,11 @@ const mockDoc = prisma.doc as unknown as {
 const mockListRecentDocs = vi.mocked(listRecentDocs);
 const mockFindDeletedDocIds = vi.mocked(findDeletedDocIds);
 const mockGetDriveClient = vi.mocked(getDriveClient);
+const mockGetChangesStartPageToken = vi.mocked(getChangesStartPageToken);
+const mockListChanges = vi.mocked(listChanges);
 const mockSyncComments = vi.mocked(syncComments);
 const mockGetStatus = vi.mocked(getStatus);
-const mockUpdateDriveTimestamp = vi.mocked(updateDriveTimestamp);
+const mockUpdateDriveChangesToken = vi.mocked(updateDriveChangesToken);
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -107,7 +111,8 @@ function postRequest(mode?: "refresh" | "full-refresh" | "load") {
 describe("POST /api/docs", () => {
   beforeEach(() => {
     mockGetStatus.mockResolvedValue(null);
-    mockUpdateDriveTimestamp.mockResolvedValue(undefined);
+    mockUpdateDriveChangesToken.mockResolvedValue(undefined);
+    mockGetChangesStartPageToken.mockResolvedValue("token-1");
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -118,7 +123,7 @@ describe("POST /api/docs", () => {
 
   it("returns 502 when Drive API fails", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    mockListRecentDocs.mockRejectedValue(new Error("Drive unavailable"));
+    mockGetDriveClient.mockRejectedValue(new Error("Drive unavailable"));
 
     await suppressingErrors(async () => {
       const res = await POST(postRequest());
@@ -441,7 +446,7 @@ describe("POST /api/docs", () => {
 
     const res = await POST(postRequest("refresh"));
     expect(res.status).toBe(200);
-    expect(mockUpdateDriveTimestamp).not.toHaveBeenCalled();
+    expect(mockUpdateDriveChangesToken).not.toHaveBeenCalled();
   });
 
   it("updates timestamp when all syncs succeed", async () => {
@@ -470,6 +475,6 @@ describe("POST /api/docs", () => {
 
     const res = await POST(postRequest("refresh"));
     expect(res.status).toBe(200);
-    expect(mockUpdateDriveTimestamp).toHaveBeenCalledTimes(1);
+    expect(mockUpdateDriveChangesToken).toHaveBeenCalledTimes(1);
   });
 });

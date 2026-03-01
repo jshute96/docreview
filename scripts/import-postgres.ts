@@ -77,7 +77,6 @@ async function main() {
     await prisma.status.create({
       data: {
         userId: s.userId,
-        lastDriveUpdateTimestamp: parseDate(s.lastDriveUpdateTimestamp),
         lastGmailUpdateTimestamp: parseDate(s.lastGmailUpdateTimestamp),
       },
     });

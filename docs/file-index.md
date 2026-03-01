@@ -80,7 +80,7 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 
 | File | Description |
 |------|-------------|
-| `google-drive.ts` | Google Drive/Docs API client — OAuth2 with token refresh, comment fetching, suggestion parsing, thread detail, reply/resolve, file listing |
+| `google-drive.ts` | Google Drive/Docs API client — OAuth2 with token refresh, changes feed (`changes.list`/`getStartPageToken`), file listing, comment fetching, suggestion parsing, thread detail, reply/resolve |
 | `auth-utils.ts` | Centralized authentication helpers for Server Components and API routes |
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates DB records, computes unarchive signals |
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
@@ -91,7 +91,7 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 | `bulk-edit.ts` | `BulkEditState` type and `cycleBulkEditState` helper for multi-doc editing |
 | `offline.ts` | Offline mode constants — `OFFLINE_MODE` flag, `OfflineModeError`, fallback user |
 | `role-colors.ts` | Tailwind class maps for Author (blue) and Reviewer (violet) role badges/filters |
-| `status.ts` | Read/write `Status` table — tracks `lastDriveUpdateTimestamp` per user for incremental sync |
+| `status.ts` | Read/write `Status` table — tracks `driveChangesPageToken` per user for incremental sync via Drive Changes API |
 | `tri-state.ts` | `TriState` type (`off`/`include`/`exclude`), cycle function, partition helper |
 | `utils.ts` | `cn()` (clsx+twMerge), `contrastText()` for label colors, `formatDate()` |
 | `__mocks__/prisma.ts` | Vitest mock of PrismaClient for unit tests |

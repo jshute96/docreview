@@ -4,10 +4,10 @@ export async function getStatus(userId: string) {
   return prisma.status.findUnique({ where: { userId } });
 }
 
-export async function updateDriveTimestamp(userId: string, timestamp: Date) {
+export async function updateDriveChangesToken(userId: string, token: string) {
   await prisma.status.upsert({
     where: { userId },
-    create: { userId, lastDriveUpdateTimestamp: timestamp },
-    update: { lastDriveUpdateTimestamp: timestamp },
+    create: { userId, driveChangesPageToken: token },
+    update: { driveChangesPageToken: token },
   });
 }

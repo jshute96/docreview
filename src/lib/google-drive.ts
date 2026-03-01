@@ -465,6 +465,85 @@ export async function replyToComment(
   console.log(`[Drive] replies.create${tag} ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
 }
 
+export async function getChangesStartPageToken(userId: string): Promise<string> {
+  const auth = await getDriveClient(userId);
+  const drive = google.drive({ version: "v3", auth });
+  const t0 = Date.now();
+  const res = await drive.changes.getStartPageToken({});
+  console.log(`[Drive] changes.getStartPageToken → ${res.data.startPageToken} (${Date.now() - t0}ms)`);
+  return res.data.startPageToken!;
+}
+
+export interface DriveChangesResult {
+  docs: DriveDoc[];
+  deletedDocIds: Set<string>;
+  newPageToken: string;
+}
+
+export async function listChanges(userId: string, pageToken: string): Promise<DriveChangesResult> {
+  const auth = await getDriveClient(userId);
+  const drive = google.drive({ version: "v3", auth });
+
+  // Collect all changes, deduplicating by fileId (keep last entry per file)
+  const changesByFileId = new Map<string, { removed: boolean; file?: { id?: string | null; name?: string | null; mimeType?: string | null; webViewLink?: string | null; modifiedTime?: string | null; createdTime?: string | null; owners?: { me?: boolean | null; displayName?: string | null }[] | null; trashed?: boolean | null } | null }>();
+  let currentToken = pageToken;
+  let newPageToken = pageToken;
+
+  do {
+    const t0 = Date.now();
+    const res = await drive.changes.list({
+      pageToken: currentToken,
+      fields: "nextPageToken, newStartPageToken, changes(removed, fileId, file(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed))",
+      pageSize: 100,
+      includeRemoved: true,
+    });
+    console.log(`[Drive] changes.list (page ${currentToken.slice(0, 8)}…) → ${res.data.changes?.length ?? 0} changes (${Date.now() - t0}ms)`);
+
+    for (const change of res.data.changes ?? []) {
+      if (!change.fileId) continue;
+      changesByFileId.set(change.fileId, {
+        removed: change.removed === true,
+        file: change.file,
+      });
+    }
+
+    if (res.data.newStartPageToken) {
+      newPageToken = res.data.newStartPageToken;
+      break;
+    }
+    currentToken = res.data.nextPageToken!;
+  } while (currentToken);
+
+  const docs: DriveDoc[] = [];
+  const deletedDocIds = new Set<string>();
+
+  for (const [fileId, change] of changesByFileId) {
+    if (change.removed || change.file?.trashed === true) {
+      deletedDocIds.add(fileId);
+      continue;
+    }
+
+    const file = change.file;
+    if (!file?.id || !file.name || !file.mimeType) continue;
+    if (!SUPPORTED_MIME_TYPES.has(file.mimeType)) continue;
+
+    const isOwner = file.owners?.some((o) => o.me === true) ?? false;
+    docs.push({
+      googleDocId: file.id,
+      title: file.name,
+      driveUrl: file.webViewLink ?? `https://docs.google.com/document/d/${file.id}/edit`,
+      mimeType: file.mimeType,
+      role: isOwner ? "AUTHOR" : "REVIEWER",
+      lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,
+      createdTimeInDrive: file.createdTime ? new Date(file.createdTime) : null,
+      owner: file.owners?.[0]?.displayName ?? null,
+    });
+  }
+
+  console.log(`[Drive] changes summary: ${docs.length} changed docs, ${deletedDocIds.size} deleted (${changesByFileId.size} total changes)`);
+  return { docs, deletedDocIds, newPageToken };
+}
+
 export async function listRecentDocs(userId: string, since?: Date): Promise<DriveDoc[]> {
   const auth = await getDriveClient(userId);
   const drive = google.drive({ version: "v3", auth });

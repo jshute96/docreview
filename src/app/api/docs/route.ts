@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { listRecentDocs, findDeletedDocIds, getDriveClient } from "@/lib/google-drive";
+import { listRecentDocs, findDeletedDocIds, getDriveClient, getChangesStartPageToken, listChanges } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
-import { getStatus, updateDriveTimestamp } from "@/lib/status";
+import { getStatus, updateDriveChangesToken } from "@/lib/status";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 
 export async function GET(req: NextRequest) {
@@ -45,20 +45,55 @@ export async function POST(req: NextRequest) {
     modeParam === "refresh" ? "refresh"
     : modeParam === "full-refresh" ? "full-refresh"
     : "load";
-  const syncStart = new Date();
 
-  // Refresh and full-refresh use incremental timestamp; load always does a full 30-day scan
-  const since = mode === "refresh" || mode === "full-refresh"
-    ? (await getStatus(userId))?.lastDriveUpdateTimestamp ?? undefined
-    : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  console.log(`[Sync] Starting ${mode} sync`);
+  const t0 = Date.now();
 
-  let driveDocs;
+  let driveDocs: import("@/lib/google-drive").DriveDoc[] = [];
+  let deletedDocIds = new Set<string>();
   let driveAuth;
+  let newPageToken: string | undefined;
+
   try {
-    driveDocs = await listRecentDocs(userId, since);
     driveAuth = await getDriveClient(userId);
+
+    if (mode === "load") {
+      // Load mode: full 30-day scan via files.list
+      console.log("[Sync] Load: scanning via files.list (30-day window)");
+      driveDocs = await listRecentDocs(userId, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+    } else {
+      // Refresh / full-refresh: use changes.list with saved token
+      const status = await getStatus(userId);
+      const savedToken = status?.driveChangesPageToken;
+
+      if (savedToken) {
+        console.log(`[Sync] ${mode}: using changes.list with saved token`);
+        try {
+          const result = await listChanges(userId, savedToken);
+          driveDocs = result.docs;
+          deletedDocIds = result.deletedDocIds;
+          newPageToken = result.newPageToken;
+          console.log(`[Sync] changes.list → ${driveDocs.length} changed docs, ${deletedDocIds.size} deletions`);
+        } catch (err: unknown) {
+          // Expired/invalid token → fall back to bootstrap
+          const code = (err as { code?: number | string })?.code;
+          if (code === 404 || code === "404") {
+            console.warn("[Sync] changes.list token expired, falling back to bootstrap (7-day files.list)");
+            newPageToken = await getChangesStartPageToken(userId);
+            driveDocs = await listRecentDocs(userId); // default 7-day window
+          } else {
+            throw err;
+          }
+        }
+      } else {
+        // Bootstrap: no saved token — establish baseline and do a 7-day scan
+        console.log(`[Sync] ${mode}: no saved token, bootstrapping (7-day files.list)`);
+        newPageToken = await getChangesStartPageToken(userId);
+        driveDocs = await listRecentDocs(userId); // default 7-day window
+      }
+    }
   } catch (err) {
-    console.error("Drive error:", err);
+    console.error("[Sync] Drive error:", err);
     return NextResponse.json(
       { error: "Failed to fetch from Google Drive" },
       { status: 502 }
@@ -116,8 +151,25 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Handle deletions detected by changes.list (refresh/full-refresh)
+  if (deletedDocIds.size > 0) {
+    console.log(`[Sync] Processing ${deletedDocIds.size} deletions from changes.list`);
+    const docsToDelete = await prisma.doc.findMany({
+      where: {
+        userId,
+        isDeleted: false,
+        googleDocId: { in: [...deletedDocIds] },
+      },
+      select: { id: true },
+    });
+    for (const doc of docsToDelete) {
+      await prisma.doc.update({ where: { id: doc.id }, data: { isDeleted: true } });
+      deleted++;
+    }
+  }
+
   // Check active docs that didn't appear in Drive results — only in load mode,
-  // since refresh/full-refresh use a narrow incremental window where most docs won't appear.
+  // since refresh/full-refresh detect deletions via changes.list.
   if (mode === "load") {
     const missingDocs = await prisma.doc.findMany({
       where: {
@@ -130,9 +182,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (missingDocs.length > 0) {
-      const deletedIds = await findDeletedDocIds(userId, missingDocs.map((d) => d.googleDocId));
+      console.log(`[Sync] Load: checking ${missingDocs.length} docs not in Drive results for deletion`);
+      const loadDeletedIds = await findDeletedDocIds(userId, missingDocs.map((d) => d.googleDocId));
       for (const doc of missingDocs) {
-        if (deletedIds.has(doc.googleDocId)) {
+        if (loadDeletedIds.has(doc.googleDocId)) {
           await prisma.doc.update({ where: { id: doc.id }, data: { isDeleted: true } });
           deleted++;
         }
@@ -141,42 +194,54 @@ export async function POST(req: NextRequest) {
   }
 
   // Sync comments: full-refresh syncs ALL docs (including previously deleted
-  // ones, so they can recover if a 403 was temporary); refresh/load only sync
-  // docs returned by Drive
-  const activeDocs = mode === "full-refresh"
+  // ones, so they can recover if a 403 was temporary); refresh syncs only
+  // changed docs; load syncs docs returned by Drive
+  const commentDocs = mode === "full-refresh"
     ? await prisma.doc.findMany({
         where: { userId },
       })
     : await prisma.doc.findMany({
         where: { userId, isDeleted: false, googleDocId: { in: [...driveDocIds] } },
       });
+  console.log(`[Sync] Syncing comments for ${commentDocs.length} docs (${mode === "full-refresh" ? "all docs" : "changed docs only"})`);
   const syncResults = await Promise.all(
-    activeDocs.map((doc) => syncComments(doc, driveAuth))
+    commentDocs.map((doc) => syncComments(doc, driveAuth))
   );
   const comments = syncResults.reduce((sum, r) => sum + r.created, 0);
 
   // Unarchive ARCHIVED docs only when syncComments detected meaningful new activity.
   // Also handle newly detected deletions from syncComments results.
   let unarchived = 0;
-  for (let i = 0; i < activeDocs.length; i++) {
+  for (let i = 0; i < commentDocs.length; i++) {
     const res = syncResults[i];
     if (res.isDeleted) {
-      await prisma.doc.update({ where: { id: activeDocs[i].id }, data: { isDeleted: true } });
+      await prisma.doc.update({ where: { id: commentDocs[i].id }, data: { isDeleted: true } });
       deleted++;
       continue;
     }
-    if (activeDocs[i].status === "ARCHIVED" && res.shouldUnarchive) {
-      await prisma.doc.update({ where: { id: activeDocs[i].id }, data: { status: "ACTIVE" } });
+    if (commentDocs[i].status === "ARCHIVED" && res.shouldUnarchive) {
+      await prisma.doc.update({ where: { id: commentDocs[i].id }, data: { status: "ACTIVE" } });
       unarchived++;
     }
   }
 
-  // Save sync timestamp only if all comment syncs succeeded — if any had transient
-  // errors, keep the old timestamp so the next refresh re-attempts those docs.
+  // Save changes page token only if no transient errors occurred.
+  // For load mode, initialize the token so subsequent refreshes use changes.list.
   const anyTransientError = syncResults.some(r => r.transientError);
   if (!anyTransientError) {
-    await updateDriveTimestamp(userId, syncStart);
+    if (newPageToken) {
+      console.log(`[Sync] Saving changes token for future refreshes`);
+      await updateDriveChangesToken(userId, newPageToken);
+    } else if (mode === "load") {
+      console.log("[Sync] Load complete, initializing changes token for future refreshes");
+      const token = await getChangesStartPageToken(userId);
+      await updateDriveChangesToken(userId, token);
+    }
+  } else {
+    console.warn("[Sync] Transient errors during comment sync, skipping token update");
   }
 
+  const elapsed = Date.now() - t0;
+  console.log(`[Sync] ${mode} complete in ${elapsed}ms: ${added} added, ${updated} updated, ${deleted} deleted, ${unarchived} unarchived, ${comments} comments synced`);
   return NextResponse.json({ mode, added, updated, deleted, unarchived, total: driveDocs.length, comments });
 }
