@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ColorPicker, PRIMARY_COLORS } from "@/components/color-picker";
 import { DialogButtons } from "@/components/dialog-buttons";
+import { broadcastChange } from "@/lib/cross-tab";
 
 function randomPrimaryColor(): string {
   return PRIMARY_COLORS[Math.floor(Math.random() * PRIMARY_COLORS.length)];
@@ -229,6 +230,7 @@ export function ManageLabelsDialog({
 
       onLabelsChange(finalLabels);
       setOpen(false);
+      broadcastChange({ type: "labels" });
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to save labels");
     } finally {

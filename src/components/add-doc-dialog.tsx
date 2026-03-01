@@ -17,6 +17,7 @@ import { DialogButtons } from "@/components/dialog-buttons";
 import { LabelPicker } from "@/components/label-picker";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
+import { broadcastChange } from "@/lib/cross-tab";
 
 interface AddDocDialogProps {
   allLabels: Label[];
@@ -158,6 +159,7 @@ export function AddDocDialog({
       const newDoc: DocWithLabels = await res.json();
       onDocAdded(newDoc);
       setOpen(false);
+      broadcastChange({ type: "docs" });
       toast.success(`Added "${newDoc.title}"`);
     } catch {
       toast.error("Failed to add document");

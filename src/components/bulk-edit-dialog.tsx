@@ -20,6 +20,7 @@ import { BulkEditState, cycleBulkEditState } from "@/lib/bulk-edit";
 import { contrastText } from "@/lib/utils";
 import { ManageLabelsDialog } from "@/components/manage-labels-dialog";
 import { Button } from "@/components/ui/button";
+import { broadcastChange } from "@/lib/cross-tab";
 
 interface BulkEditDialogProps {
   initialDocs: DocWithLabels[];
@@ -171,6 +172,7 @@ export function BulkEditDialog({
       const updatedDocs: DocWithLabels[] = await res.json();
       onSave(updatedDocs);
       setOpen(false);
+      broadcastChange({ type: "docs" });
       toast.success(`Updated ${updatedDocs.length} documents`);
     } catch {
       toast.error("Failed to save changes");

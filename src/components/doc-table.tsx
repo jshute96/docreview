@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
+import { useCrossTabListener } from "@/lib/cross-tab";
 import type { TriState } from "@/lib/tri-state";
 import { DocRow } from "@/components/doc-row";
 import { FilterBar } from "@/components/filter-bar";
@@ -14,7 +15,6 @@ import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { filterDocs, sortDocs } from "@/lib/doc-filters";
 import type { SortCol, SortDir } from "@/lib/doc-filters";
-import { getSyncChannel, broadcastSync } from "@/lib/sync-channel";
 
 interface DocTableProps {
   initialDocs: DocWithLabels[];
@@ -26,74 +26,8 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
   const [docs, setDocs] = useState<DocWithLabels[]>(initialDocs);
   const [labels, setLabelsRaw] = useState<Label[]>(initialLabels);
 
-  const fetchAll = useCallback(async () => {
-    try {
-      const [docsRes, labelsRes] = await Promise.all([
-        fetch("/api/docs?includeArchived=true"),
-        fetch("/api/labels"),
-      ]);
-      if (docsRes.ok && labelsRes.ok) {
-        const [newDocs, newLabels] = await Promise.all([docsRes.json(), labelsRes.json()]);
-        setDocs(newDocs);
-        setLabelsRaw(newLabels);
-      }
-    } catch (err) {
-      console.error("Failed to refetch data for sync", err);
-    }
-  }, []);
-
-  useEffect(() => {
-    const channel = getSyncChannel();
-    if (!channel) return;
-
-    const handleMessage = (event: MessageEvent) => {
-      const msg = event.data;
-      switch (msg.type) {
-        case "REFRESH_ALL":
-          fetchAll();
-          break;
-        case "DOC_UPDATED":
-          setDocs((prev) => prev.map((d) => (d.id === msg.payload.id ? msg.payload : d)));
-          break;
-        case "DOC_ADDED":
-          setDocs((prev) => {
-            if (prev.some((d) => d.id === msg.payload.id)) return prev;
-            return [msg.payload, ...prev];
-          });
-          break;
-        case "LABELS_UPDATED":
-          setLabelsRaw(msg.payload);
-          const labelMap = new Map((msg.payload as Label[]).map((l) => [l.id, l]));
-          setDocs((prev) =>
-            prev.map((doc) => ({
-              ...doc,
-              labels: doc.labels
-                .map((dl) => ({
-                  ...dl,
-                  label: labelMap.get(dl.labelId) ?? dl.label,
-                }))
-                .sort((a, b) => (a.label?.position ?? 0) - (b.label?.position ?? 0)),
-            }))
-          );
-          break;
-        case "LABEL_DELETED":
-          setLabelsRaw((prev) => prev.filter((l) => l.id !== msg.payload));
-          setDocs((prev) =>
-            prev.map((d) => ({
-              ...d,
-              labels: d.labels.filter((dl) => dl.labelId !== msg.payload),
-            }))
-          );
-          break;
-      }
-    };
-
-    channel.addEventListener("message", handleMessage);
-    return () => channel.removeEventListener("message", handleMessage);
-  }, [fetchAll]);
-
   // When labels change (e.g. color update), propagate into docs state too
-  function setLabels(newLabels: Label[], broadcast = true) {
+  function setLabels(newLabels: Label[]) {
     setLabelsRaw(newLabels);
     const labelMap = new Map(newLabels.map((l) => [l.id, l]));
     setDocs((prev) =>
@@ -107,10 +41,21 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
           .sort((a, b) => (a.label?.position ?? 0) - (b.label?.position ?? 0)),
       }))
     );
-    if (broadcast) {
-      broadcastSync({ type: "LABELS_UPDATED", payload: newLabels });
-    }
   }
+
+  // Any cross-tab mutation warrants a full refresh since DocTable shows aggregate data
+  const refetchAll = useCallback(async () => {
+    try {
+      const [docsRes, labelsRes] = await Promise.all([
+        fetch("/api/docs?includeArchived=true"),
+        fetch("/api/labels"),
+      ]);
+      if (docsRes.ok) setDocs(await docsRes.json());
+      if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
+    } catch { /* cross-tab sync is best-effort */ }
+  }, []);
+
+  useCrossTabListener(refetchAll);
 
   const [isActive, setIsActive] = useState<TriState>("include");
   const [hasComments, setHasComments] = useState<TriState>("off");
@@ -145,29 +90,21 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
     });
   }
 
-  function handleDocUpdate(updated: DocWithLabels, broadcast = true) {
+  function handleDocUpdate(updated: DocWithLabels) {
     setDocs((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
-    if (broadcast) {
-      broadcastSync({ type: "DOC_UPDATED", payload: updated });
-    }
   }
 
   function handleBulkUpdate(updatedDocs: DocWithLabels[]) {
     const updatedMap = new Map(updatedDocs.map((d) => [d.id, d]));
     setDocs((prev) => prev.map((d) => updatedMap.get(d.id) ?? d));
-    // Bulk update is complex, easier to just tell others to refresh all for now
-    broadcastSync({ type: "REFRESH_ALL" });
   }
 
-  function handleDocAdded(newDoc: DocWithLabels, broadcast = true) {
+  function handleDocAdded(newDoc: DocWithLabels) {
     setDocs((prev) => [newDoc, ...prev]);
-    if (broadcast) {
-      broadcastSync({ type: "DOC_ADDED", payload: newDoc });
-    }
   }
 
-  function handleLabelDelete(id: string, broadcast = true) {
-    setLabels(labels.filter((l) => l.id !== id), false);
+  function handleLabelDelete(id: string) {
+    setLabels(labels.filter((l) => l.id !== id));
     setDocs((prev) =>
       prev.map((d) => ({
         ...d,
@@ -178,14 +115,6 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
       const { [id]: _, ...rest } = prev;
       return rest;
     });
-    if (broadcast) {
-      broadcastSync({ type: "LABEL_DELETED", payload: id });
-    }
-  }
-
-  function handleRefresh(newDocs: DocWithLabels[]) {
-    setDocs(newDocs);
-    broadcastSync({ type: "REFRESH_ALL" });
   }
 
   const filteredDocs = sortDocs(
@@ -237,9 +166,9 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
               </Button>
             }
           />
-          <RefreshButton mode="refresh" onRefresh={handleRefresh} />
-          <RefreshButton mode="full-refresh" onRefresh={handleRefresh} />
-          <RefreshButton mode="load" onRefresh={handleRefresh} />
+          <RefreshButton mode="refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
+          <RefreshButton mode="full-refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
+          <RefreshButton mode="load" onRefresh={(newDocs) => setDocs(newDocs)} />
           <ManageLabelsDialog labels={labels} onLabelsChange={setLabels} onLabelDelete={handleLabelDelete} />
           <Button
             variant="outline"

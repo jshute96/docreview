@@ -67,7 +67,7 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 | `google-drive.ts` | Google Drive/Docs API client — OAuth2 with token refresh, comment fetching, suggestion parsing, thread detail, reply/resolve, file listing |
 | `auth-utils.ts` | Centralized authentication helpers for Server Components and API routes |
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates DB records, computes unarchive signals |
-| `sync-channel.ts` | Real-time cross-tab synchronization utility using the Broadcast Channel API |
+| `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
 | `doc-filters.ts` | Client-side doc filtering (tri-state logic for active/comments/author/mimeType/labels/title regex) and sorting |
 | `doc-queries.ts` | Shared Prisma include clause + transform for computing watched/open comment counts without loading full comment data |
 | `highlight.tsx` | `highlightText()` — regex/substring highlighter; `matchesFilter()` — centralized dual regex/substring search logic |

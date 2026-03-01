@@ -16,6 +16,7 @@ import { LabelPicker } from "@/components/label-picker";
 import { DialogButtons } from "@/components/dialog-buttons";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
+import { broadcastChange } from "@/lib/cross-tab";
 
 interface EditDocDialogProps {
   doc: DocWithLabels;
@@ -80,6 +81,7 @@ export function EditDocDialog({
       const updated: DocWithLabels = await res.json();
       onSave(updated);
       setOpen(false);
+      broadcastChange({ type: "docs" });
       toast.success("Saved");
     } catch {
       toast.error("Failed to save changes");

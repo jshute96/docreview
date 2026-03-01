@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CommentThreadPanel } from "@/components/comment-thread-panel";
 import { highlightText } from "@/lib/highlight";
 import { formatDate } from "@/lib/utils";
+import { broadcastChange } from "@/lib/cross-tab";
 
 interface CommentRowProps {
   comment: Comment;
@@ -191,6 +192,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       throw new Error("Failed");
     }
     applyThreadUpdate(await res.json());
+    broadcastChange({ type: "comments", docId });
     toast.success(successMsg);
   }
 
@@ -229,6 +231,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       if (!res.ok) throw new Error("Failed");
       const updated: Comment = await res.json();
       onUpdate(updated);
+      broadcastChange({ type: "comments", docId });
       toast.success(`Comment ${status.toLowerCase()}`);
     } catch {
       toast.error("Failed to update comment");

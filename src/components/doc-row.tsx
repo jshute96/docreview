@@ -11,6 +11,7 @@ import { DocTypeIcon } from "@/components/doc-type-icon";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { highlightText } from "@/lib/highlight";
+import { broadcastChange } from "@/lib/cross-tab";
 
 interface DocRowProps {
   doc: DocWithLabels;
@@ -43,6 +44,7 @@ export function DocRow({
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithLabels = await res.json();
       onUpdate(updated);
+      broadcastChange({ type: "docs" });
       toast.success(newStatus === "ARCHIVED" ? "Archived" : "Unarchived");
     } catch {
       toast.error("Failed to update status");

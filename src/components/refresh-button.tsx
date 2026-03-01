@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { RefreshCw, CloudDownload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DocWithLabels } from "@/types";
+import { broadcastChange } from "@/lib/cross-tab";
 
 interface RefreshButtonProps {
   mode: "refresh" | "full-refresh" | "load";
@@ -35,6 +36,7 @@ export function RefreshButton({ mode, onRefresh }: RefreshButtonProps) {
       const docs: DocWithLabels[] = await docsRes.json();
 
       onRefresh(docs);
+      broadcastChange({ type: "docs" });
 
       if (mode === "refresh" || mode === "full-refresh") {
         const parts = [
