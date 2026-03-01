@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
-import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import {
   Dialog,
@@ -20,12 +19,10 @@ import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { broadcastChange } from "@/lib/cross-tab";
 import { useAutoResize } from "@/hooks/use-auto-resize";
 import { useLabelSync } from "@/hooks/use-label-sync";
+import { useLabels } from "@/contexts/label-context";
 
 interface AddDocDialogProps {
-  allLabels: Label[];
   onDocAdded: (doc: DocWithLabels) => void;
-  onLabelsChange: (labels: Label[]) => void;
-  onLabelDelete: (id: string) => void;
   trigger?: React.ReactNode;
 }
 
@@ -49,12 +46,10 @@ function errorMessageForCode(code: string): string {
 }
 
 export function AddDocDialog({
-  allLabels,
   onDocAdded,
-  onLabelsChange,
-  onLabelDelete,
   trigger,
 }: AddDocDialogProps) {
+  const { allLabels } = useLabels();
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [validationState, setValidationState] = useState<ValidationState>("idle");
@@ -241,11 +236,8 @@ export function AddDocDialog({
             </div>
 
             <LabelPicker
-              allLabels={allLabels}
               selectedLabelIds={selectedLabelIds}
               onToggle={toggleLabel}
-              onLabelsChange={onLabelsChange}
-              onLabelDelete={onLabelDelete}
             />
 
             <div>

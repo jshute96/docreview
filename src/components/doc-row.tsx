@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import { LabelBadge } from "@/components/label-badge";
 import { ROLE_COLORS } from "@/lib/role-colors";
@@ -15,19 +14,13 @@ import { broadcastChange } from "@/lib/cross-tab";
 
 interface DocRowProps {
   doc: DocWithLabels;
-  allLabels: Label[];
   onUpdate: (updated: DocWithLabels) => void;
-  onLabelsChange: (labels: Label[]) => void;
-  onLabelDelete: (id: string) => void;
   searchFilter?: string;
 }
 
 export function DocRow({
   doc,
-  allLabels,
   onUpdate,
-  onLabelsChange,
-  onLabelDelete,
   searchFilter = "",
 }: DocRowProps) {
   const [archiving, setArchiving] = useState(false);
@@ -109,10 +102,7 @@ export function DocRow({
           </Button>
           <EditDocDialog
             doc={doc}
-            allLabels={allLabels}
             onSave={onUpdate}
-            onLabelsChange={onLabelsChange}
-            onLabelDelete={onLabelDelete}
           >
             <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit document labels and notes">
               Edit

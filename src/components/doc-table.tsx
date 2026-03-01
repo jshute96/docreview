@@ -15,6 +15,7 @@ import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { filterDocs, sortDocs } from "@/lib/doc-filters";
 import type { SortCol, SortDir } from "@/lib/doc-filters";
+import { LabelProvider } from "@/contexts/label-context";
 
 interface DocTableProps {
   initialDocs: DocWithLabels[];
@@ -151,15 +152,13 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
   }
 
   return (
+    <LabelProvider allLabels={labels} onLabelsChange={setLabels} onLabelDelete={handleLabelDelete}>
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-zinc-900">Your Docs</h1>
         <div className="flex items-center gap-2">
           <AddDocDialog
-            allLabels={labels}
             onDocAdded={handleDocAdded}
-            onLabelsChange={setLabels}
-            onLabelDelete={handleLabelDelete}
             trigger={
               <Button variant="outline" size="sm" title="Add a Google Drive document by URL">
                 Add doc
@@ -169,7 +168,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
           <RefreshButton mode="refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
           <RefreshButton mode="full-refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
           <RefreshButton mode="load" onRefresh={(newDocs) => setDocs(newDocs)} />
-          <ManageLabelsDialog labels={labels} onLabelsChange={setLabels} onLabelDelete={handleLabelDelete} />
+          <ManageLabelsDialog />
           <Button
             variant="outline"
             size="sm"
@@ -220,10 +219,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
                     Actions
                     <BulkEditDialog
                       initialDocs={filteredDocs}
-                      allLabels={labels}
                       onSave={handleBulkUpdate}
-                      onLabelsChange={setLabels}
-                      onLabelDelete={handleLabelDelete}
                     >
                       <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit all currently displayed documents">
                         Edit All
@@ -242,10 +238,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
                 <DocRow
                   key={doc.id}
                   doc={doc}
-                  allLabels={labels}
                   onUpdate={handleDocUpdate}
-                  onLabelsChange={setLabels}
-                  onLabelDelete={handleLabelDelete}
                   searchFilter={titleFilter}
                 />
               ))}
@@ -254,5 +247,6 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
         </div>
       )}
     </div>
+    </LabelProvider>
   );
 }

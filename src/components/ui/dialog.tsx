@@ -34,7 +34,7 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { hideClose?: boolean }
 >(({ className, children, hideClose, ...props }, ref) => {
-  const nodeRef = React.useRef(null)
+  const nodeRef = React.useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = React.useState(false)
   const [position, setPosition] = React.useState({ x: 0, y: 0 })
 

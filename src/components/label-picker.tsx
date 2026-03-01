@@ -1,25 +1,21 @@
 "use client";
 
-import type { Label } from "@prisma/client";
 import { contrastText } from "@/lib/utils";
 import { ManageLabelsDialog } from "@/components/manage-labels-dialog";
 import { Button } from "@/components/ui/button";
+import { useLabels } from "@/contexts/label-context";
 
 interface LabelPickerProps {
-  allLabels: Label[];
   selectedLabelIds: string[];
   onToggle: (id: string) => void;
-  onLabelsChange: (labels: Label[]) => void;
-  onLabelDelete: (id: string) => void;
 }
 
 export function LabelPicker({
-  allLabels,
   selectedLabelIds,
   onToggle,
-  onLabelsChange,
-  onLabelDelete,
 }: LabelPickerProps) {
+  const { allLabels } = useLabels();
+
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
@@ -27,9 +23,6 @@ export function LabelPicker({
           Labels
         </label>
         <ManageLabelsDialog
-          labels={allLabels}
-          onLabelsChange={onLabelsChange}
-          onLabelDelete={onLabelDelete}
           trigger={
             <Button
               type="button"

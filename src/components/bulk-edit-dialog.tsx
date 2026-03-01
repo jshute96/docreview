@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { Plus, HelpCircle, X } from "lucide-react";
-import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import {
   Dialog,
@@ -21,13 +20,11 @@ import { contrastText } from "@/lib/utils";
 import { ManageLabelsDialog } from "@/components/manage-labels-dialog";
 import { Button } from "@/components/ui/button";
 import { broadcastChange } from "@/lib/cross-tab";
+import { useLabels } from "@/contexts/label-context";
 
 interface BulkEditDialogProps {
   initialDocs: DocWithLabels[];
-  allLabels: Label[];
   onSave: (updatedDocs: DocWithLabels[]) => void;
-  onLabelsChange: (labels: Label[]) => void;
-  onLabelDelete: (id: string) => void;
   children: React.ReactNode;
 }
 
@@ -63,12 +60,10 @@ function StateIndicator({ state, isMixed }: { state: BulkEditState; isMixed: boo
 
 export function BulkEditDialog({
   initialDocs,
-  allLabels,
   onSave,
-  onLabelsChange,
-  onLabelDelete,
   children,
 }: BulkEditDialogProps) {
+  const { allLabels } = useLabels();
   const [open, setOpen] = useState(false);
   const [selectedDocs, setSelectedDocs] = useState<DocWithLabels[]>(initialDocs);
   const [roleState, setRoleState] = useState<BulkEditState>("as-is");
@@ -225,9 +220,6 @@ export function BulkEditDialog({
                   Labels
                 </label>
                 <ManageLabelsDialog
-                  labels={allLabels}
-                  onLabelsChange={onLabelsChange}
-                  onLabelDelete={onLabelDelete}
                   trigger={
                     <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" title="Edit labels">
                       Edit

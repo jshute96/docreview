@@ -15,24 +15,20 @@ import { Button } from "@/components/ui/button";
 import { ColorPicker, PRIMARY_COLORS } from "@/components/color-picker";
 import { DialogButtons } from "@/components/dialog-buttons";
 import { broadcastChange } from "@/lib/cross-tab";
+import { useLabels } from "@/contexts/label-context";
 
 function randomPrimaryColor(): string {
   return PRIMARY_COLORS[Math.floor(Math.random() * PRIMARY_COLORS.length)];
 }
 
 interface ManageLabelsDialogProps {
-  labels: Label[];
-  onLabelsChange: (labels: Label[]) => void;
-  onLabelDelete: (id: string) => void;
   trigger?: React.ReactNode;
 }
 
 export function ManageLabelsDialog({
-  labels,
-  onLabelsChange,
-  onLabelDelete,
   trigger,
 }: ManageLabelsDialogProps) {
+  const { allLabels: labels, onLabelsChange, onLabelDelete } = useLabels();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);

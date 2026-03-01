@@ -60,6 +60,19 @@ One-line descriptions of every source file, grouped by layer.
 
 Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `popover.tsx`, `select.tsx`, `sonner.tsx`
 
+## Hooks (`src/hooks/`)
+
+| File | Description |
+|------|-------------|
+| `use-auto-resize.ts` | `useAutoResize()` hook — auto-grows a textarea to fit content up to a max height |
+| `use-label-sync.ts` | `useLabelSync()` hook — removes stale label IDs from selection when available labels change |
+
+## Contexts (`src/contexts/`)
+
+| File | Description |
+|------|-------------|
+| `label-context.tsx` | `LabelProvider` + `useLabels()` — React context for label state, replacing prop drilling |
+
 ## Library (`src/lib/`)
 
 | File | Description |

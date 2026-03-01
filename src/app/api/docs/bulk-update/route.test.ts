@@ -9,9 +9,10 @@ vi.mock("@/auth", () => ({
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     doc: {
-      findUnique: vi.fn(),
+      findMany: vi.fn(),
       update: vi.fn(),
     },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -21,9 +22,10 @@ import { prisma } from "@/lib/prisma";
 
 const mockAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
 const mockDoc = prisma.doc as unknown as {
-  findUnique: ReturnType<typeof vi.fn>;
+  findMany: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
 };
+const mockTransaction = prisma.$transaction as unknown as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -59,7 +61,7 @@ describe("PATCH /api/docs/bulk-update", () => {
       labels: [{ labelId: "l1" }],
       comments: [],
     };
-    mockDoc.findUnique.mockResolvedValue(doc);
+    mockDoc.findMany.mockResolvedValue([doc]);
 
     const res = await PATCH(makeReq({
       docIds: ["d1"],
@@ -69,9 +71,11 @@ describe("PATCH /api/docs/bulk-update", () => {
     }));
 
     expect(res.status).toBe(200);
-    expect(mockDoc.update).not.toHaveBeenCalled();
+    // No writes should happen — $transaction should not be called with any updates
+    expect(mockTransaction).not.toHaveBeenCalled();
     const data = await res.json();
-    expect(data[0].id).toBe("d1");
+    expect(data.docs[0].id).toBe("d1");
+    expect(data.skipped).toBe(0);
   });
 
   it("updates role and appends notes", async () => {
@@ -84,17 +88,17 @@ describe("PATCH /api/docs/bulk-update", () => {
       labels: [],
       comments: [],
     };
-    mockDoc.findUnique.mockResolvedValue(doc);
-    mockDoc.update.mockImplementation(({ data }) => Promise.resolve({
+    mockDoc.findMany.mockResolvedValue([doc]);
+    const updatedDoc = {
       ...doc,
-      ...data,
-      labels: doc.labels,
-      comments: doc.comments,
-    }));
+      role: DocRole.AUTHOR,
+      notes: "First line\nSecond line",
+    };
+    mockTransaction.mockResolvedValue([updatedDoc]);
 
     const res = await PATCH(makeReq({
       docIds: ["d1"],
-      role: "set", // sets to AUTHOR
+      role: "set",
       labelUpdates: {},
       appendNotes: "Second line"
     }));
@@ -118,19 +122,19 @@ describe("PATCH /api/docs/bulk-update", () => {
       labels: [{ labelId: "l1" }],
       comments: [],
     };
-    mockDoc.findUnique.mockResolvedValue(doc);
-    mockDoc.update.mockImplementation(() => Promise.resolve({
+    mockDoc.findMany.mockResolvedValue([doc]);
+    mockTransaction.mockResolvedValue([{
       ...doc,
-      labels: [{ labelId: "l2" }], // simplified result
-    }));
+      labels: [{ labelId: "l2" }],
+    }]);
 
     const res = await PATCH(makeReq({
       docIds: ["d1"],
       role: "as-is",
       labelUpdates: {
-        l1: "clear", // remove
-        l2: "set",   // add
-        l3: "as-is"  // ignore
+        l1: "clear",
+        l2: "set",
+        l3: "as-is"
       }
     }));
 

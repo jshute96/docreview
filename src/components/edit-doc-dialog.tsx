@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
-import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import {
   Dialog,
@@ -19,24 +18,20 @@ import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { broadcastChange } from "@/lib/cross-tab";
 import { useAutoResize } from "@/hooks/use-auto-resize";
 import { useLabelSync } from "@/hooks/use-label-sync";
+import { useLabels } from "@/contexts/label-context";
 
 interface EditDocDialogProps {
   doc: DocWithLabels;
-  allLabels: Label[];
   onSave: (updated: DocWithLabels) => void;
-  onLabelsChange: (labels: Label[]) => void;
-  onLabelDelete: (id: string) => void;
   children: React.ReactNode;
 }
 
 export function EditDocDialog({
   doc,
-  allLabels,
   onSave,
-  onLabelsChange,
-  onLabelDelete,
   children,
 }: EditDocDialogProps) {
+  const { allLabels } = useLabels();
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState(doc.role);
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>(
@@ -129,11 +124,8 @@ export function EditDocDialog({
             </div>
 
             <LabelPicker
-              allLabels={allLabels}
               selectedLabelIds={selectedLabelIds}
               onToggle={toggleLabel}
-              onLabelsChange={onLabelsChange}
-              onLabelDelete={onLabelDelete}
             />
 
             <div>

@@ -139,7 +139,7 @@ export async function PATCH(req: NextRequest) {
 
   // Return all docs (updated ones from transaction, unchanged ones from initial read)
   const allDocs = docs.map((d) => {
-    const updated = updatedMap.get(d.id);
+    const updated = updatedMap.get(d.id) as typeof d | undefined;
     return withCommentCounts(updated ?? d);
   });
 

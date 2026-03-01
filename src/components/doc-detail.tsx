@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { createMatcher } from "@/lib/highlight";
 import { broadcastChange, useCrossTabListener, type CrossTabEvent } from "@/lib/cross-tab";
+import { LabelProvider } from "@/contexts/label-context";
 
 interface DocDetailProps {
   doc: DocWithComments;
@@ -265,6 +266,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   }, [doc.title]);
 
   return (
+    <LabelProvider allLabels={labels} onLabelsChange={setLabels} onLabelDelete={handleLabelDelete}>
     <div className="flex flex-col gap-6">
       {/* Header row: title left, buttons right */}
       <div className="flex items-start justify-between">
@@ -332,10 +334,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
           )}
           <EditDocDialog
             doc={doc as unknown as DocWithLabels}
-            allLabels={labels}
             onSave={handleEditSave}
-            onLabelsChange={setLabels}
-            onLabelDelete={handleLabelDelete}
           >
             <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit document labels and notes">
               Edit
@@ -429,5 +428,6 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
         </div>
       )}
     </div>
+    </LabelProvider>
   );
 }
