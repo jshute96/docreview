@@ -486,6 +486,35 @@ export async function replyToComment(
   console.log(`[Drive] replies.create${tag} ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
 }
 
+// Fetches the full plain text of a Google Doc by walking all text runs.
+// Returns empty string on error (non-Docs files should not call this).
+export async function fetchDocumentText(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  googleDocId: string
+): Promise<string | null> {
+  const docs = google.docs({ version: "v1", auth });
+  const t0 = Date.now();
+
+  try {
+    const res = await docs.documents.get({
+      documentId: googleDocId,
+      fields: "body(content(paragraph(elements(textRun(content)))))",
+    });
+    const parts: string[] = [];
+    for (const el of res.data.body?.content ?? []) {
+      for (const pe of el.paragraph?.elements ?? []) {
+        if (pe.textRun?.content) parts.push(pe.textRun.content);
+      }
+    }
+    const text = parts.join("");
+    console.log(`[Docs] documents.get ${googleDocId} (document text, ${text.length} chars) (${Date.now() - t0}ms)`);
+    return text;
+  } catch (err) {
+    console.error(`[Docs] documents.get ${googleDocId} (document text) failed (${Date.now() - t0}ms):`, err);
+    return null;
+  }
+}
+
 export async function getChangesStartPageToken(userId: string): Promise<string> {
   const auth = await getDriveClient(userId);
   const drive = google.drive({ version: "v3", auth });

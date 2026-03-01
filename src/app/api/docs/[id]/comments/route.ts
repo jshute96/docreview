@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, fetchCommentContent, fetchSuggestionContent } from "@/lib/google-drive";
+import { getDriveClient, fetchCommentContent, fetchSuggestionContent, fetchDocumentText } from "@/lib/google-drive";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 
@@ -30,14 +30,14 @@ export async function GET(
   }
 
   try {
-    const commentContent = await fetchCommentContent(driveAuth, doc.googleDocId);
+    const isDoc = doc.mimeType === DOCS_MIME_TYPE;
+    const [commentContent, suggestions, documentText] = await Promise.all([
+      fetchCommentContent(driveAuth, doc.googleDocId),
+      isDoc ? fetchSuggestionContent(driveAuth, doc.googleDocId) : Promise.resolve({}),
+      isDoc ? fetchDocumentText(driveAuth, doc.googleDocId) : Promise.resolve(undefined),
+    ]);
 
-    let suggestions: Record<string, { insertedText: string; deletedText: string }> = {};
-    if (doc.mimeType === DOCS_MIME_TYPE) {
-      suggestions = await fetchSuggestionContent(driveAuth, doc.googleDocId);
-    }
-
-    return NextResponse.json({ comments: commentContent, suggestions });
+    return NextResponse.json({ comments: commentContent, suggestions, ...(documentText != null ? { documentText } : {}) });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to fetch comment content";
     return NextResponse.json({ error: message }, { status: 502 });

@@ -53,6 +53,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   const [archiving, setArchiving] = useState(false);
   const [commentContent, setCommentContent] = useState<Record<string, string>>({});
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
+  const [documentText, setDocumentText] = useState<string | undefined>(undefined);
   // Thread text reported by CommentRow when threads are fetched (includes replies)
   const [threadText, setThreadText] = useState<Record<string, string>>({});
   const handleThreadText = useCallback((googleCommentId: string, text: string) => {
@@ -66,6 +67,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
         const data = await res.json();
         setCommentContent(data.comments ?? {});
         setSuggestionContent(data.suggestions ?? {});
+        if (data.documentText !== undefined) setDocumentText(data.documentText);
       }
     } catch { /* content is optional */ }
   }
@@ -443,6 +445,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                   onThreadText={handleThreadText}
                   isExiting={exitingIds.has(comment.id)}
                   searchFilter={searchFilter}
+                  documentText={documentText}
                 />
               ))}
             </tbody>

@@ -21,6 +21,7 @@ interface CommentRowProps {
   onThreadText?: (googleCommentId: string, text: string) => void;
   isExiting?: boolean;
   searchFilter?: string;
+  documentText?: string;
 }
 
 function splitContent(raw: string): { author: string | null; text: string } {
@@ -29,7 +30,7 @@ function splitContent(raw: string): { author: string | null; text: string } {
   return { author: raw.slice(0, sep), text: raw.slice(sep + 2) };
 }
 
-export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, onUpdate, onThreadText, isExiting, searchFilter }: CommentRowProps) {
+export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, onUpdate, onThreadText, isExiting, searchFilter, documentText }: CommentRowProps) {
   const [loading, setLoading] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -445,6 +446,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   onReopen={handleReopen}
                   onDirtyChange={setHasDirtyReply}
                   searchFilter={searchFilter}
+                  documentText={documentText}
                 />
               )}
             </div>

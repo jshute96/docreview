@@ -52,6 +52,7 @@ interface CommentThreadPanelProps {
   onReopen?: (content: string) => Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
   searchFilter?: string;
+  documentText?: string;
 }
 
 export function CommentThreadPanel({
@@ -66,6 +67,7 @@ export function CommentThreadPanel({
   onReopen,
   onDirtyChange,
   searchFilter,
+  documentText,
 }: CommentThreadPanelProps) {
   const [replyText, setReplyText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -283,13 +285,23 @@ export function CommentThreadPanel({
             className={`py-3 first:pt-0 last:pb-0 ${thread.resolved ? "opacity-60" : ""}`}
           >
             {threadIndex === 0 && thread.quotedFileContent?.value && (
-              <div className="mb-2 rounded border-l-2 border-zinc-300 bg-zinc-100 px-3 py-1.5">
-                {/* Drive returns text/html for quotedFileContent but in practice
-                   the value appears to be plain text with no formatting markup. */}
-                {thread.quotedFileContent.mimeType === "text/html" ? (
-                  <p className="text-xs text-zinc-500 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: thread.quotedFileContent.value }} />
-                ) : (
-                  <p className="text-xs text-zinc-500 whitespace-pre-wrap">{thread.quotedFileContent.value}</p>
+              <div className="mb-2">
+                <div className="rounded border-l-2 border-zinc-300 bg-zinc-100 px-3 py-1.5">
+                  {/* Drive returns text/html for quotedFileContent but in practice
+                     the value appears to be plain text with no formatting markup. */}
+                  {thread.quotedFileContent.mimeType === "text/html" ? (
+                    <p className="text-xs text-zinc-500 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: thread.quotedFileContent.value }} />
+                  ) : (
+                    <p className="text-xs text-zinc-500 whitespace-pre-wrap">{thread.quotedFileContent.value}</p>
+                  )}
+                </div>
+                {documentText !== undefined && !documentText.toLowerCase().includes(thread.quotedFileContent.value.toLowerCase()) && (
+                  <p
+                    className="mt-1 text-xs text-amber-600"
+                    title="The quoted text is a snapshot from when the comment was created. If the text has been deleted, the comment thread may not be visible when viewing the document."
+                  >
+                    This text no longer exists in the document. This comment might not be visible.
+                  </p>
                 )}
               </div>
             )}
