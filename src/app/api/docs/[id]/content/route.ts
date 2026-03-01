@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, fetchAllThreads } from "@/lib/google-drive";
-import type { CommentThread } from "@/lib/google-drive";
+import { getDriveClient, fetchDocContent, fetchFileTextViaExport } from "@/lib/google-drive";
+
+const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
+const SLIDES_MIME_TYPE = "application/vnd.google-apps.presentation";
 
 export async function GET(
   _req: NextRequest,
@@ -29,16 +31,22 @@ export async function GET(
   }
 
   try {
-    const allThreads = await fetchAllThreads(driveAuth, doc.googleDocId);
+    const isDoc = doc.mimeType === DOCS_MIME_TYPE;
+    const isSlides = doc.mimeType === SLIDES_MIME_TYPE;
 
-    const threads: Record<string, CommentThread> = {};
-    for (const t of allThreads) {
-      threads[t.id] = t;
+    if (isDoc) {
+      const { documentText, suggestions } = await fetchDocContent(driveAuth, doc.googleDocId);
+      return NextResponse.json({ suggestions, ...(documentText != null ? { documentText } : {}) });
     }
 
-    return NextResponse.json({ threads });
+    if (isSlides) {
+      const documentText = await fetchFileTextViaExport(driveAuth, doc.googleDocId);
+      return NextResponse.json({ suggestions: {}, ...(documentText != null ? { documentText } : {}) });
+    }
+
+    return NextResponse.json({ suggestions: {} });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to fetch comment threads";
+    const message = err instanceof Error ? err.message : "Failed to fetch document content";
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }

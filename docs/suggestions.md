@@ -90,5 +90,7 @@ comments" filters have no effect on suggestions.
 
 ### Suggestion text content
 
-Suggestion text (inserted and deleted strings) is fetched live from `documents.get`,
-keyed by `suggest.xxx`. It displays correctly for all suggestion records.
+Suggestion text (inserted and deleted strings) is fetched on page load via `fetchDocContent`,
+which makes a single `documents.get` call with `SUGGESTIONS_INLINE` to extract both suggestion
+content and document body text. Results are keyed by `suggest.xxx` and display correctly for
+all suggestion records.

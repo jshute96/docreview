@@ -24,7 +24,8 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/bulk-update/route.ts` | `PATCH` bulk update multiple docs — optimized role/label/notes updates with no-op protection |
 | `docs/[id]/route.ts` | `GET` single doc; `PATCH` update role/status/labels |
 | `docs/[id]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata then syncs comments |
-| `docs/[id]/comments/route.ts` | `GET` fetch comment+suggestion text content from Drive for display; also returns document body text for anchor checking (Docs and Slides) |
+| `docs/[id]/comments/route.ts` | `GET` fetch all comment threads from Drive (fast path — Drive `comments.list` only) |
+| `docs/[id]/content/route.ts` | `GET` fetch document text and suggestion content (slow path — Docs API `documents.get` or Drive `files.export`); for Docs, uses a single `SUGGESTIONS_INLINE` call for both |
 | `docs/[id]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (ACTIVE/ARCHIVED/MUTED) |
 | `docs/[id]/threads/route.ts` | `GET` fetch thread(s) from Drive; `POST` refresh a single thread (updates DB) |
 | `docs/[id]/threads/reply/route.ts` | `POST` reply to / resolve / reopen a comment thread via Drive API |
@@ -39,7 +40,7 @@ One-line descriptions of every source file, grouped by layer.
 | `doc-table.tsx` | Main doc list view (client) — filter state, sort state, renders FilterBar + DocRows |
 | `auto-signin.tsx` | Client component for seamless offline authentication |
 | `doc-row.tsx` | Single doc row in the table — title, comment counts, labels, archive/edit/open buttons |
-| `doc-detail.tsx` | Single doc detail view (client) — metadata panel, comment filters, comment table |
+| `doc-detail.tsx` | Single doc detail view (client) — metadata panel, comment filters, comment table; pre-fetches all threads on load for instant expand |
 | `filter-bar.tsx` | Doc list filter bar — tri-state buttons for type/author/labels/active/comments + title regex |
 | `comment-filter-bar.tsx` | Comment list filter bar — toggles for my threads/comments, show mode, suggestions |
 | `comment-row.tsx` | Single comment row — expandable, shows content preview, thread panel, status actions |
@@ -80,7 +81,7 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 
 | File | Description |
 |------|-------------|
-| `google-drive.ts` | Google Drive/Docs API client — OAuth2 with token refresh, changes feed (`changes.list`/`getStartPageToken`), file listing, comment fetching, suggestion parsing, thread detail, reply/resolve, document text extraction |
+| `google-drive.ts` | Google Drive/Docs API client — OAuth2 with token refresh, changes feed (`changes.list`/`getStartPageToken`), file listing, comment fetching, `fetchAllThreads` (bulk thread fetch), `fetchDocContent` (combined document text + suggestion extraction in one Docs API call), thread detail, reply/resolve |
 | `auth-utils.ts` | Centralized authentication helpers for Server Components and API routes |
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates/deletes DB records, computes unarchive signals |
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |

@@ -220,7 +220,8 @@ results are stored as `type: "COMMENT"`.
 
 **Deleted comment cleanup:** After processing all Drive results, any COMMENT records in the DB
 whose `googleCommentId` was not returned by Drive are deleted. We don't store comment text
-(it's fetched live), so orphaned records have nothing useful to show. This runs regardless of
+in the database (it's fetched from Drive on page load), so orphaned records have nothing
+useful to show. This runs regardless of
 comment status (ACTIVE, ARCHIVED, MUTED). It is safe from transient errors because
 `fetchComments` either returns a complete paginated result or throws — and if it throws, we
 return early before reaching the deletion code.

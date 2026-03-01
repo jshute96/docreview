@@ -54,7 +54,7 @@ Already-resolved threads don't need action, so they start archived.
 ## Deleted Comments
 
 When a comment is deleted in Google Docs, the Drive API simply stops returning it. Since we
-don't store comment text (it's fetched live from Drive when the user expands a row), there's
+don't store comment text in the database (it's fetched from Drive on page load), there's
 nothing useful left to show — the "Open" link would point at nothing, expanding would 404,
 and only bare metadata (dates, reply count) would remain. So during sync, any COMMENT records
 in the DB whose `googleCommentId` was not returned by Drive are deleted outright, regardless
@@ -199,7 +199,7 @@ their own sync logic. They are displayed in the comment table and can be filtere
 - **Fields used for sync**: `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me))`
 - **Fields used for thread display**: adds `content, htmlContent, quotedFileContent(mimeType, value), author(displayName), replies(content, htmlContent, createdTime, author(displayName))`
 - **`htmlContent`**: Read-only field with HTML formatting of comment/reply text (bold, italics, @mention links). The API recommends displaying `htmlContent` over plain `content`.
-- **`quotedFileContent`**: The document text the comment was anchored to at creation time. MIME type is typically `text/html` but in practice the value appears to contain no formatting markup. This is a snapshot — the text may have been edited or deleted since. The Drive API may also truncate long quoted text (the truncation format is undocumented). When the thread panel is shown, the quoted text is checked against the current document body (fetched once on page load). If the text is no longer found, a warning is displayed. For Docs, the text is fetched via `fetchDocumentText` (Docs API); for Slides, via `fetchFileTextViaExport` (Drive `files.export` as `text/plain`). Sheets are not checked.
+- **`quotedFileContent`**: The document text the comment was anchored to at creation time. MIME type is typically `text/html` but in practice the value appears to contain no formatting markup. This is a snapshot — the text may have been edited or deleted since. The Drive API may also truncate long quoted text (the truncation format is undocumented). When the thread panel is shown, the quoted text is checked against the current document body (fetched once on page load via `/api/docs/[id]/content`). If the text is no longer found, a warning is displayed. For Docs, the text is fetched via `fetchDocContent` (a single Docs API `documents.get` call that also extracts suggestion content); for Slides, via `fetchFileTextViaExport` (Drive `files.export` as `text/plain`). Sheets are not checked. Note: `fetchDocContent` uses `SUGGESTIONS_INLINE` mode, so the document text includes pending suggestion text — anchor-text matching may false-positive if a suggestion overlaps the anchor region, but the consequence is only a spurious warning.
 - **`startModifiedTime`**: RFC 3339 timestamp; filters to comments modified after this time.
   Not currently used — incremental comment sync was dropped because this filter silently
   excludes suggestions. Every sync does a full scan instead.

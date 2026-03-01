@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import type { Comment, Label } from "@prisma/client";
 import type { DocWithComments, DocWithLabels } from "@/types";
-import type { SuggestionContent } from "@/lib/google-drive";
+import type { CommentThread, SuggestionContent } from "@/lib/google-drive";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { LabelBadge } from "@/components/label-badge";
 import { EditDocDialog } from "@/components/edit-doc-dialog";
@@ -51,25 +51,61 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   const [comments, setComments] = useState<Comment[]>(initialDoc.comments);
   const [archiving, setArchiving] = useState(false);
-  const [commentContent, setCommentContent] = useState<Record<string, string>>({});
+  const [threadMap, setThreadMap] = useState<Record<string, CommentThread>>({});
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
   const [documentText, setDocumentText] = useState<string | undefined>(undefined);
-  // Thread text reported by CommentRow when threads are fetched (includes replies)
-  const [threadText, setThreadText] = useState<Record<string, string>>({});
-  const handleThreadText = useCallback((googleCommentId: string, text: string) => {
-    setThreadText((prev) => prev[googleCommentId] === text ? prev : { ...prev, [googleCommentId]: text });
+
+  // Derive searchable text from threadMap (author names + all reply content)
+  const threadText = useMemo(() => {
+    const result: Record<string, string> = {};
+    for (const [id, thread] of Object.entries(threadMap)) {
+      const parts: string[] = [thread.author, thread.content];
+      for (const r of thread.replies) {
+        if (r.author) parts.push(r.author);
+        if (r.content) parts.push(r.content);
+      }
+      result[id] = parts.join("\n");
+    }
+    return result;
+  }, [threadMap]);
+
+  // Derive preview content ("Author: text") from threadMap
+  const commentContent = useMemo(() => {
+    const result: Record<string, string> = {};
+    for (const [id, thread] of Object.entries(threadMap)) {
+      result[id] = thread.author ? `${thread.author}: ${thread.content}` : thread.content;
+    }
+    return result;
+  }, [threadMap]);
+
+  const handleThreadUpdate = useCallback((googleCommentId: string, thread: CommentThread) => {
+    setThreadMap((prev) => ({ ...prev, [googleCommentId]: thread }));
   }, []);
 
-  async function fetchContent() {
+  async function fetchThreads() {
     try {
       const res = await fetch(`/api/docs/${doc.id}/comments`);
       if (res.ok) {
         const data = await res.json();
-        setCommentContent(data.comments ?? {});
+        setThreadMap(data.threads ?? {});
+      }
+    } catch { /* threads are optional */ }
+  }
+
+  async function fetchDocContent() {
+    try {
+      const res = await fetch(`/api/docs/${doc.id}/content`);
+      if (res.ok) {
+        const data = await res.json();
         setSuggestionContent(data.suggestions ?? {});
         if (data.documentText !== undefined) setDocumentText(data.documentText);
       }
     } catch { /* content is optional */ }
+  }
+
+  function fetchContent() {
+    void fetchThreads();
+    void fetchDocContent();
   }
 
   useEffect(() => { void fetchContent(); }, [doc.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -129,6 +165,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   const frozenOrderRef = useRef<Map<string, number>>(new Map());
   // IDs of comments animating out (slide collapse) before removal from the filtered list
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
+  // Increment to signal all rows to expand or collapse
+  const [expandSignal, setExpandSignal] = useState(0);
+  const [collapseSignal, setCollapseSignal] = useState(0);
 
   function wouldBeFilteredOut(c: Comment): boolean {
     if (suggestionsOnly && c.type !== "SUGGESTION") return true;
@@ -216,6 +255,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     .filter((c) => exitingIds.has(c.id) || !wouldBeFilteredOut(c))
     .filter((c) => {
       if (!searchFilter) return true;
+      // commentContent and threadText both derive from threadMap so the initial
+      // comment text appears twice in the search string — harmless for matching.
       const text = commentContent[c.googleCommentId] ?? "";
       const sug = suggestionContent[c.googleCommentId];
       const sugText = sug ? `${sug.deletedText} ${sug.insertedText}` : "";
@@ -427,8 +468,28 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                 <ThButton col="replyCount" title="Number of replies">Responses</ThButton>
                 <ThButton col="iParticipated" title="Whether I created or replied">Created</ThButton>
                 <ThButton col="resolved" title="Whether comment is open or resolved">Status</ThButton>
-                <th className="pr-4 py-2.5 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                  Actions
+                <th className="pr-4 py-2.5 text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Actions</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-5 px-1.5 text-[10px] text-zinc-900"
+                      title="Expand all comment threads"
+                      onClick={() => setExpandSignal((n) => n + 1)}
+                    >
+                      Expand all
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-5 px-1.5 text-[10px] text-zinc-900"
+                      title="Collapse all comment threads"
+                      onClick={() => setCollapseSignal((n) => n + 1)}
+                    >
+                      Collapse all
+                    </Button>
+                  </div>
                 </th>
               </tr>
             </thead>
@@ -441,11 +502,14 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                   driveUrl={doc.driveUrl}
                   content={comment.type === "COMMENT" ? commentContent[comment.googleCommentId] : undefined}
                   suggestionContent={comment.type === "SUGGESTION" ? suggestionContent[comment.googleCommentId] : undefined}
+                  initialThread={comment.type === "COMMENT" ? threadMap[comment.googleCommentId] : undefined}
                   onUpdate={handleCommentUpdate}
-                  onThreadText={handleThreadText}
+                  onThreadUpdate={handleThreadUpdate}
                   isExiting={exitingIds.has(comment.id)}
                   searchFilter={searchFilter}
                   documentText={documentText}
+                  expandSignal={expandSignal}
+                  collapseSignal={collapseSignal}
                 />
               ))}
             </tbody>

@@ -175,35 +175,6 @@ export async function fetchComments(
   return comments;
 }
 
-// Drive comment ID → "AuthorName: text" for regular comments
-export async function fetchCommentContent(
-  auth: Awaited<ReturnType<typeof getDriveClient>>,
-  googleDocId: string
-): Promise<Record<string, string>> {
-  const drive = google.drive({ version: "v3", auth });
-  const commentContent: Record<string, string> = {};
-  let pageToken: string | undefined;
-
-  do {
-    const res = await drive.comments.list({
-      fileId: googleDocId,
-      fields: "nextPageToken, comments(id, content, author(displayName))",
-      pageSize: 100,
-      ...(pageToken ? { pageToken } : {}),
-    });
-
-    for (const c of res.data.comments ?? []) {
-      if (!c.id || c.content == null) continue;
-      const author = c.author?.displayName;
-      commentContent[c.id] = author ? `${author}: ${c.content}` : c.content;
-    }
-
-    pageToken = res.data.nextPageToken ?? undefined;
-  } while (pageToken);
-
-  return commentContent;
-}
-
 export interface DriveSuggestion {
   id: string;
   suggestionType: "INSERT" | "DELETE" | "EDIT";
@@ -215,7 +186,7 @@ export interface SuggestionContent {
 }
 
 // Walks a Docs document body and extracts all pending suggestions.
-// Returns metadata only (no text content) — use fetchSuggestionContent for display text.
+// Returns metadata only (no text content) — use fetchDocContent for display text.
 export async function fetchSuggestions(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string
@@ -260,12 +231,15 @@ export async function fetchSuggestions(
   return suggestions;
 }
 
-// Fetches the text content of all pending suggestions in a document.
-// Returns a map of suggestionId → { insertedText, deletedText } for live display.
-export async function fetchSuggestionContent(
+// Fetches document text and suggestion content in a single Docs API call.
+// Uses SUGGESTIONS_INLINE so both pending insertions and deletions are visible
+// alongside the base text. This means documentText includes suggestion text —
+// anchor-text matching may give false results if a suggestion overlaps the
+// anchor region, but the consequence is only a spurious "not found" warning.
+export async function fetchDocContent(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string
-): Promise<Record<string, SuggestionContent>> {
+): Promise<{ documentText: string | null; suggestions: Record<string, SuggestionContent> }> {
   const docs = google.docs({ version: "v1", auth });
   const t0 = Date.now();
 
@@ -278,10 +252,10 @@ export async function fetchSuggestionContent(
     });
   } catch (err) {
     console.error(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
-    return {};
+    return { documentText: null, suggestions: {} };
   }
-  console.log(`[Docs] documents.get ${googleDocId} (suggestion content) (${Date.now() - t0}ms)`);
 
+  const textParts: string[] = [];
   const insertions: Record<string, string> = {};
   const deletions: Record<string, string> = {};
 
@@ -289,6 +263,7 @@ export async function fetchSuggestionContent(
     for (const pe of el.paragraph?.elements ?? []) {
       const run = pe.textRun;
       if (!run?.content) continue;
+      textParts.push(run.content);
       // Strip trailing newline that Docs API appends to paragraph-ending runs
       const text = run.content.replace(/\n$/, "");
       if (!text) continue;
@@ -301,17 +276,18 @@ export async function fetchSuggestionContent(
     }
   }
 
+  const documentText = textParts.join("");
   const allIds = new Set([...Object.keys(insertions), ...Object.keys(deletions)]);
-  const result: Record<string, SuggestionContent> = {};
-
+  const suggestions: Record<string, SuggestionContent> = {};
   for (const id of allIds) {
-    result[id] = {
+    suggestions[id] = {
       insertedText: insertions[id] ?? "",
       deletedText: deletions[id] ?? "",
     };
   }
 
-  return result;
+  console.log(`[Docs] documents.get ${googleDocId} (doc content: ${documentText.length} chars, ${allIds.size} suggestions) (${Date.now() - t0}ms)`);
+  return { documentText, suggestions };
 }
 
 // A single reply within a comment thread (not the initial comment).
@@ -332,6 +308,7 @@ export interface CommentThread {
   content: string;
   htmlContent?: string;
   createdTime: string;
+  modifiedTime?: string;
   resolved: boolean;
   replies: ThreadReply[];
   quotedFileContent?: { mimeType: string; value: string } | null;
@@ -430,7 +407,7 @@ export async function fetchAllThreads(
     const res = await drive.comments.list({
       fileId: googleDocId,
       fields:
-        "nextPageToken, comments(id, resolved, content, htmlContent, quotedFileContent(mimeType, value), createdTime, author(displayName), replies(content, htmlContent, createdTime, action, author(displayName)))",
+        "nextPageToken, comments(id, resolved, content, htmlContent, quotedFileContent(mimeType, value), createdTime, modifiedTime, author(displayName), replies(content, htmlContent, createdTime, action, author(displayName)))",
       pageSize: 100,
       ...(pageToken ? { pageToken } : {}),
     });
@@ -452,6 +429,7 @@ export async function fetchAllThreads(
         content: c.content,
         ...(c.htmlContent ? { htmlContent: c.htmlContent } : {}),
         createdTime: c.createdTime ?? "",
+        ...(c.modifiedTime ? { modifiedTime: c.modifiedTime } : {}),
         resolved: c.resolved === true,
         replies,
         quotedFileContent: extractQuotedFileContent(c.quotedFileContent, c.id),
@@ -486,35 +464,6 @@ export async function replyToComment(
     requestBody: resolve ? { action: "resolve" } : { content },
   });
   console.log(`[Drive] replies.create${tag} ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
-}
-
-// Fetches the full plain text of a Google Doc by walking all text runs.
-// Returns null on error so callers can distinguish failure from empty content.
-export async function fetchDocumentText(
-  auth: Awaited<ReturnType<typeof getDriveClient>>,
-  googleDocId: string
-): Promise<string | null> {
-  const docs = google.docs({ version: "v1", auth });
-  const t0 = Date.now();
-
-  try {
-    const res = await docs.documents.get({
-      documentId: googleDocId,
-      fields: "body(content(paragraph(elements(textRun(content)))))",
-    });
-    const parts: string[] = [];
-    for (const el of res.data.body?.content ?? []) {
-      for (const pe of el.paragraph?.elements ?? []) {
-        if (pe.textRun?.content) parts.push(pe.textRun.content);
-      }
-    }
-    const text = parts.join("");
-    console.log(`[Docs] documents.get ${googleDocId} (document text, ${text.length} chars) (${Date.now() - t0}ms)`);
-    return text;
-  } catch (err) {
-    console.error(`[Docs] documents.get ${googleDocId} (document text) failed (${Date.now() - t0}ms):`, err);
-    return null;
-  }
 }
 
 // Exports a Google Workspace file as plain text via the Drive API.

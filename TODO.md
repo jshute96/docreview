@@ -7,7 +7,6 @@
 * how do I notice @mentions?
 * Mute state on docs
 * Track what comments I've seen, and show the new ones in a different color
-* Expand all / collapse all on comments page
 * keyboard shortcuts
 * consider saving loaded comments
 * consider preloading comments earlier (maybe from docs page too)
@@ -44,16 +43,21 @@
   * editable notes box inline on the comments page?
 
 ## gaps
-  * no way to get suggestions cheaply or incrementally
-    * we have to read doc contents and extract all the inlined suggestions
-  * we can't get comments incrementally.  we always scan all of them.
-  * for suggestions, there's minimal API support.
-    * we can't see the replies, author, accept/reject state, etc.
-    * we can't accept or remove via API
-  * for comments, we can't tell if they're attached to deleted text
-    * the reported anchor location is immutable, from time of creation
-    * the quoted text is also immutable
-    * the quoted text doesn't pass through formatting, just plain text
-      * nothing for images. for tables, seems to just give the top row.
-      * we don't get clickable links in the view
-  * *the quoted text we display for comments is always a snapshot from creation time*
+* no way to get suggestions cheaply or incrementally
+  * we have to read doc contents and extract all the inlined suggestions
+* we can't get comments incrementally.  we always scan all of them.
+* for suggestions, there's minimal API support.
+  * we can't see the replies, author, accept/reject state, etc.
+  * we can't accept or remove via API
+* for comments, we can't tell if they're attached to deleted text
+  * the reported anchor location is immutable, from time of creation
+  * the quoted text is also immutable
+  * the quoted text doesn't pass through formatting, just plain text
+    * nothing for images. for tables, seems to just give the top row.
+    * we don't get clickable links in the view
+* *the quoted text we display for comments is always a snapshot from creation time*
+
+## consider later
+* we fetch all comments with full reply text when opening the comments page
+  * if there are a lot of comments, it might make sense to split that up
+  * maybe just fetch the initial comments first

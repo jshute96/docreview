@@ -17,11 +17,14 @@ interface CommentRowProps {
   driveUrl: string;
   content?: string;
   suggestionContent?: SuggestionContent;
+  initialThread?: CommentThread;
   onUpdate: (updated: Comment) => void;
-  onThreadText?: (googleCommentId: string, text: string) => void;
+  onThreadUpdate?: (googleCommentId: string, thread: CommentThread) => void;
   isExiting?: boolean;
   searchFilter?: string;
   documentText?: string;
+  expandSignal?: number;
+  collapseSignal?: number;
 }
 
 function splitContent(raw: string): { author: string | null; text: string } {
@@ -30,22 +33,32 @@ function splitContent(raw: string): { author: string | null; text: string } {
   return { author: raw.slice(0, sep), text: raw.slice(sep + 2) };
 }
 
-export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, onUpdate, onThreadText, isExiting, searchFilter, documentText }: CommentRowProps) {
-  const [loading, setLoading] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const [hasBeenExpanded, setHasBeenExpanded] = useState(false);
-  const [threads, setThreads] = useState<CommentThread[]>([]);
-  const [loadingThreads, setLoadingThreads] = useState(false);
-  const [refreshingThread, setRefreshingThread] = useState(false);
-  const [hasDirtyReply, setHasDirtyReply] = useState(false);
-  // Epoch ms of driveModifiedAt at the time threads were last fetched
-  const fetchedModifiedMs = useRef<number | null>(null);
-
+export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, collapseSignal }: CommentRowProps) {
   const isSuggestion = comment.type === "SUGGESTION";
   const currentModifiedMs = comment.driveModifiedAt
     ? new Date(comment.driveModifiedAt).getTime()
     : 0;
+
+  const [loading, setLoading] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [hasBeenExpanded, setHasBeenExpanded] = useState(false);
+  const [threads, setThreads] = useState<CommentThread[]>(initialThread ? [initialThread] : []);
+  const [loadingThreads, setLoadingThreads] = useState(false);
+  const [refreshingThread, setRefreshingThread] = useState(false);
+  const [hasDirtyReply, setHasDirtyReply] = useState(false);
+  // Epoch ms of driveModifiedAt at the time threads were last fetched
+  const fetchedModifiedMs = useRef<number | null>(initialThread ? currentModifiedMs : null);
+
+  // Sync threads state when parent re-fetches threadMap (e.g., global refresh)
+  useEffect(() => {
+    if (!initialThread) return;
+    setThreads([initialThread]);
+    const modMs = initialThread.modifiedTime
+      ? new Date(initialThread.modifiedTime).getTime()
+      : currentModifiedMs;
+    fetchedModifiedMs.current = modMs;
+  }, [initialThread]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function commentUrl() {
     const url = new URL(driveUrl);
@@ -53,22 +66,11 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     return url.toString();
   }
 
-  // Safe to close over onThreadText: it's a useCallback([]) in doc-detail.tsx
-  function reportThreadText(threads: CommentThread[]) {
-    if (!onThreadText) return;
-    const parts: string[] = [];
-    for (const t of threads) {
-      parts.push(t.content);
-      for (const r of t.replies) {
-        if (r.content) parts.push(r.content);
-      }
-    }
-    onThreadText(comment.googleCommentId, parts.join("\n"));
-  }
-
   function applyThreadUpdate(data: { threads: CommentThread[]; comment: Comment }) {
     setThreads(data.threads);
-    reportThreadText(data.threads);
+    if (onThreadUpdate && data.threads.length > 0) {
+      onThreadUpdate(comment.googleCommentId, data.threads[0]);
+    }
     onUpdate(data.comment);
     fetchedModifiedMs.current = data.comment.driveModifiedAt
       ? new Date(data.comment.driveModifiedAt).getTime()
@@ -83,7 +85,9 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       setThreads(data.threads);
-      reportThreadText(data.threads);
+      if (onThreadUpdate && data.threads.length > 0) {
+        onThreadUpdate(comment.googleCommentId, data.threads[0]);
+      }
       fetchedModifiedMs.current = currentModifiedMs;
     } catch {
       toast.error("Failed to load comment thread");
@@ -155,6 +159,18 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     if (fetchedModifiedMs.current === currentModifiedMs) return;
     fetchThread();
   }, [expanded, currentModifiedMs]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Expand All — just set UI state; thread data is already pre-fetched
+  useEffect(() => {
+    if (!expandSignal || expanded) return;
+    setHasBeenExpanded(true);
+    setExpanded(true);
+  }, [expandSignal]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!collapseSignal || !expanded || hasDirtyReply) return;
+    setExpanded(false);
+  }, [collapseSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleRowClick() {
     if (!expanded) {
