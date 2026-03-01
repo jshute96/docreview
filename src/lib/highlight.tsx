@@ -76,29 +76,64 @@ export function highlightText(text: string, pattern: string): React.ReactNode {
 }
 
 /**
- * Check if text matches a pattern using either literal substring or regex.
+ * Check if text matches a pattern using regex-first (consistent with highlightText),
+ * falling back to literal substring match if regex is invalid.
  */
 export function matchesFilter(text: string, pattern: string): boolean {
   if (!pattern) return true;
   if (!text) return false;
 
-  // 1. Literal substring match
-  if (text.toLowerCase().includes(pattern.toLowerCase())) return true;
-
-  // 2. Regex match: find ANY non-empty match
+  // 1. Regex match first (consistent with highlightText)
   try {
     const re = new RegExp(pattern, "gi");
     let match: RegExpExecArray | null;
     while ((match = re.exec(text)) !== null) {
       if (match[0].length > 0) return true;
-      // Prevent infinite loop if regex engine doesn't advance
       if (re.lastIndex === match.index) {
         re.lastIndex++;
       }
     }
   } catch {
-    // invalid regex
+    // invalid regex — fall through to literal match
   }
 
+  // 2. Literal substring fallback
+  if (text.toLowerCase().includes(pattern.toLowerCase())) return true;
+
   return false;
+}
+
+/**
+ * Create a reusable matcher function that compiles the regex once.
+ * Avoids recompiling on every call when filtering multiple items.
+ */
+export function createMatcher(pattern: string): (text: string) => boolean {
+  if (!pattern) return () => true;
+
+  let re: RegExp | null = null;
+  try {
+    re = new RegExp(pattern, "gi");
+  } catch {
+    // invalid regex — will use literal only
+  }
+  const needle = pattern.toLowerCase();
+
+  return (text: string): boolean => {
+    if (!text) return false;
+
+    // Regex first (consistent with highlightText)
+    if (re) {
+      re.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = re.exec(text)) !== null) {
+        if (match[0].length > 0) return true;
+        if (re.lastIndex === match.index) {
+          re.lastIndex++;
+        }
+      }
+    }
+
+    // Literal fallback
+    return text.toLowerCase().includes(needle);
+  };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import type { Comment, Label } from "@prisma/client";
@@ -14,7 +14,7 @@ import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
-import { matchesFilter } from "@/lib/highlight";
+import { createMatcher } from "@/lib/highlight";
 import { broadcastChange, useCrossTabListener, type CrossTabEvent } from "@/lib/cross-tab";
 
 interface DocDetailProps {
@@ -197,6 +197,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     setComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   }
 
+  const matcher = useMemo(() => createMatcher(searchFilter), [searchFilter]);
+
   const filteredComments = comments
     .filter((c) => exitingIds.has(c.id) || !wouldBeFilteredOut(c))
     .filter((c) => {
@@ -206,7 +208,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       const sugText = sug ? `${sug.deletedText} ${sug.insertedText}` : "";
       const threads = threadText[c.googleCommentId] ?? "";
       const combined = `${text} ${sugText} ${threads}`;
-      return matchesFilter(combined, searchFilter);
+      return matcher(combined);
     })
     .sort((a, b) => {
       if (!sortActive) {

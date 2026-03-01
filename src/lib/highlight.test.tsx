@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import React from "react";
-import { highlightText, matchesFilter } from "./highlight";
+import { highlightText, matchesFilter, createMatcher } from "./highlight";
 
 function rendered(node: React.ReactNode): string {
   if (typeof node === "string") return node;
@@ -128,5 +128,48 @@ describe("matchesFilter", () => {
     expect(matchesFilter("hello (world)", "(world")).toBe(true);
     // Regex match only
     expect(matchesFilter("abc 123", "\\d+")).toBe(true);
+  });
+
+  it("uses regex-first order consistent with highlightText", () => {
+    // "a.c" as regex matches "abc", same as highlightText behavior
+    expect(matchesFilter("abc", "a.c")).toBe(true);
+  });
+});
+
+describe("createMatcher", () => {
+  it("returns a function that always returns true for empty pattern", () => {
+    const matcher = createMatcher("");
+    expect(matcher("anything")).toBe(true);
+    expect(matcher("")).toBe(true);
+  });
+
+  it("matches regex patterns", () => {
+    const matcher = createMatcher("\\d+");
+    expect(matcher("abc 123")).toBe(true);
+    expect(matcher("abc")).toBe(false);
+  });
+
+  it("falls back to literal for invalid regex", () => {
+    const matcher = createMatcher("(world");
+    expect(matcher("hello (world)")).toBe(true);
+    expect(matcher("hello world")).toBe(false);
+  });
+
+  it("is reusable across multiple calls", () => {
+    const matcher = createMatcher("foo");
+    expect(matcher("foo bar")).toBe(true);
+    expect(matcher("baz qux")).toBe(false);
+    expect(matcher("another foo")).toBe(true);
+  });
+
+  it("rejects zero-length regex matches", () => {
+    const matcher = createMatcher("x*");
+    expect(matcher("abc")).toBe(false);
+    expect(matcher("axbc")).toBe(true);
+  });
+
+  it("returns false for empty text", () => {
+    const matcher = createMatcher("foo");
+    expect(matcher("")).toBe(false);
   });
 });
