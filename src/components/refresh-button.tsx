@@ -63,7 +63,7 @@ export function RefreshButton({ mode, onRefresh }: RefreshButtonProps) {
   }
 
   return (
-    <Button onClick={handleClick} disabled={loading} variant="outline" size="sm" title={tooltip} className="text-zinc-900">
+    <Button onClick={handleClick} disabled={loading} variant="outline" size="sm" title={tooltip}>
       <Icon className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
       {label}
     </Button>

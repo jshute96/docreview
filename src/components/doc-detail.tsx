@@ -273,7 +273,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
           >{doc.title}</a>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <Button variant="outline" size="sm" title="Back to the document list" className="text-zinc-900" asChild>
+          <Button variant="outline" size="sm" title="Back to the document list" asChild>
             <a href="/docs">Doc list</a>
           </Button>
           <Button
@@ -282,7 +282,6 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
             onClick={handleRefresh}
             disabled={refreshing}
             title="Refresh comments"
-            className="text-zinc-900"
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
@@ -330,14 +329,14 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
             onLabelsChange={setLabels}
             onLabelDelete={handleLabelDelete}
           >
-            <Button variant="outline" size="sm" className="h-6 px-2 text-xs text-zinc-900" title="Edit document labels and notes">
+            <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit document labels and notes">
               Edit
             </Button>
           </EditDocDialog>
           <Button
             variant="outline"
             size="sm"
-            className="h-6 px-2 text-xs text-zinc-900"
+            className="h-6 px-2 text-xs"
             title={doc.status === "ACTIVE" ? "Hide this document in document list" : "Unhide this document in document list"}
             onClick={handleArchive}
             disabled={archiving}

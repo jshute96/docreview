@@ -104,7 +104,7 @@ export function DocRow({
       <td className="py-1.5 pr-4 text-sm text-zinc-500">{lastModified}</td>
       <td className="py-1.5 pr-4">
         <div className="flex items-center gap-1">
-          <Button variant="outline" size="sm" className="h-6 px-2 text-xs text-zinc-900" title="Open this document" asChild>
+          <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Open this document" asChild>
             <a href={doc.driveUrl} target="_blank" rel="noopener noreferrer">Open</a>
           </Button>
           <EditDocDialog
@@ -114,14 +114,14 @@ export function DocRow({
             onLabelsChange={onLabelsChange}
             onLabelDelete={onLabelDelete}
           >
-            <Button variant="outline" size="sm" className="h-6 px-2 text-xs text-zinc-900" title="Edit document labels and notes">
+            <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit document labels and notes">
               Edit
             </Button>
           </EditDocDialog>
           <Button
             variant="outline"
             size="sm"
-            className="h-6 px-2 text-xs text-zinc-900"
+            className="h-6 px-2 text-xs"
             title={doc.status === "ACTIVE" ? "Hide this document" : "Unhide this document"}
             onClick={handleArchive}
             disabled={archiving}

@@ -242,7 +242,7 @@ export function ManageLabelsDialog({
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button variant="outline" size="sm" title="Create or edit labels" className="text-zinc-900">
+          <Button variant="outline" size="sm" title="Create or edit labels">
             Manage Labels
           </Button>
         )}
@@ -261,7 +261,7 @@ export function ManageLabelsDialog({
               placeholder="Label name…"
               className="flex-1 rounded-md border border-zinc-200 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-zinc-300"
             />
-            <Button type="submit" variant="outline" size="sm" disabled={!name.trim()} className="text-zinc-900">
+            <Button type="submit" variant="outline" size="sm" disabled={!name.trim()}>
               Add
             </Button>
           </form>

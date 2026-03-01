@@ -318,7 +318,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
           <Button
             variant="outline"
             size="sm"
-            className="h-6 px-2 text-xs text-zinc-900"
+            className="h-6 px-2 text-xs"
             title="Open the document at this comment"
             asChild
           >
@@ -329,7 +329,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
           <Button
             variant="outline"
             size="sm"
-            className="h-6 px-2 text-xs text-zinc-900"
+            className="h-6 px-2 text-xs"
             title={isArchived ? "Unhide this comment" : "Hide this comment"}
             onClick={() => updateStatus(isArchived ? "ACTIVE" : "ARCHIVED")}
             disabled={loading}
@@ -339,7 +339,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
           <Button
             variant="outline"
             size="sm"
-            className="h-6 px-2 text-xs text-zinc-900"
+            className="h-6 px-2 text-xs"
             title={isMuted ? "Permanently hidden — click to unhide" : "Permanently hide this comment"}
             onClick={() => updateStatus(isMuted ? "ACTIVE" : "MUTED")}
             disabled={loading}
@@ -397,7 +397,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
               {isSuggestion ? (
                 <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
                   <div className="flex justify-end gap-1 mb-2">
-                    <Button variant="outline" size="sm" className="h-6 px-2 text-xs text-zinc-900" title="Open the document at this comment" asChild>
+                    <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Open the document at this comment" asChild>
                       <a href={commentUrl()} target="docreview-doc">
                         Open
                       </a>
@@ -405,7 +405,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-6 px-2 text-xs text-zinc-900"
+                      className="h-6 px-2 text-xs"
                       title="Refresh this thread"
                       onClick={refreshSuggestion}
                       disabled={refreshingThread}

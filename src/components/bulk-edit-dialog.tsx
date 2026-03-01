@@ -223,7 +223,7 @@ export function BulkEditDialog({
                   onLabelsChange={onLabelsChange}
                   onLabelDelete={onLabelDelete}
                   trigger={
-                    <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs text-zinc-900" title="Edit labels">
+                    <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" title="Edit labels">
                       Edit
                     </Button>
                   }

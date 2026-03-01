@@ -244,7 +244,7 @@ export function AddDocDialog({
                     {validTitle}
                   </p>
                   {existingDocId && (
-                    <Button variant="outline" size="sm" className="h-6 px-2 text-xs flex-shrink-0 text-zinc-900" title="Open document comments page" asChild>
+                    <Button variant="outline" size="sm" className="h-6 px-2 text-xs flex-shrink-0" title="Open document comments page" asChild>
                       <a href={`/comments/${existingDocId}`}>Open</a>
                     </Button>
                   )}

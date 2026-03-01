@@ -161,7 +161,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
             onLabelsChange={setLabels}
             onLabelDelete={handleLabelDelete}
             trigger={
-              <Button variant="outline" size="sm" title="Add a Google Drive document by URL" className="text-zinc-900">
+              <Button variant="outline" size="sm" title="Add a Google Drive document by URL">
                 Add doc
               </Button>
             }
@@ -176,7 +176,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
             onClick={() => signOut({ callbackUrl: "/login" })}
             disabled={isOffline}
             title="Sign out of your account"
-            className={isOffline ? "opacity-50 cursor-not-allowed text-zinc-900" : "text-zinc-900"}
+            className={isOffline ? "opacity-50 cursor-not-allowed" : ""}
           >
             Sign out
           </Button>
@@ -225,7 +225,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
                       onLabelsChange={setLabels}
                       onLabelDelete={handleLabelDelete}
                     >
-                      <Button variant="outline" size="sm" className="h-6 px-2 text-xs text-zinc-900" title="Edit all currently displayed documents">
+                      <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit all currently displayed documents">
                         Edit All
                       </Button>
                     </BulkEditDialog>

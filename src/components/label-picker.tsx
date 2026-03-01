@@ -35,7 +35,7 @@ export function LabelPicker({
               type="button"
               variant="outline"
               size="sm"
-              className="h-7 px-2 text-xs text-zinc-900"
+              className="h-7 px-2 text-xs"
               title="Edit labels"
             >
               Edit
