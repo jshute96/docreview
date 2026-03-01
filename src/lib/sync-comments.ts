@@ -4,6 +4,12 @@ import type { Doc } from "@prisma/client";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 
+function datesEqual(a: Date | null, b: Date | null): boolean {
+  if (a === null && b === null) return true;
+  if (a === null || b === null) return false;
+  return a.getTime() === b.getTime();
+}
+
 // Syncs all comments and suggestions for a single doc. Always does a full scan —
 // Drive API's startModifiedTime filter silently excludes suggestions.
 // Returns the number of new comment records created and whether the doc should be unarchived.
@@ -40,10 +46,15 @@ export async function syncComments(
   let updatedCount = 0;
   let shouldUnarchive = false;
 
+  // Batch-fetch all existing comments for this doc to avoid N+1 queries
+  const existingComments = new Map(
+    (await prisma.comment.findMany({
+      where: { docId: doc.id, type: "COMMENT" },
+    })).map((c) => [c.googleCommentId, c])
+  );
+
   for (const c of comments) {
-    const existing = await prisma.comment.findUnique({
-      where: { docId_googleCommentId: { docId: doc.id, googleCommentId: c.id } },
-    });
+    const existing = existingComments.get(c.id) ?? null;
 
     // Activity is interesting if I'm the doc author or a participant in the thread,
     // unless I resolved it myself.
@@ -71,17 +82,25 @@ export async function syncComments(
       if (isInteresting) shouldUnarchive = true;
     } else {
       if (existing.status === "MUTED") {
-        await prisma.comment.update({
-          where: { id: existing.id },
-          data: {
-            resolved: c.resolved,
-            iParticipated: c.iParticipated,
-            driveCreatedAt: c.driveCreatedAt,
-            driveModifiedAt: c.driveModifiedAt,
-            replyCount: c.replyCount,
-          },
-        });
-        updatedCount++;
+        const changed =
+          existing.resolved !== c.resolved ||
+          existing.iParticipated !== c.iParticipated ||
+          !datesEqual(existing.driveCreatedAt, c.driveCreatedAt) ||
+          !datesEqual(existing.driveModifiedAt, c.driveModifiedAt) ||
+          existing.replyCount !== c.replyCount;
+        if (changed) {
+          await prisma.comment.update({
+            where: { id: existing.id },
+            data: {
+              resolved: c.resolved,
+              iParticipated: c.iParticipated,
+              driveCreatedAt: c.driveCreatedAt,
+              driveModifiedAt: c.driveModifiedAt,
+              replyCount: c.replyCount,
+            },
+          });
+          updatedCount++;
+        }
         continue;
       }
       // Existing comment with new replies: check for unarchive
@@ -90,18 +109,27 @@ export async function syncComments(
         if (isInteresting) shouldUnarchive = true;
       }
       const status = c.resolved && c.iResolvedIt ? "ARCHIVED" : "ACTIVE";
-      await prisma.comment.update({
-        where: { id: existing.id },
-        data: {
-          resolved: c.resolved,
-          iParticipated: c.iParticipated,
-          status,
-          driveCreatedAt: c.driveCreatedAt,
-          driveModifiedAt: c.driveModifiedAt,
-          replyCount: c.replyCount,
-        },
-      });
-      updatedCount++;
+      const changed =
+        existing.resolved !== c.resolved ||
+        existing.iParticipated !== c.iParticipated ||
+        existing.status !== status ||
+        !datesEqual(existing.driveCreatedAt, c.driveCreatedAt) ||
+        !datesEqual(existing.driveModifiedAt, c.driveModifiedAt) ||
+        existing.replyCount !== c.replyCount;
+      if (changed) {
+        await prisma.comment.update({
+          where: { id: existing.id },
+          data: {
+            resolved: c.resolved,
+            iParticipated: c.iParticipated,
+            status,
+            driveCreatedAt: c.driveCreatedAt,
+            driveModifiedAt: c.driveModifiedAt,
+            replyCount: c.replyCount,
+          },
+        });
+        updatedCount++;
+      }
     }
   }
 

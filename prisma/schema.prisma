@@ -134,13 +134,13 @@ model Doc {
   mimeType             String?    @map("mime_type")
   role                 DocRole    @default(REVIEWER)
   status               DocStatus  @default(ACTIVE)
-  isDeleted            Boolean    @default(false) @map("is_deleted")
-  lastModifiedInDrive  DateTime?  @map("last_modified_in_drive")
+  isDeleted            Boolean    @default(false) @map("is_deleted") // soft-delete; set when Drive reports 404/403/trashed, cleared if doc reappears
+  lastModifiedInDrive  DateTime?  @map("last_modified_in_drive")    // Drive's modifiedTime (does NOT update when comments change)
   notes                String?    @map("notes")
   owner                String?
   createdTimeInDrive   DateTime?  @map("created_time_in_drive")
-  addedAt              DateTime   @default(now()) @map("added_at")
-  commentsLastSyncedAt DateTime?  @map("comments_last_synced_at")
+  addedAt              DateTime   @default(now()) @map("added_at")  // when this doc was first added to docreview
+  commentsLastSyncedAt DateTime?  @map("comments_last_synced_at")   // stamped each sync; currently write-only (incremental comment sync was dropped because Drive's startModifiedTime silently excludes suggestions)
   user                 User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   labels               DocLabel[]
   comments             Comment[]

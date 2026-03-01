@@ -53,17 +53,24 @@ Already-resolved threads don't need action, so they start archived.
 
 ## Status on Subsequent Syncs
 
-The Drive API's `startModifiedTime` parameter returns only comments modified since the last
-sync. If a comment is returned, something changed (a reply was added, it was resolved or
-re-opened).
+Every sync does a full `comments.list` scan (incremental sync via `startModifiedTime` was
+dropped because it silently excludes suggestions). All existing comments for the doc are
+batch-fetched from the database in a single query and compared against Drive results.
+
+**No-op detection:** Before writing an update, each comment's Drive-side fields are compared
+against the existing record. If nothing changed, the update is skipped entirely. This avoids
+unnecessary writes and makes the "N updated" log count accurate. Date fields are compared
+via `.getTime()` with null-handling.
 
 **MUTED**: If status is `MUTED`, it is left unchanged. Muted threads stay hidden regardless
 of new Drive activity. Drive-side fields (`resolved`, `iParticipated`, `driveCreatedAt`,
-`driveModifiedAt`, `replyCount`) are still updated so the detail page reflects current state.
+`driveModifiedAt`, `replyCount`) are still updated when they differ, so the detail page
+reflects current state.
 
 **For all other statuses**, apply this logic:
 
-1. Update `resolved`, `iParticipated`, `driveModifiedAt`, and `replyCount` from Drive data.
+1. Compare `resolved`, `iParticipated`, `status`, `driveCreatedAt`, `driveModifiedAt`, and
+   `replyCount` against the existing record. Skip the update if all match.
 2. If `resolved = true` AND I was the one who resolved it (the last reply with
    `action = "resolve"` has `author.me = true`) → set status to `ARCHIVED`.
 3. Otherwise (new reply added, thread re-opened, resolved by someone else) → set status
@@ -175,10 +182,10 @@ their own sync logic. They are displayed in the comment table and can be filtere
 - **`fields` is mandatory** — Drive returns nothing without it.
 - **Fields used**: `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me))`
 - **`startModifiedTime`**: RFC 3339 timestamp; filters to comments modified after this time.
-  Used to make incremental syncs cheap — returns empty if nothing changed.
+  Not currently used — incremental comment sync was dropped because this filter silently
+  excludes suggestions. Every sync does a full scan instead.
 - **File `modifiedTime` does NOT update when comments change.** This is why we cannot use the
-  file's modification time as a sync gate. Instead, `commentsLastSyncedAt` is stored per doc
-  and passed as `startModifiedTime` on each sync.
+  file's modification time as a sync gate.
 - Scope: `drive.readonly` is sufficient (already configured).
 - Pagination: `comments.list` returns `nextPageToken`; always paginate to completion.
 

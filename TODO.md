@@ -1,3 +1,8 @@
+* Better handling of docs I don't have permission to (vs deleted)
+* Load... dialog box
+* What happens to deleted comments?
+* What can we show for comments attached to deleted text, that no one will see, but we can still reply to?
+
 * Suggestions fetching is still limited and sketchy
   * No timestamps, no response counts
   * Anchor links into the doc don't work

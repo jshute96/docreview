@@ -201,6 +201,11 @@ comments change, so we cannot use it as a signal.
 Drive API's `startModifiedTime` filter silently excludes suggestions, so incremental syncs
 were dropped entirely.
 
+**Batch fetch & no-op detection:** All existing comments for the doc are loaded in a single
+`findMany` query (avoiding N+1 `findUnique` calls). Before writing each update, Drive fields
+are compared against the existing record; if nothing changed, the update is skipped. This
+makes the "N updated" log count reflect actual writes.
+
 **Fields fetched per comment:** `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me))`
 
 **Fields stored per comment:** `driveCreatedAt`, `driveModifiedAt`, `replyCount` (= number
@@ -281,12 +286,12 @@ Refresh:
 [Sync] Syncing comments for 3 docs (changed docs only)
 [Drive] comments.list abc123 (since all) → 12 comments (87ms)
 [Docs] documents.get abc123 → 2 suggestions (134ms)
-[Comments] abc123: 12 comments from Drive, 1 new, 11 updated; 2 suggestions (0 resolved)
+[Comments] abc123: 12 comments from Drive, 1 new, 3 updated; 2 suggestions (0 resolved)
 [Drive] comments.list def456 (since all) → 3 comments (45ms)
-[Comments] def456: 3 from Drive, 0 new, 3 updated
+[Comments] def456: 3 from Drive, 0 new, 0 updated
 [Drive] comments.list ghi789 (since all) → 8 comments (62ms)
 [Docs] documents.get ghi789 → 0 suggestions (98ms)
-[Comments] ghi789: 8 comments from Drive, 2 new, 6 updated; 0 suggestions (1 resolved) → unarchive
+[Comments] ghi789: 8 comments from Drive, 2 new, 1 updated; 0 suggestions (1 resolved) → unarchive
 [Sync] Saving changes token for future refreshes
 [Sync] refresh complete in 892ms: 0 added, 3 updated, 1 deleted, 1 unarchived, 3 comments synced
 ```
