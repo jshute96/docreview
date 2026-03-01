@@ -10,6 +10,7 @@ import { FilterBar } from "@/components/filter-bar";
 import { AddDocDialog } from "@/components/add-doc-dialog";
 import { ManageLabelsDialog } from "@/components/manage-labels-dialog";
 import { RefreshButton } from "@/components/refresh-button";
+import { LoadDialog } from "@/components/load-dialog";
 import { BulkEditDialog } from "@/components/bulk-edit-dialog";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -167,7 +168,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
           />
           <RefreshButton mode="refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
           <RefreshButton mode="full-refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
-          <RefreshButton mode="load" onRefresh={(newDocs) => setDocs(newDocs)} />
+          <LoadDialog onRefresh={(newDocs) => setDocs(newDocs)} />
           <ManageLabelsDialog />
           <Button
             variant="outline"

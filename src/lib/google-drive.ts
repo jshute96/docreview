@@ -569,12 +569,31 @@ export async function listChanges(userId: string, pageToken: string): Promise<Dr
   return { docs, deletedDocIds, newPageToken };
 }
 
-export async function listRecentDocs(userId: string, since?: Date): Promise<DriveDoc[]> {
+export interface ListRecentDocsOptions {
+  ownership?: "all" | "owned" | "shared-with-me";
+  includeSharedDrives?: boolean;
+}
+
+export async function listRecentDocs(userId: string, since?: Date, options?: ListRecentDocsOptions): Promise<DriveDoc[]> {
   const auth = await getDriveClient(userId);
   const drive = google.drive({ version: "v3", auth });
 
   const cutoff = since ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const modifiedAfter = cutoff.toISOString();
+  const ownership = options?.ownership ?? "all";
+  const includeSharedDrives = options?.includeSharedDrives ?? false;
+
+  // Build query
+  const qParts = [
+    "(mimeType='application/vnd.google-apps.document' or mimeType='application/vnd.google-apps.spreadsheet' or mimeType='application/vnd.google-apps.presentation')",
+    `modifiedTime > '${modifiedAfter}'`,
+    "trashed = false",
+  ];
+  if (ownership === "owned") qParts.push("'me' in owners");
+  if (ownership === "shared-with-me") qParts.push("sharedWithMe");
+  const q = qParts.join(" and ");
+
+  console.log(`[Drive] files.list query: ${q}${includeSharedDrives ? " (including shared drives)" : ""}`);
 
   const docs: DriveDoc[] = [];
   let pageToken: string | undefined;
@@ -582,11 +601,14 @@ export async function listRecentDocs(userId: string, since?: Date): Promise<Driv
   do {
     const t0 = Date.now();
     const res = await drive.files.list({
-      q: `(mimeType='application/vnd.google-apps.document' or mimeType='application/vnd.google-apps.spreadsheet' or mimeType='application/vnd.google-apps.presentation') and modifiedTime > '${modifiedAfter}' and trashed = false`,
+      q,
       fields:
         "nextPageToken, files(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName))",
       pageSize: 100,
       pageToken,
+      ...(includeSharedDrives
+        ? { corpora: "allDrives", includeItemsFromAllDrives: true, supportsAllDrives: true }
+        : {}),
     });
     console.log(`[Drive] files.list (recent docs${pageToken ? ", page " + pageToken.slice(0, 8) + "…" : ""}) → ${res.data.files?.length ?? 0} files (${Date.now() - t0}ms)`);
 

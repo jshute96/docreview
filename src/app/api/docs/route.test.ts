@@ -12,6 +12,9 @@ vi.mock("@/lib/prisma", () => ({
       upsert: vi.fn(),
       update: vi.fn(),
     },
+    label: {
+      findMany: vi.fn(),
+    },
   },
 }));
 vi.mock("@/lib/google-drive", () => ({
@@ -41,6 +44,9 @@ const mockDoc = prisma.doc as unknown as {
   findMany: ReturnType<typeof vi.fn>;
   upsert: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
+};
+const mockLabel = prisma.label as unknown as {
+  findMany: ReturnType<typeof vi.fn>;
 };
 const mockListRecentDocs = vi.mocked(listRecentDocs);
 const mockFindDeletedDocIds = vi.mocked(findDeletedDocIds);
@@ -106,6 +112,14 @@ function postRequest(mode?: "refresh" | "full-refresh" | "load") {
     ? `http://localhost/api/docs?mode=${mode}`
     : "http://localhost/api/docs";
   return new NextRequest(url, { method: "POST" });
+}
+
+function postRequestWithBody(mode: string, body: Record<string, unknown>) {
+  return new NextRequest(`http://localhost/api/docs?mode=${mode}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 describe("POST /api/docs", () => {
@@ -476,5 +490,99 @@ describe("POST /api/docs", () => {
     const res = await POST(postRequest("refresh"));
     expect(res.status).toBe(200);
     expect(mockUpdateDriveChangesToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("load mode skips unselected new docs", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
+    mockGetDriveClient.mockResolvedValue(driveAuth);
+    mockListRecentDocs.mockResolvedValue([
+      {
+        googleDocId: "g1",
+        title: "Selected Doc",
+        driveUrl: "https://docs.google.com/document/d/g1/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "AUTHOR" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Owner",
+      },
+      {
+        googleDocId: "g2",
+        title: "Unselected Doc",
+        driveUrl: "https://docs.google.com/document/d/g2/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "REVIEWER" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Someone",
+      },
+    ]);
+
+    mockDoc.findMany
+      .mockResolvedValueOnce([]) // existingDocIds
+      .mockResolvedValueOnce([]) // missingDocs
+      .mockResolvedValueOnce([]); // commentDocs
+    mockDoc.upsert.mockResolvedValue({});
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+
+    const res = await POST(postRequestWithBody("load", {
+      selectedGoogleDocIds: ["g1"], // only g1 selected
+    }));
+    const data = await res.json();
+    expect(data.added).toBe(1); // only g1 added
+    expect(mockDoc.upsert).toHaveBeenCalledTimes(1);
+    expect(mockDoc.upsert.mock.calls[0][0].create.googleDocId).toBe("g1");
+  });
+
+  it("load mode returns 400 for invalid label IDs", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    // User owns label l1 but not l2
+    mockLabel.findMany.mockResolvedValue([{ id: "l1" }]);
+
+    const res = await POST(postRequestWithBody("load", {
+      labelIds: ["l1", "l2"],
+    }));
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/label/i);
+  });
+
+  it("load mode applies labels and notes to new docs", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
+    mockGetDriveClient.mockResolvedValue(driveAuth);
+    mockLabel.findMany.mockResolvedValue([{ id: "l1" }]);
+    mockListRecentDocs.mockResolvedValue([
+      {
+        googleDocId: "g1",
+        title: "New Doc",
+        driveUrl: "https://docs.google.com/document/d/g1/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "AUTHOR" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Owner",
+      },
+    ]);
+
+    mockDoc.findMany
+      .mockResolvedValueOnce([]) // existingDocIds
+      .mockResolvedValueOnce([]) // missingDocs
+      .mockResolvedValueOnce([]); // commentDocs
+    mockDoc.upsert.mockResolvedValue({});
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+
+    const res = await POST(postRequestWithBody("load", {
+      labelIds: ["l1"],
+      notes: "Batch note",
+    }));
+    expect(res.status).toBe(200);
+
+    const upsertCall = mockDoc.upsert.mock.calls[0][0];
+    expect(upsertCall.create.notes).toBe("Batch note");
+    expect(upsertCall.create.labels).toEqual({
+      create: [{ labelId: "l1" }],
+    });
   });
 });

@@ -18,7 +18,8 @@ One-line descriptions of every source file, grouped by layer.
 | File | Description |
 |------|-------------|
 | `auth/[...nextauth]/route.ts` | NextAuth catch-all handler (GET+POST) |
-| `docs/route.ts` | `GET` list docs (with filters); `POST` refresh/full-refresh/load sync from Drive |
+| `docs/route.ts` | `GET` list docs (with filters); `POST` refresh/full-refresh/load sync from Drive (load accepts selectedGoogleDocIds, labelIds, notes) |
+| `docs/scan/route.ts` | `POST` scan Drive for documents without modifying DB — returns total, existing count, and new doc list |
 | `docs/add/route.ts` | `POST` add a doc by URL — validates via Drive, creates DB record, syncs comments |
 | `docs/validate/route.ts` | `GET` validate a Google Drive URL — checks access, mime type, returns metadata |
 | `docs/bulk-update/route.ts` | `PATCH` bulk update multiple docs — optimized role/label/notes updates with no-op protection |
@@ -51,7 +52,8 @@ One-line descriptions of every source file, grouped by layer.
 | `edit-doc-dialog.tsx` | Dialog to edit doc role and labels |
 | `bulk-edit-dialog.tsx` | Dialog to edit role, labels, and notes for multiple documents simultaneously |
 
-| `refresh-button.tsx` | Refresh/Full Refresh/Load from Drive button — calls POST `/api/docs` then reloads list |
+| `load-dialog.tsx` | Load from Drive dialog — two-phase scan→add flow with options (days back, ownership, shared drives), doc selection, labels, notes |
+| `refresh-button.tsx` | Refresh/Full Refresh button — calls POST `/api/docs` then reloads list |
 | `tri-state-button.tsx` | Tri-state filter buttons (off/include/exclude) with diagonal strikethrough + slow-click-to-reset |
 | `label-badge.tsx` | Colored label pill with optional remove button |
 | `label-picker.tsx` | Label selection grid for add/edit dialogs |
@@ -92,6 +94,7 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 | `bulk-edit.ts` | `BulkEditState` type and `cycleBulkEditState` helper for multi-doc editing |
 | `offline.ts` | Offline mode constants — `OFFLINE_MODE` flag, `OfflineModeError`, fallback user |
 | `role-colors.ts` | Tailwind class maps for Author (blue) and Reviewer (violet) role badges/filters |
+| `load-options.ts` | `parseLoadOptions()` — shared validation for scan/load request body (daysBack, ownership, includeSharedDrives) |
 | `status.ts` | Read/write `Status` table — tracks `driveChangesPageToken` per user for incremental sync via Drive Changes API |
 | `tri-state.ts` | `TriState` type (`off`/`include`/`exclude`), cycle function, partition helper |
 | `utils.ts` | `cn()` (clsx+twMerge), `contrastText()` for label colors, `formatDate()` |
@@ -117,4 +120,5 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 | `refresh.md` | Full refresh flow — Drive sync modes, deletion detection, comment sync, UI update |
 | `comment-tracking.md` | Comment status logic, unarchive rules, filter behavior |
 | `bulk-edit.md` | Bulk editing logic — tri-state UI, context-aware cycling, no-op protection |
+| `load-dialog.md` | Load dialog — two-phase scan→add flow, search options, dialog layout |
 | `suggestions.md` | Suggestion sync via Docs API, limitations |

@@ -6,7 +6,7 @@ There are three sync modes, triggered from different UI paths:
 
 | Mode | Trigger | Doc discovery | Deletion detection | Comment sync scope |
 |------|---------|---------------|--------------------|--------------------|
-| **Load** | "Load from Drive" button | `files.list` — 30-day window | `files.get` per missing doc | Docs returned by Drive |
+| **Load** | Load dialog ([`load-dialog.md`](./load-dialog.md)) | `files.list` — configurable window | `files.get` per missing doc | Docs returned by Drive |
 | **Refresh** | "Refresh" button | `changes.list` — incremental | Built into changes feed | Changed docs only |
 | **Full Refresh** | "Full Refresh" button | `changes.list` — incremental | Built into changes feed | All docs (including deleted) |
 

@@ -5,6 +5,7 @@ import { listRecentDocs, findDeletedDocIds, getDriveClient, getChangesStartPageT
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken } from "@/lib/status";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
+import { parseLoadOptions } from "@/lib/load-options";
 
 export async function GET(req: NextRequest) {
   const session = await getValidSession();
@@ -46,7 +47,33 @@ export async function POST(req: NextRequest) {
     : modeParam === "full-refresh" ? "full-refresh"
     : "load";
 
+  // Parse load options from request body (load mode only)
+  let loadBody: Record<string, unknown> = {};
+  if (mode === "load") {
+    try { loadBody = await req.json(); } catch { /* no body is fine */ }
+  }
+  const { daysBack, ownership, includeSharedDrives } = parseLoadOptions(loadBody);
+  const selectedSet = Array.isArray(loadBody.selectedGoogleDocIds)
+    ? new Set(loadBody.selectedGoogleDocIds as string[])
+    : null;
+  const loadLabelIds: string[] = Array.isArray(loadBody.labelIds) ? loadBody.labelIds as string[] : [];
+  const loadNotes: string = typeof loadBody.notes === "string" ? (loadBody.notes as string).trim() : "";
+
+  // Validate label ownership before proceeding
+  if (loadLabelIds.length > 0) {
+    const ownedLabels = await prisma.label.findMany({
+      where: { id: { in: loadLabelIds }, userId },
+      select: { id: true },
+    });
+    if (ownedLabels.length !== loadLabelIds.length) {
+      return NextResponse.json({ error: "Invalid label" }, { status: 400 });
+    }
+  }
+
   console.log(`[Sync] Starting ${mode} sync`);
+  if (mode === "load") {
+    console.log(`[Sync] Load options: daysBack=${daysBack}, ownership=${ownership}, includeSharedDrives=${includeSharedDrives}${selectedSet ? `, ${selectedSet.size} docs selected` : ""}`);
+  }
   const t0 = Date.now();
 
   let driveDocs: import("@/lib/google-drive").DriveDoc[] = [];
@@ -58,9 +85,13 @@ export async function POST(req: NextRequest) {
     driveAuth = await getDriveClient(userId);
 
     if (mode === "load") {
-      // Load mode: full 30-day scan via files.list
-      console.log("[Sync] Load: scanning via files.list (30-day window)");
-      driveDocs = await listRecentDocs(userId, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+      // Load mode: scan via files.list with user-specified options
+      console.log(`[Sync] Load: scanning via files.list (${daysBack}-day window, ownership=${ownership})`);
+      driveDocs = await listRecentDocs(
+        userId,
+        new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000),
+        { ownership, includeSharedDrives },
+      );
     } else {
       // Refresh / full-refresh: use changes.list with saved token
       const status = await getStatus(userId);
@@ -105,6 +136,7 @@ export async function POST(req: NextRequest) {
   let deleted = 0;
 
   const driveDocIds = new Set(driveDocs.map((d) => d.googleDocId));
+  console.log(`[Sync] Drive returned ${driveDocs.length} docs — processing each:`);
 
   // Pre-fetch existing doc IDs to distinguish adds from updates
   const existingDocIds = new Set(
@@ -115,11 +147,19 @@ export async function POST(req: NextRequest) {
   );
 
   for (const doc of driveDocs) {
-    console.log(`[Sync] Doc found: ${doc.title} (${doc.googleDocId})`);
     const isExisting = existingDocIds.has(doc.googleDocId);
 
     // Refresh/full-refresh: auto-add new docs I authored; skip other new docs
-    if ((mode === "refresh" || mode === "full-refresh") && !isExisting && doc.role !== "AUTHOR") continue;
+    if ((mode === "refresh" || mode === "full-refresh") && !isExisting && doc.role !== "AUTHOR") {
+      console.log(`[Sync]   SKIP "${doc.title}" — new ${doc.role} doc (${mode} only auto-adds AUTHOR docs)`);
+      continue;
+    }
+
+    // Load mode with selection: only add selected new docs
+    if (mode === "load" && !isExisting && selectedSet && !selectedSet.has(doc.googleDocId)) {
+      console.log(`[Sync]   SKIP "${doc.title}" — not selected by user`);
+      continue;
+    }
 
     await prisma.doc.upsert({
       where: { userId_googleDocId: { userId, googleDocId: doc.googleDocId } },
@@ -133,6 +173,10 @@ export async function POST(req: NextRequest) {
         lastModifiedInDrive: doc.lastModifiedInDrive,
         owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
+        ...(loadNotes ? { notes: loadNotes } : {}),
+        ...(loadLabelIds.length > 0
+          ? { labels: { create: loadLabelIds.map((id) => ({ labelId: id })) } }
+          : {}),
       },
       update: {
         title: doc.title,
@@ -145,8 +189,10 @@ export async function POST(req: NextRequest) {
       },
     });
     if (isExisting) {
+      console.log(`[Sync]   UPDATE "${doc.title}" — already tracked, metadata updated`);
       updated++;
     } else {
+      console.log(`[Sync]   ADD "${doc.title}" — new ${doc.role} doc (owner: ${doc.owner ?? "unknown"})`);
       added++;
     }
   }

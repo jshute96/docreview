@@ -1,5 +1,4 @@
 * Better handling of docs I don't have permission to (vs deleted)
-* Load... dialog box
 
 * Make refresh on a doc faster, and probably cheaper, by doing fewer API calls.
 * If someone else resolves my thread, that comment should stay active/watched?
