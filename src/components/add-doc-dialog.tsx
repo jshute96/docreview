@@ -219,7 +219,7 @@ export function AddDocDialog({
           <DialogTitle>Add Document</DialogTitle>
         </DialogHeader>
 
-        <div className="mt-2 flex flex-col gap-4">
+        <div className="flex flex-col gap-4 p-6 pt-4">
           <div>
             <div className="flex items-center gap-2">
               <input
@@ -270,14 +270,14 @@ export function AddDocDialog({
               className={`${TEXTAREA_CLASSES} w-full max-h-[200px]`}
             />
           </div>
-        </div>
 
-        <DialogButtons
-          onConfirm={handleAdd}
-          onCancel={() => setOpen(false)}
-          confirmLabel={adding ? "Adding…" : "Add"}
-          disabled={validationState !== "valid" || adding}
-        />
+          <DialogButtons
+            onConfirm={handleAdd}
+            onCancel={() => setOpen(false)}
+            confirmLabel={adding ? "Adding…" : "Add"}
+            disabled={validationState !== "valid" || adding}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -189,7 +189,7 @@ export function BulkEditDialog({
           <DialogTitle>Edit {selectedDocs.length} Document{selectedDocs.length === 1 ? "" : "s"}</DialogTitle>
         </DialogHeader>
 
-        <div className="mt-2 flex min-w-0 flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-6 p-6 pt-4">
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-900">
               Role
@@ -306,14 +306,14 @@ export function BulkEditDialog({
               )}
             </div>
           </div>
-        </div>
 
-        <DialogButtons
-          onConfirm={handleSave}
-          onCancel={() => setOpen(false)}
-          confirmLabel={saving ? "Saving…" : "Save Changes"}
-          disabled={saving || selectedDocs.length === 0}
-        />
+          <DialogButtons
+            onConfirm={handleSave}
+            onCancel={() => setOpen(false)}
+            confirmLabel={saving ? "Saving…" : "Save Changes"}
+            disabled={saving || selectedDocs.length === 0}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

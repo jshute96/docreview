@@ -102,10 +102,14 @@ export function EditDocDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="line-clamp-1">Edit Document</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-4 p-6 pt-1">
           <a
             href={doc.driveUrl}
             target="_blank"
             rel="noopener noreferrer"
+            draggable="false"
             title="Open document"
             className={`flex items-center gap-1.5 text-base hover:text-blue-600 hover:underline line-clamp-1 ${
               doc.isDeleted ? "line-through text-zinc-400" : "text-zinc-600"
@@ -114,9 +118,7 @@ export function EditDocDialog({
             <DocTypeIcon mimeType={doc.mimeType} className="h-4 w-4 flex-shrink-0" />
             {doc.title}
           </a>
-        </DialogHeader>
 
-        <div className="mt-2 flex flex-col gap-4">
           <div>
             <label className="mb-1.5 block text-xs font-medium text-zinc-900 uppercase tracking-wide">
               Role
@@ -157,14 +159,14 @@ export function EditDocDialog({
               className={`${TEXTAREA_CLASSES} w-full max-h-[200px]`}
             />
           </div>
-        </div>
 
-        <DialogButtons
-          onConfirm={handleSave}
-          onCancel={() => setOpen(false)}
-          confirmLabel={saving ? "Saving…" : "Save"}
-          disabled={saving}
-        />
+          <DialogButtons
+            onConfirm={handleSave}
+            onCancel={() => setOpen(false)}
+            confirmLabel={saving ? "Saving…" : "Save"}
+            disabled={saving}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

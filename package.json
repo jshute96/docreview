@@ -29,6 +29,7 @@
     "prisma": "^5.22.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-draggable": "^4.5.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0"
   },

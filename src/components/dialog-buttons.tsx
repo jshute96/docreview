@@ -18,7 +18,7 @@ export function DialogButtons({
   disabled = false,
 }: DialogButtonsProps) {
   return (
-    <div className="mt-4 flex gap-2">
+    <div className="mt-2 flex gap-2 justify-end">
       <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={onConfirm} className="text-zinc-900">
         {confirmLabel}
       </Button>
