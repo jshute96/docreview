@@ -1,5 +1,3 @@
-* Add from redirect links?
-
 * Suggestions fetching is still limited and sketchy
   * No timestamps, no response counts
   * Anchor links into the doc don't work

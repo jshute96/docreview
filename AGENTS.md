@@ -55,5 +55,11 @@ dropped `url = env(...)` support in schema.prisma).
 ### UI Controls
 - **Tooltips**: All buttons, filter controls, and column headings should have a `title` attribute providing a brief description of what the control does. When adding new controls, always include a tooltip. For toggle buttons with two states (e.g., Archive/Unarchive), use a dynamic title that reflects the current action.
 
+### Cross-Tab Live Sync
+- **Every page** must use `useCrossTabListener` from `src/lib/cross-tab.ts` to stay in sync when other tabs broadcast changes (label edits, doc adds, etc.).
+- When a page mutates shared data (docs, labels, comments), call `broadcastChange()` so other open tabs refresh.
+- The listener callback should re-fetch the data the page depends on (e.g., `/api/labels` for the add page, both `/api/docs` and `/api/labels` for the doc list).
+- When adding a new page, verify cross-tab sync works: open the page in two tabs, make a change in one, and confirm the other updates.
+
 ### Code Logic
 - **Documentation**: Where code has subtle or surprising logic, add comments to explain the "why" and intended behavior.

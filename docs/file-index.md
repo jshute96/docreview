@@ -10,6 +10,7 @@ One-line descriptions of every source file, grouped by layer.
 | `layout.tsx` | Root layout — Geist fonts, global CSS, Sonner toaster |
 | `login/page.tsx` | Login page — Google OAuth button, or offline-mode button |
 | `docs/page.tsx` | Doc list page (server) — fetches docs+labels, renders `DocTable` |
+| `add/page.tsx` | Add document page (server) — standalone add-doc form, accepts optional `?url=` query param |
 | `comments/[id]/page.tsx` | Doc detail page (server) — fetches single doc with comments, renders `DocDetail` |
 
 ## API Routes (`src/app/api/`)
@@ -43,7 +44,9 @@ One-line descriptions of every source file, grouped by layer.
 | `comment-filter-bar.tsx` | Comment list filter bar — toggles for my threads/comments, show mode, suggestions |
 | `comment-row.tsx` | Single comment row — expandable, shows content preview, thread panel, status actions |
 | `comment-thread-panel.tsx` | Expanded thread view — shows all replies, reply textarea, resolve/reopen buttons |
-| `add-doc-dialog.tsx` | `Dialog to add a doc by URL — debounced validation, label picker |
+| `add-doc-content.tsx` | Shared add-doc form body — URL validation, label picker, notes; used by dialog and standalone page |
+| `add-doc-dialog.tsx` | Dialog wrapper for adding a doc — renders `AddDocContent` inside a dialog |
+| `add-doc-page-client.tsx` | Standalone add-doc page (client) — renders `AddDocContent` in a card with cross-tab sync |
 | `edit-doc-dialog.tsx` | Dialog to edit doc role and labels |
 | `bulk-edit-dialog.tsx` | Dialog to edit role, labels, and notes for multiple documents simultaneously |
 
