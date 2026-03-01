@@ -245,78 +245,78 @@ export function ManageLabelsDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md" hideClose>
+      <DialogContent className="sm:max-w-md flex flex-col" hideClose>
         <DialogHeader>
           <DialogTitle>Manage Labels</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto min-h-0">
-          <div className="flex flex-col gap-4 p-6 pt-4">
-            <form onSubmit={handleAdd} className="flex gap-2">
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Label name…"
-                className="flex-1 rounded-md border border-zinc-200 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-zinc-300"
-              />
-              <Button type="submit" variant="outline" size="sm" disabled={!name.trim()} className="text-zinc-900">
-                Add
-              </Button>
-            </form>
+        <div className="px-6 pt-4 pb-2">
+          <form onSubmit={handleAdd} className="flex gap-2">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Label name…"
+              className="flex-1 rounded-md border border-zinc-200 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-zinc-300"
+            />
+            <Button type="submit" variant="outline" size="sm" disabled={!name.trim()} className="text-zinc-900">
+              Add
+            </Button>
+          </form>
+        </div>
 
-            <div
-              ref={listRef}
-              className="flex flex-col gap-1"
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-            >
-              {draft.length === 0 && (
-                <p className="text-sm text-zinc-400">No labels yet.</p>
-              )}
-              {draft.map((label, index) => (
-                <div
-                  key={label.id}
-                  data-label-row
-                  className={`flex items-center justify-between rounded-md px-2 py-1.5 select-none touch-none ${
-                    dragActiveIndex === index
-                      ? "bg-zinc-100 ring-1 ring-zinc-300 cursor-grabbing"
-                      : "hover:bg-zinc-50 cursor-grab"
-                  } ${dragging ? "cursor-grabbing" : ""}`}
-                  onPointerDown={(e) => handlePointerDown(index, e)}
-                >
-                  <div className="flex items-center gap-2">
+        <div className="flex-1 overflow-y-auto min-h-0 px-6 py-2">
+          <div
+            ref={listRef}
+            className="flex flex-col gap-1"
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+          >
+            {draft.length === 0 && (
+              <p className="text-sm text-zinc-400">No labels yet.</p>
+            )}
+            {draft.map((label, index) => (
+              <div
+                key={label.id}
+                data-label-row
+                className={`flex items-center justify-between rounded-md px-2 py-1.5 select-none touch-none ${
+                  dragActiveIndex === index
+                    ? "bg-zinc-100 ring-1 ring-zinc-300 cursor-grabbing"
+                    : "hover:bg-zinc-50 cursor-grab"
+                } ${dragging ? "cursor-grabbing" : ""}`}
+                onPointerDown={(e) => handlePointerDown(index, e)}
+              >
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => handleDelete(label.id)}
+                    className={`text-zinc-500 ${dragging ? "" : "hover:text-red-500"}`}
+                    aria-label={`Delete ${label.name}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                  <GripVertical className="h-4 w-4 text-zinc-300 flex-shrink-0" />
+                  <ColorPicker
+                    color={label.color ?? "#e4e4e7"}
+                    onChange={(c) => handleColorChange(label, c)}
+                  >
                     <button
                       type="button"
                       onPointerDown={(e) => e.stopPropagation()}
-                      onClick={() => handleDelete(label.id)}
-                      className={`text-zinc-500 ${dragging ? "" : "hover:text-red-500"}`}
-                      aria-label={`Delete ${label.name}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                    <GripVertical className="h-4 w-4 text-zinc-300 flex-shrink-0" />
-                    <ColorPicker
-                      color={label.color ?? "#e4e4e7"}
-                      onChange={(c) => handleColorChange(label, c)}
-                    >
-                      <button
-                        type="button"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        className="h-4 w-4 rounded-full cursor-pointer ring-1 ring-zinc-200 hover:ring-zinc-400"
-                        style={{ backgroundColor: label.color ?? "#e4e4e7" }}
-                        aria-label={`Change color for ${label.name}`}
-                      />
-                    </ColorPicker>
-                    <span className="text-sm text-zinc-800">{label.name}</span>
-                  </div>
+                      className="h-4 w-4 rounded-full cursor-pointer ring-1 ring-zinc-200 hover:ring-zinc-400"
+                      style={{ backgroundColor: label.color ?? "#e4e4e7" }}
+                      aria-label={`Change color for ${label.name}`}
+                    />
+                  </ColorPicker>
+                  <span className="text-sm text-zinc-800">{label.name}</span>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="p-6 pt-0">
+        <div className="p-6 pt-2">
           <DialogButtons
             onConfirm={handleSave}
             onCancel={handleCancel}
