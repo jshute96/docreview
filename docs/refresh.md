@@ -134,6 +134,21 @@ the toast reads "no updates".
 
 ---
 
+## Transient Error Handling
+
+`syncComments` catches Drive/Docs API errors per-doc so that a single doc's failure doesn't
+crash the entire sync. Permanent errors (404, 403) are treated as deletions. Transient errors
+(429 rate limit, 500 server error, network timeouts) return `transientError: true` instead —
+this also applies when `fetchSuggestions` fails, which skips the suggestion resolution logic
+to avoid incorrectly marking live suggestions as resolved.
+
+After all comment syncs complete, the POST handler checks whether any sync result had
+`transientError: true`. If so, it **skips** `updateDriveTimestamp`, keeping the old
+`lastDriveUpdateTimestamp`. This means the next refresh will use the same `since` window and
+re-attempt the docs whose comment sync failed.
+
+---
+
 ## OAuth Token Refresh
 
 `getDriveClient` builds a `google.auth.OAuth2` client, seeded with the `access_token`,

@@ -413,4 +413,63 @@ describe("POST /api/docs", () => {
       expect.objectContaining({ data: { status: "ACTIVE" } })
     );
   });
+
+  it("skips timestamp update when syncComments has a transient error", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
+    mockGetDriveClient.mockResolvedValue(driveAuth);
+    mockListRecentDocs.mockResolvedValue([
+      {
+        googleDocId: "g1",
+        title: "Doc One",
+        driveUrl: "https://docs.google.com/document/d/g1/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "AUTHOR" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Owner",
+      },
+    ]);
+
+    const dbDoc = { id: "d1", googleDocId: "g1", status: "ACTIVE" };
+    mockDoc.findMany
+      .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
+      .mockResolvedValueOnce([dbDoc]); // activeDocs for comment sync
+    mockDoc.upsert.mockResolvedValue({});
+    // syncComments reports a transient error (e.g. 429 rate limit)
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, transientError: true });
+
+    const res = await POST(postRequest("refresh"));
+    expect(res.status).toBe(200);
+    expect(mockUpdateDriveTimestamp).not.toHaveBeenCalled();
+  });
+
+  it("updates timestamp when all syncs succeed", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
+    mockGetDriveClient.mockResolvedValue(driveAuth);
+    mockListRecentDocs.mockResolvedValue([
+      {
+        googleDocId: "g1",
+        title: "Doc One",
+        driveUrl: "https://docs.google.com/document/d/g1/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "AUTHOR" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Owner",
+      },
+    ]);
+
+    const dbDoc = { id: "d1", googleDocId: "g1", status: "ACTIVE" };
+    mockDoc.findMany
+      .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
+      .mockResolvedValueOnce([dbDoc]); // activeDocs for comment sync
+    mockDoc.upsert.mockResolvedValue({});
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+
+    const res = await POST(postRequest("refresh"));
+    expect(res.status).toBe(200);
+    expect(mockUpdateDriveTimestamp).toHaveBeenCalledTimes(1);
+  });
 });

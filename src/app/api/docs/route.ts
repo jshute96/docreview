@@ -171,8 +171,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Save sync timestamp (captured before the Drive scan to avoid race conditions)
-  await updateDriveTimestamp(userId, syncStart);
+  // Save sync timestamp only if all comment syncs succeeded — if any had transient
+  // errors, keep the old timestamp so the next refresh re-attempts those docs.
+  const anyTransientError = syncResults.some(r => r.transientError);
+  if (!anyTransientError) {
+    await updateDriveTimestamp(userId, syncStart);
+  }
 
   return NextResponse.json({ mode, added, updated, deleted, unarchived, total: driveDocs.length, comments });
 }

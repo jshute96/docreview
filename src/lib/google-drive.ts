@@ -223,17 +223,11 @@ export async function fetchSuggestions(
   const docs = google.docs({ version: "v1", auth });
   const t0 = Date.now();
 
-  let res;
-  try {
-    res = await docs.documents.get({
-      documentId: googleDocId,
-      suggestionsViewMode: "SUGGESTIONS_INLINE",
-      fields: "body(content(paragraph(elements(textRun(suggestedInsertionIds,suggestedDeletionIds)))))",
-    });
-  } catch (err) {
-    console.error(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
-    return [];
-  }
+  const res = await docs.documents.get({
+    documentId: googleDocId,
+    suggestionsViewMode: "SUGGESTIONS_INLINE",
+    fields: "body(content(paragraph(elements(textRun(suggestedInsertionIds,suggestedDeletionIds)))))",
+  });
   const elapsed = Date.now() - t0;
 
   const insertionIds = new Set<string>();

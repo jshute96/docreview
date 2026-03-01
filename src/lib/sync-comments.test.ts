@@ -98,7 +98,7 @@ describe("syncComments error handling", () => {
     const doc = makeDoc();
 
     const result = await suppressingErrors(() => syncComments(doc, driveAuth));
-    expect(result).toEqual({ created: 0, shouldUnarchive: false });
+    expect(result).toEqual({ created: 0, shouldUnarchive: false, transientError: true });
   });
 });
 

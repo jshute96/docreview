@@ -10,7 +10,7 @@ const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 export async function syncComments(
   doc: Doc,
   driveAuth: Awaited<ReturnType<typeof getDriveClient>>
-): Promise<{ created: number; shouldUnarchive: boolean; isDeleted?: boolean }> {
+): Promise<{ created: number; shouldUnarchive: boolean; isDeleted?: boolean; transientError?: boolean }> {
   let comments;
   try {
     comments = await fetchComments(driveAuth, doc.googleDocId);
@@ -21,16 +21,18 @@ export async function syncComments(
       return { created: 0, shouldUnarchive: false, isDeleted: true };
     }
     console.error(`[Comments] failed for ${doc.googleDocId}:`, err);
-    return { created: 0, shouldUnarchive: false };
+    return { created: 0, shouldUnarchive: false, transientError: true };
   }
 
   // All Drive API results are regular comments. Suggestions come exclusively from Docs API.
   let docsSuggestionsForSync: Awaited<ReturnType<typeof fetchSuggestions>> = [];
+  let suggestionFetchFailed = false;
   if (doc.mimeType === DOCS_MIME_TYPE) {
     try {
       docsSuggestionsForSync = await fetchSuggestions(driveAuth, doc.googleDocId);
     } catch (err) {
       console.error(`[Suggestions] fetch failed for ${doc.googleDocId}:`, err);
+      suggestionFetchFailed = true;
     }
   }
 
@@ -106,6 +108,10 @@ export async function syncComments(
   });
 
   if (doc.mimeType !== DOCS_MIME_TYPE) return { created, shouldUnarchive };
+
+  // If the Docs API fetch failed, skip suggestion sync entirely — we can't
+  // tell which suggestions are still live, so resolving absent ones would be wrong.
+  if (suggestionFetchFailed) return { created, shouldUnarchive, transientError: true };
 
   // Docs API sync: ensures ALL pending suggestions are tracked.
   const existingSuggestionIds = new Set(
