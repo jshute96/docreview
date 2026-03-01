@@ -51,6 +51,7 @@ dropped `url = env(...)` support in schema.prisma).
 ### Testing
 - **Coverage**: Write tests for all non-trivial logic.
 - **Mocks**: Mock the Prisma client using the provided `src/lib/__mocks__/prisma.ts`.
+- This project uses **Vitest**.
 
 ### UI Controls
 - **Tooltips**: All buttons, filter controls, and column headings should have a `title` attribute providing a brief description of what the control does. When adding new controls, always include a tooltip. For toggle buttons with two states (e.g., Archive/Unarchive), use a dynamic title that reflects the current action.
@@ -63,3 +64,19 @@ dropped `url = env(...)` support in schema.prisma).
 
 ### Code Logic
 - **Documentation**: Where code has subtle or surprising logic, add comments to explain the "why" and intended behavior.
+
+## Planning vs Implementation
+When the user asks you to implement something, start coding quickly. Do NOT
+spend the entire session planning unless explicitly asked for a plan. If a plan
+is needed, keep it concise (bullet points, not paragraphs) and confirm with the
+user before elaborating further. Default to action over planning.
+
+## Git & Commits
+- When committing, include ALL relevant changed files — check `git status` before committing to avoid missing files like TODO.md, documentation, or new files.
+- Always update the file index (if one exists) when adding or renaming files.
+
+## Code Changes
+- Use the file index to help find relevant files.
+- When changing behavior, read existing design docs to understand previous designs and intentions.  Ask questions if unsure if we should change those requirements.
+- When the user asks for a change, apply it consistently to ALL similar patterns (e.g., if optimizing bulk inserts for comments, also apply to suggestions).
+- Do NOT drop or overwrite existing content in files like README.md — preserve what's there and add to it.
