@@ -72,6 +72,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   useEffect(() => { void fetchContent(); }, [doc.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [notFound, setNotFound] = useState(false);
   const handleCrossTab = useCallback(async (event: CrossTabEvent) => {
     try {
       const refetchDoc = async () => {
@@ -80,21 +81,24 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
           const updated: DocWithComments = await docRes.json();
           setDoc(updated);
           setComments(updated.comments);
+          setSortActive(true);
+        } else if (docRes.status === 404 || docRes.status === 410) {
+          setNotFound(true);
         }
       };
 
       if (event.type === "docs") {
         // Skip if the event is for a different doc
         if (event.docId && event.docId !== initialDoc.id) return;
-        const [, labelsRes] = await Promise.all([
-          refetchDoc(),
+        const [labelsRes] = await Promise.all([
           fetch("/api/labels"),
+          refetchDoc(),
         ]);
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
       } else if (event.type === "labels") {
-        const [, labelsRes] = await Promise.all([
-          refetchDoc(),
+        const [labelsRes] = await Promise.all([
           fetch("/api/labels"),
+          refetchDoc(),
         ]);
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
       } else if (event.type === "comments" && event.docId === initialDoc.id) {
@@ -265,9 +269,26 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     document.title = `Docreview: ${doc.title}`;
   }, [doc.title]);
 
+  if (notFound) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <div className="text-xl font-semibold text-zinc-900">Document not found</div>
+        <p className="text-zinc-500">This document may have been deleted in another tab.</p>
+        <Button variant="outline" asChild>
+          <a href="/docs">Back to document list</a>
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <LabelProvider allLabels={labels} onLabelsChange={setLabels} onLabelDelete={handleLabelDelete}>
     <div className="flex flex-col gap-6">
+      {doc.isDeleted && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-center gap-2">
+          <span className="font-bold">Note:</span> This document was deleted from Google Drive or is no longer accessible.
+        </div>
+      )}
       {/* Header row: title left, buttons right */}
       <div className="flex items-start justify-between">
         <div className="flex items-baseline text-xl font-semibold pt-1">
@@ -283,7 +304,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
           >{doc.title}</a>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <Button variant="outline" size="sm" title="Back to the document list" asChild>
+          <Button variant="outline" size="sm" title="Back to the document list" className="text-zinc-900" asChild>
             <a href="/docs">Doc list</a>
           </Button>
           <Button
@@ -292,6 +313,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
             onClick={handleRefresh}
             disabled={refreshing}
             title="Refresh comments"
+            className="text-zinc-900"
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
@@ -336,14 +358,14 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
             doc={doc as unknown as DocWithLabels}
             onSave={handleEditSave}
           >
-            <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit document labels and notes">
+            <Button variant="outline" size="sm" className="h-6 px-2 text-xs text-zinc-900" title="Edit document labels and notes">
               Edit
             </Button>
           </EditDocDialog>
           <Button
             variant="outline"
             size="sm"
-            className="h-6 px-2 text-xs"
+            className="h-6 px-2 text-xs text-zinc-900"
             title={doc.status === "ACTIVE" ? "Hide this document in document list" : "Unhide this document in document list"}
             onClick={handleArchive}
             disabled={archiving}
