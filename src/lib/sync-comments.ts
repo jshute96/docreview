@@ -133,13 +133,27 @@ export async function syncComments(
     }
   }
 
+  // Delete comment records that Drive no longer returns (deleted in Google Docs).
+  // We don't store comment text, so there's nothing useful left to show.
+  const driveCommentIds = new Set(comments.map((c) => c.id));
+  const deletedIds = [...existingComments.values()]
+    .filter((c) => !driveCommentIds.has(c.googleCommentId))
+    .map((c) => c.id);
+  let deleted = 0;
+  if (deletedIds.length > 0) {
+    const result = await prisma.comment.deleteMany({
+      where: { id: { in: deletedIds } },
+    });
+    deleted = result.count;
+  }
+
   await prisma.doc.update({
     where: { id: doc.id },
     data: { commentsLastSyncedAt: new Date() },
   });
 
   if (doc.mimeType !== DOCS_MIME_TYPE) {
-    console.log(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated${shouldUnarchive ? " → unarchive" : ""}`);
+    console.log(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated, ${deleted} deleted${shouldUnarchive ? " → unarchive" : ""}`);
     return { created, shouldUnarchive };
   }
 
@@ -202,6 +216,6 @@ export async function syncComments(
     }
   }
 
-  console.log(`[Comments] ${doc.googleDocId}: ${comments.length} comments from Drive, ${created} new, ${updatedCount} updated; ${docsSuggestionsForSync.length} suggestions (${suggestionsResolved} resolved)${shouldUnarchive ? " → unarchive" : ""}`);
+  console.log(`[Comments] ${doc.googleDocId}: ${comments.length} comments from Drive, ${created} new, ${updatedCount} updated, ${deleted} deleted; ${docsSuggestionsForSync.length} suggestions (${suggestionsResolved} resolved)${shouldUnarchive ? " → unarchive" : ""}`);
   return { created, shouldUnarchive };
 }

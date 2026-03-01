@@ -9,6 +9,7 @@ vi.mock("@/lib/prisma", () => ({
       create: vi.fn(),
       update: vi.fn(),
       upsert: vi.fn(),
+      deleteMany: vi.fn(),
     },
     doc: {
       update: vi.fn(),
@@ -31,6 +32,7 @@ const mockComment = prisma.comment as unknown as {
   create: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
   upsert: ReturnType<typeof vi.fn>;
+  deleteMany: ReturnType<typeof vi.fn>;
 };
 const mockDoc = prisma.doc as unknown as {
   update: ReturnType<typeof vi.fn>;
@@ -68,6 +70,7 @@ beforeEach(() => {
   mockComment.create.mockResolvedValue({});
   mockComment.update.mockResolvedValue({});
   mockComment.upsert.mockResolvedValue({});
+  mockComment.deleteMany.mockResolvedValue({ count: 0 });
   mockDoc.update.mockResolvedValue({});
   mockFetchSuggestions.mockResolvedValue([]);
 });
@@ -374,7 +377,7 @@ describe("syncComments suggestion resolution", () => {
     expect(mockFetchSuggestions).not.toHaveBeenCalled();
   });
 
-  it("skips AAAB-prefixed IDs during resolution check", async () => {
+  it("skips AAAB-prefixed IDs during suggestion resolution check", async () => {
     const doc = makeDoc();
     mockFetchComments.mockResolvedValue([]);
     mockFetchSuggestions.mockResolvedValue([]);
@@ -389,5 +392,53 @@ describe("syncComments suggestion resolution", () => {
 
     // The AAAB entry should be skipped — no update call
     expect(mockComment.update).not.toHaveBeenCalled();
+  });
+});
+
+// --------------- Deleted comment cleanup ---------------
+
+describe("syncComments deleted comment cleanup", () => {
+  it("deletes DB records for comments no longer returned by Drive", async () => {
+    const doc = makeDoc({ mimeType: "application/vnd.google-apps.spreadsheet" });
+    // DB has two comments, but Drive only returns one of them
+    mockComment.findMany.mockResolvedValueOnce([
+      { id: "cr1", docId: "d1", googleCommentId: "c1", status: "ACTIVE", replyCount: 0 },
+      { id: "cr2", docId: "d1", googleCommentId: "c2", status: "ARCHIVED", replyCount: 3 },
+    ]);
+    mockFetchComments.mockResolvedValue([driveComment({ id: "c1" })]);
+    mockComment.deleteMany.mockResolvedValue({ count: 1 });
+
+    await syncComments(doc, driveAuth);
+
+    expect(mockComment.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ["cr2"] } },
+    });
+  });
+
+  it("does not call deleteMany when all DB comments are still in Drive", async () => {
+    const doc = makeDoc({ mimeType: "application/vnd.google-apps.spreadsheet" });
+    mockComment.findMany.mockResolvedValueOnce([
+      { id: "cr1", docId: "d1", googleCommentId: "c1", status: "ACTIVE", replyCount: 0 },
+    ]);
+    mockFetchComments.mockResolvedValue([driveComment({ id: "c1" })]);
+
+    await syncComments(doc, driveAuth);
+
+    expect(mockComment.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("deletes MUTED comments that were deleted from Drive", async () => {
+    const doc = makeDoc({ mimeType: "application/vnd.google-apps.spreadsheet" });
+    mockComment.findMany.mockResolvedValueOnce([
+      { id: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED", replyCount: 0 },
+    ]);
+    mockFetchComments.mockResolvedValue([]); // Drive returns nothing
+    mockComment.deleteMany.mockResolvedValue({ count: 1 });
+
+    await syncComments(doc, driveAuth);
+
+    expect(mockComment.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ["cr1"] } },
+    });
   });
 });

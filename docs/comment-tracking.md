@@ -51,6 +51,20 @@ Already-resolved threads don't need action, so they start archived.
 
 ---
 
+## Deleted Comments
+
+When a comment is deleted in Google Docs, the Drive API simply stops returning it. Since we
+don't store comment text (it's fetched live from Drive when the user expands a row), there's
+nothing useful left to show — the "Open" link would point at nothing, expanding would 404,
+and only bare metadata (dates, reply count) would remain. So during sync, any COMMENT records
+in the DB whose `googleCommentId` was not returned by Drive are deleted outright, regardless
+of status (ACTIVE, ARCHIVED, or MUTED).
+
+This only runs when `fetchComments` succeeds — if the API call throws, we return early before
+reaching the deletion code, so a transient error can never wipe out all comments.
+
+---
+
 ## Status on Subsequent Syncs
 
 Every sync does a full `comments.list` scan (incremental sync via `startModifiedTime` was
