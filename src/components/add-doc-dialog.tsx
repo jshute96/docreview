@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import type { Label } from "@prisma/client";
@@ -18,6 +18,8 @@ import { LabelPicker } from "@/components/label-picker";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { broadcastChange } from "@/lib/cross-tab";
+import { useAutoResize } from "@/hooks/use-auto-resize";
+import { useLabelSync } from "@/hooks/use-label-sync";
 
 interface AddDocDialogProps {
   allLabels: Label[];
@@ -68,22 +70,8 @@ export function AddDocDialog({
   const abortRef = useRef<AbortController | null>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    setSelectedLabelIds((prev) =>
-      prev.filter((id) => allLabels.some((l) => l.id === id))
-    );
-  }, [allLabels]);
-
-  const autoResize = useCallback(() => {
-    const ta = notesRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    const capped = ta.scrollHeight > 200;
-    ta.style.height = (capped ? 200 : ta.scrollHeight) + "px";
-    ta.style.overflowY = capped ? "auto" : "hidden";
-  }, []);
-
-  useEffect(() => { autoResize(); }, [notes, autoResize]);
+  useLabelSync(allLabels, setSelectedLabelIds);
+  const autoResize = useAutoResize(notesRef, notes);
   useEffect(() => { if (open) requestAnimationFrame(autoResize); }, [open, autoResize]);
 
   function toggleLabel(id: string) {

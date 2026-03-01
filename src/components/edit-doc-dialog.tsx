@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
@@ -17,6 +17,8 @@ import { DialogButtons } from "@/components/dialog-buttons";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { broadcastChange } from "@/lib/cross-tab";
+import { useAutoResize } from "@/hooks/use-auto-resize";
+import { useLabelSync } from "@/hooks/use-label-sync";
 
 interface EditDocDialogProps {
   doc: DocWithLabels;
@@ -44,23 +46,8 @@ export function EditDocDialog({
   const [saving, setSaving] = useState(false);
   const notesRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    setSelectedLabelIds((prev) =>
-      prev.filter((id) => allLabels.some((l) => l.id === id))
-    );
-  }, [allLabels]);
-
-  const autoResize = useCallback(() => {
-    const ta = notesRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    const capped = ta.scrollHeight > 200;
-    ta.style.height = (capped ? 200 : ta.scrollHeight) + "px";
-    ta.style.overflowY = capped ? "auto" : "hidden";
-  }, []);
-
-  useEffect(() => { autoResize(); }, [notes, autoResize]);
-  // Re-measure after dialog mounts (ref not yet attached during state reset)
+  useLabelSync(allLabels, setSelectedLabelIds);
+  const autoResize = useAutoResize(notesRef, notes);
   useEffect(() => { if (open) requestAnimationFrame(autoResize); }, [open, autoResize]);
 
   function toggleLabel(id: string) {
