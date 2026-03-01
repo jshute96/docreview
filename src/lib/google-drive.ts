@@ -337,6 +337,18 @@ export interface CommentThread {
   quotedFileContent?: { mimeType: string; value: string } | null;
 }
 
+/** Extract quotedFileContent from a Drive comment, filtering to displayable MIME types. */
+function extractQuotedFileContent(
+  qfc: { mimeType?: string | null; value?: string | null } | null | undefined,
+  commentId: string | null | undefined,
+): CommentThread["quotedFileContent"] {
+  if (!qfc?.value) return null;
+  const mime = qfc.mimeType ?? "text/plain";
+  if (mime === "text/plain" || mime === "text/html") return { mimeType: mime, value: qfc.value };
+  console.log(`[Drive] Unexpected quotedFileContent mimeType: ${mime} on comment ${commentId}`);
+  return null;
+}
+
 // Full Drive data for a single comment thread: sync metadata (for DB update)
 // plus the displayable thread content. Returned by fetchThreadDetail().
 export interface DriveThreadDetail {
@@ -396,11 +408,7 @@ export async function fetchThreadDetail(
       createdTime: c.createdTime ?? "",
       resolved: c.resolved === true,
       replies: threadReplies,
-      quotedFileContent: c.quotedFileContent?.value
-        ? c.quotedFileContent.mimeType === "text/plain" || c.quotedFileContent.mimeType === "text/html" || !c.quotedFileContent.mimeType
-          ? { mimeType: c.quotedFileContent.mimeType ?? "text/plain", value: c.quotedFileContent.value }
-          : (console.log(`[Drive] Unexpected quotedFileContent mimeType: ${c.quotedFileContent.mimeType} on comment ${c.id}`), null)
-        : null,
+      quotedFileContent: extractQuotedFileContent(c.quotedFileContent, c.id),
     },
   };
 }
@@ -444,11 +452,7 @@ export async function fetchAllThreads(
         createdTime: c.createdTime ?? "",
         resolved: c.resolved === true,
         replies,
-        quotedFileContent: c.quotedFileContent?.value
-          ? c.quotedFileContent.mimeType === "text/plain" || !c.quotedFileContent.mimeType
-            ? { mimeType: "text/plain", value: c.quotedFileContent.value }
-            : (console.log(`[Drive] Unexpected quotedFileContent mimeType: ${c.quotedFileContent.mimeType} on comment ${c.id}`), null)
-          : null,
+        quotedFileContent: extractQuotedFileContent(c.quotedFileContent, c.id),
       });
     }
 

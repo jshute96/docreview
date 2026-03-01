@@ -196,7 +196,10 @@ their own sync logic. They are displayed in the comment table and can be filtere
 
 - **Endpoint**: `GET /drive/v3/files/{fileId}/comments`
 - **`fields` is mandatory** — Drive returns nothing without it.
-- **Fields used**: `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me))`
+- **Fields used for sync**: `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me))`
+- **Fields used for thread display**: adds `content, htmlContent, quotedFileContent(mimeType, value), author(displayName), replies(content, htmlContent, createdTime, author(displayName))`
+- **`htmlContent`**: Read-only field with HTML formatting of comment/reply text (bold, italics, @mention links). The API recommends displaying `htmlContent` over plain `content`.
+- **`quotedFileContent`**: The document text the comment was anchored to at creation time. MIME type is typically `text/html` but in practice the value appears to contain no formatting markup.
 - **`startModifiedTime`**: RFC 3339 timestamp; filters to comments modified after this time.
   Not currently used — incremental comment sync was dropped because this filter silently
   excludes suggestions. Every sync does a full scan instead.

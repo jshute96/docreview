@@ -4,8 +4,29 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { RefreshCw } from "lucide-react";
 import type { CommentThread } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
-import { highlightText } from "@/lib/highlight";
+import { highlightText, highlightHtml } from "@/lib/highlight";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
+
+/** Render comment/reply text with search highlighting, preferring htmlContent. */
+function CommentContent({ htmlContent, content, searchFilter, className }: {
+  htmlContent?: string;
+  content: string;
+  searchFilter: string;
+  className: string;
+}) {
+  if (htmlContent) {
+    const highlighted = highlightHtml(htmlContent, searchFilter);
+    if (highlighted != null)
+      return <p className={`${className} [&_a]:text-blue-600 [&_a]:underline`} dangerouslySetInnerHTML={{ __html: highlighted }} />;
+    // Search matched plain text but not HTML text segments — fall back
+    const plainHighlighted = highlightText(content, searchFilter);
+    if (plainHighlighted !== content)
+      return <p className={className}>{plainHighlighted}</p>;
+    // No match anywhere — show formatted HTML
+    return <p className={`${className} [&_a]:text-blue-600 [&_a]:underline`} dangerouslySetInnerHTML={{ __html: htmlContent }} />;
+  }
+  return content ? <p className={className}>{highlightText(content, searchFilter)}</p> : null;
+}
 
 function formatTime(iso: string): string {
   if (!iso) return "";
@@ -285,13 +306,7 @@ export function CommentThreadPanel({
                 </span>
               )}
             </div>
-            {thread.htmlContent ? (
-              <p className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap [&_a]:text-blue-600 [&_a]:underline" dangerouslySetInnerHTML={{ __html: thread.htmlContent }} />
-            ) : (
-              <p className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap">
-                {highlightText(thread.content, searchFilter ?? "")}
-              </p>
-            )}
+            <CommentContent htmlContent={thread.htmlContent} content={thread.content} searchFilter={searchFilter ?? ""} className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap" />
 
             {thread.replies.map((reply, i) => (
               <div key={i} className="ml-8 mt-2">
@@ -313,15 +328,7 @@ export function CommentThreadPanel({
                     </span>
                   )}
                 </div>
-                {(reply.htmlContent || reply.content) && (
-                  reply.htmlContent ? (
-                    <p className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap [&_a]:text-blue-600 [&_a]:underline" dangerouslySetInnerHTML={{ __html: reply.htmlContent }} />
-                  ) : (
-                    <p className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap">
-                      {highlightText(reply.content, searchFilter ?? "")}
-                    </p>
-                  )
-                )}
+                <CommentContent htmlContent={reply.htmlContent} content={reply.content} searchFilter={searchFilter ?? ""} className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap" />
               </div>
             ))}
           </div>

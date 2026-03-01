@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import React from "react";
-import { highlightText, matchesFilter, createMatcher } from "./highlight";
+import { highlightText, highlightHtml, matchesFilter, createMatcher } from "./highlight";
 
 function rendered(node: React.ReactNode): string {
   if (typeof node === "string") return node;
@@ -91,6 +91,112 @@ describe("highlightText", () => {
   it("still matches non-empty parts of a regex that could be zero-length", () => {
     const result = rendered(highlightText("abbbc", "b*"));
     expect(result).toBe('a<mark class="bg-yellow-200">bbb</mark>c');
+  });
+});
+
+describe("highlightHtml", () => {
+  const mark = (s: string) => `<mark class="bg-yellow-200">${s}</mark>`;
+
+  // --- passthrough cases ---
+
+  it("returns original html when pattern is empty", () => {
+    expect(highlightHtml("<b>hello</b>", "")).toBe("<b>hello</b>");
+  });
+
+  it("returns original html when html is empty", () => {
+    expect(highlightHtml("", "foo")).toBe("");
+  });
+
+  // --- basic highlighting ---
+
+  it("highlights text outside tags", () => {
+    expect(highlightHtml("<b>hello</b> world", "world"))
+      .toBe(`<b>hello</b> ${mark("world")}`);
+  });
+
+  it("highlights text inside tags without breaking tags", () => {
+    expect(highlightHtml('<a href="hello">hello</a>', "hello"))
+      .toBe(`<a href="hello">${mark("hello")}</a>`);
+  });
+
+  it("highlights multiple occurrences", () => {
+    expect(highlightHtml("foo <b>foo</b> foo", "foo"))
+      .toBe(`${mark("foo")} <b>${mark("foo")}</b> ${mark("foo")}`);
+  });
+
+  it("highlights case-insensitively", () => {
+    expect(highlightHtml("<b>Hello</b> HELLO", "hello"))
+      .toBe(`<b>${mark("Hello")}</b> ${mark("HELLO")}`);
+  });
+
+  // --- regex patterns ---
+
+  it("highlights regex patterns", () => {
+    expect(highlightHtml("<b>abc</b> 123", "\\d+"))
+      .toBe(`<b>abc</b> ${mark("123")}`);
+  });
+
+  it("falls back to literal on invalid regex", () => {
+    expect(highlightHtml("<b>hello (world)</b>", "(world"))
+      .toBe(`<b>hello ${mark("(world")})</b>`);
+  });
+
+  // --- cross-tag matches return null ---
+
+  it("returns null when match spans across tags", () => {
+    // "hello" spans across <b>hel</b>lo
+    expect(highlightHtml("<b>hel</b>lo", "hello")).toBeNull();
+  });
+
+  // --- no match returns null ---
+
+  it("returns null when pattern does not match any text", () => {
+    expect(highlightHtml("<b>hello</b> world", "xyz")).toBeNull();
+  });
+
+  // --- does not modify tag attributes ---
+
+  it("does not highlight inside tag attributes", () => {
+    const html = '<a href="http://example.com">click</a>';
+    expect(highlightHtml(html, "http")).toBeNull();
+  });
+
+  it("does not highlight attribute values that match", () => {
+    const html = '<div class="foo">bar</div>';
+    expect(highlightHtml(html, "foo")).toBeNull();
+  });
+
+  // --- zero-length regex ---
+
+  it("skips zero-length regex matches", () => {
+    expect(highlightHtml("<b>abc</b>", "x*")).toBeNull();
+  });
+
+  // --- plain text (no tags) ---
+
+  it("works on plain text without any tags", () => {
+    expect(highlightHtml("hello world", "world"))
+      .toBe(`hello ${mark("world")}`);
+  });
+
+  // --- preserves HTML structure ---
+
+  it("preserves self-closing tags", () => {
+    expect(highlightHtml("hello<br/>world", "world"))
+      .toBe(`hello<br/>${mark("world")}`);
+  });
+
+  it("preserves nested tags", () => {
+    expect(highlightHtml("<p><b>hello</b> world</p>", "world"))
+      .toBe(`<p><b>hello</b> ${mark("world")}</p>`);
+  });
+
+  // --- special characters in text ---
+
+  it("handles HTML entities in text segments", () => {
+    // &amp; is a text node, not a tag
+    expect(highlightHtml("a &amp; b", "&amp;"))
+      .toBe(`a ${mark("&amp;")} b`);
   });
 });
 

@@ -76,6 +76,39 @@ export function highlightText(text: string, pattern: string): React.ReactNode {
 }
 
 /**
+ * Highlight matching portions within an HTML string, only matching text outside
+ * of tags. Returns the HTML string with <mark> tags injected, or the original
+ * HTML unchanged if no matches or on error.
+ */
+export function highlightHtml(html: string, pattern: string): string | null {
+  if (!pattern || !html) return html;
+
+  // Build a regex, or fall back to escaped literal for invalid patterns
+  let re: RegExp;
+  try {
+    re = new RegExp(pattern, "gi");
+  } catch {
+    re = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  }
+
+  // Split HTML into tags (odd indices) and text segments (even indices)
+  const segments = html.split(/(<[^>]*>)/);
+
+  let matched = false;
+  const result = segments.map((seg, i) => {
+    if (i % 2 === 1) return seg; // tag — pass through
+    return seg.replace(re, (m) => {
+      if (m.length === 0) return m;
+      matched = true;
+      return `<mark class="bg-yellow-200">${m}</mark>`;
+    });
+  });
+
+  if (!matched) return null;
+  return result.join("");
+}
+
+/**
  * Check if text matches a pattern. Tries both regex and literal substring —
  * returns true if either matches.
  */
