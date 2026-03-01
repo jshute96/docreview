@@ -189,124 +189,128 @@ export function BulkEditDialog({
           <DialogTitle>Edit {selectedDocs.length} Document{selectedDocs.length === 1 ? "" : "s"}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex min-w-0 flex-col gap-6 p-6 pt-4">
-          <div>
-            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-900">
-              Role
-            </label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={cycleRole}
-                className={`relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  roleState === "set" || roleState === "clear" || (roleState === "as-is" && role.all)
-                    ? ROLE_COLORS.AUTHOR.activeFilter
-                    : ROLE_COLORS.AUTHOR.inactiveFilter
-                }`}
-              >
-                Author
-                <StateIndicator state={roleState} isMixed={role.mixed} />
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <label className="text-xs font-medium uppercase tracking-wide text-zinc-900">
-                Labels
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="flex flex-col gap-6 p-6 pt-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-900">
+                Role
               </label>
-              <ManageLabelsDialog
-                labels={allLabels}
-                onLabelsChange={onLabelsChange}
-                onLabelDelete={onLabelDelete}
-                trigger={
-                  <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs text-zinc-900" title="Edit labels">
-                    Edit
-                  </Button>
-                }
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={cycleRole}
+                  className={`relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    roleState === "set" || roleState === "clear" || (roleState === "as-is" && role.all)
+                      ? ROLE_COLORS.AUTHOR.activeFilter
+                      : ROLE_COLORS.AUTHOR.inactiveFilter
+                  }`}
+                >
+                  Author
+                  <StateIndicator state={roleState} isMixed={role.mixed} />
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <label className="text-xs font-medium uppercase tracking-wide text-zinc-900">
+                  Labels
+                </label>
+                <ManageLabelsDialog
+                  labels={allLabels}
+                  onLabelsChange={onLabelsChange}
+                  onLabelDelete={onLabelDelete}
+                  trigger={
+                    <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs text-zinc-900" title="Edit labels">
+                      Edit
+                    </Button>
+                  }
+                />
+              </div>
+              <div className="flex flex-wrap gap-3 pt-1">
+                {allLabels.map((label) => {
+                  const bg = label.color ?? "#e4e4e7";
+                  const state = labelStates[label.id] ?? "as-is";
+                  const { all: allHave, mixed: isMixed } = checkConsistency(selectedDocs, d => d.labels.some(dl => dl.labelId === label.id));
+                  const active = state === "set" || state === "clear" || (state === "as-is" && allHave);
+
+                  return (
+                    <button
+                      key={label.id}
+                      type="button"
+                      onClick={(e) => cycleLabel(label.id, e)}
+                      className={`relative rounded-full px-2 py-0.5 text-xs font-medium transition-opacity ${
+                        active ? "opacity-100 ring-2 ring-offset-1 ring-zinc-400" : "opacity-40 hover:opacity-70"
+                      }`}
+                      style={{ backgroundColor: bg, color: contrastText(bg) }}
+                    >
+                      {label.name}
+                      <StateIndicator state={state} isMixed={isMixed} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-900">
+                Append Notes
+              </label>
+              <textarea
+                ref={notesRef}
+                value={appendNotes}
+                onChange={(e) => setAppendNotes(e.target.value)}
+                placeholder="Append notes..."
+                rows={1}
+                className={`${TEXTAREA_CLASSES} max-h-[150px] w-full`}
               />
             </div>
-            <div className="flex flex-wrap gap-3 pt-1">
-              {allLabels.map((label) => {
-                const bg = label.color ?? "#e4e4e7";
-                const state = labelStates[label.id] ?? "as-is";
-                const { all: allHave, mixed: isMixed } = checkConsistency(selectedDocs, d => d.labels.some(dl => dl.labelId === label.id));
-                const active = state === "set" || state === "clear" || (state === "as-is" && allHave);
 
-                return (
-                  <button
-                    key={label.id}
-                    type="button"
-                    onClick={(e) => cycleLabel(label.id, e)}
-                    className={`relative rounded-full px-2 py-0.5 text-xs font-medium transition-opacity ${
-                      active ? "opacity-100 ring-2 ring-offset-1 ring-zinc-400" : "opacity-40 hover:opacity-70"
-                    }`}
-                    style={{ backgroundColor: bg, color: contrastText(bg) }}
-                  >
-                    {label.name}
-                    <StateIndicator state={state} isMixed={isMixed} />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-900">
-              Append Notes
-            </label>
-            <textarea
-              ref={notesRef}
-              value={appendNotes}
-              onChange={(e) => setAppendNotes(e.target.value)}
-              placeholder="Append notes..."
-              rows={1}
-              className={`${TEXTAREA_CLASSES} max-h-[150px] w-full`}
-            />
-          </div>
-
-          <div className="overflow-hidden rounded-md border border-zinc-200 bg-zinc-50/50">
             <div 
-              className="max-w-full overflow-auto"
+              className="overflow-hidden rounded-md border border-zinc-200 bg-zinc-50/50 flex flex-col"
               style={{ 
-                maxHeight: "calc(15 * 1.5rem)",
-                height: selectedDocs.length < 15 ? "auto" : "calc(15 * 1.5rem)"
+                maxHeight: `clamp(calc(5 * 1.5rem + 2px), 30vh, calc(15 * 1.5rem + 2px))`,
+                minHeight: selectedDocs.length > 0 ? `calc(${Math.min(selectedDocs.length, 5)} * 1.5rem + 2px)` : "auto",
               }}
             >
-              {selectedDocs.length === 0 ? (
-                <div className="py-4 text-center text-xs italic text-zinc-400">No documents selected</div>
-              ) : (
-                <div className="flex flex-col">
-                  {selectedDocs.map((doc) => (
-                    <div key={doc.id} className="flex h-6 min-w-max items-center gap-2 px-2 transition-colors hover:bg-zinc-100">
-                      <button
-                        onClick={() => handleRemoveDoc(doc.id)}
-                        className="rounded p-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-600"
-                        title="Remove from list"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                      <a 
-                        href={`/comments/${doc.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Open document comments page"
-                        className={`flex items-center gap-2 transition-colors hover:text-blue-600 hover:underline ${
-                          doc.isDeleted ? "text-zinc-400 line-through" : ""
-                        }`}
-                      >
-                        <DocTypeIcon mimeType={doc.mimeType} className={`h-3 w-3 flex-shrink-0 ${doc.isDeleted ? "text-zinc-300" : ""}`} />
-                        <span className="whitespace-nowrap pr-4 text-xs font-medium">
-                          {doc.title}
-                        </span>
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="max-w-full overflow-auto">
+                {selectedDocs.length === 0 ? (
+                  <div className="py-4 text-center text-xs italic text-zinc-400">No documents selected</div>
+                ) : (
+                  <div className="flex flex-col">
+                    {selectedDocs.map((doc) => (
+                      <div key={doc.id} className="flex h-6 min-w-max items-center gap-2 px-2 transition-colors hover:bg-zinc-100">
+                        <button
+                          onClick={() => handleRemoveDoc(doc.id)}
+                          className="rounded p-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-600"
+                          title="Remove from list"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                        <a 
+                          href={`/comments/${doc.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open document comments page"
+                          className={`flex items-center gap-2 transition-colors hover:text-blue-600 hover:underline ${
+                            doc.isDeleted ? "text-zinc-400 line-through" : ""
+                          }`}
+                        >
+                          <DocTypeIcon mimeType={doc.mimeType} className={`h-3 w-3 flex-shrink-0 ${doc.isDeleted ? "text-zinc-300" : ""}`} />
+                          <span className="whitespace-nowrap pr-4 text-xs font-medium">
+                            {doc.title}
+                          </span>
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
+        </div>
 
+        <div className="p-6 pt-0">
           <DialogButtons
             onConfirm={handleSave}
             onCancel={() => setOpen(false)}

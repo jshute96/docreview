@@ -58,7 +58,7 @@ const DialogContent = React.forwardRef<
               }
             }}
             className={cn(
-              "relative grid w-full max-w-lg gap-0 border bg-background p-0 shadow-lg pointer-events-auto sm:rounded-lg overflow-hidden",
+              "relative flex flex-col w-full max-w-lg gap-0 border bg-background p-0 shadow-lg pointer-events-auto sm:rounded-lg overflow-hidden max-h-[95vh]",
               // Disable transitions while dragging to prevent lag
               !isDragging && "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
               className

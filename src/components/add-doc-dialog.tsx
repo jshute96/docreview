@@ -219,58 +219,62 @@ export function AddDocDialog({
           <DialogTitle>Add Document</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4 p-6 pt-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <input
-                type="url"
-                placeholder="https://docs.google.com/..."
-                value={url}
-                onChange={(e) => handleUrlChange(e.target.value)}
-                className="flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
-              />
-              <ValidationIcon />
-            </div>
-            {validationError && (
-              <p className="mt-1 text-xs text-red-500">{validationError}</p>
-            )}
-            {validTitle && (
-              <div className="mt-1.5 flex items-center justify-between gap-2">
-                <p className="flex items-center gap-1.5 text-sm font-medium text-zinc-900 line-clamp-1" title={validTitle}>
-                  <DocTypeIcon mimeType={validMimeType} className="h-4 w-4 flex-shrink-0" />
-                  {validTitle}
-                </p>
-                {existingDocId && (
-                  <Button variant="outline" size="sm" className="h-6 px-2 text-xs flex-shrink-0 text-zinc-900" title="Open document comments page" asChild>
-                    <a href={`/comments/${existingDocId}`}>Open</a>
-                  </Button>
-                )}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="flex flex-col gap-4 p-6 pt-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="url"
+                  placeholder="https://docs.google.com/..."
+                  value={url}
+                  onChange={(e) => handleUrlChange(e.target.value)}
+                  className="flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                />
+                <ValidationIcon />
               </div>
-            )}
-          </div>
+              {validationError && (
+                <p className="mt-1 text-xs text-red-500">{validationError}</p>
+              )}
+              {validTitle && (
+                <div className="mt-1.5 flex items-center justify-between gap-2">
+                  <p className="flex items-center gap-1.5 text-sm font-medium text-zinc-900 line-clamp-1" title={validTitle}>
+                    <DocTypeIcon mimeType={validMimeType} className="h-4 w-4 flex-shrink-0" />
+                    {validTitle}
+                  </p>
+                  {existingDocId && (
+                    <Button variant="outline" size="sm" className="h-6 px-2 text-xs flex-shrink-0 text-zinc-900" title="Open document comments page" asChild>
+                      <a href={`/comments/${existingDocId}`}>Open</a>
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
 
-          <LabelPicker
-            allLabels={allLabels}
-            selectedLabelIds={selectedLabelIds}
-            onToggle={toggleLabel}
-            onLabelsChange={onLabelsChange}
-            onLabelDelete={onLabelDelete}
-          />
-
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-900 uppercase tracking-wide">
-              Notes
-            </label>
-            <textarea
-              ref={notesRef}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add notes…"
-              rows={1}
-              className={`${TEXTAREA_CLASSES} w-full max-h-[200px]`}
+            <LabelPicker
+              allLabels={allLabels}
+              selectedLabelIds={selectedLabelIds}
+              onToggle={toggleLabel}
+              onLabelsChange={onLabelsChange}
+              onLabelDelete={onLabelDelete}
             />
-          </div>
 
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-zinc-900 uppercase tracking-wide">
+                Notes
+              </label>
+              <textarea
+                ref={notesRef}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Add notes…"
+                rows={1}
+                className={`${TEXTAREA_CLASSES} w-full max-h-[200px]`}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 pt-0">
           <DialogButtons
             onConfirm={handleAdd}
             onCancel={() => setOpen(false)}
