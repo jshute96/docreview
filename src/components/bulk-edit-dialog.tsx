@@ -169,11 +169,17 @@ export function BulkEditDialog({
         }),
       });
       if (!res.ok) throw new Error("Bulk update failed");
-      const updatedDocs: DocWithLabels[] = await res.json();
+      const { docs: updatedDocs, skipped } = (await res.json()) as {
+        docs: DocWithLabels[];
+        skipped: number;
+      };
       onSave(updatedDocs);
       setOpen(false);
       broadcastChange({ type: "docs" });
       toast.success(`Updated ${updatedDocs.length} documents`);
+      if (skipped > 0) {
+        toast.warning(`${skipped} document${skipped === 1 ? " was" : "s were"} not found`);
+      }
     } catch {
       toast.error("Failed to save changes");
     } finally {
@@ -286,6 +292,7 @@ export function BulkEditDialog({
                           onClick={() => handleRemoveDoc(doc.id)}
                           className="rounded p-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-600"
                           title="Remove from list"
+                          aria-label={`Remove ${doc.title}`}
                         >
                           <X className="h-3 w-3" />
                         </button>

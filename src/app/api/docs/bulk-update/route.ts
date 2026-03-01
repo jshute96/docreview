@@ -3,7 +3,10 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { DocRole, Prisma } from "@prisma/client";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
-import { BulkEditState } from "@/lib/bulk-edit";
+import type { BulkEditState } from "@/lib/bulk-edit";
+
+const VALID_ROLES: string[] = Object.values(DocRole);
+const VALID_BULK_STATES = new Set(["as-is", "set", "clear"]);
 
 export async function PATCH(req: NextRequest) {
   const session = await getValidSession();
@@ -20,67 +23,95 @@ export async function PATCH(req: NextRequest) {
   }
 
   const { docIds, role, labelUpdates, appendNotes } = body as {
-    docIds: string[];
-    role: BulkEditState;
-    labelUpdates: Record<string, BulkEditState>;
-    appendNotes?: string;
+    docIds: unknown;
+    role: unknown;
+    labelUpdates: unknown;
+    appendNotes?: unknown;
   };
 
+  // Runtime validation
   if (!Array.isArray(docIds) || docIds.length === 0) {
     return NextResponse.json({ error: "No docIds provided" }, { status: 400 });
   }
+  if (docIds.length > 500) {
+    return NextResponse.json({ error: "Too many documents (max 500)" }, { status: 400 });
+  }
+  if (!docIds.every((id) => typeof id === "string")) {
+    return NextResponse.json({ error: "Invalid docIds" }, { status: 400 });
+  }
+  if (typeof role !== "string" || !VALID_BULK_STATES.has(role)) {
+    return NextResponse.json({ error: "Invalid role state" }, { status: 400 });
+  }
+  if (
+    typeof labelUpdates !== "object" ||
+    labelUpdates === null ||
+    Array.isArray(labelUpdates) ||
+    !Object.values(labelUpdates as Record<string, unknown>).every(
+      (v) => typeof v === "string" && VALID_BULK_STATES.has(v)
+    )
+  ) {
+    return NextResponse.json({ error: "Invalid labelUpdates" }, { status: 400 });
+  }
+  if (appendNotes !== undefined && typeof appendNotes !== "string") {
+    return NextResponse.json({ error: "Invalid appendNotes" }, { status: 400 });
+  }
 
-  const updatedDocs = await Promise.all(
-    docIds.map(async (id) => {
-      const doc = await prisma.doc.findUnique({
-        where: { id, userId },
-        include: { 
-          ...docWithCountsInclude,
-        },
-      });
-      if (!doc) return null;
+  const typedRole = role as BulkEditState;
+  const typedLabelUpdates = labelUpdates as Record<string, BulkEditState>;
+  const typedAppendNotes = appendNotes as string | undefined;
 
-      const data: Prisma.DocUpdateInput = {};
-      if (role === "set") data.role = DocRole.AUTHOR;
-      else if (role === "clear") data.role = DocRole.REVIEWER;
+  // Batch read: fetch all docs at once instead of N+1
+  const docs = await prisma.doc.findMany({
+    where: { id: { in: docIds as string[] }, userId },
+    include: docWithCountsInclude,
+  });
+  const docMap = new Map(docs.map((d) => [d.id, d]));
+  const skipped = (docIds as string[]).length - docs.length;
 
-      if (appendNotes && appendNotes.trim().length > 0) {
-        const currentNotes = doc.notes ?? "";
-        let newNotes = currentNotes;
-        if (newNotes.length > 0 && !newNotes.endsWith("\n")) {
-          newNotes += "\n";
-        }
-        newNotes += appendNotes;
-        data.notes = newNotes;
+  // Build all update operations
+  const updates: Prisma.PrismaPromise<unknown>[] = [];
+  const updateOrder: string[] = [];
+
+  for (const doc of docs) {
+    const data: Prisma.DocUpdateInput = {};
+    if (typedRole === "set") data.role = DocRole.AUTHOR;
+    else if (typedRole === "clear") data.role = DocRole.REVIEWER;
+
+    if (typedAppendNotes && typedAppendNotes.trim().length > 0) {
+      const currentNotes = doc.notes ?? "";
+      let newNotes = currentNotes;
+      if (newNotes.length > 0 && !newNotes.endsWith("\n")) {
+        newNotes += "\n";
       }
+      newNotes += typedAppendNotes;
+      data.notes = newNotes;
+    }
 
-      const currentLabelIds = new Set(doc.labels.map((l) => l.labelId));
-      const labelsToCreate: { labelId: string }[] = [];
-      const labelsToDelete: string[] = [];
+    const currentLabelIds = new Set(doc.labels.map((l) => l.labelId));
+    const labelsToCreate: { labelId: string }[] = [];
+    const labelsToDelete: string[] = [];
 
-      for (const [labelId, state] of Object.entries(labelUpdates)) {
-        if (state === "set" && !currentLabelIds.has(labelId)) {
-          labelsToCreate.push({ labelId });
-        } else if (state === "clear" && currentLabelIds.has(labelId)) {
-          labelsToDelete.push(labelId);
-        }
+    for (const [labelId, state] of Object.entries(typedLabelUpdates)) {
+      if (state === "set" && !currentLabelIds.has(labelId)) {
+        labelsToCreate.push({ labelId });
+      } else if (state === "clear" && currentLabelIds.has(labelId)) {
+        labelsToDelete.push(labelId);
       }
+    }
 
-      // No-op protection: Check if absolutely nothing has changed for this document
-      // (role, notes, and labels all match the current state). If it's a no-op, 
-      // we skip the database 'update' call entirely to avoid unnecessary transactions,
-      // row locks, and WAL overhead.
-      if (
-        Object.keys(data).length === 0 &&
-        labelsToCreate.length === 0 &&
-        labelsToDelete.length === 0
-      ) {
-        // Return 'doc' directly because we included counts in the initial fetch.
-        return doc;
-      }
+    // No-op protection: skip if nothing changed
+    if (
+      Object.keys(data).length === 0 &&
+      labelsToCreate.length === 0 &&
+      labelsToDelete.length === 0
+    ) {
+      continue;
+    }
 
-      return prisma.doc.update({
-        where: { id },
+    updateOrder.push(doc.id);
+    updates.push(
+      prisma.doc.update({
+        where: { id: doc.id },
         data: {
           ...data,
           labels: {
@@ -91,11 +122,26 @@ export async function PATCH(req: NextRequest) {
           },
         },
         include: docWithCountsInclude,
-      });
-    })
-  );
+      })
+    );
+  }
 
-  return NextResponse.json(
-    updatedDocs.filter((d) => d !== null).map(withCommentCounts)
-  );
+  // Execute all writes in a single transaction
+  const results = updates.length > 0
+    ? await prisma.$transaction(updates)
+    : [];
+
+  // Build result map from updated docs
+  const updatedMap = new Map<string, unknown>();
+  for (let i = 0; i < updateOrder.length; i++) {
+    updatedMap.set(updateOrder[i], results[i]);
+  }
+
+  // Return all docs (updated ones from transaction, unchanged ones from initial read)
+  const allDocs = docs.map((d) => {
+    const updated = updatedMap.get(d.id);
+    return withCommentCounts(updated ?? d);
+  });
+
+  return NextResponse.json({ docs: allDocs, skipped });
 }
