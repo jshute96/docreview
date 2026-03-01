@@ -68,16 +68,10 @@ async function run() {
 
   // 2. Check if Database Migrations are in sync
   try {
-    // Get local migrations
-    const migrationsDir = path.join(rootDir, 'prisma', 'migrations');
-    const localMigrations = fs.readdirSync(migrationsDir)
-      .filter(f => fs.statSync(path.join(migrationsDir, f)).isDirectory())
-      .sort();
-
     // Use prisma migrate status for better env var handling and portability
     const statusRes = execSync(
       'npx prisma migrate status',
-      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }
+      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
     );
     
     if (statusRes.includes('Database schema is up to date')) {
@@ -112,4 +106,7 @@ async function run() {
   }
 }
 
-run();
+run().catch((err) => {
+  logError(err.message ?? 'Unexpected error');
+  process.exit(1);
+});

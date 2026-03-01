@@ -36,6 +36,7 @@ const DialogContent = React.forwardRef<
 >(({ className, children, hideClose, ...props }, ref) => {
   const nodeRef = React.useRef(null)
   const [isDragging, setIsDragging] = React.useState(false)
+  const [position, setPosition] = React.useState({ x: 0, y: 0 })
 
   return (
     <DialogPortal>
@@ -45,7 +46,9 @@ const DialogContent = React.forwardRef<
           handle=".draggable-handle"
           cancel="a, button"
           nodeRef={nodeRef}
+          position={position}
           onStart={() => setIsDragging(true)}
+          onDrag={(_e, data) => setPosition({ x: data.x, y: data.y })}
           onStop={() => setIsDragging(false)}
         >
           <DialogPrimitive.Content
@@ -86,7 +89,7 @@ const DialogHeader = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "draggable-handle cursor-grab active:cursor-grabbing pt-6 px-6 pb-0 flex flex-col space-y-1.5 text-center sm:text-left select-none",
+      "draggable-handle cursor-grab active:cursor-grabbing pt-6 px-6 pb-0 flex flex-col space-y-1.5 text-center sm:text-left",
       className
     )}
     {...props}
