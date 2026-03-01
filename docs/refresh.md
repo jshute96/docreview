@@ -206,6 +206,12 @@ were dropped entirely.
 are compared against the existing record; if nothing changed, the update is skipped. This
 makes the "N updated" log count reflect actual writes.
 
+**Bulk inserts:** New comments are collected during the loop and inserted with a single
+`createMany` call rather than individual `create` calls. This collapses N `INSERT` statements
+into one `INSERT ... VALUES (...)`, reducing round-trips and Postgres parse/plan/execute
+overhead. Most beneficial on initial doc load when many comments exist; after that, new
+comments typically trickle in one or two at a time.
+
 **Fields fetched per comment:** `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me))`
 
 **Fields stored per comment:** `driveCreatedAt`, `driveModifiedAt`, `replyCount` (= number
@@ -221,8 +227,10 @@ return early before reaching the deletion code.
 
 **Suggestions via Docs API:** For Google Docs files, a second pass calls `documents.get`
 via the Docs API to capture all pending suggestions. These are stored as `type: "SUGGESTION"`
-with `suggest.xxx` IDs. Any previously-active suggestion no longer returned by the Docs API
-is marked resolved — this runs even when the Docs API returns zero suggestions.
+with `suggest.xxx` IDs. New suggestions are bulk-inserted with `createMany` (like comments).
+Existing suggestions are only updated if `suggestionType` changed (which is rare), and
+skipped entirely otherwise — no write at all. Any previously-active suggestion no longer
+returned by the Docs API is marked resolved.
 
 For full details on comment status logic (ACTIVE / ARCHIVED / MUTED, who-resolved-it
 detection, `isThreadAuthor` / `iParticipated`), see [`comment-tracking.md`](./comment-tracking.md).
@@ -293,12 +301,12 @@ Refresh:
 [Sync] Syncing comments for 3 docs (changed docs only)
 [Drive] comments.list abc123 (since all) → 12 comments (87ms)
 [Docs] documents.get abc123 → 2 suggestions (134ms)
-[Comments] abc123: 12 comments from Drive, 1 new, 3 updated, 0 deleted; 2 suggestions (0 resolved)
+[Comments] abc123: 12 comments from Drive, 1 new, 3 updated, 0 deleted; 2 suggestions (0 new, 0 updated, 0 resolved)
 [Drive] comments.list def456 (since all) → 3 comments (45ms)
 [Comments] def456: 3 from Drive, 0 new, 0 updated, 0 deleted
 [Drive] comments.list ghi789 (since all) → 8 comments (62ms)
 [Docs] documents.get ghi789 → 0 suggestions (98ms)
-[Comments] ghi789: 8 comments from Drive, 2 new, 1 updated, 1 deleted; 0 suggestions (1 resolved) → unarchive
+[Comments] ghi789: 8 comments from Drive, 2 new, 1 updated, 1 deleted; 0 suggestions (0 new, 0 updated, 1 resolved) → unarchive
 [Sync] Saving changes token for future refreshes
 [Sync] refresh complete in 892ms: 0 added, 3 updated, 1 deleted, 1 unarchived, 3 comments synced
 ```

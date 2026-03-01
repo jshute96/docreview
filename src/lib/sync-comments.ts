@@ -42,7 +42,7 @@ export async function syncComments(
     }
   }
 
-  let created = 0;
+  const toCreate: Parameters<typeof prisma.comment.createMany>[0]["data"] = [];
   let updatedCount = 0;
   let shouldUnarchive = false;
 
@@ -64,21 +64,18 @@ export async function syncComments(
 
     if (!existing) {
       const status = c.resolved ? "ARCHIVED" : "ACTIVE";
-      await prisma.comment.create({
-        data: {
-          docId: doc.id,
-          googleCommentId: c.id,
-          type: "COMMENT",
-          resolved: c.resolved,
-          isThreadAuthor: c.isThreadAuthor,
-          iParticipated: c.iParticipated,
-          status,
-          driveCreatedAt: c.driveCreatedAt,
-          driveModifiedAt: c.driveModifiedAt,
-          replyCount: c.replyCount,
-        },
+      toCreate.push({
+        docId: doc.id,
+        googleCommentId: c.id,
+        type: "COMMENT",
+        resolved: c.resolved,
+        isThreadAuthor: c.isThreadAuthor,
+        iParticipated: c.iParticipated,
+        status,
+        driveCreatedAt: c.driveCreatedAt,
+        driveModifiedAt: c.driveModifiedAt,
+        replyCount: c.replyCount,
       });
-      created++;
       if (isInteresting) shouldUnarchive = true;
     } else {
       if (existing.status === "MUTED") {
@@ -133,6 +130,11 @@ export async function syncComments(
     }
   }
 
+  if (toCreate.length > 0) {
+    await prisma.comment.createMany({ data: toCreate });
+  }
+  const created = toCreate.length;
+
   // Delete comment records that Drive no longer returns (deleted in Google Docs).
   // We don't store comment text, so there's nothing useful left to show.
   const driveCommentIds = new Set(comments.map((c) => c.id));
@@ -165,19 +167,21 @@ export async function syncComments(
   }
 
   // Docs API sync: ensures ALL pending suggestions are tracked.
-  const existingSuggestionIds = new Set(
+  const existingSuggestions = new Map(
     (await prisma.comment.findMany({
       where: { docId: doc.id, type: "SUGGESTION" },
-      select: { googleCommentId: true },
-    })).map((r) => r.googleCommentId)
+      select: { id: true, googleCommentId: true, suggestionType: true },
+    })).map((r) => [r.googleCommentId, r])
   );
 
   const liveDocsIds = new Set<string>();
+  const suggestionsToCreate: typeof toCreate = [];
+  let suggestionsUpdated = 0;
   for (const s of docsSuggestionsForSync) {
     liveDocsIds.add(s.id);
-    await prisma.comment.upsert({
-      where: { docId_googleCommentId: { docId: doc.id, googleCommentId: s.id } },
-      create: {
+    const existing = existingSuggestions.get(s.id);
+    if (!existing) {
+      suggestionsToCreate.push({
         docId: doc.id,
         googleCommentId: s.id,
         type: "SUGGESTION",
@@ -185,17 +189,20 @@ export async function syncComments(
         resolved: false,
         status: "ACTIVE",
         driveCreatedAt: doc.lastModifiedInDrive ?? new Date(),
-      },
-      update: {
-        suggestionType: s.suggestionType,
-      },
-    });
-    if (!existingSuggestionIds.has(s.id)) {
-      created++;
+      });
       // New suggestion: unarchive if I'm the doc author (suggestions have
       // isThreadAuthor=false and iParticipated=false)
       if (doc.role === "AUTHOR") shouldUnarchive = true;
+    } else if (existing.suggestionType !== s.suggestionType) {
+      await prisma.comment.update({
+        where: { id: existing.id },
+        data: { suggestionType: s.suggestionType },
+      });
+      suggestionsUpdated++;
     }
+  }
+  if (suggestionsToCreate.length > 0) {
+    await prisma.comment.createMany({ data: suggestionsToCreate });
   }
 
   // Mark suggest.xxx suggestions no longer in the document as resolved.
@@ -216,6 +223,7 @@ export async function syncComments(
     }
   }
 
-  console.log(`[Comments] ${doc.googleDocId}: ${comments.length} comments from Drive, ${created} new, ${updatedCount} updated, ${deleted} deleted; ${docsSuggestionsForSync.length} suggestions (${suggestionsResolved} resolved)${shouldUnarchive ? " → unarchive" : ""}`);
-  return { created, shouldUnarchive };
+  const totalCreated = created + suggestionsToCreate.length;
+  console.log(`[Comments] ${doc.googleDocId}: ${comments.length} comments from Drive, ${totalCreated} new, ${updatedCount} updated, ${deleted} deleted; ${docsSuggestionsForSync.length} suggestions (${suggestionsToCreate.length} new, ${suggestionsUpdated} updated, ${suggestionsResolved} resolved)${shouldUnarchive ? " → unarchive" : ""}`);
+  return { created: totalCreated, shouldUnarchive };
 }

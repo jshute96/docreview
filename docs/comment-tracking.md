@@ -69,7 +69,9 @@ reaching the deletion code, so a transient error can never wipe out all comments
 
 Every sync does a full `comments.list` scan (incremental sync via `startModifiedTime` was
 dropped because it silently excludes suggestions). All existing comments for the doc are
-batch-fetched from the database in a single query and compared against Drive results.
+batch-fetched from the database in a single query and compared against Drive results. New
+comments are collected and inserted with a single `createMany` call; updates are applied
+individually (with no-op detection to skip unchanged records).
 
 **No-op detection:** Before writing an update, each comment's Drive-side fields are compared
 against the existing record. If nothing changed, the update is skipped entirely. This avoids

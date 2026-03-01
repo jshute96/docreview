@@ -6,9 +6,8 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     comment: {
       findMany: vi.fn(),
-      create: vi.fn(),
+      createMany: vi.fn(),
       update: vi.fn(),
-      upsert: vi.fn(),
       deleteMany: vi.fn(),
     },
     doc: {
@@ -29,9 +28,8 @@ import type { Doc } from "@prisma/client";
 
 const mockComment = prisma.comment as unknown as {
   findMany: ReturnType<typeof vi.fn>;
-  create: ReturnType<typeof vi.fn>;
+  createMany: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
-  upsert: ReturnType<typeof vi.fn>;
   deleteMany: ReturnType<typeof vi.fn>;
 };
 const mockDoc = prisma.doc as unknown as {
@@ -67,9 +65,8 @@ beforeEach(() => {
   vi.resetAllMocks();
   // Default: no existing comments, no suggestions
   mockComment.findMany.mockResolvedValue([]);
-  mockComment.create.mockResolvedValue({});
+  mockComment.createMany.mockResolvedValue({ count: 0 });
   mockComment.update.mockResolvedValue({});
-  mockComment.upsert.mockResolvedValue({});
   mockComment.deleteMany.mockResolvedValue({ count: 0 });
   mockDoc.update.mockResolvedValue({});
   mockFetchSuggestions.mockResolvedValue([]);
@@ -256,7 +253,7 @@ describe("syncComments isInteresting logic", () => {
     ]);
     mockComment.findMany
       .mockResolvedValueOnce([])  // batch fetch comments
-      .mockResolvedValueOnce([{ googleCommentId: "suggest.abc" }]);
+      .mockResolvedValueOnce([{ id: "cr1", googleCommentId: "suggest.abc", suggestionType: "DELETE" }]);
 
     const { shouldUnarchive, created } = await syncComments(doc, driveAuth);
     expect(created).toBe(0);
@@ -272,8 +269,8 @@ describe("syncComments comment status", () => {
 
     await syncComments(makeDoc(), driveAuth);
 
-    const createCall = mockComment.create.mock.calls[0][0];
-    expect(createCall.data.status).toBe("ACTIVE");
+    const createCall = mockComment.createMany.mock.calls[0][0];
+    expect(createCall.data[0].status).toBe("ACTIVE");
   });
 
   it("creates new resolved comment as ARCHIVED", async () => {
@@ -281,8 +278,8 @@ describe("syncComments comment status", () => {
 
     await syncComments(makeDoc(), driveAuth);
 
-    const createCall = mockComment.create.mock.calls[0][0];
-    expect(createCall.data.status).toBe("ARCHIVED");
+    const createCall = mockComment.createMany.mock.calls[0][0];
+    expect(createCall.data[0].status).toBe("ARCHIVED");
   });
 
   it("archives existing comment when I resolved it", async () => {
@@ -337,9 +334,9 @@ describe("syncComments suggestion resolution", () => {
     mockFetchComments.mockResolvedValue([]);
     mockFetchSuggestions.mockResolvedValue([]); // suggestion disappeared
     mockComment.findMany
-      .mockResolvedValueOnce([])                                   // batch fetch comments
-      .mockResolvedValueOnce([{ googleCommentId: "suggest.abc" }]) // existingSuggestionIds
-      .mockResolvedValueOnce([{                                    // activeSuggestions
+      .mockResolvedValueOnce([])                                                            // batch fetch comments
+      .mockResolvedValueOnce([{ id: "cr1", googleCommentId: "suggest.abc", suggestionType: "EDIT" }]) // existingSuggestions
+      .mockResolvedValueOnce([{                                                             // activeSuggestions
         id: "cr1", googleCommentId: "suggest.abc", resolved: false, status: "ACTIVE",
       }]);
 
@@ -355,8 +352,8 @@ describe("syncComments suggestion resolution", () => {
     mockFetchComments.mockResolvedValue([]);
     mockFetchSuggestions.mockResolvedValue([]);
     mockComment.findMany
-      .mockResolvedValueOnce([])                                   // batch fetch comments
-      .mockResolvedValueOnce([{ googleCommentId: "suggest.abc" }])
+      .mockResolvedValueOnce([])                                                            // batch fetch comments
+      .mockResolvedValueOnce([{ id: "cr1", googleCommentId: "suggest.abc", suggestionType: "EDIT" }])
       .mockResolvedValueOnce([{
         id: "cr1", googleCommentId: "suggest.abc", resolved: false, status: "MUTED",
       }]);
@@ -383,7 +380,7 @@ describe("syncComments suggestion resolution", () => {
     mockFetchSuggestions.mockResolvedValue([]);
     mockComment.findMany
       .mockResolvedValueOnce([])  // batch fetch comments
-      .mockResolvedValueOnce([])  // existingSuggestionIds
+      .mockResolvedValueOnce([])  // existingSuggestions
       .mockResolvedValueOnce([{
         id: "cr1", googleCommentId: "AAAB0xyz", resolved: false, status: "ACTIVE",
       }]);
