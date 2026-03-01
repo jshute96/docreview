@@ -9,8 +9,39 @@ export const SUPPORTED_MIME_TYPES = new Set([
 ]);
 
 export function parseGoogleDocId(url: string): string | null {
-  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  return match?.[1] ?? null;
+  // /d/ID pattern (docs, sheets, slides, drive file links)
+  const dMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (dMatch) return dMatch[1];
+
+  // ?id=ID pattern (drive.google.com/open?id=...)
+  try {
+    const id = new URL(url).searchParams.get("id");
+    if (id && /^[a-zA-Z0-9_-]+$/.test(id)) return id;
+  } catch { /* not a valid URL */ }
+
+  return null;
+}
+
+/** Follow HTTP redirects (HEAD) and return the final URL. */
+export async function resolveRedirects(url: string): Promise<string> {
+  // Prepend http:// for schemeless URLs like "go/abc"
+  if (!/^https?:\/\//i.test(url)) {
+    if (/^[a-z0-9][\w.-]*\//i.test(url)) {
+      url = `http://${url}`;
+    } else {
+      return url;
+    }
+  }
+  try {
+    const res = await fetch(url, {
+      method: "HEAD",
+      redirect: "follow",
+      signal: AbortSignal.timeout(5000),
+    });
+    return res.url;
+  } catch {
+    return url;
+  }
 }
 
 export async function getDriveClient(userId: string) {

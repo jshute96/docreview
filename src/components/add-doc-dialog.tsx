@@ -106,6 +106,7 @@ export function AddDocDialog({
       if (res.ok) {
         setValidTitle(data.title ?? null);
         setValidMimeType(data.mimeType ?? null);
+        if (data.resolvedUrl) setUrl(data.resolvedUrl);
         setValidationState("valid");
       } else {
         if (data.title) setValidTitle(data.title);

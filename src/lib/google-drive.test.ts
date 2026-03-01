@@ -52,6 +52,18 @@ describe("parseGoogleDocId", () => {
       )
     ).toBe("longId123");
   });
+
+  it("extracts ID from drive.google.com/open?id= URL", () => {
+    expect(
+      parseGoogleDocId("https://drive.google.com/open?id=1aBcDeFgHiJkLmNoPqRsTuVwXyZ")
+    ).toBe("1aBcDeFgHiJkLmNoPqRsTuVwXyZ");
+  });
+
+  it("extracts ID from ?id= with other query params", () => {
+    expect(
+      parseGoogleDocId("https://drive.google.com/open?id=abc-123_XYZ&usp=sharing")
+    ).toBe("abc-123_XYZ");
+  });
 });
 
 describe("deriveCommentFlags", () => {

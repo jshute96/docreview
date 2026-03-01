@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import {
   getDriveClient,
   parseGoogleDocId,
+  resolveRedirects,
   SUPPORTED_MIME_TYPES,
 } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
@@ -23,9 +24,13 @@ export async function POST(req: NextRequest) {
   }
   const { url, labelIds = [], notes } = body as { url: string; labelIds?: string[]; notes?: string };
 
-  const fileId = parseGoogleDocId(url);
+  let fileId = parseGoogleDocId(url);
   if (!fileId) {
-    return NextResponse.json({ error: "invalid_url" }, { status: 400 });
+    const resolvedUrl = await resolveRedirects(url);
+    fileId = parseGoogleDocId(resolvedUrl);
+    if (!fileId) {
+      return NextResponse.json({ error: "invalid_url" }, { status: 400 });
+    }
   }
 
   const existing = await prisma.doc.findUnique({
