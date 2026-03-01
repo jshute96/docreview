@@ -15,6 +15,7 @@ import { CommentRow } from "@/components/comment-row";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { matchesFilter } from "@/lib/highlight";
+import { getSyncChannel, broadcastSync } from "@/lib/sync-channel";
 
 interface DocDetailProps {
   doc: DocWithComments;
@@ -24,8 +25,116 @@ interface DocDetailProps {
 export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDetailProps) {
   const [doc, setDoc] = useState(initialDoc);
   const [labels, setLabelsRaw] = useState<Label[]>(initialLabels);
+  const [comments, setComments] = useState<Comment[]>(initialDoc.comments);
+  const [archiving, setArchiving] = useState(false);
+  const [commentContent, setCommentContent] = useState<Record<string, string>>({});
+  const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
+  const [threadText, setThreadText] = useState<Record<string, string>>({});
+  const [myThreadsFilter, setMyThreadsFilter] = useState(false);
+  const [myCommentsFilter, setMyCommentsFilter] = useState(false);
+  const [showMode, setShowMode] = useState<"active" | "open" | "all">("active");
+  const [suggestionsOnly, setSuggestionsOnly] = useState(false);
+  const [searchFilter, setSearchFilter] = useState("");
+  const [sortActive, setSortActive] = useState(true);
+  const frozenOrderRef = useRef<Map<string, number>>(new Map());
+  const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
 
-  function setLabels(newLabels: Label[]) {
+  const fetchAll = useCallback(async () => {
+    try {
+      const [docRes, labelsRes] = await Promise.all([
+        fetch(`/api/docs/${doc.id}`),
+        fetch("/api/labels"),
+      ]);
+      if (docRes.ok && labelsRes.ok) {
+        const [updatedDoc, newLabels] = await Promise.all([docRes.json(), labelsRes.json()]);
+        setDoc((prev) => ({ ...prev, ...updatedDoc }));
+        setLabelsRaw(newLabels);
+      }
+    } catch (err) {
+      console.error("Failed to refetch data for sync", err);
+    }
+  }, [doc.id]);
+
+  const wouldBeFilteredOut = useCallback((c: Comment): boolean => {
+    if (suggestionsOnly && c.type !== "SUGGESTION") return true;
+    if (showMode === "active" && (c.status === "ARCHIVED" || c.status === "MUTED")) return true;
+    if (showMode === "open" && c.resolved) return true;
+    if (myThreadsFilter && !c.iParticipated) return true;
+    if (myCommentsFilter && !c.isThreadAuthor) return true;
+    return false;
+  }, [suggestionsOnly, showMode, myThreadsFilter, myCommentsFilter]);
+
+  const handleCommentUpdate = useCallback((updated: Comment, broadcast = true) => {
+    setSortActive(false);
+    if (wouldBeFilteredOut(updated)) {
+      setExitingIds((prev) => new Set(prev).add(updated.id));
+      setTimeout(() => {
+        setExitingIds((prev) => {
+          if (!prev.has(updated.id)) return prev;
+          const next = new Set(prev);
+          next.delete(updated.id);
+          return next;
+        });
+      }, 200);
+    }
+    setComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    if (broadcast) {
+      broadcastSync({ type: "COMMENT_UPDATED", payload: { docId: doc.id, comment: updated } });
+      broadcastSync({ type: "REFRESH_ALL" });
+    }
+  }, [wouldBeFilteredOut, doc.id]);
+
+  useEffect(() => {
+    const channel = getSyncChannel();
+    if (!channel) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      const msg = event.data;
+      switch (msg.type) {
+        case "REFRESH_ALL":
+          fetchAll();
+          break;
+        case "DOC_UPDATED":
+          if (msg.payload.id === doc.id) {
+            setDoc((prev) => ({ ...prev, ...msg.payload }));
+            if (msg.payload.comments) {
+              setComments(msg.payload.comments);
+            }
+          }
+          break;
+        case "LABELS_UPDATED":
+          setLabelsRaw(msg.payload);
+          const labelMap = new Map((msg.payload as Label[]).map((l) => [l.id, l]));
+          setDoc((prev) => ({
+            ...prev,
+            labels: prev.labels
+              .map((dl) => ({
+                ...dl,
+                label: labelMap.get(dl.labelId) ?? dl.label,
+              }))
+              .sort((a, b) => (a.label?.position ?? 0) - (b.label?.position ?? 0)),
+          }));
+          break;
+        case "LABEL_DELETED":
+          setLabelsRaw((prev) => prev.filter((l) => l.id !== msg.payload));
+          setDoc((prev) => ({
+            ...prev,
+            labels: prev.labels.filter((dl) => dl.labelId !== msg.payload),
+          }));
+          break;
+        case "COMMENT_UPDATED":
+          if (msg.payload.docId === doc.id) {
+            handleCommentUpdate(msg.payload.comment, false);
+          }
+          break;
+      }
+    };
+
+    channel.addEventListener("message", handleMessage);
+    return () => channel.removeEventListener("message", handleMessage);
+  }, [doc.id, fetchAll, handleCommentUpdate]);
+
+  function setLabels(newLabels: Label[], broadcast = true) {
     setLabelsRaw(newLabels);
     const labelMap = new Map(newLabels.map((l) => [l.id, l]));
     setDoc((prev) => ({
@@ -37,22 +146,22 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
         }))
         .sort((a, b) => (a.label?.position ?? 0) - (b.label?.position ?? 0)),
     }));
+    if (broadcast) {
+      broadcastSync({ type: "LABELS_UPDATED", payload: newLabels });
+    }
   }
 
-  function handleLabelDelete(id: string) {
-    setLabels(labels.filter((l) => l.id !== id));
+  function handleLabelDelete(id: string, broadcast = true) {
+    setLabels(labels.filter((l) => l.id !== id), false);
     setDoc((prev) => ({
       ...prev,
       labels: prev.labels.filter((dl) => dl.labelId !== id),
     }));
+    if (broadcast) {
+      broadcastSync({ type: "LABEL_DELETED", payload: id });
+    }
   }
 
-  const [comments, setComments] = useState<Comment[]>(initialDoc.comments);
-  const [archiving, setArchiving] = useState(false);
-  const [commentContent, setCommentContent] = useState<Record<string, string>>({});
-  const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
-  // Thread text reported by CommentRow when threads are fetched (includes replies)
-  const [threadText, setThreadText] = useState<Record<string, string>>({});
   const handleThreadText = useCallback((googleCommentId: string, text: string) => {
     setThreadText((prev) => prev[googleCommentId] === text ? prev : { ...prev, [googleCommentId]: text });
   }, []);
@@ -69,32 +178,11 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   }
 
   useEffect(() => { void fetchContent(); }, [doc.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [myThreadsFilter, setMyThreadsFilter] = useState(false);
-  const [myCommentsFilter, setMyCommentsFilter] = useState(false);
-  const [showMode, setShowMode] = useState<"active" | "open" | "all">("active");
-  const [suggestionsOnly, setSuggestionsOnly] = useState(false);
-  const [searchFilter, setSearchFilter] = useState("");
+  
   type SortCol = "driveCreatedAt" | "driveModifiedAt" | "replyCount" | "iParticipated" | "resolved";
   type SortDir = "asc" | "desc";
   const [sortCol, setSortCol] = useState<SortCol>("driveModifiedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  // When a single comment is updated (reply, resolve, refresh), we freeze the
-  // table order so it doesn't jump around. Sort icons go unselected to signal
-  // the order may be stale. Clicking a column header or the global Refresh
-  // reactivates sorting.
-  const [sortActive, setSortActive] = useState(true);
-  const frozenOrderRef = useRef<Map<string, number>>(new Map());
-  // IDs of comments animating out (slide collapse) before removal from the filtered list
-  const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
-
-  function wouldBeFilteredOut(c: Comment): boolean {
-    if (suggestionsOnly && c.type !== "SUGGESTION") return true;
-    if (showMode === "active" && (c.status === "ARCHIVED" || c.status === "MUTED")) return true;
-    if (showMode === "open" && c.resolved) return true;
-    if (myThreadsFilter && !c.iParticipated) return true;
-    if (myCommentsFilter && !c.isThreadAuthor) return true;
-    return false;
-  }
 
   function handleSort(col: SortCol) {
     setSortActive(true);
@@ -117,6 +205,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       setComments(updated.comments);
       setSortActive(true);
       void fetchContent();
+      broadcastSync({ type: "DOC_UPDATED", payload: updated });
       toast.success("Comments synced");
     } catch {
       toast.error("Failed to sync comments");
@@ -127,6 +216,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   function handleEditSave(updated: DocWithLabels) {
     setDoc((prev) => ({ ...prev, role: updated.role, labels: updated.labels, status: updated.status, notes: updated.notes }));
+    broadcastSync({ type: "DOC_UPDATED", payload: updated });
   }
 
   async function handleArchive() {
@@ -141,28 +231,13 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithLabels = await res.json();
       setDoc((prev) => ({ ...prev, status: updated.status }));
+      broadcastSync({ type: "DOC_UPDATED", payload: updated });
       toast.success(newStatus === "ARCHIVED" ? "Archived" : "Unarchived");
     } catch {
       toast.error("Failed to update status");
     } finally {
       setArchiving(false);
     }
-  }
-
-  function handleCommentUpdate(updated: Comment) {
-    setSortActive(false);
-    if (wouldBeFilteredOut(updated)) {
-      setExitingIds((prev) => new Set(prev).add(updated.id));
-      setTimeout(() => {
-        setExitingIds((prev) => {
-          if (!prev.has(updated.id)) return prev;
-          const next = new Set(prev);
-          next.delete(updated.id);
-          return next;
-        });
-      }, 200);
-    }
-    setComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   }
 
   const filteredComments = comments
@@ -195,7 +270,6 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       return sortDir === "asc" ? cmp : -cmp;
     });
 
-  // Snapshot display order while sort is active so we can freeze it later
   if (sortActive) {
     frozenOrderRef.current = new Map(filteredComments.map((c, i) => [c.id, i]));
   }
