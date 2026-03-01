@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { fetchComments, fetchSuggestions, getDriveClient } from "@/lib/google-drive";
-import type { Doc } from "@prisma/client";
+import type { Doc, Prisma } from "@prisma/client";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 
@@ -42,7 +42,7 @@ export async function syncComments(
     }
   }
 
-  const toCreate: Parameters<typeof prisma.comment.createMany>[0]["data"] = [];
+  const toCreate: Prisma.CommentCreateManyInput[] = [];
   let updatedCount = 0;
   let shouldUnarchive = false;
 

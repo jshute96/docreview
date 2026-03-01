@@ -122,7 +122,10 @@ npm run dev -- -p 3001
 ```bash
 npm test            # run all tests once
 npm run test:watch  # run tests in watch mode
+npm run typecheck   # type check without building
 ```
+
+A pre-commit hook (via Husky) runs `npm test` and `npm run typecheck` automatically before each commit.
 
 ## After Schema Changes
 
@@ -160,7 +163,7 @@ npm run dev       # start dev server at http://localhost:3000
 npm run build     # production build (also runs type checking)
 npm run lint      # ESLint
 npm run test      # run tests
-npx tsc --noEmit  # type check without building
+npm run typecheck # type check without building
 
 npx prisma migrate dev --name <name>  # create and apply a migration
 npx prisma studio                     # open DB browser at http://localhost:5555
