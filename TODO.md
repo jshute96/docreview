@@ -1,5 +1,4 @@
 * Add from redirect links?
-* Error if schema is out of date
 
 * Suggestions fetching is still limited and sketchy
   * No timestamps, no response counts
@@ -13,7 +12,6 @@
 * gmail scan
 * how do I notice @mentions?
 * dialog box for filtering what to Load from Drive
-* add/remove labels from multiple docs (multi-select or filtered view)
 * Mute state on docs
 * Track what comments I've seen, and show the new ones in a different color
 * Expand all / collapse all on comments page
@@ -24,7 +22,6 @@
 * hosting
   * cloud run
   * deployment scripts
-* testing?
 * offline mode - run with a database but no API login
     * can the agent use this autonomously in a browser to test?
 
@@ -34,9 +31,11 @@
 
 * chrome plugin
   * add a doc
+  * standalone add page / dialog
   * capture linked-from notes when requesting permission
   * scroll to comments in the doc window without reloading
 
+* testing strategies
 * sandbox test environment
 * snapshot database and simulated or recorded google APIs
 * demo version with some fake docs or a starting snapshot
