@@ -56,3 +56,4 @@
     * the quoted text doesn't pass through formatting, just plain text
       * nothing for images. for tables, seems to just give the top row.
       * we don't get clickable links in the view
+  * *the quoted text we display for comments is always a snapshot from creation time*

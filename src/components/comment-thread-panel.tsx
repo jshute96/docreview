@@ -295,7 +295,12 @@ export function CommentThreadPanel({
                     <p className="text-xs text-zinc-500 whitespace-pre-wrap">{thread.quotedFileContent.value}</p>
                   )}
                 </div>
-                {documentText !== undefined && !documentText.toLowerCase().includes(thread.quotedFileContent.value.toLowerCase()) && (
+                {documentText !== undefined && (() => {
+                  // Drive API may truncate long quoted text with "..." or "…" — match on the prefix
+                  const raw = thread.quotedFileContent!.value;
+                  const trimmed = raw.replace(/\.{3}$|…$/, "");
+                  return !documentText.toLowerCase().includes(trimmed.toLowerCase());
+                })() && (
                   <p
                     className="mt-1 text-xs text-amber-600"
                     title="The quoted text is a snapshot from when the comment was created. If the text has been deleted, the comment thread may not be visible when viewing the document."

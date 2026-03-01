@@ -337,7 +337,9 @@ export interface CommentThread {
   quotedFileContent?: { mimeType: string; value: string } | null;
 }
 
-/** Extract quotedFileContent from a Drive comment, filtering to displayable MIME types. */
+/** Extract quotedFileContent from a Drive comment, filtering to displayable MIME types.
+ *  Note: the Drive API truncates long quoted text (the truncation format is undocumented).
+ *  Callers comparing against document text should strip trailing "..." or "…" first. */
 function extractQuotedFileContent(
   qfc: { mimeType?: string | null; value?: string | null } | null | undefined,
   commentId: string | null | undefined,
@@ -487,7 +489,7 @@ export async function replyToComment(
 }
 
 // Fetches the full plain text of a Google Doc by walking all text runs.
-// Returns empty string on error (non-Docs files should not call this).
+// Returns null on error so callers can distinguish failure from empty content.
 export async function fetchDocumentText(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string
@@ -511,6 +513,30 @@ export async function fetchDocumentText(
     return text;
   } catch (err) {
     console.error(`[Docs] documents.get ${googleDocId} (document text) failed (${Date.now() - t0}ms):`, err);
+    return null;
+  }
+}
+
+// Exports a Google Workspace file as plain text via the Drive API.
+// Works for Slides (and Sheets) without needing additional OAuth scopes.
+// Returns null on error.
+export async function fetchFileTextViaExport(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  fileId: string
+): Promise<string | null> {
+  const drive = google.drive({ version: "v3", auth });
+  const t0 = Date.now();
+
+  try {
+    const res = await drive.files.export({
+      fileId,
+      mimeType: "text/plain",
+    });
+    const text = typeof res.data === "string" ? res.data : String(res.data ?? "");
+    console.log(`[Drive] files.export ${fileId} (plain text, ${text.length} chars) (${Date.now() - t0}ms)`);
+    return text;
+  } catch (err) {
+    console.error(`[Drive] files.export ${fileId} (plain text) failed (${Date.now() - t0}ms):`, err);
     return null;
   }
 }

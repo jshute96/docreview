@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, fetchCommentContent, fetchSuggestionContent, fetchDocumentText } from "@/lib/google-drive";
+import { getDriveClient, fetchCommentContent, fetchSuggestionContent, fetchDocumentText, fetchFileTextViaExport } from "@/lib/google-drive";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
+const SLIDES_MIME_TYPE = "application/vnd.google-apps.presentation";
 
 export async function GET(
   _req: NextRequest,
@@ -31,10 +32,14 @@ export async function GET(
 
   try {
     const isDoc = doc.mimeType === DOCS_MIME_TYPE;
+    const isSlides = doc.mimeType === SLIDES_MIME_TYPE;
+    const textFetcher = isDoc ? fetchDocumentText(driveAuth, doc.googleDocId)
+      : isSlides ? fetchFileTextViaExport(driveAuth, doc.googleDocId)
+      : Promise.resolve(undefined);
     const [commentContent, suggestions, documentText] = await Promise.all([
       fetchCommentContent(driveAuth, doc.googleDocId),
       isDoc ? fetchSuggestionContent(driveAuth, doc.googleDocId) : Promise.resolve({}),
-      isDoc ? fetchDocumentText(driveAuth, doc.googleDocId) : Promise.resolve(undefined),
+      textFetcher,
     ]);
 
     return NextResponse.json({ comments: commentContent, suggestions, ...(documentText != null ? { documentText } : {}) });

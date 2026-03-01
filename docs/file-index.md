@@ -11,7 +11,7 @@ One-line descriptions of every source file, grouped by layer.
 | `login/page.tsx` | Login page — Google OAuth button, or offline-mode button |
 | `docs/page.tsx` | Doc list page (server) — fetches docs+labels, renders `DocTable` |
 | `add/page.tsx` | Add document page (server) — standalone add-doc form, accepts optional `?url=` query param |
-| `comments/[id]/page.tsx` | Doc detail page (server) — fetches single doc with comments, renders `DocDetail` |
+| `comments/[id]/page.tsx` | Doc detail page (server) — fetches single doc with comments, renders `DocDetail`; `generateMetadata` sets page title |
 
 ## API Routes (`src/app/api/`)
 
@@ -24,7 +24,7 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/bulk-update/route.ts` | `PATCH` bulk update multiple docs — optimized role/label/notes updates with no-op protection |
 | `docs/[id]/route.ts` | `GET` single doc; `PATCH` update role/status/labels |
 | `docs/[id]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata then syncs comments |
-| `docs/[id]/comments/route.ts` | `GET` fetch comment+suggestion text content from Drive for display; also returns document body text for anchor checking (Docs only) |
+| `docs/[id]/comments/route.ts` | `GET` fetch comment+suggestion text content from Drive for display; also returns document body text for anchor checking (Docs and Slides) |
 | `docs/[id]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (ACTIVE/ARCHIVED/MUTED) |
 | `docs/[id]/threads/route.ts` | `GET` fetch thread(s) from Drive; `POST` refresh a single thread (updates DB) |
 | `docs/[id]/threads/reply/route.ts` | `POST` reply to / resolve / reopen a comment thread via Drive API |
