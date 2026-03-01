@@ -291,10 +291,12 @@ export function BulkEditDialog({
                         target="_blank"
                         rel="noopener noreferrer"
                         title="Open document comments page"
-                        className="flex items-center gap-2 transition-colors hover:text-blue-600 hover:underline"
+                        className={`flex items-center gap-2 transition-colors hover:text-blue-600 hover:underline ${
+                          doc.isDeleted ? "text-zinc-400 line-through" : ""
+                        }`}
                       >
-                        <DocTypeIcon mimeType={doc.mimeType} className="h-3 w-3 flex-shrink-0" />
-                        <span className="whitespace-nowrap pr-4 text-xs font-medium text-zinc-700">
+                        <DocTypeIcon mimeType={doc.mimeType} className={`h-3 w-3 flex-shrink-0 ${doc.isDeleted ? "text-zinc-300" : ""}`} />
+                        <span className="whitespace-nowrap pr-4 text-xs font-medium">
                           {doc.title}
                         </span>
                       </a>

@@ -236,7 +236,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
             href={doc.driveUrl}
             target="docreview-doc"
             title="Open document"
-            className="text-zinc-900 hover:underline hover:text-blue-600"
+            className={`hover:underline hover:text-blue-600 ${
+              doc.isDeleted ? "line-through text-zinc-400" : "text-zinc-900"
+            }`}
           >{doc.title}</a>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">

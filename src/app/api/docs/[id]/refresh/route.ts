@@ -37,9 +37,10 @@ export async function POST(
     const drive = google.drive({ version: "v3", auth: driveAuth });
     const fileRes = await drive.files.get({
       fileId: doc.googleDocId,
-      fields: "name, mimeType, webViewLink, modifiedTime, owners(displayName)",
+      fields: "name, mimeType, webViewLink, modifiedTime, owners(displayName), trashed",
     });
     const f = fileRes.data;
+    const isTrashed = f.trashed === true;
     freshDoc = await prisma.doc.update({
       where: { id },
       data: {
@@ -48,13 +49,41 @@ export async function POST(
         driveUrl: f.webViewLink ?? doc.driveUrl,
         lastModifiedInDrive: f.modifiedTime ? new Date(f.modifiedTime) : doc.lastModifiedInDrive,
         owner: f.owners?.[0]?.displayName ?? doc.owner,
+        isDeleted: isTrashed, // Access confirmed, but might be trashed
       },
     });
-  } catch (err) {
-    console.error("Failed to refresh file metadata:", err);
+  } catch (err: any) {
+    const code = err?.code;
+    if (code === 404 || code === 403) {
+      console.log(`[Refresh] doc ${doc.id} (${doc.googleDocId}) is deleted or inaccessible (code ${code})`);
+      freshDoc = await prisma.doc.update({
+        where: { id },
+        data: { isDeleted: true },
+      });
+    } else {
+      console.error("Failed to refresh file metadata:", err);
+    }
   }
 
-  await syncComments(freshDoc, driveAuth);
+  // If we already confirmed it's deleted, skip comment sync
+  if (freshDoc.isDeleted) {
+    const updated = await prisma.doc.findUnique({
+      where: { id },
+      include: {
+        labels: { include: { label: true } },
+        comments: { orderBy: { driveCreatedAt: "asc" } },
+      },
+    });
+    return NextResponse.json(updated);
+  }
+
+  const syncResult = await syncComments(freshDoc, driveAuth);
+  if (syncResult.isDeleted && !freshDoc.isDeleted) {
+    await prisma.doc.update({
+      where: { id },
+      data: { isDeleted: true },
+    });
+  }
 
   const updated = await prisma.doc.findUnique({
     where: { id },

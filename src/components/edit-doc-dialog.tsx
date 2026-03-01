@@ -107,7 +107,9 @@ export function EditDocDialog({
             target="_blank"
             rel="noopener noreferrer"
             title="Open document"
-            className="flex items-center gap-1.5 text-base text-zinc-600 hover:text-blue-600 hover:underline line-clamp-1"
+            className={`flex items-center gap-1.5 text-base hover:text-blue-600 hover:underline line-clamp-1 ${
+              doc.isDeleted ? "line-through text-zinc-400" : "text-zinc-600"
+            }`}
           >
             <DocTypeIcon mimeType={doc.mimeType} className="h-4 w-4 flex-shrink-0" />
             {doc.title}

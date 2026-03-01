@@ -16,7 +16,12 @@ export function RefreshButton({ mode, onRefresh }: RefreshButtonProps) {
 
   const Icon = mode === "load" ? CloudDownload : RefreshCw;
   const label = mode === "refresh" ? "Refresh" : mode === "full-refresh" ? "Full Refresh" : "Load from Drive";
-  const tooltip = mode === "refresh" ? "Refresh comment counts" : mode === "full-refresh" ? "Re-fetch comment data from Google Drive for all documents" : "Import recent documents from Google Drive";
+  const tooltip =
+    mode === "refresh"
+      ? "Sync docs modified since last refresh"
+      : mode === "full-refresh"
+      ? "Sync docs modified since last refresh, and all loaded docs"
+      : "Add all docs modified in the last 30 days, and find deleted docs";
 
   async function handleClick() {
     setLoading(true);
@@ -35,6 +40,7 @@ export function RefreshButton({ mode, onRefresh }: RefreshButtonProps) {
         const parts = [
           data.added > 0 ? `${data.added} new` : "",
           data.updated > 0 ? `${data.updated} updated` : "",
+          data.deleted > 0 ? `${data.deleted} deleted` : "",
           data.unarchived > 0 ? `${data.unarchived} unarchived` : "",
         ].filter(Boolean).join(", ");
         const prefix = mode === "full-refresh" ? "Full refresh" : "Refresh";

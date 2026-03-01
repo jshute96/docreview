@@ -154,10 +154,17 @@ export async function POST(req: NextRequest) {
   );
   const comments = syncResults.reduce((sum, r) => sum + r.created, 0);
 
-  // Unarchive ARCHIVED docs only when syncComments detected meaningful new activity
+  // Unarchive ARCHIVED docs only when syncComments detected meaningful new activity.
+  // Also handle newly detected deletions from syncComments results.
   let unarchived = 0;
   for (let i = 0; i < activeDocs.length; i++) {
-    if (activeDocs[i].status === "ARCHIVED" && syncResults[i].shouldUnarchive) {
+    const res = syncResults[i];
+    if (res.isDeleted) {
+      await prisma.doc.update({ where: { id: activeDocs[i].id }, data: { isDeleted: true } });
+      deleted++;
+      continue;
+    }
+    if (activeDocs[i].status === "ARCHIVED" && res.shouldUnarchive) {
       await prisma.doc.update({ where: { id: activeDocs[i].id }, data: { status: "ACTIVE" } });
       unarchived++;
     }

@@ -10,11 +10,16 @@ const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 export async function syncComments(
   doc: Doc,
   driveAuth: Awaited<ReturnType<typeof getDriveClient>>
-): Promise<{ created: number; shouldUnarchive: boolean }> {
+): Promise<{ created: number; shouldUnarchive: boolean; isDeleted?: boolean }> {
   let comments;
   try {
     comments = await fetchComments(driveAuth, doc.googleDocId);
-  } catch (err) {
+  } catch (err: any) {
+    const code = err?.code;
+    if (code === 404 || code === 403) {
+      console.log(`[Comments] doc ${doc.googleDocId} is deleted or inaccessible (code ${code})`);
+      return { created: 0, shouldUnarchive: false, isDeleted: true };
+    }
     console.error(`[Comments] failed for ${doc.googleDocId}:`, err);
     return { created: 0, shouldUnarchive: false };
   }
