@@ -4,6 +4,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getDriveClient } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
+import { docWithCommentsInclude } from "@/lib/doc-queries";
 
 export async function POST(
   _req: NextRequest,
@@ -66,37 +67,19 @@ export async function POST(
   }
 
   // If we already confirmed it's deleted, skip comment sync
-  if (freshDoc.isDeleted) {
-    const updated = await prisma.doc.findUnique({
-      where: { id },
-      include: {
-        labels: { 
-          include: { label: true },
-          orderBy: { label: { position: "asc" } },
-        },
-        comments: { orderBy: { driveCreatedAt: "asc" } },
-      },
-    });
-    return NextResponse.json(updated);
-  }
-
-  const syncResult = await syncComments(freshDoc, driveAuth);
-  if (syncResult.isDeleted && !freshDoc.isDeleted) {
-    await prisma.doc.update({
-      where: { id },
-      data: { isDeleted: true },
-    });
+  if (!freshDoc.isDeleted) {
+    const syncResult = await syncComments(freshDoc, driveAuth);
+    if (syncResult.isDeleted && !freshDoc.isDeleted) {
+      await prisma.doc.update({
+        where: { id },
+        data: { isDeleted: true },
+      });
+    }
   }
 
   const updated = await prisma.doc.findUnique({
     where: { id },
-    include: {
-      labels: { 
-        include: { label: true },
-        orderBy: { label: { position: "asc" } },
-      },
-      comments: { orderBy: { driveCreatedAt: "asc" } },
-    },
+    include: docWithCommentsInclude,
   });
 
   return NextResponse.json(updated);

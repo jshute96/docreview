@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { DocDetail } from "@/components/doc-detail";
 import { requireAuth } from "@/lib/auth-utils";
+import { docWithCommentsInclude } from "@/lib/doc-queries";
 import type { DocWithComments } from "@/types";
 
 export default async function DocDetailPage({
@@ -16,13 +17,7 @@ export default async function DocDetailPage({
   const [doc, allLabels] = await Promise.all([
     prisma.doc.findUnique({
       where: { id },
-      include: {
-        labels: { 
-          include: { label: true },
-          orderBy: { label: { position: "asc" } },
-        },
-        comments: { orderBy: { driveCreatedAt: "asc" } },
-      },
+      include: docWithCommentsInclude,
     }),
     prisma.label.findMany({
       where: { userId },

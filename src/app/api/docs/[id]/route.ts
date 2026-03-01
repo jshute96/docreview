@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { DocRole, DocStatus } from "@prisma/client";
-import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
+import { docWithCountsInclude, docWithCommentsInclude, withCommentCounts } from "@/lib/doc-queries";
 
 const VALID_ROLES: string[] = Object.values(DocRole);
 const VALID_STATUSES: string[] = Object.values(DocStatus);
@@ -20,13 +20,7 @@ export async function GET(
 
   const doc = await prisma.doc.findUnique({
     where: { id },
-    include: {
-      labels: { 
-        include: { label: true },
-        orderBy: { label: { position: "asc" } },
-      },
-      comments: { orderBy: { driveCreatedAt: "asc" } },
-    },
+    include: docWithCommentsInclude,
   });
 
   if (!doc || doc.userId !== userId) {
