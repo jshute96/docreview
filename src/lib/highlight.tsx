@@ -25,8 +25,8 @@ function highlightLiteral(text: string, pattern: string): React.ReactNode {
 
 /**
  * Highlight matching portions of text.
- * Always checks both regex and literal substring match.
- * If both match, regex highlighting is preferred.
+ * Tries regex first — if it produces non-empty matches, those are highlighted.
+ * Otherwise tries literal substring match.
  */
 export function highlightText(text: string, pattern: string): React.ReactNode {
   if (!pattern || !text) return text;
@@ -71,13 +71,13 @@ export function highlightText(text: string, pattern: string): React.ReactNode {
     // invalid regex — fall through to literal match
   }
 
-  // Fallback to literal match if regex was invalid or had no matches
+  // Literal match — tried when regex was invalid or had no non-empty matches
   return highlightLiteral(text, pattern);
 }
 
 /**
- * Check if text matches a pattern using regex-first (consistent with highlightText),
- * falling back to literal substring match if regex is invalid.
+ * Check if text matches a pattern. Tries both regex and literal substring —
+ * returns true if either matches.
  */
 export function matchesFilter(text: string, pattern: string): boolean {
   if (!pattern) return true;
@@ -94,10 +94,10 @@ export function matchesFilter(text: string, pattern: string): boolean {
       }
     }
   } catch {
-    // invalid regex — fall through to literal match
+    // invalid regex — skip to literal check
   }
 
-  // 2. Literal substring fallback
+  // 2. Literal substring
   if (text.toLowerCase().includes(pattern.toLowerCase())) return true;
 
   return false;
@@ -121,7 +121,7 @@ export function createMatcher(pattern: string): (text: string) => boolean {
   return (text: string): boolean => {
     if (!text) return false;
 
-    // Regex first (consistent with highlightText)
+    // Try regex
     if (re) {
       re.lastIndex = 0;
       let match: RegExpExecArray | null;
@@ -133,7 +133,7 @@ export function createMatcher(pattern: string): (text: string) => boolean {
       }
     }
 
-    // Literal fallback
+    // Also try literal substring
     return text.toLowerCase().includes(needle);
   };
 }

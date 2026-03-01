@@ -136,11 +136,15 @@ The doc detail page provides three ways to narrow the comment table:
 **Search filter**:
 The search bar at the top of the table allows filtering comments by text. The search is
 case-insensitive and checks against the comment content, suggestion text, and reply threads.
-- **Literal match**: It checks if the search string is contained as a literal substring.
-- **Regex match**: It also attempts to treat the search string as a regular expression.
-- Only non-empty regex matches are considered (e.g., `x*` won't match every character).
-- If both a literal match and a regex match are found, the regex match is preferred for
-  highlighting purposes.
+Both regex and literal substring matching are always attempted:
+- **Regex**: The search string is tried as a regular expression. Only non-empty regex
+  matches are considered (e.g., `x*` won't match every character).
+- **Literal substring**: The search string is also checked as a plain case-insensitive
+  substring.
+- A comment matches if either check succeeds. When highlighting, regex matches are preferred
+  if present; otherwise literal matches are highlighted.
+- The same logic is used for both filtering (`matchesFilter`) and highlighting
+  (`highlightText`), ensuring consistent behavior.
 
 All five data columns (Created, Modified, Responses, Mine, Replied, Status) are sortable.
 Modified shows "—" when it equals Created (i.e., no replies have been added).

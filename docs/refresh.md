@@ -74,8 +74,11 @@ Drive. If a doc re-appears in Drive (e.g., shared again), the upsert in Phase 1 
 ## Phase 3 — Comment Sync
 
 Both the main Refresh and the per-doc Refresh run the same `syncComments` function
-(`src/lib/sync-comments.ts`). The main Refresh processes all non-deleted docs in parallel
-(`Promise.all`); the per-doc Refresh runs it for a single doc.
+(`src/lib/sync-comments.ts`). The main Refresh processes docs in parallel (`Promise.all`);
+the per-doc Refresh runs it for a single doc. In **full-refresh** mode, all docs are synced
+(including previously deleted ones, so they can recover from temporary 403 errors). In
+**refresh** and **load** modes, only non-deleted docs scoped to the current Drive results
+are synced.
 
 **Why not gate on file `modifiedTime`:** Drive does not update a file's `modifiedTime` when
 comments change, so we cannot use it as a signal.

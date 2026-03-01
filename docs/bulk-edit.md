@@ -25,13 +25,16 @@ The Bulk Edit feature allows users to update roles, labels, and notes for multip
 - **Automatic State Reversion**: When a document is removed from the selection, the dialog re-evaluates all pending actions. If an action (e.g., "Add Label X") becomes redundant for the remaining selection, it reverts to `as-is`.
 
 ### Backend (`src/app/api/docs/bulk-update/route.ts`)
-- **Optimized Batching**: Performs updates document-by-document within a single bulk request.
-- **No-Op Protection**: Before issuing a database `update` command, the API verifies if any actual changes are required (role change, non-empty append notes, or label additions/removals). If no change is detected, it returns the existing document data immediately, avoiding unnecessary database transactions.
+- **Batch Read**: All target docs are fetched in a single `findMany` call (not N+1 queries).
+- **Transaction**: All writes are wrapped in `prisma.$transaction` for atomicity.
+- **Validation**: Runtime checks on all inputs — `docIds` must be a non-empty string array (max 500), `role` and `labelUpdates` values must be valid `BulkEditState` strings, `appendNotes` must be a string if present.
+- **No-Op Protection**: Before building an `update` call, the API checks whether any actual changes are required (role change, non-empty append notes, or label additions/removals). Unchanged docs are skipped but still included in the response from the initial batch read.
+- **Response Shape**: Returns `{ docs, skipped }` — `docs` is the full list (updated + unchanged), `skipped` is the count of requested IDs not found in the database (e.g., docs owned by another user).
 
 ## Data Flow
 1. User opens the dialog -> `initialDocs` and `allLabels` are captured.
 2. User interacts with toggles -> `roleState` and `labelStates` (Record of `BulkEditState`) are updated.
 3. User removes a doc -> `selectedDocs` is filtered; states are re-evaluated via `checkConsistency`.
 4. User clicks "Save Changes" -> A `PATCH` request is sent with the target document IDs and the desired state updates.
-5. API processes each doc -> Skips update if state matches; otherwise, performs optimized `prisma.doc.update`.
-6. Frontend updates -> `onSave` callback propagates the updated document data back to the main table.
+5. API batch-reads all docs, builds updates, executes in a single transaction. Unchanged docs are returned from the initial read. Response includes a `skipped` count if any IDs were not found.
+6. Frontend updates -> `onSave` callback propagates the updated document data back to the main table. A toast is shown if any docs were skipped.

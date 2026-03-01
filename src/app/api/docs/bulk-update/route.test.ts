@@ -52,6 +52,41 @@ describe("PATCH /api/docs/bulk-update", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 when docIds exceeds 500", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const ids = Array.from({ length: 501 }, (_, i) => `d${i}`);
+    const res = await PATCH(makeReq({ docIds: ids, role: "as-is", labelUpdates: {} }));
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/too many/i);
+  });
+
+  it("returns 400 for non-string docIds", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const res = await PATCH(makeReq({ docIds: [123], role: "as-is", labelUpdates: {} }));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for invalid role", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const res = await PATCH(makeReq({ docIds: ["d1"], role: "bogus", labelUpdates: {} }));
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/role/i);
+  });
+
+  it("returns 400 for invalid labelUpdates", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const res = await PATCH(makeReq({ docIds: ["d1"], role: "as-is", labelUpdates: { l1: "bogus" } }));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for non-string appendNotes", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const res = await PATCH(makeReq({ docIds: ["d1"], role: "as-is", labelUpdates: {}, appendNotes: 42 }));
+    expect(res.status).toBe(400);
+  });
+
   it("performs no update when role and labels are 'as-is' and no notes", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const doc = {
@@ -111,6 +146,54 @@ describe("PATCH /api/docs/bulk-update", () => {
         notes: "First line\nSecond line"
       })
     }));
+  });
+
+  it("clears role to REVIEWER", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const doc = {
+      id: "d1",
+      userId: "u1",
+      role: DocRole.AUTHOR,
+      labels: [],
+      comments: [],
+    };
+    mockDoc.findMany.mockResolvedValue([doc]);
+    mockTransaction.mockResolvedValue([{ ...doc, role: DocRole.REVIEWER }]);
+
+    const res = await PATCH(makeReq({
+      docIds: ["d1"],
+      role: "clear",
+      labelUpdates: {},
+    }));
+
+    expect(res.status).toBe(200);
+    expect(mockDoc.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ role: DocRole.REVIEWER }),
+    }));
+  });
+
+  it("reports skipped count for docs not found", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const doc = {
+      id: "d1",
+      userId: "u1",
+      role: DocRole.AUTHOR,
+      labels: [],
+      comments: [],
+    };
+    // Request 3 docs but only 1 found (d2 and d3 belong to another user or don't exist)
+    mockDoc.findMany.mockResolvedValue([doc]);
+
+    const res = await PATCH(makeReq({
+      docIds: ["d1", "d2", "d3"],
+      role: "as-is",
+      labelUpdates: {},
+    }));
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.skipped).toBe(2);
+    expect(data.docs).toHaveLength(1);
   });
 
   it("adds and removes labels", async () => {
