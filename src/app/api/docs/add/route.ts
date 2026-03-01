@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const { url, labelIds = [] } = body as { url: string; labelIds?: string[] };
+  const { url, labelIds = [], notes } = body as { url: string; labelIds?: string[]; notes?: string };
 
   const fileId = parseGoogleDocId(url);
   if (!fileId) {
@@ -80,6 +80,7 @@ export async function POST(req: NextRequest) {
       owner: f.owners?.[0]?.displayName ?? null,
       lastModifiedInDrive: f.modifiedTime ? new Date(f.modifiedTime) : null,
       createdTimeInDrive: f.createdTime ? new Date(f.createdTime) : null,
+      notes: notes || null,
       ...(labelIds.length > 0
         ? { labels: { create: labelIds.map((labelId: string) => ({ labelId })) } }
         : {}),

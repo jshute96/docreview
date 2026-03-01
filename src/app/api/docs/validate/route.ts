@@ -28,9 +28,15 @@ export async function GET(req: NextRequest) {
 
   const existing = await prisma.doc.findUnique({
     where: { userId_googleDocId: { userId, googleDocId: fileId } },
+    select: { id: true, title: true, mimeType: true },
   });
   if (existing) {
-    return NextResponse.json({ error: "already_exists" }, { status: 409 });
+    return NextResponse.json({
+      error: "already_exists",
+      id: existing.id,
+      title: existing.title,
+      mimeType: existing.mimeType,
+    }, { status: 409 });
   }
 
   let f;
@@ -47,11 +53,19 @@ export async function GET(req: NextRequest) {
   }
 
   if (f.trashed) {
-    return NextResponse.json({ error: "trashed" }, { status: 400 });
+    return NextResponse.json({
+      error: "trashed",
+      title: f.name ?? "",
+      mimeType: f.mimeType,
+    }, { status: 400 });
   }
 
   if (!f.mimeType || !SUPPORTED_MIME_TYPES.has(f.mimeType)) {
-    return NextResponse.json({ error: "invalid_mime_type" }, { status: 400 });
+    return NextResponse.json({
+      error: "invalid_mime_type",
+      title: f.name ?? "",
+      mimeType: f.mimeType,
+    }, { status: 400 });
   }
 
   const isOwner = f.owners?.some((o) => o.me === true) ?? false;

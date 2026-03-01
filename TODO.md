@@ -1,3 +1,8 @@
+* Add dialog with labels and notes
+* Add from go/ links?
+* Error if schema is out of date
+* Multiselect and edit multiple labels/notes
+
 * Suggestions fetching is still limited and sketchy
   * No timestamps, no response counts
   * Anchor links into the doc don't work
@@ -8,6 +13,7 @@
 * Use last comments sync timestamp during doc refresh
 * If someone else resolves my thread, that comment should stay active/watched?
 * gmail scan
+* how do I notice @mentions?
 * dialog box for filtering what to Load from Drive
 * add/remove labels from multiple docs (multi-select or filtered view)
 * Mute state on docs

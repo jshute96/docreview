@@ -36,5 +36,20 @@ export function DocTypeIcon({ mimeType, className = "h-4 w-4" }: DocTypeIconProp
     );
   }
 
-  return null;
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-label="Unknown Type">
+      <rect width="24" height="24" rx="3" fill="#a1a1aa" />
+      <text
+        x="50%"
+        y="50%"
+        dominantBaseline="central"
+        textAnchor="middle"
+        fill="white"
+        fontSize="16"
+        fontWeight="bold"
+      >
+        ?
+      </text>
+    </svg>
+  );
 }

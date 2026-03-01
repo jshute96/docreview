@@ -44,7 +44,7 @@ export function CommentFilterBar({
 
   return (
     <fieldset className="rounded-lg border border-zinc-200 px-4 py-2">
-      <legend className="px-1 text-xs font-medium text-zinc-400 uppercase tracking-wide">
+      <legend className="px-1 text-xs font-medium text-zinc-900 uppercase tracking-wide">
         Filters
       </legend>
       <div className="flex flex-col gap-2">

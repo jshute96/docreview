@@ -19,10 +19,10 @@ export function DialogButtons({
 }: DialogButtonsProps) {
   return (
     <div className="mt-4 flex gap-2">
-      <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={onConfirm}>
+      <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={onConfirm} className="text-zinc-900">
         {confirmLabel}
       </Button>
-      <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+      <Button type="button" variant="outline" size="sm" onClick={onCancel} className="text-zinc-900">
         {cancelLabel}
       </Button>
     </div>

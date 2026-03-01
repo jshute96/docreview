@@ -31,7 +31,7 @@ status, comments, and suggestions via the Google Drive API.
 
 3. **Google Cloud setup:**
    - Enabled APIs & Services:
-     - Enable the **Google Drive API** and **Google Docs API** in 
+     - Enable the **Google Drive API** and **Google Docs API** in
    - OAuth consent screen:
      - Client:
         - Create an OAuth 2.0 client (Web application type)
@@ -39,7 +39,8 @@ status, comments, and suggestions via the Google Drive API.
      - Data Access:
         - Add `drive` and `documents.readonly` scopes
       - Audience:
-        - Set to External and add your Google account as a test user
+        - Set to External and add your Google account as a test user.
+        - Leave as Internal for corp account.
 
 4. **Configure `.env`:**
    ```

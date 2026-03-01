@@ -24,12 +24,14 @@ interface ManageLabelsDialogProps {
   labels: Label[];
   onLabelsChange: (labels: Label[]) => void;
   onLabelDelete: (id: string) => void;
+  trigger?: React.ReactNode;
 }
 
 export function ManageLabelsDialog({
   labels,
   onLabelsChange,
   onLabelDelete,
+  trigger,
 }: ManageLabelsDialogProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -238,9 +240,11 @@ export function ManageLabelsDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" title="Create or edit labels">
-          Manage Labels
-        </Button>
+        {trigger ?? (
+          <Button variant="outline" size="sm" title="Create or edit labels" className="text-zinc-900">
+            Manage Labels
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md" hideClose>
         <DialogHeader>
@@ -255,7 +259,7 @@ export function ManageLabelsDialog({
             placeholder="Label name…"
             className="flex-1 rounded-md border border-zinc-200 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-zinc-300"
           />
-          <Button type="submit" variant="outline" size="sm" disabled={!name.trim()}>
+          <Button type="submit" variant="outline" size="sm" disabled={!name.trim()} className="text-zinc-900">
             Add
           </Button>
         </form>

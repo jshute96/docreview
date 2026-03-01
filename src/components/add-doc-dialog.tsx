@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import type { Label } from "@prisma/client";
@@ -15,10 +15,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { DialogButtons } from "@/components/dialog-buttons";
 import { LabelPicker } from "@/components/label-picker";
+import { DocTypeIcon } from "@/components/doc-type-icon";
+import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 
 interface AddDocDialogProps {
   allLabels: Label[];
   onDocAdded: (doc: DocWithLabels) => void;
+  onLabelsChange: (labels: Label[]) => void;
+  onLabelDelete: (id: string) => void;
+  trigger?: React.ReactNode;
 }
 
 type ValidationState = "idle" | "validating" | "valid" | "invalid";
@@ -40,17 +45,45 @@ function errorMessageForCode(code: string): string {
   }
 }
 
-export function AddDocDialog({ allLabels, onDocAdded }: AddDocDialogProps) {
+export function AddDocDialog({
+  allLabels,
+  onDocAdded,
+  onLabelsChange,
+  onLabelDelete,
+  trigger,
+}: AddDocDialogProps) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [validationState, setValidationState] = useState<ValidationState>("idle");
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [validTitle, setValidTitle] = useState<string | null>(null);
+  const [validMimeType, setValidMimeType] = useState<string | null>(null);
+  const [existingDocId, setExistingDocId] = useState<string | null>(null);
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
+  const [notes, setNotes] = useState("");
   const [adding, setAdding] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const validTitleRef = useRef<string | null>(null);
+  const notesRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setSelectedLabelIds((prev) =>
+      prev.filter((id) => allLabels.some((l) => l.id === id))
+    );
+  }, [allLabels]);
+
+  const autoResize = useCallback(() => {
+    const ta = notesRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    const capped = ta.scrollHeight > 200;
+    ta.style.height = (capped ? 200 : ta.scrollHeight) + "px";
+    ta.style.overflowY = capped ? "auto" : "hidden";
+  }, []);
+
+  useEffect(() => { autoResize(); }, [notes, autoResize]);
+  useEffect(() => { if (open) requestAnimationFrame(autoResize); }, [open, autoResize]);
 
   function toggleLabel(id: string) {
     setSelectedLabelIds((prev) =>
@@ -70,9 +103,15 @@ export function AddDocDialog({ allLabels, onDocAdded }: AddDocDialogProps) {
       );
       const data = await res.json();
       if (res.ok) {
-        validTitleRef.current = data.title ?? null;
+        setValidTitle(data.title ?? null);
+        setValidMimeType(data.mimeType ?? null);
         setValidationState("valid");
       } else {
+        if (data.title) setValidTitle(data.title);
+        if (data.mimeType) setValidMimeType(data.mimeType);
+        if (data.error === "already_exists") {
+          setExistingDocId(data.id ?? null);
+        }
         setValidationState("invalid");
         setValidationError(errorMessageForCode(data.error));
       }
@@ -87,6 +126,9 @@ export function AddDocDialog({ allLabels, onDocAdded }: AddDocDialogProps) {
     setUrl(newUrl);
     setValidationState("idle");
     setValidationError(null);
+    setValidTitle(null);
+    setValidMimeType(null);
+    setExistingDocId(null);
 
     if (abortRef.current) {
       abortRef.current.abort();
@@ -110,7 +152,7 @@ export function AddDocDialog({ allLabels, onDocAdded }: AddDocDialogProps) {
       const res = await fetch("/api/docs/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, labelIds: selectedLabelIds }),
+        body: JSON.stringify({ url, labelIds: selectedLabelIds, notes }),
       });
       if (!res.ok) throw new Error("Add failed");
       const newDoc: DocWithLabels = await res.json();
@@ -153,7 +195,11 @@ export function AddDocDialog({ allLabels, onDocAdded }: AddDocDialogProps) {
           setUrl("");
           setValidationState("idle");
           setValidationError(null);
+          setValidTitle(null);
+          setValidMimeType(null);
+          setExistingDocId(null);
           setSelectedLabelIds([]);
+          setNotes("");
           setAdding(false);
           if (debounceRef.current) clearTimeout(debounceRef.current);
           if (abortRef.current) abortRef.current.abort();
@@ -162,9 +208,11 @@ export function AddDocDialog({ allLabels, onDocAdded }: AddDocDialogProps) {
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" title="Add a Google Drive document by URL">
-          Add doc
-        </Button>
+        {trigger ?? (
+          <Button variant="outline" size="sm" title="Add a Google Drive document by URL">
+            Add doc
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
@@ -186,13 +234,42 @@ export function AddDocDialog({ allLabels, onDocAdded }: AddDocDialogProps) {
             {validationError && (
               <p className="mt-1 text-xs text-red-500">{validationError}</p>
             )}
+            {validTitle && (
+              <div className="mt-1.5 flex items-center justify-between gap-2">
+                <p className="flex items-center gap-1.5 text-sm font-medium text-zinc-900 line-clamp-1" title={validTitle}>
+                  <DocTypeIcon mimeType={validMimeType} className="h-4 w-4 flex-shrink-0" />
+                  {validTitle}
+                </p>
+                {existingDocId && (
+                  <Button variant="outline" size="sm" className="h-6 px-2 text-xs flex-shrink-0 text-zinc-900" title="Open document comments page" asChild>
+                    <a href={`/comments/${existingDocId}`}>Open</a>
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           <LabelPicker
             allLabels={allLabels}
             selectedLabelIds={selectedLabelIds}
             onToggle={toggleLabel}
+            onLabelsChange={onLabelsChange}
+            onLabelDelete={onLabelDelete}
           />
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-zinc-900 uppercase tracking-wide">
+              Notes
+            </label>
+            <textarea
+              ref={notesRef}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add notes…"
+              rows={1}
+              className={`${TEXTAREA_CLASSES} w-full max-h-[200px]`}
+            />
+          </div>
         </div>
 
         <DialogButtons

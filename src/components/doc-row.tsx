@@ -16,10 +16,19 @@ interface DocRowProps {
   doc: DocWithLabels;
   allLabels: Label[];
   onUpdate: (updated: DocWithLabels) => void;
+  onLabelsChange: (labels: Label[]) => void;
+  onLabelDelete: (id: string) => void;
   searchFilter?: string;
 }
 
-export function DocRow({ doc, allLabels, onUpdate, searchFilter = "" }: DocRowProps) {
+export function DocRow({
+  doc,
+  allLabels,
+  onUpdate,
+  onLabelsChange,
+  onLabelDelete,
+  searchFilter = "",
+}: DocRowProps) {
   const [archiving, setArchiving] = useState(false);
 
   async function handleArchive() {
@@ -93,18 +102,24 @@ export function DocRow({ doc, allLabels, onUpdate, searchFilter = "" }: DocRowPr
       <td className="py-1.5 pr-4 text-sm text-zinc-500">{lastModified}</td>
       <td className="py-1.5 pr-4">
         <div className="flex items-center gap-1">
-          <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Open this document" asChild>
+          <Button variant="outline" size="sm" className="h-6 px-2 text-xs text-zinc-900" title="Open this document" asChild>
             <a href={doc.driveUrl} target="_blank" rel="noopener noreferrer">Open</a>
           </Button>
-          <EditDocDialog doc={doc} allLabels={allLabels} onSave={onUpdate}>
-            <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit document labels and notes">
+          <EditDocDialog
+            doc={doc}
+            allLabels={allLabels}
+            onSave={onUpdate}
+            onLabelsChange={onLabelsChange}
+            onLabelDelete={onLabelDelete}
+          >
+            <Button variant="outline" size="sm" className="h-6 px-2 text-xs text-zinc-900" title="Edit document labels and notes">
               Edit
             </Button>
           </EditDocDialog>
           <Button
             variant="outline"
             size="sm"
-            className="h-6 px-2 text-xs"
+            className="h-6 px-2 text-xs text-zinc-900"
             title={doc.status === "ACTIVE" ? "Hide this document" : "Unhide this document"}
             onClick={handleArchive}
             disabled={archiving}

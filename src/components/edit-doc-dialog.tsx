@@ -21,6 +21,8 @@ interface EditDocDialogProps {
   doc: DocWithLabels;
   allLabels: Label[];
   onSave: (updated: DocWithLabels) => void;
+  onLabelsChange: (labels: Label[]) => void;
+  onLabelDelete: (id: string) => void;
   children: React.ReactNode;
 }
 
@@ -28,6 +30,8 @@ export function EditDocDialog({
   doc,
   allLabels,
   onSave,
+  onLabelsChange,
+  onLabelDelete,
   children,
 }: EditDocDialogProps) {
   const [open, setOpen] = useState(false);
@@ -38,6 +42,12 @@ export function EditDocDialog({
   const [notes, setNotes] = useState(doc.notes ?? "");
   const [saving, setSaving] = useState(false);
   const notesRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setSelectedLabelIds((prev) =>
+      prev.filter((id) => allLabels.some((l) => l.id === id))
+    );
+  }, [allLabels]);
 
   const autoResize = useCallback(() => {
     const ta = notesRef.current;
@@ -106,7 +116,7 @@ export function EditDocDialog({
 
         <div className="mt-2 flex flex-col gap-4">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-500 uppercase tracking-wide">
+            <label className="mb-1.5 block text-xs font-medium text-zinc-900 uppercase tracking-wide">
               Role
             </label>
             <div className="flex gap-2">
@@ -124,10 +134,16 @@ export function EditDocDialog({
             </div>
           </div>
 
-          <LabelPicker allLabels={allLabels} selectedLabelIds={selectedLabelIds} onToggle={toggleLabel} />
+          <LabelPicker
+            allLabels={allLabels}
+            selectedLabelIds={selectedLabelIds}
+            onToggle={toggleLabel}
+            onLabelsChange={onLabelsChange}
+            onLabelDelete={onLabelDelete}
+          />
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-500 uppercase tracking-wide">
+            <label className="mb-1.5 block text-xs font-medium text-zinc-900 uppercase tracking-wide">
               Notes
             </label>
             <textarea

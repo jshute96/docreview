@@ -132,7 +132,17 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-zinc-900">Your Docs</h1>
         <div className="flex items-center gap-2">
-          <AddDocDialog allLabels={labels} onDocAdded={handleDocAdded} />
+          <AddDocDialog
+            allLabels={labels}
+            onDocAdded={handleDocAdded}
+            onLabelsChange={setLabels}
+            onLabelDelete={handleLabelDelete}
+            trigger={
+              <Button variant="outline" size="sm" title="Add a Google Drive document by URL" className="text-zinc-900">
+                Add doc
+              </Button>
+            }
+          />
           <RefreshButton mode="refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
           <RefreshButton mode="full-refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
           <RefreshButton mode="load" onRefresh={(newDocs) => setDocs(newDocs)} />
@@ -143,7 +153,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
             onClick={() => signOut({ callbackUrl: "/login" })}
             disabled={isOffline}
             title="Sign out of your account"
-            className={isOffline ? "opacity-50 cursor-not-allowed" : ""}
+            className={isOffline ? "opacity-50 cursor-not-allowed text-zinc-900" : "text-zinc-900"}
           >
             Sign out
           </Button>
@@ -198,6 +208,8 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
                   doc={doc}
                   allLabels={labels}
                   onUpdate={handleDocUpdate}
+                  onLabelsChange={setLabels}
+                  onLabelDelete={handleLabelDelete}
                   searchFilter={titleFilter}
                 />
               ))}

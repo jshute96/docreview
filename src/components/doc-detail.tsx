@@ -20,8 +20,30 @@ interface DocDetailProps {
   allLabels: Label[];
 }
 
-export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
+export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDetailProps) {
   const [doc, setDoc] = useState(initialDoc);
+  const [labels, setLabelsRaw] = useState<Label[]>(initialLabels);
+
+  function setLabels(newLabels: Label[]) {
+    setLabelsRaw(newLabels);
+    const labelMap = new Map(newLabels.map((l) => [l.id, l]));
+    setDoc((prev) => ({
+      ...prev,
+      labels: prev.labels.map((dl) => ({
+        ...dl,
+        label: labelMap.get(dl.labelId) ?? dl.label,
+      })),
+    }));
+  }
+
+  function handleLabelDelete(id: string) {
+    setLabels(labels.filter((l) => l.id !== id));
+    setDoc((prev) => ({
+      ...prev,
+      labels: prev.labels.filter((dl) => dl.labelId !== id),
+    }));
+  }
+
   const [comments, setComments] = useState<Comment[]>(initialDoc.comments);
   const [archiving, setArchiving] = useState(false);
   const [commentContent, setCommentContent] = useState<Record<string, string>>({});
@@ -218,7 +240,7 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
           >{doc.title}</a>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <Button variant="outline" size="sm" title="Back to the document list" asChild>
+          <Button variant="outline" size="sm" title="Back to the document list" className="text-zinc-900" asChild>
             <a href="/docs">Doc list</a>
           </Button>
           <Button
@@ -227,6 +249,7 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
             onClick={handleRefresh}
             disabled={refreshing}
             title="Refresh comments"
+            className="text-zinc-900"
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
@@ -267,15 +290,21 @@ export function DocDetail({ doc: initialDoc, allLabels }: DocDetailProps) {
           {doc.role !== "AUTHOR" && doc.labels.length === 0 && (
             <span className="text-zinc-400">—</span>
           )}
-          <EditDocDialog doc={doc as unknown as DocWithLabels} allLabels={allLabels} onSave={handleEditSave}>
-            <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit document labels and notes">
+          <EditDocDialog
+            doc={doc as unknown as DocWithLabels}
+            allLabels={labels}
+            onSave={handleEditSave}
+            onLabelsChange={setLabels}
+            onLabelDelete={handleLabelDelete}
+          >
+            <Button variant="outline" size="sm" className="h-6 px-2 text-xs text-zinc-900" title="Edit document labels and notes">
               Edit
             </Button>
           </EditDocDialog>
           <Button
             variant="outline"
             size="sm"
-            className="h-6 px-2 text-xs"
+            className="h-6 px-2 text-xs text-zinc-900"
             title={doc.status === "ACTIVE" ? "Hide this document in document list" : "Unhide this document in document list"}
             onClick={handleArchive}
             disabled={archiving}
