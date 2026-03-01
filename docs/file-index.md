@@ -20,6 +20,7 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/route.ts` | `GET` list docs (with filters); `POST` refresh/full-refresh/load sync from Drive |
 | `docs/add/route.ts` | `POST` add a doc by URL — validates via Drive, creates DB record, syncs comments |
 | `docs/validate/route.ts` | `GET` validate a Google Drive URL — checks access, mime type, returns metadata |
+| `docs/bulk-update/route.ts` | `PATCH` bulk update multiple docs — optimized role/label/notes updates with no-op protection |
 | `docs/[id]/route.ts` | `GET` single doc; `PATCH` update role/status/labels |
 | `docs/[id]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata then syncs comments |
 | `docs/[id]/comments/route.ts` | `GET` fetch comment+suggestion text content from Drive for display |
@@ -42,8 +43,10 @@ One-line descriptions of every source file, grouped by layer.
 | `comment-filter-bar.tsx` | Comment list filter bar — toggles for my threads/comments, show mode, suggestions |
 | `comment-row.tsx` | Single comment row — expandable, shows content preview, thread panel, status actions |
 | `comment-thread-panel.tsx` | Expanded thread view — shows all replies, reply textarea, resolve/reopen buttons |
-| `add-doc-dialog.tsx` | Dialog to add a doc by URL — debounced validation, label picker |
+| `add-doc-dialog.tsx` | `Dialog to add a doc by URL — debounced validation, label picker |
 | `edit-doc-dialog.tsx` | Dialog to edit doc role and labels |
+| `bulk-edit-dialog.tsx` | Dialog to edit role, labels, and notes for multiple documents simultaneously |
+
 | `refresh-button.tsx` | Refresh/Full Refresh/Load from Drive button — calls POST `/api/docs` then reloads list |
 | `tri-state-button.tsx` | Tri-state filter buttons (off/include/exclude) with diagonal strikethrough + slow-click-to-reset |
 | `label-badge.tsx` | Colored label pill with optional remove button |
@@ -68,6 +71,7 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 | `doc-queries.ts` | Shared Prisma include clause + transform for computing watched/open comment counts without loading full comment data |
 | `highlight.tsx` | `highlightText()` — regex/substring match highlighter, wraps matches in yellow `<mark>` tags |
 | `prisma.ts` | Singleton PrismaClient with dev-mode write-op logging |
+| `bulk-edit.ts` | `BulkEditState` type and `cycleBulkEditState` helper for multi-doc editing |
 | `offline.ts` | Offline mode constants — `OFFLINE_MODE` flag, `OfflineModeError`, fallback user |
 | `role-colors.ts` | Tailwind class maps for Author (blue) and Reviewer (violet) role badges/filters |
 | `status.ts` | Read/write `Status` table — tracks `lastDriveUpdateTimestamp` per user for incremental sync |
@@ -94,4 +98,5 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 |------|-------------|
 | `refresh.md` | Full refresh flow — Drive sync modes, deletion detection, comment sync, UI update |
 | `comment-tracking.md` | Comment status logic, unarchive rules, filter behavior |
+| `bulk-edit.md` | Bulk editing logic — tri-state UI, context-aware cycling, no-op protection |
 | `suggestions.md` | Suggestion sync via Docs API, limitations |

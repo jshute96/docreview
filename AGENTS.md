@@ -27,11 +27,16 @@ dropped `url = env(...)` support in schema.prisma).
 
 ## Workflow Rules
 
-- **Documentation**: Keep `docs/*.md` design documents in sync with behavioral changes. Update `docs/file-index.md` when adding, renaming, or removing source files.
-- **Database Safety**: Ask for human review before making database schema changes or manual data updates. Never run DDL or DML (updates/alters) directly on PostgreSQL; use Prisma migrations or ask for permission to run read-only queries.
-- **Commit Preparation**: 
+- **Documentation**:
+    - Keep `docs/*.md` design documents in sync with behavioral changes.
+    - Update `docs/file-index.md` when adding, renaming, or removing source files.
+- **Database Safety**:
+    - Ask for human review before making database schema changes or manual data updates.
+    - Never run DDL or DML (updates/alters) directly on PostgreSQL; use Prisma migrations or ask for permission to run these.
+- **Commit Preparation**:
   - Run `npm test` before committing code.
   - Ensure `README.md` is updated if setup or debugging commands change.
+  - Include all significant changes in the commit message.
 
 ## Development Conventions
 

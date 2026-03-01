@@ -9,6 +9,7 @@ import { FilterBar } from "@/components/filter-bar";
 import { AddDocDialog } from "@/components/add-doc-dialog";
 import { ManageLabelsDialog } from "@/components/manage-labels-dialog";
 import { RefreshButton } from "@/components/refresh-button";
+import { BulkEditDialog } from "@/components/bulk-edit-dialog";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { filterDocs, sortDocs } from "@/lib/doc-filters";
@@ -74,6 +75,11 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
 
   function handleDocUpdate(updated: DocWithLabels) {
     setDocs((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+  }
+
+  function handleBulkUpdate(updatedDocs: DocWithLabels[]) {
+    const updatedMap = new Map(updatedDocs.map((d) => [d.id, d]));
+    setDocs((prev) => prev.map((d) => updatedMap.get(d.id) ?? d));
   }
 
   function handleDocAdded(newDoc: DocWithLabels) {
@@ -193,7 +199,20 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
                 </th>
                 <ThButton col="lastModifiedInDrive" rowSpan={2} title="Last change time">Last Modified</ThButton>
                 <th rowSpan={2} className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide text-left">
-                  Actions
+                  <div className="flex items-center gap-2">
+                    Actions
+                    <BulkEditDialog
+                      initialDocs={filteredDocs}
+                      allLabels={labels}
+                      onSave={handleBulkUpdate}
+                      onLabelsChange={setLabels}
+                      onLabelDelete={handleLabelDelete}
+                    >
+                      <Button variant="outline" size="sm" className="h-6 px-2 text-xs text-zinc-900" title="Edit all currently displayed documents">
+                        Edit All
+                      </Button>
+                    </BulkEditDialog>
+                  </div>
                 </th>
               </tr>
               <tr className="border-b border-zinc-200 bg-zinc-50">

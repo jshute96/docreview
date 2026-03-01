@@ -63,6 +63,8 @@ export function DocRow({
         <div className="flex flex-wrap items-center gap-2">
           <a
             href={`/comments/${doc.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
             title="Open document comments page"
             className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline hover:text-blue-600 ${
               doc.isDeleted ? "line-through text-zinc-400" : "text-zinc-900"
@@ -88,13 +90,11 @@ export function DocRow({
         )}
       </td>
       <td className="py-1.5 px-4 text-sm text-zinc-500">
-        {/*<!-- translate-x-2 is manual tuning to line up the column nicely */}
         <div className="mx-auto w-8 text-right -translate-x-2">
           {doc._count.watchedComments > 0 ? doc._count.watchedComments : ""}
         </div>
       </td>
       <td className="py-1.5 px-4 text-sm text-zinc-500">
-        {/*<!-- translate-x-3 is manual tuning to line up the column nicely */}
         <div className="mx-auto w-8 text-right -translate-x-3">
           {doc._count.openComments > 0 ? doc._count.openComments : ""}
         </div>

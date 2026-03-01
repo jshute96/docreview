@@ -1,7 +1,5 @@
-* Add dialog with labels and notes
-* Add from go/ links?
+* Add from redirect links?
 * Error if schema is out of date
-* Multiselect and edit multiple labels/notes
 
 * Suggestions fetching is still limited and sketchy
   * No timestamps, no response counts
