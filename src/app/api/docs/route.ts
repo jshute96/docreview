@@ -140,11 +140,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Sync comments: full-refresh syncs all non-deleted docs;
-  // refresh/load only sync docs returned by Drive
+  // Sync comments: full-refresh syncs ALL docs (including previously deleted
+  // ones, so they can recover if a 403 was temporary); refresh/load only sync
+  // docs returned by Drive
   const activeDocs = mode === "full-refresh"
     ? await prisma.doc.findMany({
-        where: { userId, isDeleted: false },
+        where: { userId },
       })
     : await prisma.doc.findMany({
         where: { userId, isDeleted: false, googleDocId: { in: [...driveDocIds] } },
