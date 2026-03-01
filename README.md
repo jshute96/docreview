@@ -108,6 +108,15 @@ To run a second instance (e.g. from a separate checkout), use the `-p` flag:
 npm run dev -- -p 3001
 ```
 
+## Usage
+
+| Path | Description |
+|------|-------------|
+| `/docs` | Main document list — filters, sorting, bulk edit, refresh |
+| `/comments/[id]` | Document detail — comment threads, reply, resolve |
+| `/add` | Standalone add-document form — also accessible via the "Add doc" button on the doc list |
+| `/add?url=...` | Pre-fills the URL field and auto-validates — useful for browser extensions |
+
 ## Testing
 
 ```bash
