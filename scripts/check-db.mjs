@@ -34,6 +34,16 @@ function logWarning(msg) {
   console.warn(`${COLORS.yellow}⚠️  ${msg}${COLORS.reset}`);
 }
 
+function runPrismaMigrateStatus() {
+  // Merge stderr into stdout so we capture all Prisma output (Prisma
+  // sometimes writes status details to stderr rather than stdout).
+  const result = execSync(
+    'npx prisma migrate status 2>&1',
+    { encoding: 'utf8', shell: true }
+  );
+  return result;
+}
+
 async function run() {
   let hasError = false;
 
@@ -68,37 +78,51 @@ async function run() {
 
   // 2. Check if Database Migrations are in sync
   try {
-    // Use prisma migrate status for better env var handling and portability
-    const statusRes = execSync(
-      'npx prisma migrate status',
-      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
-    );
-    
+    const statusRes = runPrismaMigrateStatus();
+
     if (statusRes.includes('Database schema is up to date')) {
       logSuccess('Database migrations are up to date.');
+    } else if (statusRes.includes('not been applied')) {
+      logError('Database is OUT OF DATE (missing migrations).');
+      console.log(statusRes);
+      console.log(`Run: ${COLORS.bold}npx prisma migrate dev${COLORS.reset}\n`);
+      hasError = true;
+    } else if (statusRes.includes('not yet been applied') || statusRes.includes('following migration')) {
+      logError('Database has pending migrations.');
+      console.log(statusRes);
+      console.log(`Run: ${COLORS.bold}npx prisma migrate dev${COLORS.reset}\n`);
+      hasError = true;
     } else {
-      // If it's not up to date, it will list migrations or show errors.
-      // prisma migrate status doesn't return a non-zero exit code for pending migrations,
-      // so we parse the text.
-      if (statusRes.includes('not been applied')) {
-        logError('Database is OUT OF DATE (missing migrations).');
-        console.log(statusRes);
-        console.log(`Run: ${COLORS.bold}npx prisma migrate dev${COLORS.reset}\n`);
-        hasError = true;
-      } else if (statusRes.includes('missing locally')) {
-        logError('Database is AHEAD of this branch (missing local migrations).');
-        console.log(statusRes);
-        console.log(`You may need to reset your DB (npx prisma migrate reset) or switch back to the original branch.\n`);
-        hasError = true;
-      } else {
-        logSuccess('Database migrations are up to date.');
-      }
+      logWarning('Unexpected output from prisma migrate status:');
+      console.log(statusRes);
+      hasError = true;
     }
 
   } catch (e) {
-    logWarning('Could not verify database migrations (is the database running and initialized?)');
-    console.log(`Check your ${COLORS.bold}.env${COLORS.reset} and DATABASE_URL.\n`);
-    // Don't fail the whole check if the DB is just offline, as long as the user knows.
+    // prisma migrate status exits non-zero for some mismatch cases —
+    // inspect the actual output rather than assuming a connection error.
+    // With 2>&1, merged output lands in e.stdout on non-zero exit.
+    // Fall back to stderr/message in case shell redirection didn't apply.
+    const output = (e.stdout || '') + (e.stderr || '') || e.message || '';
+
+    if (output.includes('not found locally') || output.includes('have been applied to the database but are missing from the local')) {
+      logError('Database is AHEAD of this branch (has migrations not found locally).');
+      console.log(output);
+      console.log(`\nYou may need to ${COLORS.bold}git pull${COLORS.reset} or switch to the branch that created these migrations.\n`);
+      hasError = true;
+    } else if (output.includes('not been applied') || output.includes('not yet been applied')) {
+      logError('Database is OUT OF DATE (missing migrations).');
+      console.log(output);
+      console.log(`Run: ${COLORS.bold}npx prisma migrate dev${COLORS.reset}\n`);
+      hasError = true;
+    } else if (output.includes('P1001') || output.includes('Can\'t reach database') || output.includes('ECONNREFUSED')) {
+      logWarning('Could not connect to database (is it running?)');
+      console.log(`Check your ${COLORS.bold}.env${COLORS.reset} and DATABASE_URL.\n`);
+    } else {
+      logWarning('Could not verify database migrations.');
+      console.log(output);
+      hasError = true;
+    }
   }
 
   if (hasError) {
