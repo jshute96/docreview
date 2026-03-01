@@ -81,7 +81,7 @@ export function EditDocDialog({
       const updated: DocWithLabels = await res.json();
       onSave(updated);
       setOpen(false);
-      broadcastChange({ type: "docs" });
+      broadcastChange({ type: "docs", docId: doc.id });
       toast.success("Saved");
     } catch {
       toast.error("Failed to save changes");

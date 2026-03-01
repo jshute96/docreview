@@ -79,11 +79,18 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
           const updated: DocWithComments = await docRes.json();
           setDoc(updated);
           setComments(updated.comments);
-          setSortActive(true);
         }
       };
 
-      if (event.type === "docs" || event.type === "labels") {
+      if (event.type === "docs") {
+        // Skip if the event is for a different doc
+        if (event.docId && event.docId !== initialDoc.id) return;
+        const [, labelsRes] = await Promise.all([
+          refetchDoc(),
+          fetch("/api/labels"),
+        ]);
+        if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
+      } else if (event.type === "labels") {
         const [, labelsRes] = await Promise.all([
           refetchDoc(),
           fetch("/api/labels"),
@@ -91,7 +98,6 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
       } else if (event.type === "comments" && event.docId === initialDoc.id) {
         await refetchDoc();
-        // fetchContent closes over doc.id which equals initialDoc.id and never changes
         void fetchContent();
       }
     } catch { /* cross-tab sync is best-effort */ }

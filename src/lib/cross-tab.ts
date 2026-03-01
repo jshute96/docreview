@@ -3,25 +3,42 @@ import { useEffect, useRef } from "react";
 const CHANNEL_NAME = "docreview-sync";
 
 export type CrossTabEvent =
-  | { type: "docs" }
+  | { type: "docs"; docId?: string }
   | { type: "labels" }
   | { type: "comments"; docId: string };
 
 export function broadcastChange(event: CrossTabEvent) {
+  if (typeof window === "undefined") return;
   const ch = new BroadcastChannel(CHANNEL_NAME);
   ch.postMessage(event);
   ch.close();
 }
 
-export function useCrossTabListener(handler: (event: CrossTabEvent) => void) {
+export function useCrossTabListener(
+  handler: (event: CrossTabEvent) => void,
+  debounceMs = 300,
+) {
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
 
   useEffect(() => {
     const ch = new BroadcastChannel(CHANNEL_NAME);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let pending: CrossTabEvent | null = null;
+
     ch.onmessage = (e: MessageEvent<CrossTabEvent>) => {
-      handlerRef.current(e.data);
+      pending = e.data;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (pending) handlerRef.current(pending);
+        pending = null;
+        timer = null;
+      }, debounceMs);
     };
-    return () => ch.close();
-  }, []);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      ch.close();
+    };
+  }, [debounceMs]);
 }
