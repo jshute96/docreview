@@ -35,8 +35,7 @@ export async function PATCH(req: NextRequest) {
       const doc = await prisma.doc.findUnique({
         where: { id, userId },
         include: { 
-          labels: true,
-          ...docWithCountsInclude.include // Include counts in the initial fetch
+          ...docWithCountsInclude,
         },
       });
       if (!doc) return null;

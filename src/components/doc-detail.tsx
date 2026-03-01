@@ -30,10 +30,12 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     const labelMap = new Map(newLabels.map((l) => [l.id, l]));
     setDoc((prev) => ({
       ...prev,
-      labels: prev.labels.map((dl) => ({
-        ...dl,
-        label: labelMap.get(dl.labelId) ?? dl.label,
-      })),
+      labels: prev.labels
+        .map((dl) => ({
+          ...dl,
+          label: labelMap.get(dl.labelId) ?? dl.label,
+        }))
+        .sort((a, b) => (a.label?.position ?? 0) - (b.label?.position ?? 0)),
     }));
   }
 

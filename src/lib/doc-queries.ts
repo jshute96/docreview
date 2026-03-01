@@ -5,7 +5,10 @@
 
 /** Prisma include clause: fetches labels + minimal comment fields for count computation */
 export const docWithCountsInclude = {
-  labels: { include: { label: true } },
+  labels: { 
+    include: { label: true },
+    orderBy: { label: { position: "asc" as const } },
+  },
   comments: {
     where: { status: "ACTIVE" as const },
     select: { isThreadAuthor: true, iParticipated: true },

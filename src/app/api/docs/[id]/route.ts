@@ -21,7 +21,10 @@ export async function GET(
   const doc = await prisma.doc.findUnique({
     where: { id },
     include: {
-      labels: { include: { label: true } },
+      labels: { 
+        include: { label: true },
+        orderBy: { label: { position: "asc" } },
+      },
       comments: { orderBy: { driveCreatedAt: "asc" } },
     },
   });
