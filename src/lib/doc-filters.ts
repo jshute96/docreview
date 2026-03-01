@@ -1,6 +1,7 @@
 import type { DocWithLabels } from "@/types";
 import type { TriState } from "./tri-state";
 import { partitionTriState } from "./tri-state";
+import { matchesFilter } from "./highlight";
 
 export type SortCol = "title" | "lastModifiedInDrive" | "watched" | "open";
 export type SortDir = "asc" | "desc";
@@ -54,17 +55,10 @@ export function filterDocs(
     )
       return false;
 
-    // titleFilter: regex with substring fallback (searches title and notes)
+    // titleFilter: searches title and notes
     if (opts.titleFilter) {
       const searchable = doc.title + (doc.notes ? " " + doc.notes : "");
-      try {
-        const re = new RegExp(opts.titleFilter, "i");
-        if (!re.test(searchable)) return false;
-      } catch {
-        // invalid regex — fall back to plain substring match
-        if (!searchable.toLowerCase().includes(opts.titleFilter.toLowerCase()))
-          return false;
-      }
+      if (!matchesFilter(searchable, opts.titleFilter)) return false;
     }
     return true;
   });

@@ -14,6 +14,7 @@ import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
+import { matchesFilter } from "@/lib/highlight";
 
 interface DocDetailProps {
   doc: DocWithComments;
@@ -171,11 +172,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       const sugText = sug ? `${sug.deletedText} ${sug.insertedText}` : "";
       const threads = threadText[c.googleCommentId] ?? "";
       const combined = `${text} ${sugText} ${threads}`;
-      try {
-        return new RegExp(searchFilter, "i").test(combined);
-      } catch {
-        return combined.toLowerCase().includes(searchFilter.toLowerCase());
-      }
+      return matchesFilter(combined, searchFilter);
     })
     .sort((a, b) => {
       if (!sortActive) {

@@ -69,7 +69,7 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates DB records, computes unarchive signals |
 | `doc-filters.ts` | Client-side doc filtering (tri-state logic for active/comments/author/mimeType/labels/title regex) and sorting |
 | `doc-queries.ts` | Shared Prisma include clause + transform for computing watched/open comment counts without loading full comment data |
-| `highlight.tsx` | `highlightText()` — regex/substring match highlighter, wraps matches in yellow `<mark>` tags |
+| `highlight.tsx` | `highlightText()` — regex/substring highlighter; `matchesFilter()` — centralized dual regex/substring search logic |
 | `prisma.ts` | Singleton PrismaClient with dev-mode write-op logging |
 | `bulk-edit.ts` | `BulkEditState` type and `cycleBulkEditState` helper for multi-doc editing |
 | `offline.ts` | Offline mode constants — `OFFLINE_MODE` flag, `OfflineModeError`, fallback user |

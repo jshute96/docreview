@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import React from "react";
-import { highlightText } from "./highlight";
+import { highlightText, matchesFilter } from "./highlight";
 
 function rendered(node: React.ReactNode): string {
   if (typeof node === "string") return node;
@@ -54,7 +54,6 @@ describe("highlightText", () => {
   });
 
   it("highlights all consecutive single-char matches", () => {
-    // Regression: using re.test() with /g flag skips every other match
     const result = rendered(highlightText("aaa", "a"));
     expect(result).toBe(
       '<mark class="bg-yellow-200">a</mark><mark class="bg-yellow-200">a</mark><mark class="bg-yellow-200">a</mark>',
@@ -66,5 +65,68 @@ describe("highlightText", () => {
     expect(result).toBe(
       '<mark class="bg-yellow-200">foo</mark><mark class="bg-yellow-200">foo</mark><mark class="bg-yellow-200">foo</mark>',
     );
+  });
+
+  it("prefers regex match over literal match", () => {
+    // pattern "a.c" matches "abc" as regex, but could be literal if we didn't prefer regex
+    const result = rendered(highlightText("abc", "a.c"));
+    expect(result).toBe('<mark class="bg-yellow-200">abc</mark>');
+  });
+
+  it("falls back to literal match if regex doesn't match", () => {
+    // pattern "a.c" literal exists, but regex "a.c" doesn't match "a.c" if we use ^/$ or something, 
+    // but here "a.c" regex matches "a.c" text.
+    // Let's use a pattern that is invalid regex but valid literal.
+    const result = rendered(highlightText("hello (world)", "(world"));
+    expect(result).toBe('hello <mark class="bg-yellow-200">(world</mark>)');
+  });
+
+  it("skips zero-length regex matches (e.g. x*)", () => {
+    // x* matches "" at every position. We should not highlight empty strings.
+    const result = rendered(highlightText("abc", "x*"));
+    // Since x* matches "" (zero-length), it should be skipped, and if no other matches, return plain text.
+    expect(result).toBe("abc");
+  });
+
+  it("still matches non-empty parts of a regex that could be zero-length", () => {
+    const result = rendered(highlightText("abbbc", "b*"));
+    expect(result).toBe('a<mark class="bg-yellow-200">bbb</mark>c');
+  });
+});
+
+describe("matchesFilter", () => {
+  it("returns true for empty pattern", () => {
+    expect(matchesFilter("hello", "")).toBe(true);
+  });
+
+  it("returns false for empty text with non-empty pattern", () => {
+    expect(matchesFilter("", "foo")).toBe(false);
+  });
+
+  it("matches literal substring", () => {
+    expect(matchesFilter("hello world", "world")).toBe(true);
+    expect(matchesFilter("hello world", "WORLD")).toBe(true);
+  });
+
+  it("matches regex", () => {
+    expect(matchesFilter("abc 123", "\\d+")).toBe(true);
+    expect(matchesFilter("abc 123", "^abc")).toBe(true);
+  });
+
+  it("rejects zero-length regex matches", () => {
+    // x* matches "" on any string. We only want it to return true if it matches SOMETHING.
+    expect(matchesFilter("abc", "x*")).toBe(false);
+    expect(matchesFilter("axbc", "x*")).toBe(true); // matches "x"
+  });
+
+  it("handles invalid regex gracefully by falling back to literal", () => {
+    expect(matchesFilter("hello (world)", "(world")).toBe(true);
+  });
+
+  it("returns true if EITHER literal or regex matches", () => {
+    // Literal match only
+    expect(matchesFilter("hello (world)", "(world")).toBe(true);
+    // Regex match only
+    expect(matchesFilter("abc 123", "\\d+")).toBe(true);
   });
 });

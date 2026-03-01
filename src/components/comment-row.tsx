@@ -372,8 +372,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             </p>
           ) : (
             <p className="truncate text-sm text-zinc-400">
-              {author && <span className="text-zinc-600">{highlightText(author, searchFilter ?? "")}: </span>}
-              {highlightText(text, searchFilter ?? "")}
+              <span>
+                {author && <span className="text-zinc-600">{highlightText(author, searchFilter ?? "")}: </span>}
+                {highlightText(text, searchFilter ?? "")}
+              </span>
             </p>
           )}
             </div>

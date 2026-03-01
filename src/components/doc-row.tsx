@@ -71,7 +71,7 @@ export function DocRow({
             }`}
           >
             <DocTypeIcon mimeType={doc.mimeType} />
-            {highlightText(doc.title, searchFilter)}
+            <span>{highlightText(doc.title, searchFilter)}</span>
           </a>
           {doc.role === "AUTHOR" && (
             <span title="You are an author of this document" className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>
@@ -85,7 +85,7 @@ export function DocRow({
         {hasNotes && (
           <p className="truncate text-sm text-zinc-400 w-0 min-w-full" title={notesTooltip}>
             <span className="text-zinc-500">Notes: </span>
-            {highlightText(doc.notes!.replace(/\n/g, " "), searchFilter)}
+            <span>{highlightText(doc.notes!.replace(/\n/g, " "), searchFilter)}</span>
           </p>
         )}
       </td>
