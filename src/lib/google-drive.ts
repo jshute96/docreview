@@ -318,6 +318,7 @@ export async function fetchSuggestionContent(
 export interface ThreadReply {
   author: string;
   content: string;
+  htmlContent?: string;
   createdTime: string;
   action?: "resolve" | "reopen";
 }
@@ -329,9 +330,11 @@ export interface CommentThread {
   id: string;
   author: string;
   content: string;
+  htmlContent?: string;
   createdTime: string;
   resolved: boolean;
   replies: ThreadReply[];
+  quotedFileContent?: { mimeType: string; value: string } | null;
 }
 
 // Full Drive data for a single comment thread: sync metadata (for DB update)
@@ -361,7 +364,7 @@ export async function fetchThreadDetail(
     fileId: googleDocId,
     commentId,
     fields:
-      "id, resolved, content, createdTime, modifiedTime, author(me, displayName), replies(content, createdTime, action, author(me, displayName))",
+      "id, resolved, content, htmlContent, quotedFileContent(mimeType, value), createdTime, modifiedTime, author(me, displayName), replies(content, htmlContent, createdTime, action, author(me, displayName))",
   });
   console.log(`[Drive] comments.get ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
 
@@ -374,6 +377,7 @@ export async function fetchThreadDetail(
   const threadReplies: ThreadReply[] = allReplies.map((r) => ({
     author: r.author?.displayName ?? "Unknown",
     content: r.content ?? "",
+    ...(r.htmlContent ? { htmlContent: r.htmlContent } : {}),
     createdTime: r.createdTime ?? "",
     ...(r.action === "resolve" || r.action === "reopen" ? { action: r.action } : {}),
   }));
@@ -388,9 +392,15 @@ export async function fetchThreadDetail(
       id: c.id,
       author: c.author?.displayName ?? "Unknown",
       content: c.content,
+      ...(c.htmlContent ? { htmlContent: c.htmlContent } : {}),
       createdTime: c.createdTime ?? "",
       resolved: c.resolved === true,
       replies: threadReplies,
+      quotedFileContent: c.quotedFileContent?.value
+        ? c.quotedFileContent.mimeType === "text/plain" || c.quotedFileContent.mimeType === "text/html" || !c.quotedFileContent.mimeType
+          ? { mimeType: c.quotedFileContent.mimeType ?? "text/plain", value: c.quotedFileContent.value }
+          : (console.log(`[Drive] Unexpected quotedFileContent mimeType: ${c.quotedFileContent.mimeType} on comment ${c.id}`), null)
+        : null,
     },
   };
 }
@@ -410,7 +420,7 @@ export async function fetchAllThreads(
     const res = await drive.comments.list({
       fileId: googleDocId,
       fields:
-        "nextPageToken, comments(id, resolved, content, createdTime, author(displayName), replies(content, createdTime, action, author(displayName)))",
+        "nextPageToken, comments(id, resolved, content, htmlContent, quotedFileContent(mimeType, value), createdTime, author(displayName), replies(content, htmlContent, createdTime, action, author(displayName)))",
       pageSize: 100,
       ...(pageToken ? { pageToken } : {}),
     });
@@ -421,6 +431,7 @@ export async function fetchAllThreads(
       const replies: ThreadReply[] = (c.replies ?? []).map((r) => ({
         author: r.author?.displayName ?? "Unknown",
         content: r.content ?? "",
+        ...(r.htmlContent ? { htmlContent: r.htmlContent } : {}),
         createdTime: r.createdTime ?? "",
         ...(r.action === "resolve" || r.action === "reopen" ? { action: r.action } : {}),
       }));
@@ -429,9 +440,15 @@ export async function fetchAllThreads(
         id: c.id,
         author: c.author?.displayName ?? "Unknown",
         content: c.content,
+        ...(c.htmlContent ? { htmlContent: c.htmlContent } : {}),
         createdTime: c.createdTime ?? "",
         resolved: c.resolved === true,
         replies,
+        quotedFileContent: c.quotedFileContent?.value
+          ? c.quotedFileContent.mimeType === "text/plain" || !c.quotedFileContent.mimeType
+            ? { mimeType: "text/plain", value: c.quotedFileContent.value }
+            : (console.log(`[Drive] Unexpected quotedFileContent mimeType: ${c.quotedFileContent.mimeType} on comment ${c.id}`), null)
+          : null,
       });
     }
 

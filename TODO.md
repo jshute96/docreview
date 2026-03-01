@@ -1,19 +1,10 @@
 * Better handling of docs I don't have permission to (vs deleted)
 * Load... dialog box
-* What can we show for comments attached to deleted text, that no one will see, but we can still reply to?
-
-* Suggestions fetching is still limited and sketchy
-  * No timestamps, no response counts
-  * Anchor links into the doc don't work
-  * There's no timestamp-based detection of new ones or updates, so there might
-    be excessive polling
 
 * Make refresh on a doc faster, and probably cheaper, by doing fewer API calls.
-* Use last comments sync timestamp during doc refresh
 * If someone else resolves my thread, that comment should stay active/watched?
 * gmail scan
 * how do I notice @mentions?
-* dialog box for filtering what to Load from Drive
 * Mute state on docs
 * Track what comments I've seen, and show the new ones in a different color
 * Expand all / collapse all on comments page
@@ -51,3 +42,17 @@
   * better visual for the cross-out filter buttons
   * tooltip display for longer notes
   * editable notes box inline on the comments page?
+
+## gaps
+  * no way to get suggestions cheaply or incrementally
+    * we have to read doc contents and extract all the inlined suggestions
+  * we can't get comments incrementally.  we always scan all of them.
+  * for suggestions, there's minimal API support.
+    * we can't see the replies, author, accept/reject state, etc.
+    * we can't accept or remove via API
+  * for comments, we can't tell if they're attached to deleted text
+    * the reported anchor location is immutable, from time of creation
+    * the quoted text is also immutable
+    * the quoted text doesn't pass through formatting, just plain text
+      * nothing for images. for tables, seems to just give the top row.
+      * we don't get clickable links in the view

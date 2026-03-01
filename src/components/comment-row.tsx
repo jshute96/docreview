@@ -396,7 +396,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             <div className="overflow-hidden min-h-0">
               {isSuggestion ? (
                 <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
-                  <div className="flex justify-end gap-1 mb-2">
+                  <div className="float-right relative z-10 flex gap-1 ml-2 mb-1">
                     <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Open the document at this comment" asChild>
                       <a href={commentUrl()} target="docreview-doc">
                         Open

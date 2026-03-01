@@ -256,11 +256,22 @@ export function CommentThreadPanel({
     <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
       {buttons}
       <div className="divide-y divide-zinc-200">
-        {threads.map((thread) => (
+        {threads.map((thread, threadIndex) => (
           <div
             key={thread.id}
             className={`py-3 first:pt-0 last:pb-0 ${thread.resolved ? "opacity-60" : ""}`}
           >
+            {threadIndex === 0 && thread.quotedFileContent?.value && (
+              <div className="mb-2 rounded border-l-2 border-zinc-300 bg-zinc-100 px-3 py-1.5">
+                {/* Drive returns text/html for quotedFileContent but in practice
+                   the value appears to be plain text with no formatting markup. */}
+                {thread.quotedFileContent.mimeType === "text/html" ? (
+                  <p className="text-xs text-zinc-500 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: thread.quotedFileContent.value }} />
+                ) : (
+                  <p className="text-xs text-zinc-500 whitespace-pre-wrap">{thread.quotedFileContent.value}</p>
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-zinc-900">
                 {thread.author}
@@ -274,9 +285,13 @@ export function CommentThreadPanel({
                 </span>
               )}
             </div>
-            <p className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap">
-              {highlightText(thread.content, searchFilter ?? "")}
-            </p>
+            {thread.htmlContent ? (
+              <p className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap [&_a]:text-blue-600 [&_a]:underline" dangerouslySetInnerHTML={{ __html: thread.htmlContent }} />
+            ) : (
+              <p className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap">
+                {highlightText(thread.content, searchFilter ?? "")}
+              </p>
+            )}
 
             {thread.replies.map((reply, i) => (
               <div key={i} className="ml-8 mt-2">
@@ -298,10 +313,14 @@ export function CommentThreadPanel({
                     </span>
                   )}
                 </div>
-                {reply.content && (
-                  <p className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap">
-                    {highlightText(reply.content, searchFilter ?? "")}
-                  </p>
+                {(reply.htmlContent || reply.content) && (
+                  reply.htmlContent ? (
+                    <p className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap [&_a]:text-blue-600 [&_a]:underline" dangerouslySetInnerHTML={{ __html: reply.htmlContent }} />
+                  ) : (
+                    <p className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap">
+                      {highlightText(reply.content, searchFilter ?? "")}
+                    </p>
+                  )
                 )}
               </div>
             ))}
