@@ -43,10 +43,10 @@ export function filterDocs(
       return false;
     if (mime.exclude.length > 0 && mime.exclude.includes(docMime)) return false;
 
-    // labels: include = must have at least one (OR), exclude = must not have any
+    // labels: include = must have ALL (AND), exclude = must not have any
     if (
       lbl.include.length > 0 &&
-      !doc.labels.some((dl) => lbl.include.includes(dl.labelId))
+      !lbl.include.every((id) => doc.labels.some((dl) => dl.labelId === id))
     )
       return false;
     if (

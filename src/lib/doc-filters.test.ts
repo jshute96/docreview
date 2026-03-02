@@ -213,6 +213,33 @@ describe("filterDocs", () => {
     expect(result[0].title).toBe("HasBug");
   });
 
+  it("filters by multiple label include (uses AND)", () => {
+    const docs = [
+      makeDoc({
+        title: "HasL1",
+        labels: [{ docId: "d1", labelId: "L1", label: { id: "L1", name: "L1" } }] as any,
+      }),
+      makeDoc({
+        title: "HasL2",
+        labels: [{ docId: "d2", labelId: "L2", label: { id: "L2", name: "L2" } }] as any,
+      }),
+      makeDoc({
+        title: "HasBoth",
+        labels: [
+          { docId: "d3", labelId: "L1", label: { id: "L1", name: "L1" } },
+          { docId: "d3", labelId: "L2", label: { id: "L2", name: "L2" } },
+        ] as any,
+      }),
+    ];
+    const result = filterDocs(docs, {
+      ...defaultOpts,
+      labels: { L1: "include", L2: "include" },
+    });
+    // DESIRED BEHAVIOR: AND logic (should only return HasBoth)
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe("HasBoth");
+  });
+
   it("filters by title regex", () => {
     const docs = [
       makeDoc({ title: "Design Doc" }),
