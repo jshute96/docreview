@@ -120,6 +120,7 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 
 | File | Description |
 |------|-------------|
+| `inbox-states.md` | Describes Inbox/Archived/Muted states for docs and comments, and state changes between them |
 | `refresh.md` | Full refresh flow — Drive sync modes, deletion detection, comment sync, UI update |
 | `comment-tracking.md` | Comment status logic, unarchive rules, filter behavior |
 | `bulk-edit.md` | Bulk editing logic — tri-state UI, context-aware cycling, no-op protection |

@@ -1,13 +1,41 @@
-* Better handling of docs I don't have permission to (vs deleted)
-
+P1:
+* how do I notice @mentions?
+* refine gmail flows
+* schema change, rename all "id" columns
+* change to "Inbox" terminology
+  * Change "Active" filter on main page to Inbox|All (or not muted?)
+  * Add and Load controls can choose to add in inbox.
+* refine flows for what comes into Inbox (for comments and docs)
+  * my docs
+  * shared with me explicitly
+  * reply to my comment
+  * I commented?
+  * @mention me
+  * doc: add to inbox if a comment goes to inbox
+* State/tag for @mentioned on comment, with mine/replied and resolved
+* Status column in comments view: Mine, Replied, Open, Inbox, Muted
 * Load - when I click Add, it rescans and re-resolves all the docs, not just
   the selected ones.
-* Multi-select in Load and Edit All, with remove or "just these".
 
+Easy:
+* X to clear search boxes
+* scroll bars for lots of docs
+
+* Dialog boxes
+  * dialog box moves on new vs add
+  * Edit All and Load dialog boxes don't follow my dialog-sizing.md rules and aren't consistent. Make a common widget for these?
+  * Load dialog upper bound of 365 days? and UI weirdness from that.
+  * Multi-select in Load and Edit All, with remove or "just these".
+
+* Better handling of docs I don't have permission to (vs deleted)
+  * rename is_deleted to in_trash
+  * add a not_accessible bit
+  * support adding these from gmail notifications, with fill-in title and notes
+  * try flow of adding a doc I am requesting permission to, with notes about what it was
+
+* "No comments on this doc" still shows if we try to load and fail.
 * Make refresh on a doc faster, and probably cheaper, by doing fewer API calls.
 * If someone else resolves my thread, that comment should stay active/watched?
-* gmail scan
-* how do I notice @mentions?
 * Mute state on docs
 * Track what comments I've seen, and show the new ones in a different color
 * keyboard shortcuts
@@ -44,6 +72,8 @@
   * better visual for the cross-out filter buttons
   * tooltip display for longer notes
   * editable notes box inline on the comments page?
+  * rendering glitch when toggling filters makes scroll bar appear
+  * wrapped dates, tall rows in the main box again
 
 ## gaps
 * no way to get suggestions cheaply or incrementally
