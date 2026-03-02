@@ -3,6 +3,7 @@ export interface LoadOptions {
   daysBack: number;
   ownership: "all" | "owned" | "shared-with-me";
   includeSharedDrives: boolean;
+  source: "drive" | "gmail";
 }
 
 /**
@@ -20,6 +21,11 @@ export function parseLoadOptions(body: Record<string, unknown>): LoadOptions {
       : "all"
   ) as LoadOptions["ownership"];
   const includeSharedDrives = body.includeSharedDrives === true;
+  const source = (
+    typeof body.source === "string" && ["drive", "gmail"].includes(body.source)
+      ? body.source
+      : "drive"
+  ) as LoadOptions["source"];
 
-  return { daysBack, ownership, includeSharedDrives };
+  return { daysBack, ownership, includeSharedDrives, source };
 }

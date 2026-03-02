@@ -49,6 +49,7 @@ interface ScanDoc {
 interface ScanResult {
   total: number;
   existingCount: number;
+  errorCount?: number;
   docs: ScanDoc[];
 }
 
@@ -73,6 +74,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [adding, setAdding] = useState(false);
+  const [source, setSource] = useState<"drive" | "gmail">("drive");
   const [daysBackText, setDaysBackText] = useState(
     String(DEFAULT_OPTIONS.daysBack)
   );
@@ -88,6 +90,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       setScanResult(null);
       setRemovedDocIds(new Set());
       setViewMode("new");
+      setSource("drive");
       setSelectedLabelIds([]);
       setNotes("");
       setDaysBackText(String(DEFAULT_OPTIONS.daysBack));
@@ -115,10 +118,13 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
     setScanning(true);
     setScanResult(null);
     try {
+      const scanBody = source === "gmail"
+        ? { source: "gmail", daysBack: options.daysBack }
+        : { source: "drive", ...options };
       const res = await apiFetch("/api/docs/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(options),
+        body: JSON.stringify(scanBody),
         signal: controller.signal,
       });
       if (!res.ok) throw new Error("Scan failed");
@@ -128,7 +134,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       setDocListRows(Math.min(15, Math.max(5, result.docs.filter((d) => viewMode === "all" || d.isNew).length)));
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
-      if (!isAuthError(err)) toast.error("Failed to scan Google Drive");
+      if (!isAuthError(err)) toast.error(`Failed to scan ${source === "gmail" ? "Gmail" : "Google Drive"}`);
     } finally {
       setScanning(false);
     }
@@ -145,6 +151,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...options,
+          source,
           selectedGoogleDocIds: visibleDocs.map((d) => d.googleDocId),
           labelIds: selectedLabelIds,
           notes,
@@ -217,6 +224,47 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
 
         <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
           <div className="flex flex-col gap-4 px-6 py-4 shrink-0">
+            {/* Source toggle */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-zinc-700">
+                Source
+              </label>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => {
+                    if (source !== "drive") {
+                      setSource("drive");
+                      setScanResult(null);
+                      setRemovedDocIds(new Set());
+                    }
+                  }}
+                  className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                    source === "drive"
+                      ? "bg-zinc-900 text-white"
+                      : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                  }`}
+                >
+                  Drive
+                </button>
+                <button
+                  onClick={() => {
+                    if (source !== "gmail") {
+                      setSource("gmail");
+                      setScanResult(null);
+                      setRemovedDocIds(new Set());
+                    }
+                  }}
+                  className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                    source === "gmail"
+                      ? "bg-zinc-900 text-white"
+                      : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                  }`}
+                >
+                  Gmail
+                </button>
+              </div>
+            </div>
+
             {/* Days back */}
             <div className="flex flex-col gap-1.5">
               <label
@@ -254,60 +302,64 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
               </div>
             </div>
 
-            {/* Ownership filter */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-zinc-700">
-                Which documents
-              </label>
-              <Select
-                value={options.ownership}
-                onValueChange={(v) =>
-                  setOptions((o) => ({
-                    ...o,
-                    ownership: v as LoadOptions["ownership"],
-                  }))
-                }
-              >
-                <SelectTrigger className="w-full bg-background">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All accessible docs</SelectItem>
-                  <SelectItem value="owned">Only docs I own</SelectItem>
-                  <SelectItem value="shared-with-me">
-                    Only docs shared with me
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-zinc-400">
-                {options.ownership === "all" &&
-                  "Everything you can access in Google Drive."}
-                {options.ownership === "owned" &&
-                  "Only documents where you are the owner."}
-                {options.ownership === "shared-with-me" &&
-                  "Only documents that were explicitly shared with you."}
-              </p>
-            </div>
+            {/* Ownership filter — Drive only */}
+            {source === "drive" && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-zinc-700">
+                  Which documents
+                </label>
+                <Select
+                  value={options.ownership}
+                  onValueChange={(v) =>
+                    setOptions((o) => ({
+                      ...o,
+                      ownership: v as LoadOptions["ownership"],
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-full bg-background">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All accessible docs</SelectItem>
+                    <SelectItem value="owned">Only docs I own</SelectItem>
+                    <SelectItem value="shared-with-me">
+                      Only docs shared with me
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-zinc-400">
+                  {options.ownership === "all" &&
+                    "Everything you can access in Google Drive."}
+                  {options.ownership === "owned" &&
+                    "Only documents where you are the owner."}
+                  {options.ownership === "shared-with-me" &&
+                    "Only documents that were explicitly shared with you."}
+                </p>
+              </div>
+            )}
 
-            {/* Include shared drives */}
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="load-shared-drives"
-                checked={options.includeSharedDrives}
-                onCheckedChange={(checked) =>
-                  setOptions((o) => ({
-                    ...o,
-                    includeSharedDrives: checked === true,
-                  }))
-                }
-              />
-              <label
-                htmlFor="load-shared-drives"
-                className="text-sm text-zinc-700 cursor-pointer"
-              >
-                Include shared drives
-              </label>
-            </div>
+            {/* Include shared drives — Drive only */}
+            {source === "drive" && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="load-shared-drives"
+                  checked={options.includeSharedDrives}
+                  onCheckedChange={(checked) =>
+                    setOptions((o) => ({
+                      ...o,
+                      includeSharedDrives: checked === true,
+                    }))
+                  }
+                />
+                <label
+                  htmlFor="load-shared-drives"
+                  className="text-sm text-zinc-700 cursor-pointer"
+                >
+                  Include shared drives
+                </label>
+              </div>
+            )}
 
             {/* Scan results - summary */}
             {scanResult && (
@@ -321,6 +373,11 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                   <span>
                     New documents: {scanResult.docs.filter((d) => d.isNew).length}
                   </span>
+                  {(scanResult.errorCount ?? 0) > 0 && (
+                    <span className="text-amber-600">
+                      {scanResult.errorCount} email{scanResult.errorCount === 1 ? "" : "s"} could not be resolved
+                    </span>
+                  )}
                 </div>
 
                 {/* New / All toggle */}

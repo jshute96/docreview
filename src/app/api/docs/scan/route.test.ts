@@ -107,6 +107,7 @@ describe("POST /api/docs/scan", () => {
 
   it("returns 502 when Drive API fails", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findMany.mockResolvedValue([]);
     mockListRecentDocs.mockRejectedValue(new Error("Drive error"));
 
     await suppressingErrors(async () => {

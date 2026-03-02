@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { listRecentDocs, findDeletedDocIds, getDriveClient, getChangesStartPageToken, listChanges, invalidGrantResponse } from "@/lib/google-drive";
+import { listRecentDocs, fetchDocsByIds, findDeletedDocIds, getDriveClient, getChangesStartPageToken, listChanges, invalidGrantResponse } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken } from "@/lib/status";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   if (mode === "load") {
     try { loadBody = await req.json(); } catch { /* no body is fine */ }
   }
-  const { daysBack, ownership, includeSharedDrives } = parseLoadOptions(loadBody);
+  const { daysBack, ownership, includeSharedDrives, source } = parseLoadOptions(loadBody);
   const selectedSet = Array.isArray(loadBody.selectedGoogleDocIds)
     ? new Set(loadBody.selectedGoogleDocIds as string[])
     : null;
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 
   console.log(`[Sync] Starting ${mode} sync`);
   if (mode === "load") {
-    console.log(`[Sync] Load options: daysBack=${daysBack}, ownership=${ownership}, includeSharedDrives=${includeSharedDrives}${selectedSet ? `, ${selectedSet.size} docs selected` : ""}`);
+    console.log(`[Sync] Load options: source=${source}, daysBack=${daysBack}, ownership=${ownership}, includeSharedDrives=${includeSharedDrives}${selectedSet ? `, ${selectedSet.size} docs selected` : ""}`);
   }
   const t0 = Date.now();
 
@@ -84,8 +84,13 @@ export async function POST(req: NextRequest) {
   try {
     driveAuth = await getDriveClient(userId);
 
-    if (mode === "load") {
-      // Load mode: scan via files.list with user-specified options
+    if (mode === "load" && source === "gmail") {
+      // Gmail load mode: fetch metadata directly by doc ID
+      const docIds = selectedSet ? [...selectedSet] : [];
+      console.log(`[Sync] Load (gmail): fetching metadata for ${docIds.length} docs by ID`);
+      driveDocs = await fetchDocsByIds(userId, docIds);
+    } else if (mode === "load") {
+      // Drive load mode: scan via files.list with user-specified options
       console.log(`[Sync] Load: scanning via files.list (${daysBack}-day window, ownership=${ownership})`);
       driveDocs = await listRecentDocs(
         userId,
@@ -240,9 +245,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Check active docs that didn't appear in Drive results — only in load mode,
-  // since refresh/full-refresh detect deletions via changes.list.
-  if (mode === "load") {
+  // Check active docs that didn't appear in Drive results — only in Drive load
+  // mode, since refresh/full-refresh detect deletions via changes.list and Gmail
+  // loads only fetch specific doc IDs (no meaningful "missing" set).
+  if (mode === "load" && source !== "gmail") {
     const missingDocs = await prisma.doc.findMany({
       where: {
         userId,

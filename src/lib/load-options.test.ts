@@ -7,6 +7,7 @@ describe("parseLoadOptions", () => {
       daysBack: 30,
       ownership: "all",
       includeSharedDrives: false,
+      source: "drive",
     });
   });
 
@@ -45,5 +46,16 @@ describe("parseLoadOptions", () => {
     expect(parseLoadOptions({ includeSharedDrives: false }).includeSharedDrives).toBe(false);
     expect(parseLoadOptions({ includeSharedDrives: "true" }).includeSharedDrives).toBe(false);
     expect(parseLoadOptions({ includeSharedDrives: 1 }).includeSharedDrives).toBe(false);
+  });
+
+  it("accepts valid source values", () => {
+    expect(parseLoadOptions({ source: "drive" }).source).toBe("drive");
+    expect(parseLoadOptions({ source: "gmail" }).source).toBe("gmail");
+  });
+
+  it("defaults source for invalid values", () => {
+    expect(parseLoadOptions({ source: "bogus" }).source).toBe("drive");
+    expect(parseLoadOptions({ source: 42 }).source).toBe("drive");
+    expect(parseLoadOptions({}).source).toBe("drive");
   });
 });

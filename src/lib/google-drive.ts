@@ -586,6 +586,45 @@ export async function listChanges(userId: string, pageToken: string): Promise<Dr
   return { docs, deletedDocIds, newPageToken };
 }
 
+/** Fetch Drive metadata for specific doc IDs (via individual files.get calls). */
+export async function fetchDocsByIds(userId: string, docIds: string[]): Promise<DriveDoc[]> {
+  if (docIds.length === 0) return [];
+
+  const auth = await getDriveClient(userId);
+  const drive = google.drive({ version: "v3", auth });
+
+  const results = await Promise.all(
+    docIds.map(async (id) => {
+      const t0 = Date.now();
+      try {
+        const res = await drive.files.get({
+          fileId: id,
+          fields: "id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName)",
+          supportsAllDrives: true,
+        });
+        const file = res.data;
+        const isOwner = file.owners?.some((o) => o.me === true) ?? false;
+        console.log(`[Drive] files.get ${id} → "${file.name}" (${Date.now() - t0}ms)`);
+        return {
+          googleDocId: id,
+          title: file.name ?? id,
+          driveUrl: file.webViewLink ?? `https://docs.google.com/document/d/${id}/edit`,
+          mimeType: file.mimeType ?? "",
+          role: (isOwner ? "AUTHOR" : "REVIEWER") as "AUTHOR" | "REVIEWER",
+          lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,
+          createdTimeInDrive: file.createdTime ? new Date(file.createdTime) : null,
+          owner: file.owners?.[0]?.displayName ?? null,
+        };
+      } catch (err) {
+        console.error(`[Drive] files.get ${id} failed (${Date.now() - t0}ms):`, err);
+        return null;
+      }
+    })
+  );
+
+  return results.filter((d): d is DriveDoc => d !== null);
+}
+
 export interface ListRecentDocsOptions {
   ownership?: "all" | "owned" | "shared-with-me";
   includeSharedDrives?: boolean;
