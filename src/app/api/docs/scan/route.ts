@@ -25,10 +25,11 @@ export async function POST(req: NextRequest) {
   );
 
   if (source === "gmail") {
-    console.log(`[Scan] Starting Gmail scan: daysBack=${daysBack}`);
+    const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+    console.log(`[Scan] Starting Gmail scan: daysBack=${daysBack}, since=${since.toISOString()}`);
 
     try {
-      const { docs: gmailDocs, errorCount } = await scanGmailNotifications(userId, daysBack);
+      const { docs: gmailDocs, errorCount } = await scanGmailNotifications(userId, since);
 
       const docs = gmailDocs.map(d => ({
         googleDocId: d.googleDocId,

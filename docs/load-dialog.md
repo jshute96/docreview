@@ -16,20 +16,11 @@ Returns Google Docs/Sheets/Slides modified within the time window.
 
 ### Gmail
 
-Searches Gmail for notification emails from:
-- `drive-shares-dm-noreply@google.com` (sharing notifications)
-- `comments-noreply@docs.google.com` (comment notifications)
-
-For each email, the scanner extracts the Google Doc link from the body, then
-fetches the real doc title and metadata from Drive. Emails where no doc link
-can be extracted, or where Drive metadata fails to fetch, are counted as errors
-and logged (but not shown in the doc list). The error count is displayed in the
-scan summary.
+Searches Gmail for doc notification emails, extracts doc IDs, and fetches Drive
+metadata. See [`gmail.md`](./gmail.md) for full scanner details.
 
 When Gmail is selected, the ownership filter and shared drives checkbox are
-hidden (not applicable).
-
-Switching sources clears any existing scan results.
+hidden (not applicable). Switching sources clears any existing scan results.
 
 ## UI Flow
 
@@ -231,20 +222,10 @@ move when clicking X, because that's annoying when trying to click X on multiple
 
 ---
 
-## Gmail Scanning Details
+## Gmail
 
-The Gmail scanner (`src/lib/gmail.ts`) works as follows:
-
-1. Queries Gmail for messages from the two notification sender addresses, filtered by date
-2. Fetches each message to extract headers (Subject, From, Date) and body
-3. Parses the plaintext body with regex to find a `/d/DOC_ID/` pattern
-4. For messages with a doc ID, calls Drive `files.get` to fetch real title, mimeType, webViewLink, and owner
-5. Messages with no doc link or failed Drive fetch are logged as errors and counted
-6. Deduplicates by googleDocId (multiple emails may reference the same doc)
-7. Returns `{ docs, errorCount }` — only successfully resolved docs are included
-
-The Gmail scope (`gmail.readonly`) is requested alongside Drive scopes in `src/auth.ts`.
-Users must sign out and sign back in to grant the new scope.
+For Gmail scanner internals, the **Refresh from Gmail** toolbar button, and a
+comparison of Load vs Refresh flows, see [`gmail.md`](./gmail.md).
 
 ---
 

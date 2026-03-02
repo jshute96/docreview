@@ -11,3 +11,11 @@ export async function updateDriveChangesToken(userId: string, token: string) {
     update: { driveChangesPageToken: token },
   });
 }
+
+export async function updateGmailTimestamp(userId: string, timestamp: Date) {
+  await prisma.status.upsert({
+    where: { userId },
+    create: { userId, lastGmailUpdateTimestamp: timestamp },
+    update: { lastGmailUpdateTimestamp: timestamp },
+  });
+}

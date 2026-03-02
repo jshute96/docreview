@@ -9,8 +9,10 @@ There are three sync modes, triggered from different UI paths:
 | **Load** | Load dialog ([`load-dialog.md`](./load-dialog.md)) | `files.list` — configurable window | `files.get` per missing doc | Docs returned by Drive |
 | **Refresh** | "Refresh" button | `changes.list` — incremental | Built into changes feed | Changed docs only |
 | **Full Refresh** | "Full Refresh" button | `changes.list` — incremental | Built into changes feed | All docs (including deleted) |
+| **Gmail Refresh** | "Refresh from Gmail" button ([`gmail.md`](./gmail.md)) | Gmail notification scan | `findDeletedDocIds` for missing docs | Upserted docs |
 
-All three modes share the same POST handler (`POST /api/docs?mode=...`). Per-doc refresh
+Load, Refresh, and Full Refresh share the same POST handler (`POST /api/docs?mode=...`).
+Gmail Refresh has its own handler (`POST /api/docs/gmail-refresh`). Per-doc refresh
 (detail page) is separate — see below.
 
 ## Per-doc Refresh (detail page)

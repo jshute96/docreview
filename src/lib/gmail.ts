@@ -18,15 +18,15 @@ export interface GmailScanResult {
 /** Scan Gmail for Google Doc notification emails and resolve doc metadata via Drive. */
 export async function scanGmailNotifications(
   userId: string,
-  daysBack: number
+  since: Date
 ): Promise<GmailScanResult> {
   const auth = await getDriveClient(userId);
   const gmail = google.gmail({ version: "v1", auth });
   const drive = google.drive({ version: "v3", auth });
 
-  // Build date cutoff for Gmail query
-  const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
-  const afterDate = `${cutoff.getFullYear()}/${String(cutoff.getMonth() + 1).padStart(2, "0")}/${String(cutoff.getDate()).padStart(2, "0")}`;
+  // Build date cutoff for Gmail query (day-level precision)
+  const afterDate = `${since.getFullYear()}/${String(since.getMonth() + 1).padStart(2, "0")}/${String(since.getDate()).padStart(2, "0")}`;
+  const sinceMs = since.getTime();
 
   const query = `from:drive-shares-dm-noreply@google.com OR from:comments-noreply@docs.google.com after:${afterDate}`;
   console.log(`[Gmail] Searching: ${query}`);
@@ -71,6 +71,13 @@ export async function scanGmailNotifications(
           id: messageId,
           format: "full",
         });
+
+        // Filter by internalDate for timestamp-level precision (Gmail after: is day-level only)
+        const internalDate = Number(res.data.internalDate);
+        if (internalDate && internalDate < sinceMs) {
+          console.log(`[Gmail] ${messageId}: skipped — internalDate ${new Date(internalDate).toISOString()} < since (${Date.now() - t0}ms)`);
+          return;
+        }
 
         const headers = res.data.payload?.headers ?? [];
         const subject = headers.find((h) => h.name?.toLowerCase() === "subject")?.value ?? "(no subject)";
