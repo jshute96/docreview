@@ -50,7 +50,18 @@ status, comments, and suggestions via the Google Drive API.
    AUTH_GOOGLE_SECRET="..."
    ```
 
-5. **Set up postgres**
+5. **Proxy & HTTPS Setup:**
+   This is not necessary to access a server directly using http://localhost:3000.
+
+   If you are accessing the server via a reverse proxy (e.g., Nginx, Caddy, or a cloud dev proxy), add these to `.env`:
+   ```
+   AUTH_URL="https://myapp.example.com"
+   AUTH_TRUST_HOST=true
+   ```
+   Ensure you add the `https` callback URL to your OAuth provider's authorized redirect URIs (e.g., in the Google Cloud Console):
+   `https://myapp.example.com/api/auth/callback/google`
+
+6. **Set up postgres**
    ```bash
    sudo apt install postgresql
 
@@ -65,17 +76,17 @@ status, comments, and suggestions via the Google Drive API.
    alter user USER CREATEDB;
    ```
 
-6. **Create a PostgreSQL database:**
+7. **Create a PostgreSQL database:**
    ```bash
    createdb docreview
    ```
 
-7. **Initialize the database:**
+8. **Initialize the database:**
    ```bash
    npx prisma migrate dev
    ```
 
-8. **Start the dev server:**
+9. **Start the dev server:**
    ```bash
    npm run dev
    ```

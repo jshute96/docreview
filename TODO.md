@@ -1,3 +1,7 @@
+P0:
+* Bug: When I refresh a doc, the archived comments all come back.
+* Put doc name first in title for comments tab to make tabs easier to find.
+
 P1:
 * how do I notice @mentions?
 * refine gmail flows
@@ -16,20 +20,28 @@ P1:
 * Status column in comments view: Mine, Replied, Open, Inbox, Muted
 * Load - when I click Add, it rescans and re-resolves all the docs, not just
   the selected ones.
+* Main app title in the top level.  Plus more decoration.
 
 Easy:
 * X to clear search boxes
 * scroll bars for lots of docs
+* Button to open Drive
+* Button for search in Drive (from docs search box)
+* Put filter labels in window title, so I can distinguish multiple windows
+* Confirm screen on deleting label, with a label count (also show in hover)
+* Comments: Archive all
 
 * Dialog boxes
   * dialog box moves on new vs add
-  * Edit All and Load dialog boxes don't follow my dialog-sizing.md rules and aren't consistent. Make a common widget for these?
+  * Edit All and Load dialog boxes don't follow my dialog-sizing.md rules and aren't consistent.
+      * Refactor SelectBox widget to use in both
   * Load dialog upper bound of 365 days? and UI weirdness from that.
-  * Multi-select in Load and Edit All, with remove or "just these".
+  * Multi-select in SelectBox, with remove or "just these".
+  * Deleting multiple labels, the window resizes and moves
 
 * Better handling of docs I don't have permission to (vs deleted)
-  * rename is_deleted to in_trash
-  * add a not_accessible bit
+  * rename `is_deleted` to `in_trash`
+  * add a `not_accessible` bit
   * support adding these from gmail notifications, with fill-in title and notes
   * try flow of adding a doc I am requesting permission to, with notes about what it was
 
@@ -94,3 +106,7 @@ Easy:
 * we fetch all comments with full reply text when opening the comments page
   * if there are a lot of comments, it might make sense to split that up
   * maybe just fetch the initial comments first
+* add a screen for labeling new docs that appeared during a refresh?
+
+## low priority
+* rename a label

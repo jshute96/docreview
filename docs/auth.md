@@ -147,10 +147,21 @@ Every API route that calls Google wraps its catch block with `invalidGrantRespon
 | `src/lib/api-fetch.ts` | Client-side fetch wrapper that handles 401 → reauth toast |
 | `prisma/schema.prisma` | `Session`, `Account`, `User` table definitions |
 
-## Offline Mode
+## Proxy & HTTPS Setup
 
-When `OFFLINE_MODE` is enabled:
-- Uses `CredentialsProvider` instead of Google OAuth (no tokens needed)
-- Session strategy switches to `"jwt"` (PrismaAdapter doesn't create DB sessions for credentials-based auth)
-- No `accounts` row is created — all Google API calls throw `OfflineModeError`
-- The sign-out button is disabled in the UI
+When running behind a reverse proxy (e.g., Nginx, Caddy, or cloud development proxies), special configuration is needed to ensure OAuth redirects use the correct protocol (`https`) and hostname.
+
+### Required Environment Variables
+
+Set these in your `.env` file:
+- **`AUTH_URL`**: The public URL of your app (e.g., `https://myapp.example.com`). This defines the canonical base for all OAuth operations.
+- **`AUTH_TRUST_HOST=true`**: Permitted Auth.js to use the `AUTH_URL` hostname for absolute link generation.
+
+### Configuration (`src/auth.ts`)
+
+- **`trustHost: true`**: Permitted Auth.js to trust `X-Forwarded-*` headers sent by the proxy.
+- **`useSecureCookies: true`**: Forces session and CSRF cookies to use the `Secure` flag. This is mandatory when the app is accessed via HTTPS, even if the internal Next.js server runs on HTTP. Without this, the browser will block the state/PKCE cookies during the OAuth callback redirect.
+
+### UI Implementation (`src/components/google-signin-button.tsx`)
+
+The sign-in button is a **Client Component** using the client-side `signIn` function. This is more reliable in proxy environments because it uses the browser's `window.location` to determine the protocol and domain, ensuring the `redirect_uri` sent to the provider matches exactly what the user sees in their address bar.
