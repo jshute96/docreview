@@ -28,6 +28,7 @@ will be added before committing.
 │  ─────────────────────────── │
 │  Total documents found: 42   │
 │  New documents: 5            │
+│  [New] [All]                 │
 │  ┌──────────────────────┐    │
 │  │ ✕ 📄 Design Doc      │    │
 │  │ ✕ 📊 Q3 Budget       │    │
@@ -44,21 +45,30 @@ will be added before committing.
 ### Phase 1 — Scan
 
 The user configures search options and clicks **Scan**. This calls `POST /api/docs/scan`
-(read-only — no DB writes). The response shows total docs found and a list of new
-(not-yet-tracked) documents. All new docs are selected by default.
+(read-only — no DB writes). The response returns all matching docs, each flagged with
+`isNew` to indicate whether it's already tracked. The default view shows only new docs.
 
 ### Phase 2 — Review & Add
 
-The user can remove docs from the list by clicking the ✕ button. Removed docs will
-not be added. Doc titles are clickable links that open in Google Drive.
+A **New / All** toggle above the doc list controls which docs are visible:
+- **New** (default) — shows only not-yet-tracked documents
+- **All** — shows all scanned documents, including already-tracked ones
+
+New documents display a green **NEW** badge between the ✕ button and the doc icon.
+
+The user can remove docs from the list by clicking the ✕ button. Removed docs persist
+across view switches (removing a doc in "All" view keeps it removed in "New" view).
+Doc titles are clickable links that open in Google Drive.
 
 If any docs were removed, a "N documents selected" line appears below the list.
 
-The user can optionally assign labels and notes that will be applied to all newly
-added documents.
+The user can optionally assign labels and notes:
+- **New docs:** labels and notes are set on creation
+- **Existing docs:** labels are added (duplicates skipped), notes are appended with a
+  newline separator
 
-Clicking **Add** calls `POST /api/docs?mode=load` with the selected doc IDs, options,
-labels, and notes. The backend re-queries Drive with the same options (rather than
+Clicking **Add** calls `POST /api/docs?mode=load` with the visible (non-removed) doc IDs,
+options, labels, and notes. The backend re-queries Drive with the same options (rather than
 trusting client-passed metadata), filters to the selected IDs, and upserts each doc.
 After the sync completes, the doc list refreshes and a toast summarizes results.
 
@@ -103,14 +113,15 @@ and returns results without modifying anything.
 {
   "total": 42,
   "existingCount": 37,
-  "newDocs": [
+  "docs": [
     {
       "googleDocId": "abc123",
       "title": "Design Doc",
       "mimeType": "application/vnd.google-apps.document",
       "driveUrl": "https://docs.google.com/document/d/abc123/edit",
       "owner": "alice@example.com",
-      "role": "REVIEWER"
+      "role": "REVIEWER",
+      "isNew": true
     }
   ]
 }
@@ -134,11 +145,12 @@ detection, comment sync, token lifecycle), see [`refresh.md`](./refresh.md).
 ```
 
 **Additional load-mode behavior:**
-- `selectedGoogleDocIds` — only new docs in this set are added; existing docs still
-  get metadata updates regardless of selection.
-- `labelIds` — validated for ownership before processing; applied to newly created
-  docs only (not existing ones).
-- `notes` — applied to newly created docs only.
+- `selectedGoogleDocIds` — docs not in this set are skipped entirely (no upsert,
+  no labels, no notes).
+- `labelIds` — validated for ownership before processing. New docs: set on creation.
+  Existing selected docs: added via `createMany` with `skipDuplicates`.
+- `notes` — New docs: set on creation. Existing selected docs: appended with a
+  newline separator (matching the bulk-update pattern).
 
 ---
 

@@ -43,12 +43,13 @@ interface ScanDoc {
   driveUrl: string;
   owner: string | null;
   role: "AUTHOR" | "REVIEWER";
+  isNew: boolean;
 }
 
 interface ScanResult {
   total: number;
   existingCount: number;
-  newDocs: ScanDoc[];
+  docs: ScanDoc[];
 }
 
 const DEFAULT_OPTIONS: LoadOptions = {
@@ -67,10 +68,15 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
   const [options, setOptions] = useState<LoadOptions>(DEFAULT_OPTIONS);
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
-  const [selectedDocs, setSelectedDocs] = useState<ScanDoc[]>([]);
+  const [removedDocIds, setRemovedDocIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<"new" | "all">("new");
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [adding, setAdding] = useState(false);
+  const [daysBackText, setDaysBackText] = useState(
+    String(DEFAULT_OPTIONS.daysBack)
+  );
+  const [docListRows, setDocListRows] = useState(5);
 
   const abortRef = useRef<AbortController | null>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
@@ -80,9 +86,11 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
   const handleOpenChange = useCallback((isOpen: boolean) => {
     if (isOpen) {
       setScanResult(null);
-      setSelectedDocs([]);
+      setRemovedDocIds(new Set());
+      setViewMode("new");
       setSelectedLabelIds([]);
       setNotes("");
+      setDaysBackText(String(DEFAULT_OPTIONS.daysBack));
     } else {
       abortRef.current?.abort();
     }
@@ -116,7 +124,8 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       if (!res.ok) throw new Error("Scan failed");
       const result: ScanResult = await res.json();
       setScanResult(result);
-      setSelectedDocs(result.newDocs);
+      setRemovedDocIds(new Set());
+      setDocListRows(Math.min(15, Math.max(5, result.docs.filter((d) => viewMode === "all" || d.isNew).length)));
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       if (!isAuthError(err)) toast.error("Failed to scan Google Drive");
@@ -136,7 +145,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...options,
-          selectedGoogleDocIds: selectedDocs.map((d) => d.googleDocId),
+          selectedGoogleDocIds: visibleDocs.map((d) => d.googleDocId),
           labelIds: selectedLabelIds,
           notes,
         }),
@@ -173,8 +182,15 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
     }
   }
 
-  const docsRemoved =
-    scanResult !== null && selectedDocs.length < scanResult.newDocs.length;
+  const visibleDocs = scanResult
+    ? scanResult.docs.filter(
+        (d) =>
+          !removedDocIds.has(d.googleDocId) &&
+          (viewMode === "all" || d.isNew)
+      )
+    : [];
+
+  const hasAnyDocs = scanResult ? scanResult.docs.length > 0 : false;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -215,12 +231,19 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                   type="number"
                   min={1}
                   max={365}
-                  value={options.daysBack}
+                  value={daysBackText}
                   onFocus={(e) => e.target.select()}
                   onChange={(e) => {
+                    setDaysBackText(e.target.value);
                     const v = parseInt(e.target.value, 10);
                     if (!isNaN(v) && v >= 1 && v <= 365) {
                       setOptions((o) => ({ ...o, daysBack: v }));
+                    }
+                  }}
+                  onBlur={() => {
+                    const v = parseInt(daysBackText, 10);
+                    if (isNaN(v) || v < 1 || v > 365) {
+                      setDaysBackText(String(options.daysBack));
                     }
                   }}
                   className="w-20 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -296,11 +319,43 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                     Total documents found: {scanResult.total}
                   </span>
                   <span>
-                    New documents: {scanResult.newDocs.length}
+                    New documents: {scanResult.docs.filter((d) => d.isNew).length}
                   </span>
                 </div>
 
-                {scanResult.newDocs.length === 0 && (
+                {/* New / All toggle */}
+                {hasAnyDocs && (
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => {
+                        setViewMode("new");
+                        setDocListRows(Math.min(15, Math.max(5, scanResult.docs.filter((d) => d.isNew && !removedDocIds.has(d.googleDocId)).length)));
+                      }}
+                      className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                        viewMode === "new"
+                          ? "bg-zinc-900 text-white"
+                          : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                      }`}
+                    >
+                      New
+                    </button>
+                    <button
+                      onClick={() => {
+                        setViewMode("all");
+                        setDocListRows(Math.min(15, Math.max(5, scanResult.docs.filter((d) => !removedDocIds.has(d.googleDocId)).length)));
+                      }}
+                      className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                        viewMode === "all"
+                          ? "bg-zinc-900 text-white"
+                          : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                      }`}
+                    >
+                      All
+                    </button>
+                  </div>
+                )}
+
+                {!hasAnyDocs && (
                   <p className="text-sm italic text-zinc-400">
                     No new documents found.
                   </p>
@@ -309,34 +364,36 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
             )}
           </div>
 
-          {/* Doc list - flexible, shrinks first */}
-          {scanResult && scanResult.newDocs.length > 0 && (
+          {/* Doc list - flexible, shrinks first; height based on view's doc count (ignoring removals) so X-clicks don't resize */}
+          {scanResult && hasAnyDocs && (
             <div
               className="mx-6 overflow-y-auto overflow-x-hidden rounded-md border border-zinc-200 bg-zinc-50/50 shrink"
               style={{
+                height: `calc(${docListRows} * 1.5rem + 2px)`,
                 minHeight: `calc(5 * 1.5rem + 2px)`,
                 maxHeight: `calc(15 * 1.5rem + 2px)`,
               }}
             >
-              {selectedDocs.length === 0 ? (
+              {visibleDocs.length === 0 ? (
                 <div className="py-4 text-center text-xs italic text-zinc-400">
-                  All documents removed
+                  {viewMode === "new"
+                    ? "No new documents — switch to All to see existing docs"
+                    : "All documents removed"}
                 </div>
               ) : (
                 <div className="flex flex-col">
-                  {selectedDocs.map((doc) => (
+                  {visibleDocs.map((doc) => (
                     <div
                       key={doc.googleDocId}
                       className="flex h-6 min-w-max items-center gap-2 px-2 transition-colors hover:bg-zinc-100"
                     >
                       <button
                         onClick={() =>
-                          setSelectedDocs((prev) =>
-                            prev.filter(
-                              (d) =>
-                                d.googleDocId !== doc.googleDocId
-                            )
-                          )
+                          setRemovedDocIds((prev) => {
+                            const next = new Set(prev);
+                            next.add(doc.googleDocId);
+                            return next;
+                          })
                         }
                         className="rounded p-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-600"
                         title="Remove from list"
@@ -344,6 +401,15 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                       >
                         <X className="h-3 w-3" />
                       </button>
+                      {viewMode === "all" && (
+                        <span className={`w-7 text-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
+                          doc.isNew
+                            ? "bg-emerald-100 text-emerald-700"
+                            : ""
+                        }`}>
+                          {doc.isNew ? "NEW" : ""}
+                        </span>
+                      )}
                       <a
                         href={doc.driveUrl}
                         target="_blank"
@@ -367,12 +433,12 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
           )}
 
           {/* Below doc list - fixed */}
-          {scanResult && scanResult.newDocs.length > 0 && (
+          {scanResult && hasAnyDocs && (
             <div className="flex flex-col gap-4 px-6 py-4 shrink-0">
-              {docsRemoved && (
+              {removedDocIds.size > 0 && (
                 <p className="text-sm text-zinc-500">
-                  {selectedDocs.length} document
-                  {selectedDocs.length === 1 ? "" : "s"} selected
+                  {visibleDocs.length} document
+                  {visibleDocs.length === 1 ? "" : "s"} selected
                 </p>
               )}
 
@@ -399,17 +465,19 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
         </div>
 
         <div className="px-6 pb-6 flex gap-2 justify-end">
-          {scanResult && scanResult.newDocs.length > 0 ? (
+          {scanResult && hasAnyDocs ? (
             <>
               <Button
                 variant="outline"
                 size="sm"
-                disabled={selectedDocs.length === 0 || adding}
+                disabled={visibleDocs.length === 0 || adding}
                 onClick={handleAdd}
-                title="Add selected documents to your list"
+                title={viewMode === "all"
+                  ? "Add new documents and update labels/notes on existing ones"
+                  : "Add selected documents to your list"}
               >
                 {adding && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-                Add
+                {viewMode === "all" ? "Add or Update" : "Add"}
               </Button>
               <Button
                 variant="outline"

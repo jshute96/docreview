@@ -48,7 +48,7 @@ describe("POST /api/docs/scan", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns total, existingCount, and newDocs", async () => {
+  it("returns total, existingCount, and docs with isNew flag", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockListRecentDocs.mockResolvedValue([
       {
@@ -80,10 +80,15 @@ describe("POST /api/docs/scan", () => {
     const data = await res.json();
     expect(data.total).toBe(2);
     expect(data.existingCount).toBe(1);
-    expect(data.newDocs).toHaveLength(1);
-    expect(data.newDocs[0].googleDocId).toBe("g2");
-    expect(data.newDocs[0].title).toBe("New Doc");
-    expect(data.newDocs[0].role).toBe("REVIEWER");
+    expect(data.docs).toHaveLength(2);
+    // Existing doc
+    expect(data.docs[0].googleDocId).toBe("g1");
+    expect(data.docs[0].isNew).toBe(false);
+    // New doc
+    expect(data.docs[1].googleDocId).toBe("g2");
+    expect(data.docs[1].title).toBe("New Doc");
+    expect(data.docs[1].role).toBe("REVIEWER");
+    expect(data.docs[1].isNew).toBe(true);
   });
 
   it("passes options to listRecentDocs", async () => {
@@ -119,6 +124,6 @@ describe("POST /api/docs/scan", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.total).toBe(0);
-    expect(data.newDocs).toEqual([]);
+    expect(data.docs).toEqual([]);
   });
 });

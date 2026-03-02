@@ -157,13 +157,14 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    // Load mode with selection: only add selected new docs
-    if (mode === "load" && !isExisting && selectedSet && !selectedSet.has(doc.googleDocId)) {
+    // Load mode with selection: skip docs not selected by user
+    const isSelected = !selectedSet || selectedSet.has(doc.googleDocId);
+    if (mode === "load" && !isSelected) {
       console.log(`[Sync]   SKIP "${doc.title}" — not selected by user`);
       continue;
     }
 
-    await prisma.doc.upsert({
+    const result = await prisma.doc.upsert({
       where: { userId_googleDocId: { userId, googleDocId: doc.googleDocId } },
       create: {
         userId,
@@ -189,7 +190,30 @@ export async function POST(req: NextRequest) {
         createdTimeInDrive: doc.createdTimeInDrive,
         isDeleted: false,
       },
+      select: { id: true, notes: true },
     });
+
+    // For existing docs selected in load mode, add labels and append notes
+    if (isExisting && mode === "load" && isSelected) {
+      if (loadLabelIds.length > 0) {
+        await prisma.docLabel.createMany({
+          data: loadLabelIds.map((labelId) => ({ docId: result.id, labelId })),
+          skipDuplicates: true,
+        });
+      }
+      if (loadNotes) {
+        let newNotes = result.notes ?? "";
+        if (newNotes.length > 0 && !newNotes.endsWith("\n")) {
+          newNotes += "\n";
+        }
+        newNotes += loadNotes;
+        await prisma.doc.update({
+          where: { id: result.id },
+          data: { notes: newNotes },
+        });
+      }
+    }
+
     if (isExisting) {
       console.log(`[Sync]   UPDATE "${doc.title}" — already tracked, metadata updated`);
       updated++;

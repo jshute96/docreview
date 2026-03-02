@@ -29,23 +29,23 @@ export async function POST(req: NextRequest) {
       })).map((d) => d.googleDocId)
     );
 
-    const newDocs = driveDocs
-      .filter(d => !existingDocIds.has(d.googleDocId))
-      .map(d => ({
-        googleDocId: d.googleDocId,
-        title: d.title,
-        mimeType: d.mimeType,
-        driveUrl: d.driveUrl,
-        owner: d.owner,
-        role: d.role,
-      }));
+    const docs = driveDocs.map(d => ({
+      googleDocId: d.googleDocId,
+      title: d.title,
+      mimeType: d.mimeType,
+      driveUrl: d.driveUrl,
+      owner: d.owner,
+      role: d.role,
+      isNew: !existingDocIds.has(d.googleDocId),
+    }));
 
-    console.log(`[Scan] Found ${driveDocs.length} total docs, ${newDocs.length} new`);
+    const existingCount = docs.filter(d => !d.isNew).length;
+    console.log(`[Scan] Found ${driveDocs.length} total docs, ${driveDocs.length - existingCount} new`);
 
     return NextResponse.json({
       total: driveDocs.length,
-      existingCount: driveDocs.length - newDocs.length,
-      newDocs,
+      existingCount,
+      docs,
     });
   } catch (err) {
     const reauth = invalidGrantResponse(err);
