@@ -55,10 +55,10 @@ export async function POST(
         isDeleted: isTrashed, // Access confirmed, but might be trashed
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
-    const code = err?.code;
+    const code = (err as { code?: number })?.code;
     if (code === 404 || code === 403) {
       console.log(`[Refresh] doc ${doc.id} (${doc.googleDocId}) is deleted or inaccessible (code ${code})`);
       freshDoc = await prisma.doc.update({

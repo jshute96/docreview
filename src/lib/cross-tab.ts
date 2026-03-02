@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useLayoutEffect } from "react";
 
 const CHANNEL_NAME = "docreview-sync";
 
@@ -19,7 +19,10 @@ export function useCrossTabListener(
   debounceMs = 300,
 ) {
   const handlerRef = useRef(handler);
-  handlerRef.current = handler;
+  
+  useLayoutEffect(() => {
+    handlerRef.current = handler;
+  });
 
   useEffect(() => {
     const ch = new BroadcastChannel(CHANNEL_NAME);

@@ -217,18 +217,18 @@ describe("filterDocs", () => {
     const docs = [
       makeDoc({
         title: "HasL1",
-        labels: [{ docId: "d1", labelId: "L1", label: { id: "L1", name: "L1" } }] as any,
+        labels: [{ docId: "d1", labelId: "L1", label: { id: "L1", name: "L1", userId: "u", color: null, position: 0 } }] as DocWithLabels["labels"],
       }),
       makeDoc({
         title: "HasL2",
-        labels: [{ docId: "d2", labelId: "L2", label: { id: "L2", name: "L2" } }] as any,
+        labels: [{ docId: "d2", labelId: "L2", label: { id: "L2", name: "L2", userId: "u", color: null, position: 0 } }] as DocWithLabels["labels"],
       }),
       makeDoc({
         title: "HasBoth",
         labels: [
-          { docId: "d3", labelId: "L1", label: { id: "L1", name: "L1" } },
-          { docId: "d3", labelId: "L2", label: { id: "L2", name: "L2" } },
-        ] as any,
+          { docId: "d3", labelId: "L1", label: { id: "L1", name: "L1", userId: "u", color: null, position: 0 } },
+          { docId: "d3", labelId: "L2", label: { id: "L2", name: "L2", userId: "u", color: null, position: 1 } },
+        ] as DocWithLabels["labels"],
       }),
     ];
     const result = filterDocs(docs, {

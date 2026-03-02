@@ -20,8 +20,8 @@ export async function syncComments(
   let comments;
   try {
     comments = await fetchComments(driveAuth, doc.googleDocId);
-  } catch (err: any) {
-    const code = err?.code;
+  } catch (err: unknown) {
+    const code = (err as { code?: number })?.code;
     if (code === 404 || code === 403) {
       console.log(`[Comments] doc ${doc.googleDocId} is deleted or inaccessible (code ${code})`);
       return { created: 0, shouldUnarchive: false, isDeleted: true };
