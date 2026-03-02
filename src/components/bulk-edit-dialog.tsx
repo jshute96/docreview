@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ROLE_COLORS } from "@/lib/role-colors";
+import { ROLE_COLORS, STATUS_COLORS } from "@/lib/role-colors";
 import { DialogButtons } from "@/components/dialog-buttons";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
@@ -67,6 +67,7 @@ export function BulkEditDialog({
   const [open, setOpen] = useState(false);
   const [selectedDocs, setSelectedDocs] = useState<DocWithLabels[]>(initialDocs);
   const [roleState, setRoleState] = useState<BulkEditState>("as-is");
+  const [statusState, setStatusState] = useState<BulkEditState>("as-is");
   const [labelStates, setLabelStates] = useState<Record<string, BulkEditState>>({});
   const [appendNotes, setAppendNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -77,6 +78,7 @@ export function BulkEditDialog({
       setSelectedDocs(initialDocs);
       setAppendNotes("");
       setRoleState("as-is");
+      setStatusState("as-is");
       const initialLabelStates: Record<string, BulkEditState> = {};
       allLabels.forEach(label => { initialLabelStates[label.id] = "as-is"; });
       setLabelStates(initialLabelStates);
@@ -94,6 +96,11 @@ export function BulkEditDialog({
     const role = checkConsistency(next, d => d.role === "AUTHOR");
     if ((roleState === "set" && role.all) || (roleState === "clear" && role.none)) {
       setRoleState("as-is");
+    }
+
+    const status = checkConsistency(next, d => d.status === "ACTIVE");
+    if ((statusState === "set" && status.all) || (statusState === "clear" && status.none)) {
+      setStatusState("as-is");
     }
 
     setLabelStates(current => {
@@ -115,6 +122,16 @@ export function BulkEditDialog({
     setRoleState(prev => {
       // Skip redundant states: 
       // If all are authors, skip 'set' (+). If none are authors, skip 'clear' (-).
+      if (all) return prev === "as-is" ? "clear" : "as-is";
+      if (none) return prev === "as-is" ? "set" : "as-is";
+      return cycleBulkEditState(prev);
+    });
+  }
+
+  function cycleStatus(e: React.MouseEvent) {
+    e.preventDefault(); e.stopPropagation();
+    const { all, none } = checkConsistency(selectedDocs, d => d.status === "ACTIVE");
+    setStatusState(prev => {
       if (all) return prev === "as-is" ? "clear" : "as-is";
       if (none) return prev === "as-is" ? "set" : "as-is";
       return cycleBulkEditState(prev);
@@ -159,6 +176,7 @@ export function BulkEditDialog({
         body: JSON.stringify({
           docIds: selectedDocs.map(d => d.id),
           role: roleState,
+          status: statusState,
           labelUpdates: labelStates,
           appendNotes: appendNotes.trim(),
         }),
@@ -183,6 +201,7 @@ export function BulkEditDialog({
   }
 
   const role = checkConsistency(selectedDocs, d => d.role === "AUTHOR");
+  const status = checkConsistency(selectedDocs, d => d.status === "ACTIVE");
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -194,23 +213,47 @@ export function BulkEditDialog({
 
         <div className="flex-1 overflow-y-auto min-h-0">
           <div className="flex flex-col gap-6 p-6 pt-4">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-900">
-                Role
-              </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={cycleRole}
-                  className={`relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                    roleState === "set" || roleState === "clear" || (roleState === "as-is" && role.all)
-                      ? ROLE_COLORS.AUTHOR.activeFilter
-                      : ROLE_COLORS.AUTHOR.inactiveFilter
-                  }`}
-                >
-                  Author
-                  <StateIndicator state={roleState} isMixed={role.mixed} />
-                </button>
+            <div className="flex gap-8">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-900">
+                  Role
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={cycleRole}
+                    title="Toggle author role for all selected documents"
+                    className={`relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                      roleState === "set" || roleState === "clear" || (roleState === "as-is" && role.all)
+                        ? ROLE_COLORS.AUTHOR.activeFilter
+                        : ROLE_COLORS.AUTHOR.inactiveFilter
+                    }`}
+                  >
+                    Author
+                    <StateIndicator state={roleState} isMixed={role.mixed} />
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-900">
+                  State
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={cycleStatus}
+                    title="Toggle active/archived state for all selected documents"
+                    className={`relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                      statusState === "set" || statusState === "clear" || (statusState === "as-is" && status.all)
+                        ? STATUS_COLORS.ACTIVE.activeFilter
+                        : STATUS_COLORS.ACTIVE.inactiveFilter
+                    }`}
+                  >
+                    Active
+                    <StateIndicator state={statusState} isMixed={status.mixed} />
+                  </button>
+                </div>
               </div>
             </div>
 

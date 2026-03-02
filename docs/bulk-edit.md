@@ -14,11 +14,11 @@ The dialog follows the shared dialog sizing pattern (see [`dialog-sizing.md`](./
 the doc list is the flexible element that shrinks on viewport resize.
 
 - **Dynamic Selection**: Displays a list of selected documents with their respective icons and titles. Users can remove documents from the bulk operation using the "X" button.
-- **Tri-State Controls**: Role and Label buttons use a three-state logic:
+- **Tri-State Controls**: Role, State (Active/Archived), and Label buttons use a three-state logic:
     - `as-is`: No change to the document. Represented by a `?` overlay if the selection is inconsistent (mixed), or no overlay if all documents share the state.
-    - `set` (+): Ensures the property is applied to all selected documents.
-    - `clear` (-): Ensures the property is removed from all selected documents.
-- **Context-Aware Cycling**: To minimize clicks, buttons automatically skip states that are redundant for the current selection. For example, if all selected documents already have a specific label, clicking that label will skip the `set` state and go directly from `as-is` to `clear`.
+    - `set` (+): Ensures the property is applied to all selected documents (e.g., sets Role to AUTHOR, or State to ACTIVE).
+    - `clear` (-): Ensures the property is removed/negated (e.g., sets Role to REVIEWER, or State to ARCHIVED).
+- **Context-Aware Cycling**: To minimize clicks, buttons automatically skip states that are redundant for the current selection. For example, if all selected documents are already ARCHIVED, clicking the "Active" button will skip the `clear` state and go directly from `as-is` to `set`.
 - **Append Notes**: A text area for appending notes to all selected documents. It intelligently inserts a newline if the existing notes are non-empty and don't already end with one.
 
 ## Implementation Details

@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { DocRole, Prisma } from "@prisma/client";
+import { DocRole, DocStatus, Prisma } from "@prisma/client";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 import type { BulkEditState } from "@/lib/bulk-edit";
 
-const VALID_ROLES: string[] = Object.values(DocRole);
 const VALID_BULK_STATES = new Set(["as-is", "set", "clear"]);
 
 export async function PATCH(req: NextRequest) {
@@ -22,9 +21,10 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { docIds, role, labelUpdates, appendNotes } = body as {
+  const { docIds, role, status, labelUpdates, appendNotes } = body as {
     docIds: unknown;
     role: unknown;
+    status: unknown;
     labelUpdates: unknown;
     appendNotes?: unknown;
   };
@@ -42,6 +42,9 @@ export async function PATCH(req: NextRequest) {
   if (typeof role !== "string" || !VALID_BULK_STATES.has(role)) {
     return NextResponse.json({ error: "Invalid role state" }, { status: 400 });
   }
+  if (typeof status !== "string" || !VALID_BULK_STATES.has(status)) {
+    return NextResponse.json({ error: "Invalid status state" }, { status: 400 });
+  }
   if (
     typeof labelUpdates !== "object" ||
     labelUpdates === null ||
@@ -57,6 +60,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const typedRole = role as BulkEditState;
+  const typedStatus = status as BulkEditState;
   const typedLabelUpdates = labelUpdates as Record<string, BulkEditState>;
   const typedAppendNotes = appendNotes as string | undefined;
 
@@ -65,7 +69,6 @@ export async function PATCH(req: NextRequest) {
     where: { id: { in: docIds as string[] }, userId },
     include: docWithCountsInclude,
   });
-  const docMap = new Map(docs.map((d) => [d.id, d]));
   const skipped = (docIds as string[]).length - docs.length;
 
   // Build all update operations
@@ -76,6 +79,9 @@ export async function PATCH(req: NextRequest) {
     const data: Prisma.DocUpdateInput = {};
     if (typedRole === "set") data.role = DocRole.AUTHOR;
     else if (typedRole === "clear") data.role = DocRole.REVIEWER;
+
+    if (typedStatus === "set") data.status = DocStatus.ACTIVE;
+    else if (typedStatus === "clear") data.status = DocStatus.ARCHIVED;
 
     if (typedAppendNotes && typedAppendNotes.trim().length > 0) {
       const currentNotes = doc.notes ?? "";

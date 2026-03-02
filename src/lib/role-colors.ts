@@ -10,3 +10,16 @@ export const ROLE_COLORS = {
     inactiveFilter: "bg-violet-50 text-violet-400 hover:bg-violet-100",
   },
 } as const;
+
+export const STATUS_COLORS = {
+  ACTIVE: {
+    badge: "bg-emerald-100 text-emerald-700",
+    activeFilter: "bg-emerald-600 text-white",
+    inactiveFilter: "bg-emerald-50 text-emerald-400 hover:bg-emerald-100",
+  },
+  ARCHIVED: {
+    badge: "bg-zinc-100 text-zinc-700",
+    activeFilter: "bg-zinc-600 text-white",
+    inactiveFilter: "bg-zinc-50 text-zinc-400 hover:bg-zinc-100",
+  },
+} as const;

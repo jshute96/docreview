@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ROLE_COLORS } from "@/lib/role-colors";
+import { ROLE_COLORS, STATUS_COLORS } from "@/lib/role-colors";
 import { LabelPicker } from "@/components/label-picker";
 import { DialogButtons } from "@/components/dialog-buttons";
 import { DocTypeIcon } from "@/components/doc-type-icon";
@@ -34,6 +34,7 @@ export function EditDocDialog({
   const { allLabels } = useLabels();
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState(doc.role);
+  const [status, setStatus] = useState(doc.status);
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>(
     doc.labels.map((dl) => dl.labelId)
   );
@@ -57,7 +58,7 @@ export function EditDocDialog({
       const res = await fetch(`/api/docs/${doc.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, labelIds: selectedLabelIds, notes }),
+        body: JSON.stringify({ role, status, labelIds: selectedLabelIds, notes }),
       });
       if (!res.ok) throw new Error("Save failed");
       const updated: DocWithLabels = await res.json();
@@ -77,6 +78,7 @@ export function EditDocDialog({
       if (v) {
         // Reset on open
         setRole(doc.role);
+        setStatus(doc.status);
         setSelectedLabelIds(doc.labels.map((dl) => dl.labelId));
         setNotes(doc.notes ?? "");
       }
@@ -104,22 +106,43 @@ export function EditDocDialog({
               {doc.title}
             </a>
 
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-900 uppercase tracking-wide">
-                Role
-              </label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setRole(role === "AUTHOR" ? "REVIEWER" : "AUTHOR")}
-                  title="You are an author of this document"
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                    role === "AUTHOR"
-                      ? ROLE_COLORS.AUTHOR.activeFilter
-                      : ROLE_COLORS.AUTHOR.inactiveFilter
-                  }`}
-                >
-                  Author
-                </button>
+            <div className="flex gap-8">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-900 uppercase tracking-wide">
+                  Role
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setRole(role === "AUTHOR" ? "REVIEWER" : "AUTHOR")}
+                    title="You are an author of this document"
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                      role === "AUTHOR"
+                        ? ROLE_COLORS.AUTHOR.activeFilter
+                        : ROLE_COLORS.AUTHOR.inactiveFilter
+                    }`}
+                  >
+                    Author
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-900 uppercase tracking-wide">
+                  State
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setStatus(status === "ACTIVE" ? "ARCHIVED" : "ACTIVE")}
+                    title={status === "ACTIVE" ? "This document is active" : "This document is archived"}
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                      status === "ACTIVE"
+                        ? STATUS_COLORS.ACTIVE.activeFilter
+                        : STATUS_COLORS.ACTIVE.inactiveFilter
+                    }`}
+                  >
+                    Active
+                  </button>
+                </div>
               </div>
             </div>
 
