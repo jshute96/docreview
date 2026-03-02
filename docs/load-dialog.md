@@ -156,16 +156,17 @@ detection, comment sync, token lifecycle), see [`refresh.md`](./refresh.md).
 
 ## Dialog Layout
 
-The dialog uses a flex column layout with controlled shrinking:
+The dialog follows the shared dialog sizing pattern (see [`dialog-sizing.md`](./dialog-sizing.md)):
 
-- **Top section** (options + summary) — `shrink-0`, always fully visible
-- **Doc list** — `shrink`, compresses first when the dialog is too tall for the viewport;
-  min height of 5 rows, max height of 15 rows, internal scroll
-- **Bottom section** (labels + notes) — `shrink-0`, always fully visible
+- **Top section** (options + summary + toggle) — `shrink-0`, always fully visible
+- **Doc list** — `shrink`, flexible item list (5–15 rows)
+- **Bottom section** (selected count + labels + notes) — `shrink-0`, always fully visible
 - **Footer** (buttons) — fixed at bottom
 
-When the dialog cannot fit even with the doc list at minimum size, an overall
-scrollbar appears on the dialog content area.
+The `docListRows` state tracks the preferred list height. It recomputes on view
+switch (New ↔ All, accounting for removals) and on rescan (fresh data), but NOT
+on individual X-click removals. This is important so that the dialog box doesn't
+move when clicking X, because that's annoying when trying to click X on multiple rows.
 
 ---
 

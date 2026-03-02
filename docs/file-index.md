@@ -121,5 +121,6 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 | `refresh.md` | Full refresh flow — Drive sync modes, deletion detection, comment sync, UI update |
 | `comment-tracking.md` | Comment status logic, unarchive rules, filter behavior |
 | `bulk-edit.md` | Bulk editing logic — tri-state UI, context-aware cycling, no-op protection |
+| `dialog-sizing.md` | Shared dialog sizing pattern — flexible item list, stable height on removal |
 | `load-dialog.md` | Load dialog — two-phase scan→add flow, search options, dialog layout |
 | `suggestions.md` | Suggestion sync via Docs API, limitations |

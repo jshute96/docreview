@@ -9,6 +9,10 @@ The Bulk Edit feature allows users to update roles, labels, and notes for multip
 - It targets all documents currently visible in the table (respecting active filters and search terms).
 
 ### Bulk Edit Dialog
+
+The dialog follows the shared dialog sizing pattern (see [`dialog-sizing.md`](./dialog-sizing.md)) —
+the doc list is the flexible element that shrinks on viewport resize.
+
 - **Dynamic Selection**: Displays a list of selected documents with their respective icons and titles. Users can remove documents from the bulk operation using the "X" button.
 - **Tri-State Controls**: Role and Label buttons use a three-state logic:
     - `as-is`: No change to the document. Represented by a `?` overlay if the selection is inconsistent (mixed), or no overlay if all documents share the state.
