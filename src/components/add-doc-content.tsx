@@ -18,6 +18,7 @@ import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { useAutoResize } from "@/hooks/use-auto-resize";
 import { useLabelSync } from "@/hooks/use-label-sync";
 import { useLabels } from "@/contexts/label-context";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type ValidationState = "idle" | "validating" | "valid" | "invalid";
 
@@ -65,6 +66,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
     const [existingDocId, setExistingDocId] = useState<string | null>(null);
     const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
     const [notes, setNotes] = useState("");
+    const [addAsActive, setAddAsActive] = useState(true);
     const [adding, setAdding] = useState(false);
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,6 +86,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
       setExistingDocId(null);
       setSelectedLabelIds([]);
       setNotes("");
+      setAddAsActive(true);
       setAdding(false);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (abortRef.current) abortRef.current.abort();
@@ -169,7 +172,12 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
         const res = await apiFetch("/api/docs/add", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url, labelIds: selectedLabelIds, notes }),
+          body: JSON.stringify({
+            url,
+            labelIds: selectedLabelIds,
+            notes,
+            status: addAsActive ? "ACTIVE" : "ARCHIVED",
+          }),
         });
         if (!res.ok) throw new Error("Add failed");
         const newDoc: DocWithLabels = await res.json();
@@ -270,6 +278,20 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
               rows={1}
               className={`${TEXTAREA_CLASSES} w-full max-h-[200px]`}
             />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="add-as-active"
+              checked={addAsActive}
+              onCheckedChange={(checked) => setAddAsActive(checked === true)}
+            />
+            <label
+              htmlFor="add-as-active"
+              className="text-sm text-zinc-700 cursor-pointer"
+            >
+              Add as Active
+            </label>
           </div>
         </div>
 

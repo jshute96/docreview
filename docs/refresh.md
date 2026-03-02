@@ -137,8 +137,10 @@ For each file Drive returns:
   Refresh and full-refresh skip these — reviewer docs must already be tracked in the DB or
   added manually via `/api/docs/add`.
 - **Existing doc:** `title`, `driveUrl`, `mimeType`, `lastModifiedInDrive`, `owner`,
-  `createdTimeInDrive`, and `isDeleted` are updated. `role`, `status`, and `labels` are
-  never touched; they belong to the user. Setting `isDeleted: false` on upsert means a doc
+  `createdTimeInDrive`, and `isDeleted` are updated. `role` and `labels` are
+  never touched; they belong to the user. `status` is only updated during **load**
+  mode if the user specifies a status (via "Add as Active" or "Move to Active");
+  otherwise it is preserved. Setting `isDeleted: false` on upsert means a doc
   that re-appears in Drive (e.g., shared again) is automatically restored.
 
 **What's preserved across refreshes:**

@@ -73,6 +73,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
   const [viewMode, setViewMode] = useState<"new" | "all">("new");
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+  const [addAsActive, setAddAsActive] = useState(true);
   const [adding, setAdding] = useState(false);
   const [source, setSource] = useState<"drive" | "gmail">("drive");
   const [daysBackText, setDaysBackText] = useState(
@@ -93,6 +94,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       setSource("drive");
       setSelectedLabelIds([]);
       setNotes("");
+      setAddAsActive(true);
       setDaysBackText(String(DEFAULT_OPTIONS.daysBack));
     } else {
       abortRef.current?.abort();
@@ -155,6 +157,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
           selectedGoogleDocIds: visibleDocs.map((d) => d.googleDocId),
           labelIds: selectedLabelIds,
           notes,
+          status: addAsActive ? "ACTIVE" : "ARCHIVED",
         }),
         signal: controller.signal,
       });
@@ -516,6 +519,20 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                   rows={1}
                   className={`${TEXTAREA_CLASSES} w-full max-h-[200px]`}
                 />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="load-as-active"
+                  checked={addAsActive}
+                  onCheckedChange={(checked) => setAddAsActive(checked === true)}
+                />
+                <label
+                  htmlFor="load-as-active"
+                  className="text-sm text-zinc-700 cursor-pointer"
+                >
+                  {viewMode === "all" ? "Move to Active" : "Add as Active"}
+                </label>
               </div>
             </div>
           )}

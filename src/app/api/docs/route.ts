@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
     : null;
   const loadLabelIds: string[] = Array.isArray(loadBody.labelIds) ? loadBody.labelIds as string[] : [];
   const loadNotes: string = typeof loadBody.notes === "string" ? (loadBody.notes as string).trim() : "";
+  const loadStatus: "ACTIVE" | "ARCHIVED" | undefined = typeof loadBody.status === "string" && (loadBody.status === "ACTIVE" || loadBody.status === "ARCHIVED") ? (loadBody.status as "ACTIVE" | "ARCHIVED") : undefined;
 
   // Validate label ownership before proceeding
   if (loadLabelIds.length > 0) {
@@ -181,6 +182,7 @@ export async function POST(req: NextRequest) {
         lastModifiedInDrive: doc.lastModifiedInDrive,
         owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
+        status: loadStatus || "ACTIVE",
         ...(loadNotes ? { notes: loadNotes } : {}),
         ...(loadLabelIds.length > 0
           ? { labels: { create: loadLabelIds.map((id) => ({ labelId: id })) } }
@@ -194,6 +196,7 @@ export async function POST(req: NextRequest) {
         owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
         isDeleted: false,
+        ...(loadStatus ? { status: loadStatus } : {}),
       },
       select: { id: true, notes: true },
     });

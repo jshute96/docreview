@@ -593,6 +593,73 @@ describe("POST /api/docs", () => {
     });
   });
 
+  it("load mode applies status (ARCHIVED) to new docs", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
+    mockGetDriveClient.mockResolvedValue(driveAuth);
+    mockListRecentDocs.mockResolvedValue([
+      {
+        googleDocId: "g1",
+        title: "New Doc",
+        driveUrl: "https://docs.google.com/document/d/g1/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "AUTHOR" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Owner",
+      },
+    ]);
+
+    mockDoc.findMany
+      .mockResolvedValueOnce([]) // existingDocIds
+      .mockResolvedValueOnce([]) // missingDocs
+      .mockResolvedValueOnce([]); // commentDocs
+    mockDoc.upsert.mockResolvedValue({});
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+
+    const res = await POST(postRequestWithBody("load", {
+      status: "ARCHIVED",
+    }));
+    expect(res.status).toBe(200);
+
+    const upsertCall = mockDoc.upsert.mock.calls[0][0];
+    expect(upsertCall.create.status).toBe("ARCHIVED");
+  });
+
+  it("load mode updates status (ARCHIVED) for existing docs", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
+    mockGetDriveClient.mockResolvedValue(driveAuth);
+    mockListRecentDocs.mockResolvedValue([
+      {
+        googleDocId: "g1",
+        title: "Existing Doc",
+        driveUrl: "https://docs.google.com/document/d/g1/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "AUTHOR" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Owner",
+      },
+    ]);
+
+    // g1 already exists
+    mockDoc.findMany
+      .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
+      .mockResolvedValueOnce([]) // missingDocs
+      .mockResolvedValueOnce([]); // commentDocs
+    mockDoc.upsert.mockResolvedValue({ id: "d1", notes: null });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+
+    const res = await POST(postRequestWithBody("load", {
+      status: "ARCHIVED",
+    }));
+    expect(res.status).toBe(200);
+
+    const upsertCall = mockDoc.upsert.mock.calls[0][0];
+    expect(upsertCall.update.status).toBe("ARCHIVED");
+  });
+
   it("load mode adds labels to existing docs via createMany skipDuplicates", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;

@@ -22,7 +22,12 @@ export async function POST(req: NextRequest) {
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const { url, labelIds = [], notes } = body as { url: string; labelIds?: string[]; notes?: string };
+  const { url, labelIds = [], notes, status } = body as {
+    url: string;
+    labelIds?: string[];
+    notes?: string;
+    status?: "ACTIVE" | "ARCHIVED";
+  };
 
   const fileId = parseGoogleDocId(url);
   if (!fileId) {
@@ -80,6 +85,7 @@ export async function POST(req: NextRequest) {
       driveUrl: f.webViewLink ?? `https://docs.google.com/document/d/${fileId}/edit`,
       mimeType: f.mimeType,
       role: isOwner ? "AUTHOR" : "REVIEWER",
+      status: status || "ACTIVE",
       owner: f.owners?.[0]?.displayName ?? null,
       lastModifiedInDrive: f.modifiedTime ? new Date(f.modifiedTime) : null,
       createdTimeInDrive: f.createdTime ? new Date(f.createdTime) : null,
