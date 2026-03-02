@@ -5,6 +5,7 @@ import {
   getDriveClient,
   replyToComment,
   fetchThreadDetail,
+  invalidGrantResponse,
 } from "@/lib/google-drive";
 
 export async function POST(
@@ -82,6 +83,8 @@ export async function POST(
 
     return NextResponse.json({ comment: updated, threads: [data.thread] });
   } catch (err) {
+    const reauth = invalidGrantResponse(err);
+    if (reauth) return reauth;
     console.error(`[API] Failed to reply/resolve comment ${commentId} for doc ${id}:`, err);
     return NextResponse.json(
       { error: "Failed to reply/resolve comment" },

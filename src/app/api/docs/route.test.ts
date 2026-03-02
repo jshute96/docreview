@@ -23,6 +23,7 @@ vi.mock("@/lib/google-drive", () => ({
   getDriveClient: vi.fn(),
   getChangesStartPageToken: vi.fn(),
   listChanges: vi.fn(),
+  invalidGrantResponse: vi.fn(() => null),
 }));
 vi.mock("@/lib/sync-comments", () => ({
   syncComments: vi.fn(),

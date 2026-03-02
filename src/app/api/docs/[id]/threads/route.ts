@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { google } from "googleapis";
-import { getDriveClient, fetchThreadDetail, fetchSuggestions, fetchAllThreads } from "@/lib/google-drive";
+import { getDriveClient, fetchThreadDetail, fetchSuggestions, fetchAllThreads, invalidGrantResponse } from "@/lib/google-drive";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 
@@ -46,6 +46,8 @@ export async function GET(
     const threads = await fetchAllThreads(driveAuth, doc.googleDocId);
     return NextResponse.json({ threads });
   } catch (err) {
+    const reauth = invalidGrantResponse(err);
+    if (reauth) return reauth;
     console.error(`[API] Failed to fetch threads for doc ${id}:`, err);
     return NextResponse.json(
       { error: "Failed to fetch comment threads from Drive" },
@@ -134,6 +136,8 @@ export async function POST(
 
     return NextResponse.json({ comment: updated, threads: [data.thread] });
   } catch (err) {
+    const reauth = invalidGrantResponse(err);
+    if (reauth) return reauth;
     console.error(`[API] Failed to refresh comment ${commentId} for doc ${id}:`, err);
     return NextResponse.json(
       { error: "Failed to refresh comment from Drive" },

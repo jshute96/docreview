@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, fetchAllThreads } from "@/lib/google-drive";
+import { getDriveClient, fetchAllThreads, invalidGrantResponse } from "@/lib/google-drive";
 import type { CommentThread } from "@/lib/google-drive";
 
 export async function GET(
@@ -24,6 +24,8 @@ export async function GET(
   try {
     driveAuth = await getDriveClient(userId);
   } catch (err) {
+    const reauth = invalidGrantResponse(err);
+    if (reauth) return reauth;
     const message = err instanceof Error ? err.message : "Failed to connect to Google Drive";
     return NextResponse.json({ error: message }, { status: 502 });
   }
@@ -38,6 +40,8 @@ export async function GET(
 
     return NextResponse.json({ threads });
   } catch (err) {
+    const reauth = invalidGrantResponse(err);
+    if (reauth) return reauth;
     const message = err instanceof Error ? err.message : "Failed to fetch comment threads";
     return NextResponse.json({ error: message }, { status: 502 });
   }

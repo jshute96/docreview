@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { createMatcher } from "@/lib/highlight";
 import { broadcastChange, useCrossTabListener, type CrossTabEvent } from "@/lib/cross-tab";
+import { apiFetch, isAuthError } from "@/lib/api-fetch";
 import { LabelProvider } from "@/contexts/label-context";
 
 interface DocDetailProps {
@@ -84,7 +85,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   async function fetchThreads() {
     try {
-      const res = await fetch(`/api/docs/${doc.id}/comments`);
+      const res = await apiFetch(`/api/docs/${doc.id}/comments`);
       if (res.ok) {
         const data = await res.json();
         setThreadMap(data.threads ?? {});
@@ -94,7 +95,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   async function fetchDocContent() {
     try {
-      const res = await fetch(`/api/docs/${doc.id}/content`);
+      const res = await apiFetch(`/api/docs/${doc.id}/content`);
       if (res.ok) {
         const data = await res.json();
         setSuggestionContent(data.suggestions ?? {});
@@ -192,7 +193,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   async function handleRefresh() {
     setRefreshing(true);
     try {
-      const res = await fetch(`/api/docs/${doc.id}/refresh`, { method: "POST" });
+      const res = await apiFetch(`/api/docs/${doc.id}/refresh`, { method: "POST" });
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithComments = await res.json();
       setDoc(updated);
@@ -201,8 +202,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       void fetchContent();
       broadcastChange({ type: "comments", docId: doc.id });
       toast.success("Comments synced");
-    } catch {
-      toast.error("Failed to sync comments");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to sync comments");
     } finally {
       setRefreshing(false);
     }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient } from "@/lib/google-drive";
+import { getDriveClient, invalidGrantResponse } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { docWithCommentsInclude } from "@/lib/doc-queries";
 
@@ -26,6 +26,8 @@ export async function POST(
   try {
     driveAuth = await getDriveClient(userId);
   } catch (err) {
+    const reauth = invalidGrantResponse(err);
+    if (reauth) return reauth;
     console.error("Drive auth error:", err);
     return NextResponse.json({ error: "Failed to connect to Google Drive" }, { status: 502 });
   }
@@ -54,6 +56,8 @@ export async function POST(
       },
     });
   } catch (err: any) {
+    const reauth = invalidGrantResponse(err);
+    if (reauth) return reauth;
     const code = err?.code;
     if (code === 404 || code === 403) {
       console.log(`[Refresh] doc ${doc.id} (${doc.googleDocId}) is deleted or inaccessible (code ${code})`);

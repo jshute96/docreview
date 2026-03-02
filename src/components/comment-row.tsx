@@ -10,6 +10,7 @@ import { CommentThreadPanel } from "@/components/comment-thread-panel";
 import { highlightText } from "@/lib/highlight";
 import { formatDate } from "@/lib/utils";
 import { broadcastChange } from "@/lib/cross-tab";
+import { apiFetch, isAuthError } from "@/lib/api-fetch";
 
 interface CommentRowProps {
   comment: Comment;
@@ -81,7 +82,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   async function fetchThread() {
     setLoadingThreads(true);
     try {
-      const res = await fetch(`/api/docs/${docId}/threads?commentId=${comment.googleCommentId}`);
+      const res = await apiFetch(`/api/docs/${docId}/threads?commentId=${comment.googleCommentId}`);
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       setThreads(data.threads);
@@ -89,8 +90,8 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         onThreadUpdate(comment.googleCommentId, data.threads[0]);
       }
       fetchedModifiedMs.current = currentModifiedMs;
-    } catch {
-      toast.error("Failed to load comment thread");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to load comment thread");
     } finally {
       setLoadingThreads(false);
     }
@@ -99,14 +100,14 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   async function refreshThread() {
     setRefreshingThread(true);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/docs/${docId}/threads?commentId=${comment.googleCommentId}`,
         { method: "POST" }
       );
       if (!res.ok) throw new Error("Failed");
       applyThreadUpdate(await res.json());
-    } catch {
-      toast.error("Failed to refresh comment");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to refresh comment");
     } finally {
       setRefreshingThread(false);
     }
@@ -115,7 +116,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   // Cheap background check: ask Drive for modifiedTime only, full refresh if changed
   async function backgroundCheck() {
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/docs/${docId}/threads?commentId=${comment.googleCommentId}&checkOnly=true`
       );
       if (!res.ok) return;
@@ -123,7 +124,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       const driveMs = data.modifiedTime ? new Date(data.modifiedTime).getTime() : 0;
       if (driveMs !== fetchedModifiedMs.current) {
         // Drive has newer data — do a full silent refresh
-        const refreshRes = await fetch(
+        const refreshRes = await apiFetch(
           `/api/docs/${docId}/threads?commentId=${comment.googleCommentId}`,
           { method: "POST" }
         );
@@ -138,15 +139,15 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   async function refreshSuggestion() {
     setRefreshingThread(true);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/docs/${docId}/threads?commentId=${comment.googleCommentId}`,
         { method: "POST" }
       );
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       onUpdate(data.comment);
-    } catch {
-      toast.error("Failed to refresh suggestion");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to refresh suggestion");
     } finally {
       setRefreshingThread(false);
     }
@@ -199,7 +200,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     errorMsg: string,
     successMsg: string,
   ) {
-    const res = await fetch(`/api/docs/${docId}/threads/reply`, {
+    const res = await apiFetch(`/api/docs/${docId}/threads/reply`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

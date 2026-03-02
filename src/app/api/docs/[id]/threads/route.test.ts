@@ -25,6 +25,7 @@ vi.mock("@/lib/google-drive", () => ({
   fetchThreadDetail: vi.fn(),
   fetchSuggestions: vi.fn(),
   fetchAllThreads: vi.fn(),
+  invalidGrantResponse: vi.fn(() => null),
 }));
 
 import { GET, POST } from "./route";

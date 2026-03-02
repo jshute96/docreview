@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { listRecentDocs, findDeletedDocIds, getDriveClient, getChangesStartPageToken, listChanges } from "@/lib/google-drive";
+import { listRecentDocs, findDeletedDocIds, getDriveClient, getChangesStartPageToken, listChanges, invalidGrantResponse } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken } from "@/lib/status";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
@@ -124,6 +124,8 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (err) {
+    const reauth = invalidGrantResponse(err);
+    if (reauth) return reauth;
     console.error("[Sync] Drive error:", err);
     return NextResponse.json(
       { error: "Failed to fetch from Google Drive" },

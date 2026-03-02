@@ -62,6 +62,11 @@ dropped `url = env(...)` support in schema.prisma).
 - The listener callback should re-fetch the data the page depends on (e.g., `/api/labels` for the add page, both `/api/docs` and `/api/labels` for the doc list).
 - When adding a new page, verify cross-tab sync works: open the page in two tabs, make a change in one, and confirm the other updates.
 
+### Google Drive API Error Handling
+- **API routes**: Every catch block around Drive API calls must check `invalidGrantResponse(err)` from `google-drive.ts` before returning a generic 502. This returns a 401 with a clear reauth message when the OAuth token has expired.
+- **Client components**: Use `apiFetch()` from `src/lib/api-fetch.ts` instead of raw `fetch()` for any request to a Drive-backed API route. It intercepts 401 responses, shows a single deduplicated reauth toast, and throws `ApiAuthError`.
+- **Catch blocks**: When a catch block shows a `toast.error`, guard it with `if (!isAuthError(err))` so generic error toasts are suppressed when the real cause is an expired token — otherwise the user sees duplicate/confusing toasts.
+
 ### Code Logic
 - **Documentation**: Where code has subtle or surprising logic, add comments to explain the "why" and intended behavior.
 

@@ -83,7 +83,8 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 
 | File | Description |
 |------|-------------|
-| `google-drive.ts` | Google Drive/Docs API client — OAuth2 with token refresh, changes feed (`changes.list`/`getStartPageToken`), file listing, comment fetching, `fetchAllThreads` (bulk thread fetch), `fetchDocContent` (combined document text + suggestion extraction in one Docs API call), thread detail, reply/resolve |
+| `api-fetch.ts` | Client-side `apiFetch()` wrapper — intercepts 401 (expired Google token), shows deduplicated reauth toast, throws `ApiAuthError`; `isAuthError()` helper for catch blocks |
+| `google-drive.ts` | Google Drive/Docs API client — OAuth2 with token refresh, `invalidGrantResponse()` for API routes, changes feed (`changes.list`/`getStartPageToken`), file listing, comment fetching, `fetchAllThreads` (bulk thread fetch), `fetchDocContent` (combined document text + suggestion extraction in one Docs API call), thread detail, reply/resolve |
 | `auth-utils.ts` | Centralized authentication helpers for Server Components and API routes |
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates/deletes DB records, computes unarchive signals |
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |

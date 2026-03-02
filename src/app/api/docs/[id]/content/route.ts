@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, fetchDocContent, fetchFileTextViaExport } from "@/lib/google-drive";
+import { getDriveClient, fetchDocContent, fetchFileTextViaExport, invalidGrantResponse } from "@/lib/google-drive";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 const SLIDES_MIME_TYPE = "application/vnd.google-apps.presentation";
@@ -26,6 +26,8 @@ export async function GET(
   try {
     driveAuth = await getDriveClient(userId);
   } catch (err) {
+    const reauth = invalidGrantResponse(err);
+    if (reauth) return reauth;
     const message = err instanceof Error ? err.message : "Failed to connect to Google Drive";
     return NextResponse.json({ error: message }, { status: 502 });
   }
@@ -46,6 +48,8 @@ export async function GET(
 
     return NextResponse.json({ suggestions: {} });
   } catch (err) {
+    const reauth = invalidGrantResponse(err);
+    if (reauth) return reauth;
     const message = err instanceof Error ? err.message : "Failed to fetch document content";
     return NextResponse.json({ error: message }, { status: 502 });
   }

@@ -6,6 +6,7 @@ import { RefreshCw, CloudDownload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DocWithLabels } from "@/types";
 import { broadcastChange } from "@/lib/cross-tab";
+import { apiFetch, isAuthError } from "@/lib/api-fetch";
 
 interface RefreshButtonProps {
   mode: "refresh" | "full-refresh" | "load";
@@ -27,7 +28,7 @@ export function RefreshButton({ mode, onRefresh }: RefreshButtonProps) {
   async function handleClick() {
     setLoading(true);
     try {
-      const syncRes = await fetch(`/api/docs?mode=${mode}`, { method: "POST" });
+      const syncRes = await apiFetch(`/api/docs?mode=${mode}`, { method: "POST" });
       if (!syncRes.ok) throw new Error("Sync failed");
       const data = await syncRes.json();
 
@@ -55,8 +56,8 @@ export function RefreshButton({ mode, onRefresh }: RefreshButtonProps) {
         ].filter(Boolean).join(", ");
         toast.success(`Sync complete — ${parts || "no updates"}`, { duration: 8000 });
       }
-    } catch {
-      toast.error("Failed to sync with Google Drive");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to sync with Google Drive");
     } finally {
       setLoading(false);
     }

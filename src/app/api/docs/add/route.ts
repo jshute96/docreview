@@ -5,6 +5,7 @@ import {
   getDriveClient,
   parseGoogleDocId,
   SUPPORTED_MIME_TYPES,
+  invalidGrantResponse,
 } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { google } from "googleapis";
@@ -55,7 +56,9 @@ export async function POST(req: NextRequest) {
       fields: "name,mimeType,webViewLink,modifiedTime,createdTime,owners(me,displayName),trashed",
     });
     f = res.data;
-  } catch {
+  } catch (err) {
+    const reauth = invalidGrantResponse(err);
+    if (reauth) return reauth;
     return NextResponse.json({ error: "no_access" }, { status: 404 });
   }
 

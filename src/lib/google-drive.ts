@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { OFFLINE_MODE, OfflineModeError } from "@/lib/offline";
 
@@ -7,6 +8,22 @@ export const SUPPORTED_MIME_TYPES = new Set([
   "application/vnd.google-apps.spreadsheet",
   "application/vnd.google-apps.presentation",
 ]);
+
+/** Detect expired/revoked OAuth refresh token (Google returns 400 invalid_grant) */
+function isInvalidGrantError(err: unknown): boolean {
+  if (err instanceof Error && err.message?.includes("invalid_grant")) return true;
+  const code = (err as { code?: number | string })?.code;
+  return code === 400 && String(err).includes("invalid_grant");
+}
+
+const REAUTH_MESSAGE = "Google authorization expired. Please sign out and sign back in.";
+
+/** If err is an invalid_grant error, return a 401 NextResponse; otherwise return null. */
+export function invalidGrantResponse(err: unknown): NextResponse | null {
+  if (!isInvalidGrantError(err)) return null;
+  console.warn("[Auth] Google authorization expired (invalid_grant)");
+  return NextResponse.json({ error: REAUTH_MESSAGE }, { status: 401 });
+}
 
 export function parseGoogleDocId(url: string): string | null {
   const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);

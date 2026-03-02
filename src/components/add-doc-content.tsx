@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
+import { apiFetch, isAuthError } from "@/lib/api-fetch";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import type { DocWithLabels } from "@/types";
 import { LabelPicker } from "@/components/label-picker";
@@ -102,7 +103,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
       setValidationState("validating");
 
       try {
-        const res = await fetch(
+        const res = await apiFetch(
           `/api/docs/validate?url=${encodeURIComponent(urlToValidate)}`,
           { signal: controller.signal }
         );
@@ -122,8 +123,10 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
         }
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
-        setValidationState("invalid");
-        setValidationError("Validation failed");
+        if (!isAuthError(err)) {
+          setValidationState("invalid");
+          setValidationError("Validation failed");
+        }
       }
     }
 
@@ -163,7 +166,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
     async function handleAdd(): Promise<DocWithLabels | null> {
       setAdding(true);
       try {
-        const res = await fetch("/api/docs/add", {
+        const res = await apiFetch("/api/docs/add", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url, labelIds: selectedLabelIds, notes }),
@@ -172,8 +175,8 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
         const newDoc: DocWithLabels = await res.json();
         onSuccess(newDoc);
         return newDoc;
-      } catch {
-        toast.error("Failed to add document");
+      } catch (err) {
+        if (!isAuthError(err)) toast.error("Failed to add document");
         return null;
       } finally {
         setAdding(false);
