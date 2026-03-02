@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-utils";
 import { AddDocPageClient } from "@/components/add-doc-page-client";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Add Document - Docreview",
+};
 
 export default async function AddPage({
   searchParams,

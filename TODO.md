@@ -1,6 +1,5 @@
 P0:
 * Bug: When I refresh a doc, the archived comments all come back.
-* Put doc name first in title for comments tab to make tabs easier to find.
 
 P1:
 * how do I notice @mentions?
@@ -20,7 +19,8 @@ P1:
 * Status column in comments view: Mine, Replied, Open, Inbox, Muted
 * Load - when I click Add, it rescans and re-resolves all the docs, not just
   the selected ones.
-* Main app title in the top level.  Plus more decoration.
+* Main app title in the top level.
+* More decoration - favicon.
 
 Easy:
 * X to clear search boxes

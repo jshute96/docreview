@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     where: { id, userId: session.user.id },
     select: { title: true },
   });
-  return { title: doc ? `Docreview: ${doc.title}` : "Docreview" };
+  return { title: doc ? `${doc.title} - Docreview` : "Unknown doc - Docreview" };
 }
 
 export default async function DocDetailPage({ params }: PageProps) {
