@@ -52,6 +52,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   const [comments, setComments] = useState<Comment[]>(initialDoc.comments);
   const [archiving, setArchiving] = useState(false);
+  const [bulkArchiving, setBulkArchiving] = useState(false);
   const [threadMap, setThreadMap] = useState<Record<string, CommentThread>>({});
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
   const [documentText, setDocumentText] = useState<string | undefined>(undefined);
@@ -231,6 +232,51 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       toast.error("Failed to update status");
     } finally {
       setArchiving(false);
+    }
+  }
+
+  async function handleArchiveAll() {
+    const toArchive = filteredComments.filter((c) => c.status === "ACTIVE");
+    if (toArchive.length === 0) return;
+
+    setBulkArchiving(true);
+    try {
+      const commentIds = toArchive.map((c) => c.id);
+      const res = await apiFetch(`/api/docs/${doc.id}/comments`, {
+        method: "PATCH",
+        body: JSON.stringify({ commentIds, status: "ARCHIVED" }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      
+      const { count } = await res.json();
+      setComments((prev) =>
+        prev.map((c) =>
+          commentIds.includes(c.id) ? { ...c, status: "ARCHIVED" } : c
+        )
+      );
+      
+      // Trigger animations for comments that are now filtered out
+      toArchive.forEach(c => {
+        const updated = { ...c, status: "ARCHIVED" as const };
+        if (wouldBeFilteredOut(updated)) {
+          setExitingIds((prev) => new Set(prev).add(updated.id));
+        }
+      });
+      
+      setTimeout(() => {
+        setExitingIds((prev) => {
+          const next = new Set(prev);
+          toArchive.forEach(c => next.delete(c.id));
+          return next;
+        });
+      }, 200);
+
+      broadcastChange({ type: "comments", docId: doc.id });
+      toast.success(`Archived ${count} comments`);
+    } catch {
+      toast.error("Failed to archive comments");
+    } finally {
+      setBulkArchiving(false);
     }
   }
 
@@ -489,6 +535,16 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                       onClick={() => setCollapseSignal((n) => n + 1)}
                     >
                       Collapse all
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-5 px-1.5 text-[10px] text-zinc-900"
+                      title="Archive all visible comments"
+                      onClick={handleArchiveAll}
+                      disabled={bulkArchiving || !filteredComments.some((c) => c.status === "ACTIVE")}
+                    >
+                      {bulkArchiving ? "Archiving..." : "Archive all"}
                     </Button>
                   </div>
                 </th>

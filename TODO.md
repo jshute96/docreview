@@ -1,5 +1,6 @@
 P0:
 * Bug: When I refresh a doc, the archived comments all come back.
+* Distinguish a comment state for "last comment is by me".
 
 P1:
 * how do I notice @mentions?
@@ -21,6 +22,7 @@ P1:
   the selected ones.
 * Main app title in the top level.
 * More decoration - favicon.
+* Hamburger menus for some of the buttons for extra actions.
 
 Easy:
 * X to clear search boxes
@@ -29,7 +31,6 @@ Easy:
 * Button for search in Drive (from docs search box)
 * Put filter labels in window title, so I can distinguish multiple windows
 * Confirm screen on deleting label, with a label count (also show in hover)
-* Comments: Archive all
 
 * Dialog boxes
   * dialog box moves on new vs add

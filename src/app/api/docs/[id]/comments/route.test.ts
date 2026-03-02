@@ -1,0 +1,132 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
+import { GET, PATCH } from "./route";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { getDriveClient, fetchAllThreads } from "@/lib/google-drive";
+
+vi.mock("@/auth", () => ({
+  auth: vi.fn(),
+}));
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    doc: {
+      findUnique: vi.fn(),
+    },
+    comment: {
+      updateMany: vi.fn(),
+    },
+  },
+}));
+vi.mock("@/lib/google-drive", () => ({
+  getDriveClient: vi.fn(),
+  fetchAllThreads: vi.fn(),
+  invalidGrantResponse: vi.fn().mockReturnValue(null),
+}));
+
+const mockAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
+const mockDoc = prisma.doc as unknown as {
+  findUnique: ReturnType<typeof vi.fn>;
+};
+const mockComment = prisma.comment as unknown as {
+  updateMany: ReturnType<typeof vi.fn>;
+};
+const mockFetchAllThreads = vi.mocked(fetchAllThreads);
+
+function makeParams(id: string) {
+  return { params: Promise.resolve({ id }) };
+}
+
+beforeEach(() => {
+  vi.resetAllMocks();
+});
+
+describe("GET /api/docs/[id]/comments", () => {
+  it("returns 401 when not authenticated", async () => {
+    mockAuth.mockResolvedValue(null);
+    const req = new NextRequest("http://localhost/api/docs/d1/comments");
+    const res = await GET(req, makeParams("d1"));
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 when doc not found", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue(null);
+    const req = new NextRequest("http://localhost/api/docs/d1/comments");
+    const res = await GET(req, makeParams("d1"));
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 200 with threads", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1", googleDocId: "g1" });
+    mockFetchAllThreads.mockResolvedValue([
+      { id: "c1", author: "A", content: "C", createdTime: "T", resolved: false, replies: [] },
+    ]);
+    const req = new NextRequest("http://localhost/api/docs/d1/comments");
+    const res = await GET(req, makeParams("d1"));
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.threads["c1"]).toBeDefined();
+  });
+});
+
+describe("PATCH /api/docs/[id]/comments", () => {
+  function makePatchReq(id: string, body: unknown): [NextRequest, ReturnType<typeof makeParams>] {
+    const req = new NextRequest(`http://localhost/api/docs/${id}/comments`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      headers: { "content-type": "application/json" },
+    });
+    return [req, makeParams(id)];
+  }
+
+  it("returns 401 when not authenticated", async () => {
+    mockAuth.mockResolvedValue(null);
+    const [req, params] = makePatchReq("d1", { commentIds: ["c1"], status: "ARCHIVED" });
+    const res = await PATCH(req, params);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 when doc not found", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue(null);
+    const [req, params] = makePatchReq("d1", { commentIds: ["c1"], status: "ARCHIVED" });
+    const res = await PATCH(req, params);
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 400 for invalid commentIds", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
+    const [req, params] = makePatchReq("d1", { commentIds: "not-array", status: "ARCHIVED" });
+    const res = await PATCH(req, params);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for invalid status", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
+    const [req, params] = makePatchReq("d1", { commentIds: ["c1"], status: "INVALID" });
+    const res = await PATCH(req, params);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 200 on successful bulk update", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
+    mockComment.updateMany.mockResolvedValue({ count: 2 });
+    const [req, params] = makePatchReq("d1", { commentIds: ["c1", "c2"], status: "ARCHIVED" });
+    const res = await PATCH(req, params);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.count).toBe(2);
+    expect(mockComment.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ["c1", "c2"] },
+        docId: "d1",
+      },
+      data: { status: "ARCHIVED" },
+    });
+  });
+});
