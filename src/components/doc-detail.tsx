@@ -152,7 +152,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   const [myThreadsFilter, setMyThreadsFilter] = useState(false);
   const [myCommentsFilter, setMyCommentsFilter] = useState(false);
-  const [showMode, setShowMode] = useState<"active" | "open" | "all">("active");
+  const [showMode, setShowMode] = useState<"active" | "open" | "resolved" | "all">("active");
   const [suggestionsOnly, setSuggestionsOnly] = useState(false);
   const [searchFilter, setSearchFilter] = useState("");
   type SortCol = "driveCreatedAt" | "driveModifiedAt" | "replyCount" | "iParticipated" | "resolved";
@@ -175,6 +175,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     if (suggestionsOnly && c.type !== "SUGGESTION") return true;
     if (showMode === "active" && (c.status === "ARCHIVED" || c.status === "MUTED")) return true;
     if (showMode === "open" && c.resolved) return true;
+    if (showMode === "resolved" && !c.resolved) return true;
     if (myThreadsFilter && !c.iParticipated) return true;
     if (myCommentsFilter && !c.isThreadAuthor) return true;
     return false;

@@ -52,6 +52,7 @@ Easy:
   * support adding these from gmail notifications, with fill-in title and notes
   * try flow of adding a doc I am requesting permission to, with notes about what it was
 
+* Star a comment or doc?
 * "No comments on this doc" still shows if we try to load and fail.
 * Make refresh on a doc faster, and probably cheaper, by doing fewer API calls.
 * If someone else resolves my thread, that comment should stay active/watched?

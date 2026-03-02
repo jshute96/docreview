@@ -1,6 +1,6 @@
 "use client";
 
-type ShowMode = "active" | "open" | "all";
+type ShowMode = "active" | "open" | "resolved" | "all";
 interface CommentFilterBarProps {
   myThreadsFilter: boolean;
   myCommentsFilter: boolean;
@@ -57,11 +57,16 @@ export function CommentFilterBar({
         <div className="h-4 w-px bg-zinc-200" />
 
         <div className="flex items-center gap-1">
-          {(["active", "open", "all"] as const).map((mode) => (
+          {(["active", "open", "resolved", "all"] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => onShowModeChange(mode)}
-              title={{ active: "Show unarchived comments", open: "Show all unresolved comments", all: "Show all comments including resolved" }[mode]}
+              title={{
+                active: "Show unarchived comments",
+                open: "Show all unresolved comments",
+                resolved: "Show only resolved comments",
+                all: "Show all comments including resolved"
+              }[mode]}
               className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
                 showMode === mode
                   ? "bg-zinc-800 text-white"
