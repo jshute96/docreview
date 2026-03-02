@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { listRecentDocs } from "@/lib/google-drive";
+import { listRecentDocs, invalidGrantResponse } from "@/lib/google-drive";
 import { parseLoadOptions } from "@/lib/load-options";
 
 export async function POST(req: NextRequest) {
@@ -48,6 +48,8 @@ export async function POST(req: NextRequest) {
       newDocs,
     });
   } catch (err) {
+    const reauth = invalidGrantResponse(err);
+    if (reauth) return reauth;
     console.error("[Scan] Drive error:", err);
     return NextResponse.json({ error: "Failed to scan Google Drive" }, { status: 502 });
   }

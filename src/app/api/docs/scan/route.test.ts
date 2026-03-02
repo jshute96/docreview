@@ -14,6 +14,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 vi.mock("@/lib/google-drive", () => ({
   listRecentDocs: vi.fn(),
+  invalidGrantResponse: vi.fn(() => null),
 }));
 
 import { POST } from "./route";

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
+import { apiFetch, isAuthError } from "@/lib/api-fetch";
 import { X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -106,7 +107,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
     setScanning(true);
     setScanResult(null);
     try {
-      const res = await fetch("/api/docs/scan", {
+      const res = await apiFetch("/api/docs/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(options),
@@ -118,7 +119,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       setSelectedDocs(result.newDocs);
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
-      toast.error("Failed to scan Google Drive");
+      if (!isAuthError(err)) toast.error("Failed to scan Google Drive");
     } finally {
       setScanning(false);
     }
@@ -130,7 +131,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
     abortRef.current = controller;
     setAdding(true);
     try {
-      const syncRes = await fetch("/api/docs?mode=load", {
+      const syncRes = await apiFetch("/api/docs?mode=load", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -166,7 +167,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       });
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
-      toast.error("Failed to sync with Google Drive");
+      if (!isAuthError(err)) toast.error("Failed to sync with Google Drive");
     } finally {
       setAdding(false);
     }
