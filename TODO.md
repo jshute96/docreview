@@ -1,5 +1,9 @@
 * Better handling of docs I don't have permission to (vs deleted)
 
+* Load - when I click Add, it rescans and re-resolves all the docs, not just
+  the selected ones.
+* Multi-select in Load and Edit All, with remove or "just these".
+
 * Make refresh on a doc faster, and probably cheaper, by doing fewer API calls.
 * If someone else resolves my thread, that comment should stay active/watched?
 * gmail scan
