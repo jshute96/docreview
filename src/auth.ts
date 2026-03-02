@@ -69,4 +69,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
+  events: {
+    async signIn({ account }) {
+      // PrismaAdapter only writes tokens on first linkAccount; on subsequent
+      // sign-ins the fresh tokens from Google are discarded. Persist them here
+      // so that a re-login actually fixes expired/revoked credentials.
+      if (account?.provider === "google" && account.providerAccountId) {
+        await prisma.account.update({
+          where: {
+            provider_providerAccountId: {
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+            },
+          },
+          data: {
+            access_token: account.access_token,
+            refresh_token: account.refresh_token,
+            expires_at: account.expires_at,
+          },
+        });
+      }
+    },
+  },
 });

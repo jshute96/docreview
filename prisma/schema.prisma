@@ -10,7 +10,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// NextAuth models
+// NextAuth models — see docs/auth.md for how these interact.
+//
+// User:    The identity. One row per person. All app data (docs, labels, etc.)
+//          hangs off this. Created on first sign-in.
+//
+// Account: Links a User to an OAuth provider (Google). Stores the access_token
+//          and refresh_token used to call Google APIs on the user's behalf.
+//          One row per provider per user. Tokens are updated on sign-in
+//          (events.signIn in src/auth.ts) and on automatic refresh
+//          (oauth2Client.on("tokens") in src/lib/google-drive.ts).
+//
+// Session: Maps a browser cookie (session_token) to a User. Created on sign-in,
+//          deleted on sign-out. This is how NextAuth identifies who is making
+//          each request — it has nothing to do with Google tokens.
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -32,9 +46,9 @@ model Account {
   type              String
   provider          String
   providerAccountId String  @map("provider_account_id")
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
+  refresh_token     String? // long-lived; used to obtain new access_tokens without user interaction
+  access_token      String? // short-lived (~1hr); sent with every Google API call
+  expires_at        Int?    // unix timestamp when access_token expires
   token_type        String?
   scope             String?
   id_token          String?
@@ -47,7 +61,7 @@ model Account {
 
 model Session {
   id           String   @id @default(cuid())
-  sessionToken String   @unique @map("session_token")
+  sessionToken String   @unique @map("session_token") // random string stored as browser cookie
   userId       String   @map("user_id")
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -55,6 +69,8 @@ model Session {
   @@map("sessions")
 }
 
+// Used by NextAuth for email-based (passwordless) sign-in flows.
+// Not currently used — we only support Google OAuth — but required by PrismaAdapter.
 model VerificationToken {
   identifier String
   token      String   @unique
