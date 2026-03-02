@@ -4,10 +4,10 @@ import type { Doc, Prisma } from "@prisma/client";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 
-function datesEqual(a: Date | null, b: Date | null): boolean {
-  if (a === null && b === null) return true;
-  if (a === null || b === null) return false;
-  return a.getTime() === b.getTime();
+function datesEqual(a: Date | null | undefined, b: Date | null | undefined): boolean {
+  const timeA = a instanceof Date ? a.getTime() : null;
+  const timeB = b instanceof Date ? b.getTime() : null;
+  return timeA === timeB;
 }
 
 // Syncs all comments and suggestions for a single doc. Always does a full scan —
@@ -105,7 +105,21 @@ export async function syncComments(
         // MUTED comments already handled above (early continue), so status is ACTIVE or ARCHIVED here
         if (isInteresting) shouldUnarchive = true;
       }
-      const status = c.resolved && c.iResolvedIt ? "ARCHIVED" : "ACTIVE";
+
+      // Determine the target status. We want to preserve manual ARCHIVED status
+      // unless there is new activity that should "wake up" the thread.
+      let status = existing.status as "ACTIVE" | "ARCHIVED";
+      const hasNewActivity =
+        c.replyCount > existing.replyCount ||
+        (existing.resolved && !c.resolved) ||
+        !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
+
+      if (c.resolved && c.iResolvedIt) {
+        status = "ARCHIVED";
+      } else if (hasNewActivity) {
+        status = "ACTIVE";
+      }
+
       const changed =
         existing.resolved !== c.resolved ||
         existing.iParticipated !== c.iParticipated ||

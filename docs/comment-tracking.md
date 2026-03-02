@@ -89,10 +89,14 @@ reflects current state.
    `replyCount` against the existing record. Skip the update if all match.
 2. If `resolved = true` AND I was the one who resolved it (the last reply with
    `action = "resolve"` has `author.me = true`) → set status to `ARCHIVED`.
-3. Otherwise (new reply added, thread re-opened, resolved by someone else) → set status
-   to `ACTIVE`.
+3. Otherwise, if there is **new activity** (new reply added, thread re-opened, or any
+   other modification detected via `driveModifiedAt`) → set status to `ACTIVE`.
+4. Otherwise (no new activity), preserve the existing `status`. This ensures that if
+   you manually archive an unresolved thread, it stays archived until someone replies
+   to it or re-opens it.
 
-The effect: threads you close yourself get archived quietly. Anything else surfaces as Active.
+The effect: threads you close yourself get archived quietly. Manual archiving is preserved
+until new activity occurs. Anything else surfaces as Active.
 
 ---
 

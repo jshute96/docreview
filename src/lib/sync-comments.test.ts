@@ -324,6 +324,45 @@ describe("syncComments comment status", () => {
     // MUTED path updates Drive fields but not status
     expect(updateCall.data.status).toBeUndefined();
   });
+
+  it("preserves manual ARCHIVED status if no new activity", async () => {
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      id: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", 
+      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({ resolved: false, replyCount: 0, driveModifiedAt: modDate }),
+    ]);
+
+    await syncComments(makeDoc(), driveAuth);
+
+    // No-op detection should mean no update, or at least status remains ARCHIVED if updated
+    const updateCall = mockComment.update.mock.calls[0]?.[0];
+    if (updateCall && updateCall.data.status) {
+      expect(updateCall.data.status).toBe("ARCHIVED");
+    }
+  });
+
+  it("wakes up ARCHIVED comment if new reply added", async () => {
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      id: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", 
+      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({ 
+        resolved: false, 
+        replyCount: 1, 
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z") 
+      }),
+    ]);
+
+    await syncComments(makeDoc(), driveAuth);
+
+    const updateCall = mockComment.update.mock.calls[0][0];
+    expect(updateCall.data.status).toBe("ACTIVE");
+  });
 });
 
 // --------------- Suggestion resolution ---------------
