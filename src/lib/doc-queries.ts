@@ -12,8 +12,18 @@ export const labelInclude = {
 export const docWithCountsInclude = {
   labels: labelInclude,
   comments: {
-    where: { status: "ACTIVE" as const },
-    select: { isThreadAuthor: true, iParticipated: true },
+    where: {
+      OR: [
+        { status: "ACTIVE" as const },
+        { resolved: false as const }
+      ]
+    },
+    select: { 
+      isThreadAuthor: true, 
+      iParticipated: true, 
+      resolved: true, 
+      status: true 
+    },
   },
 };
 
@@ -25,16 +35,21 @@ export const docWithCommentsInclude = {
 
 /** Strip raw comments array and replace with computed _count */
 export function withCommentCounts<
-  T extends { comments: { isThreadAuthor: boolean; iParticipated: boolean }[] },
+  T extends { 
+    role: string;
+    comments: { isThreadAuthor: boolean; iParticipated: boolean; resolved: boolean; status: string }[] 
+  },
 >(doc: T) {
   const { comments, ...rest } = doc;
   return {
     ...rest,
     _count: {
       watchedComments: comments.filter(
-        (c) => c.isThreadAuthor || c.iParticipated,
+        (c) =>
+          c.status === "ACTIVE" &&
+          (doc.role === "AUTHOR" || c.isThreadAuthor || c.iParticipated),
       ).length,
-      openComments: comments.length,
+      openComments: comments.filter((c) => !c.resolved).length,
     },
   };
 }

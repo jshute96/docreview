@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { highlightText } from "@/lib/highlight";
 import { broadcastChange } from "@/lib/cross-tab";
+import { WATCHED_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 
 interface DocRowProps {
   doc: DocWithLabels;
@@ -85,12 +86,18 @@ export function DocRow({
         )}
       </td>
       <td className="py-1.5 px-4 text-sm text-zinc-500">
-        <div className="mx-auto w-8 text-right -translate-x-2">
+        <div 
+          className="mx-auto w-8 text-right -translate-x-2" 
+          title={doc._count.watchedComments > 0 ? WATCHED_COMMENTS_TOOLTIP : ""}
+        >
           {doc._count.watchedComments > 0 ? doc._count.watchedComments : ""}
         </div>
       </td>
       <td className="py-1.5 px-4 text-sm text-zinc-500">
-        <div className="mx-auto w-8 text-right -translate-x-3">
+        <div 
+          className="mx-auto w-8 text-right -translate-x-3" 
+          title={doc._count.openComments > 0 ? OPEN_COMMENTS_TOOLTIP : ""}
+        >
           {doc._count.openComments > 0 ? doc._count.openComments : ""}
         </div>
       </td>

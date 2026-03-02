@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { filterDocs, sortDocs } from "@/lib/doc-filters";
 import type { SortCol, SortDir } from "@/lib/doc-filters";
 import { LabelProvider } from "@/contexts/label-context";
+import { WATCHED_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 
 interface DocTableProps {
   initialDocs: DocWithLabels[];
@@ -231,8 +232,8 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
                 </th>
               </tr>
               <tr className="border-b border-zinc-200 bg-zinc-50">
-                <ThButton col="watched" title="Comments in my threads and my docs">Watched</ThButton>
-                <ThButton col="open" title="All open comments">Open</ThButton>
+                <ThButton col="watched" title={WATCHED_COMMENTS_TOOLTIP}>Watched</ThButton>
+                <ThButton col="open" title={OPEN_COMMENTS_TOOLTIP}>Open</ThButton>
               </tr>
             </thead>
             <tbody className="bg-white">

@@ -9,6 +9,7 @@ P1:
 * change to "Inbox" terminology
   * Change "Active" filter on main page to Inbox|All (or not muted?)
   * Add and Load controls can choose to add in inbox.
+  * Also change "Open" to "Unresolved"?
 * refine flows for what comes into Inbox (for comments and docs)
   * my docs
   * shared with me explicitly
@@ -23,6 +24,9 @@ P1:
 * Main app title in the top level.
 * More decoration - favicon.
 * Hamburger menus for some of the buttons for extra actions.
+* ergonomics of control placement in comments view
+  - archive at the bottom, etc.
+* Refresh selected docs
 
 Easy:
 * X to clear search boxes
@@ -31,6 +35,8 @@ Easy:
 * Button for search in Drive (from docs search box)
 * Put filter labels in window title, so I can distinguish multiple windows
 * Confirm screen on deleting label, with a label count (also show in hover)
+* Filter for all resolved.
+* Comments page Doc List button gets a finger icon, other buttons don't.
 
 * Dialog boxes
   * dialog box moves on new vs add
