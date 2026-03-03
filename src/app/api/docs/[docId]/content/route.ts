@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getDriveClient, fetchDocContent, fetchFileTextViaExport, invalidGrantResponse } from "@/lib/google-drive";
+import { runWithRequestId } from "@/lib/request-context";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 const SLIDES_MIME_TYPE = "application/vnd.google-apps.presentation";
@@ -10,6 +11,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ docId: string }> }
 ) {
+  return runWithRequestId(`GET ${_req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -53,4 +55,5 @@ export async function GET(
     const message = err instanceof Error ? err.message : "Failed to fetch document content";
     return NextResponse.json({ error: message }, { status: 502 });
   }
+  });
 }

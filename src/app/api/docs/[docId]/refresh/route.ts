@@ -6,11 +6,13 @@ import { getDriveClient, invalidGrantResponse } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { docWithCommentsInclude } from "@/lib/doc-queries";
 import { logError, logWarning } from "@/lib/log";
+import { runWithRequestId } from "@/lib/request-context";
 
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ docId: string }> }
 ) {
+  return runWithRequestId(`POST ${_req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -89,4 +91,5 @@ export async function POST(
   });
 
   return NextResponse.json(updated);
+  });
 }

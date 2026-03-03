@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { google } from "googleapis";
 import { getDriveClient, fetchThreadDetail, fetchSuggestions, fetchAllThreads, invalidGrantResponse } from "@/lib/google-drive";
 import { logError } from "@/lib/log";
+import { runWithRequestId } from "@/lib/request-context";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 
@@ -11,6 +12,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ docId: string }> }
 ) {
+  return runWithRequestId(`GET ${req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -55,12 +57,14 @@ export async function GET(
       { status: 502 }
     );
   }
+  });
 }
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ docId: string }> }
 ) {
+  return runWithRequestId(`POST ${req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -145,4 +149,5 @@ export async function POST(
       { status: 502 }
     );
   }
+  });
 }

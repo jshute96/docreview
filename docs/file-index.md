@@ -98,7 +98,8 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 | `offline.ts` | Offline mode constants — `OFFLINE_MODE` flag, `OfflineModeError`, fallback user |
 | `role-colors.ts` | Tailwind class maps for Author (blue) and Reviewer (violet) role badges/filters |
 | `load-options.ts` | `parseLoadOptions()` — shared validation for scan/load request body (daysBack, ownership, includeSharedDrives, source) |
-| `log.ts` | `logError()`, `logWarning()`, and `logInfo()` — centralized logging helpers; errors print red with `ERROR:` prefix, warnings print yellow with `WARNING:` prefix; all server-side logging goes through these |
+| `log.ts` | `logError()`, `logWarning()`, and `logInfo()` — centralized logging helpers; console output (colored) + daily file output to `logs/` with timestamps and request IDs |
+| `request-context.ts` | `runWithRequestId(label, fn)` and `getRequestId()` — AsyncLocalStorage-based request ID context for correlating log lines across a single API request; logs `[API] label` silently on entry |
 | `status.ts` | Read/write `Status` table — tracks `driveChangesPageToken` and `lastGmailUpdateTimestamp` per user for incremental sync |
 | `tri-state.ts` | `TriState` type (`off`/`include`/`exclude`), cycle function, partition helper |
 | `utils.ts` | `cn()` (clsx+twMerge), `contrastText()` for label colors, `formatDate()` |

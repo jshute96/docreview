@@ -7,8 +7,10 @@ import { getStatus, updateDriveChangesToken } from "@/lib/status";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 import { parseLoadOptions } from "@/lib/load-options";
 import { logError, logWarning, logInfo } from "@/lib/log";
+import { runWithRequestId } from "@/lib/request-context";
 
 export async function GET(req: NextRequest) {
+  return runWithRequestId(`GET ${req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,9 +34,11 @@ export async function GET(req: NextRequest) {
   });
 
   return NextResponse.json(rawDocs.map(withCommentCounts));
+  });
 }
 
 export async function POST(req: NextRequest) {
+  return runWithRequestId(`POST ${req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -298,4 +302,5 @@ export async function POST(req: NextRequest) {
   const elapsed = Date.now() - t0;
   logInfo(`[Sync] ${mode} complete in ${elapsed}ms: ${added} added, ${updated} updated, ${deleted} deleted, ${unarchived} unarchived, ${comments} comments synced`);
   return NextResponse.json({ mode, added, updated, deleted, unarchived, total: driveDocs.length, comments });
+  });
 }

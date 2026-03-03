@@ -70,11 +70,14 @@ dropped `url = env(...)` support in schema.prisma).
 ### Logging
 - **Errors:** Use `logError(message, ...args)` from `src/lib/log.ts` — prints red with `ERROR:` prefix via `console.error`.
 - **Warnings:** Use `logWarning(message, ...args)` from `src/lib/log.ts` — prints yellow with `WARNING:` prefix via `console.warn`.
-- **Info:** Use `logInfo(message, ...args)` from `src/lib/log.ts` — currently wraps `console.log` but centralizes for future file/structured logging.
+- **Info:** Use `logInfo(message, ...args)` from `src/lib/log.ts` — wraps `console.log` and writes to daily log files.
 - **Never** use raw `console.log()`, `console.error()`, or `console.warn()` in application code; always use the helpers in `log.ts`.
 - **Prefix** every log message with a bracketed tag: `[Drive]`, `[Gmail]`, `[Sync]`, `[Comments]`, `[Suggestions]`, `[Scan]`, `[Refresh]`, `[Prisma]`, `[Auth]`, `[API]`, `[GmailRefresh]`, `[Docs]`.
 - **Include timing** for external API calls: `(${Date.now() - t0}ms)`.
 - Client-side toasts don't need corresponding `console.log` — the server-side API route already logs the operation or error.
+- **File logging:** All log calls also write to `logs/docreview-YYYY-MM-DD.log` (PST dates). Each line has format: `TIMESTAMP REQUEST_ID LEVEL MESSAGE args`. Log files auto-rotate daily and are cleaned up after 14 days. `logSilent(message, ...args)` writes to the file only (no console output).
+- **Request IDs:** Every API route handler must be wrapped in `runWithRequestId(\`METHOD ${req.nextUrl.pathname}\`, async () => { ... })` from `src/lib/request-context.ts`. This assigns an 8-char hex ID that tags all log lines within that request. When adding a new route handler, always add this wrapper. For handlers without a `req` parameter, use a static label string.
+- **Reading logs for debugging:** Use `tail -f logs/docreview-*.log` to watch live output. To trace a single request, find its 8-char ID and `grep` for it: `grep 'a1b2c3d4' logs/docreview-2026-03-03.log`. To find errors: `grep 'ERROR' logs/docreview-*.log`. To see all activity for a tag: `grep '\[Sync\]' logs/docreview-*.log`.
 
 ### Code Logic
 - **Documentation**: Where code has subtle or surprising logic, add comments to explain the "why" and intended behavior.

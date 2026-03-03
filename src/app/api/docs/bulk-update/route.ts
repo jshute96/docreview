@@ -4,10 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { DocRole, DocStatus, Prisma } from "@prisma/client";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 import type { BulkEditState } from "@/lib/bulk-edit";
+import { runWithRequestId } from "@/lib/request-context";
 
 const VALID_BULK_STATES = new Set(["as-is", "set", "clear"]);
 
 export async function PATCH(req: NextRequest) {
+  return runWithRequestId(`PATCH ${req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -150,4 +152,5 @@ export async function PATCH(req: NextRequest) {
   });
 
   return NextResponse.json({ docs: allDocs, skipped });
+  });
 }

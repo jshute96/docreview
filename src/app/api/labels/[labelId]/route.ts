@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
+import { runWithRequestId } from "@/lib/request-context";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ labelId: string }> }
 ) {
+  return runWithRequestId(`PATCH ${req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -30,12 +32,14 @@ export async function PATCH(
   });
 
   return NextResponse.json(updated);
+  });
 }
 
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ labelId: string }> }
 ) {
+  return runWithRequestId(`DELETE ${_req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -50,4 +54,5 @@ export async function DELETE(
 
   await prisma.label.delete({ where: { labelId } });
   return new NextResponse(null, { status: 204 });
+  });
 }

@@ -5,8 +5,10 @@ import { listRecentDocs, invalidGrantResponse } from "@/lib/google-drive";
 import { scanGmailNotifications } from "@/lib/gmail";
 import { parseLoadOptions } from "@/lib/load-options";
 import { logError, logInfo } from "@/lib/log";
+import { runWithRequestId } from "@/lib/request-context";
 
 export async function POST(req: NextRequest) {
+  return runWithRequestId(`POST ${req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -89,4 +91,5 @@ export async function POST(req: NextRequest) {
     logError("[Scan] Drive error:", err);
     return NextResponse.json({ error: "Failed to scan Google Drive" }, { status: 502 });
   }
+  });
 }

@@ -43,6 +43,9 @@ next-env.d.ts
 # data export
 scripts/data-export.json
 
+# log files
+/logs/
+
 # claude code
 .claude/
 .gemini/

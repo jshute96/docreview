@@ -4,12 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { fetchDocsByIds, findDeletedDocIds, getDriveClient, invalidGrantResponse } from "@/lib/google-drive";
 import { scanGmailNotifications } from "@/lib/gmail";
 import { logError, logInfo } from "@/lib/log";
+import { runWithRequestId } from "@/lib/request-context";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateGmailTimestamp } from "@/lib/status";
 
 const DEFAULT_DAYS_BACK = 7;
 
 export async function POST() {
+  return runWithRequestId("POST /api/docs/gmail-refresh", async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -143,4 +145,5 @@ export async function POST() {
     logError("[GmailRefresh] Error:", err);
     return NextResponse.json({ error: "Failed to refresh from Gmail" }, { status: 502 });
   }
+  });
 }

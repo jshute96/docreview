@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
+import { runWithRequestId } from "@/lib/request-context";
 
 export async function GET() {
+  return runWithRequestId("GET /api/labels", async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,9 +18,11 @@ export async function GET() {
   });
 
   return NextResponse.json(labels);
+  });
 }
 
 export async function POST(req: NextRequest) {
+  return runWithRequestId(`POST ${req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -46,4 +50,5 @@ export async function POST(req: NextRequest) {
     }
     throw err;
   }
+  });
 }

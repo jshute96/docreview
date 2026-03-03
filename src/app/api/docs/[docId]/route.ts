@@ -3,6 +3,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { DocRole, DocStatus } from "@prisma/client";
 import { docWithCountsInclude, docWithCommentsInclude, withCommentCounts } from "@/lib/doc-queries";
+import { runWithRequestId } from "@/lib/request-context";
 
 const VALID_ROLES: string[] = Object.values(DocRole);
 const VALID_STATUSES: string[] = Object.values(DocStatus);
@@ -11,6 +12,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ docId: string }> }
 ) {
+  return runWithRequestId(`GET ${_req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -28,12 +30,14 @@ export async function GET(
   }
 
   return NextResponse.json(doc);
+  });
 }
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ docId: string }> }
 ) {
+  return runWithRequestId(`PATCH ${req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -98,4 +102,5 @@ export async function PATCH(
   });
 
   return NextResponse.json(withCommentCounts(updated));
+  });
 }

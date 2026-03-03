@@ -8,8 +8,10 @@ import {
   invalidGrantResponse,
 } from "@/lib/google-drive";
 import { google } from "googleapis";
+import { runWithRequestId } from "@/lib/request-context";
 
 export async function GET(req: NextRequest) {
+  return runWithRequestId(`GET ${req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -82,5 +84,6 @@ export async function GET(req: NextRequest) {
     owner: f.owners?.[0]?.displayName ?? null,
     lastModifiedInDrive: f.modifiedTime ?? null,
     createdTimeInDrive: f.createdTime ?? null,
+  });
   });
 }

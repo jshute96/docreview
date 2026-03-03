@@ -4,11 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { getDriveClient, fetchAllThreads, invalidGrantResponse } from "@/lib/google-drive";
 import type { CommentThread } from "@/lib/google-drive";
 import { CommentStatus } from "@prisma/client";
+import { runWithRequestId } from "@/lib/request-context";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ docId: string }> }
 ) {
+  return runWithRequestId(`GET ${_req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -46,12 +48,14 @@ export async function GET(
     const message = err instanceof Error ? err.message : "Failed to fetch comment threads";
     return NextResponse.json({ error: message }, { status: 502 });
   }
+  });
 }
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ docId: string }> }
 ) {
+  return runWithRequestId(`PATCH ${req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -93,4 +97,5 @@ export async function PATCH(
   });
 
   return NextResponse.json({ count: result.count });
+  });
 }

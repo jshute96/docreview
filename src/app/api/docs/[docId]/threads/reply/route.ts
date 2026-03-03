@@ -8,11 +8,13 @@ import {
   invalidGrantResponse,
 } from "@/lib/google-drive";
 import { logError } from "@/lib/log";
+import { runWithRequestId } from "@/lib/request-context";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ docId: string }> }
 ) {
+  return runWithRequestId(`POST ${req.nextUrl.pathname}`, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -92,4 +94,5 @@ export async function POST(
       { status: 502 }
     );
   }
+  });
 }
