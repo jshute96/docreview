@@ -168,8 +168,8 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
             }
           />
           <RefreshButton mode="refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
-          <RefreshButton mode="full-refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
           <RefreshButton mode="gmail-refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
+          <RefreshButton mode="full-refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
           <LoadDialog onRefresh={(newDocs) => setDocs(newDocs)} />
           <ManageLabelsDialog />
           <Button
