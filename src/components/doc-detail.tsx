@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { createMatcher } from "@/lib/highlight";
 import { broadcastChange, useCrossTabListener, type CrossTabEvent } from "@/lib/cross-tab";
-import { apiFetch, isAuthError } from "@/lib/api-fetch";
+import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { LabelProvider } from "@/contexts/label-context";
 
 interface DocDetailProps {
@@ -84,9 +84,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     setThreadMap((prev) => ({ ...prev, [googleCommentId]: thread }));
   }, []);
 
-  async function fetchThreads() {
+  async function fetchThreads(contextId?: string) {
     try {
-      const res = await apiFetch(`/api/docs/${doc.docId}/comments`);
+      const res = await apiFetch(`/api/docs/${doc.docId}/comments`, { contextId });
       if (res.ok) {
         const data = await res.json();
         setThreadMap(data.threads ?? {});
@@ -94,9 +94,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     } catch { /* threads are optional */ }
   }
 
-  async function fetchDocContent() {
+  async function fetchDocContent(contextId?: string) {
     try {
-      const res = await apiFetch(`/api/docs/${doc.docId}/content`);
+      const res = await apiFetch(`/api/docs/${doc.docId}/content`, { contextId });
       if (res.ok) {
         const data = await res.json();
         setSuggestionContent(data.suggestions ?? {});
@@ -105,12 +105,12 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     } catch { /* content is optional */ }
   }
 
-  function fetchContent() {
-    void fetchThreads();
-    void fetchDocContent();
+  function fetchContent(contextId?: string) {
+    void fetchThreads(contextId);
+    void fetchDocContent(contextId);
   }
 
-  useEffect(() => { void fetchContent(); }, [doc.docId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void fetchContent(generateContextId()); }, [doc.docId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [notFound, setNotFound] = useState(false);
   const handleCrossTab = useCallback(async (event: CrossTabEvent) => {
@@ -194,14 +194,15 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   async function handleRefresh() {
     setRefreshing(true);
+    const contextId = generateContextId();
     try {
-      const res = await apiFetch(`/api/docs/${doc.docId}/refresh`, { method: "POST" });
+      const res = await apiFetch(`/api/docs/${doc.docId}/refresh`, { method: "POST", contextId });
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithComments = await res.json();
       setDoc(updated);
       setComments(updated.comments);
       setSortActive(true);
-      void fetchContent();
+      void fetchContent(contextId);
       broadcastChange({ type: "comments", docId: doc.docId });
       toast.success("Comments synced");
     } catch (err) {

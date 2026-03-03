@@ -9,7 +9,7 @@ import { runWithRequestId } from "@/lib/request-context";
 const VALID_BULK_STATES = new Set(["as-is", "set", "clear"]);
 
 export async function PATCH(req: NextRequest) {
-  return runWithRequestId(`PATCH ${req.nextUrl.pathname}`, async () => {
+  return runWithRequestId("PATCH", req, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

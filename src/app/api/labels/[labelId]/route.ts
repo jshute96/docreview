@@ -7,7 +7,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ labelId: string }> }
 ) {
-  return runWithRequestId(`PATCH ${req.nextUrl.pathname}`, async () => {
+  return runWithRequestId("PATCH", req, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -39,7 +39,7 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ labelId: string }> }
 ) {
-  return runWithRequestId(`DELETE ${_req.nextUrl.pathname}`, async () => {
+  return runWithRequestId("DELETE", _req, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

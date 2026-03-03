@@ -32,7 +32,7 @@ beforeEach(() => {
 describe("GET /api/labels", () => {
   it("returns 401 when not authenticated", async () => {
     mockAuth.mockResolvedValue(null);
-    const res = await GET();
+    const res = await GET(new NextRequest("http://localhost/api/labels"));
     expect(res.status).toBe(401);
   });
 
@@ -44,7 +44,7 @@ describe("GET /api/labels", () => {
     ];
     mockLabel.findMany.mockResolvedValue(labels);
 
-    const res = await GET();
+    const res = await GET(new NextRequest("http://localhost/api/labels"));
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data).toEqual(labels);

@@ -6,7 +6,7 @@ import { RefreshCw, CloudDownload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DocWithLabels } from "@/types";
 import { broadcastChange } from "@/lib/cross-tab";
-import { apiFetch, isAuthError } from "@/lib/api-fetch";
+import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 
 interface RefreshButtonProps {
   mode: "refresh" | "full-refresh" | "load" | "gmail-refresh";
@@ -29,13 +29,14 @@ export function RefreshButton({ mode, onRefresh }: RefreshButtonProps) {
 
   async function handleClick() {
     setLoading(true);
+    const contextId = generateContextId();
     try {
       const url = mode === "gmail-refresh" ? "/api/docs/gmail-refresh" : `/api/docs?mode=${mode}`;
-      const syncRes = await apiFetch(url, { method: "POST" });
+      const syncRes = await apiFetch(url, { method: "POST", contextId });
       if (!syncRes.ok) throw new Error("Sync failed");
       const data = await syncRes.json();
 
-      const docsRes = await fetch("/api/docs?includeArchived=true");
+      const docsRes = await apiFetch("/api/docs?includeArchived=true", { contextId });
       if (!docsRes.ok) throw new Error("Failed to reload docs");
       const docs: DocWithLabels[] = await docsRes.json();
 

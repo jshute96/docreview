@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { logInfo } from "@/lib/log";
+import { getRequestId } from "@/lib/request-context";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -15,10 +16,12 @@ function makePrismaClient() {
 
   if (process.env.NODE_ENV === "development") {
     client.$use(async (params, next) => {
+      // Capture request ID before await — Prisma middleware can lose AsyncLocalStorage context
+      const reqId = getRequestId();
       const start = Date.now();
       const result = await next(params);
       if (!READ_OPS.has(params.action)) {
-        logInfo(`[Prisma] ${params.model}.${params.action} (${Date.now() - start}ms)`);
+        logInfo(`[Prisma] ${params.model}.${params.action} (${Date.now() - start}ms)`, { _reqId: reqId });
       }
       return result;
     });

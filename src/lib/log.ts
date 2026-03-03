@@ -116,18 +116,18 @@ function cleanupOldLogs() {
   }
 }
 
-function writeToFile(level: string, message: string, args: unknown[]) {
+function writeToFile(level: string, message: string, args: unknown[], requestId?: string) {
   const stream = ensureStream();
   if (!stream) return;
 
   const ts = pstTimestamp();
-  const reqId = getRequestId();
+  const reqId = requestId ?? getRequestId();
   const cleanMsg = stripAnsi(message);
   const argsStr = formatArgs(args);
   stream.write(`${ts} ${reqId} ${level} ${cleanMsg}${argsStr}\n`);
 }
 
-// --- Public API (unchanged signatures) ---
+// --- Public API ---
 
 export function logError(message: string, ...args: unknown[]) {
   console.error(`${RED}ERROR: ${message}${RESET}`, ...args);
@@ -139,9 +139,24 @@ export function logWarning(message: string, ...args: unknown[]) {
   writeToFile("WARN ", message, args);
 }
 
-export function logInfo(message: string, ...args: unknown[]) {
-  console.log(message, ...args);
-  writeToFile("INFO ", message, args);
+/** Log at info level to console and file. Pass `requestId` to override the
+ *  AsyncLocalStorage context (useful when the context may be lost, e.g. Prisma middleware). */
+export function logInfo(message: string, ...args: [...unknown[], { _reqId: string }] | unknown[]) {
+  // Extract explicit request ID if last arg is { _reqId }
+  let requestId: string | undefined;
+  if (args.length > 0) {
+    const last = args[args.length - 1];
+    if (last && typeof last === "object" && "_reqId" in (last as Record<string, unknown>)) {
+      requestId = (last as { _reqId: string })._reqId;
+      args = args.slice(0, -1);
+    }
+  }
+  if (args.length > 0) {
+    console.log(message, ...args);
+  } else {
+    console.log(message);
+  }
+  writeToFile("INFO ", message, args, requestId);
 }
 
 export function logSilent(message: string, ...args: unknown[]) {

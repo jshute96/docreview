@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { runWithRequestId } from "@/lib/request-context";
 
 export async function PATCH(req: NextRequest) {
-  return runWithRequestId(`PATCH ${req.nextUrl.pathname}`, async () => {
+  return runWithRequestId("PATCH", req, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

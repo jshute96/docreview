@@ -10,7 +10,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ docId: string }> }
 ) {
-  return runWithRequestId(`GET ${_req.nextUrl.pathname}`, async () => {
+  return runWithRequestId("GET", _req, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -55,7 +55,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ docId: string }> }
 ) {
-  return runWithRequestId(`PATCH ${req.nextUrl.pathname}`, async () => {
+  return runWithRequestId("PATCH", req, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

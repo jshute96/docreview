@@ -11,7 +11,7 @@ export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ docId: string }> }
 ) {
-  return runWithRequestId(`POST ${_req.nextUrl.pathname}`, async () => {
+  return runWithRequestId("POST", _req, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { fetchDocsByIds, findDeletedDocIds, getDriveClient, invalidGrantResponse } from "@/lib/google-drive";
@@ -10,8 +10,8 @@ import { getStatus, updateGmailTimestamp } from "@/lib/status";
 
 const DEFAULT_DAYS_BACK = 7;
 
-export async function POST() {
-  return runWithRequestId("POST /api/docs/gmail-refresh", async () => {
+export async function POST(req: NextRequest) {
+  return runWithRequestId("POST", req, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

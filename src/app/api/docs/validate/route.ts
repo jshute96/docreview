@@ -11,7 +11,7 @@ import {
 import { runWithRequestId } from "@/lib/request-context";
 
 export async function GET(req: NextRequest) {
-  return runWithRequestId(`GET ${req.nextUrl.pathname}`, async () => {
+  return runWithRequestId("GET", req, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

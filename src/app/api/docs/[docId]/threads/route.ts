@@ -11,7 +11,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ docId: string }> }
 ) {
-  return runWithRequestId(`GET ${req.nextUrl.pathname}`, async () => {
+  return runWithRequestId("GET", req, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -63,7 +63,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ docId: string }> }
 ) {
-  return runWithRequestId(`POST ${req.nextUrl.pathname}`, async () => {
+  return runWithRequestId("POST", req, async () => {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

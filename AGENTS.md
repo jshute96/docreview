@@ -76,7 +76,7 @@ dropped `url = env(...)` support in schema.prisma).
 - **Include timing** for external API calls: `(${Date.now() - t0}ms)`.
 - Client-side toasts don't need corresponding `console.log` — the server-side API route already logs the operation or error.
 - **File logging:** All log calls also write to `logs/docreview-YYYY-MM-DD.PORT.log` (PST dates, port from `process.env.PORT` defaulting to 3000). Each line has format: `TIMESTAMP REQUEST_ID LEVEL MESSAGE args`. Log files auto-rotate daily and are cleaned up after 14 days. `logSilent(message, ...args)` writes to the file only (no console output).
-- **Request IDs:** Every API route handler must be wrapped in `runWithRequestId(\`METHOD ${req.nextUrl.pathname}\`, async () => { ... })` from `src/lib/request-context.ts`. This assigns an 8-char hex ID that tags all log lines within that request. When adding a new route handler, always add this wrapper. For handlers without a `req` parameter, use a static label string.
+- **Request IDs:** Every API route handler must be wrapped in `runWithRequestId("METHOD", req, async () => { ... })` from `src/lib/request-context.ts`. This extracts the URL and client context ID from the request, assigns an 8-char hex ID that tags all log lines within that request. When adding a new route handler, always add this wrapper.
 - **Reading logs for debugging:** The port is set via `PORT` in `.env` (defaults to 3000). Use `tail -50 logs/docreview-*.log` to see recent log messages. To trace a single request, find its 8-char ID and `grep` for it: `grep 'a1b2c3d4' logs/docreview-*.log`. To find errors: `grep 'ERROR' logs/docreview-*.log`. To see all activity for a tag: `grep '\[Sync\]' logs/docreview-*.log`.
 
 ### Code Logic

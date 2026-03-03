@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
-import { apiFetch, isAuthError } from "@/lib/api-fetch";
+import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -128,6 +128,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(scanBody),
         signal: controller.signal,
+        contextId: generateContextId(),
       });
       if (!res.ok) throw new Error("Scan failed");
       const result: ScanResult = await res.json();
@@ -147,6 +148,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
     const controller = new AbortController();
     abortRef.current = controller;
     setAdding(true);
+    const contextId = generateContextId();
     try {
       const syncRes = await apiFetch("/api/docs?mode=load", {
         method: "POST",
@@ -160,12 +162,14 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
           status: addToInbox ? "INBOX" : "ARCHIVED",
         }),
         signal: controller.signal,
+        contextId,
       });
       if (!syncRes.ok) throw new Error("Sync failed");
       const data = await syncRes.json();
 
-      const docsRes = await fetch("/api/docs?includeArchived=true", {
+      const docsRes = await apiFetch("/api/docs?includeArchived=true", {
         signal: controller.signal,
+        contextId,
       });
       if (!docsRes.ok) throw new Error("Failed to reload docs");
       const docs: DocWithLabels[] = await docsRes.json();
