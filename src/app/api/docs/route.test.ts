@@ -22,6 +22,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 vi.mock("@/lib/google-drive", () => ({
   listRecentDocs: vi.fn(),
+  fetchDocsByIds: vi.fn(),
   findDeletedDocIds: vi.fn(),
   getDriveClient: vi.fn(),
   getChangesStartPageToken: vi.fn(),
@@ -39,7 +40,7 @@ vi.mock("@/lib/status", () => ({
 import { GET, POST } from "./route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { listRecentDocs, findDeletedDocIds, getDriveClient, getChangesStartPageToken, listChanges } from "@/lib/google-drive";
+import { listRecentDocs, fetchDocsByIds, findDeletedDocIds, getDriveClient, getChangesStartPageToken, listChanges } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken } from "@/lib/status";
 
@@ -56,6 +57,7 @@ const mockDocLabel = prisma.docLabel as unknown as {
   createMany: ReturnType<typeof vi.fn>;
 };
 const mockListRecentDocs = vi.mocked(listRecentDocs);
+const mockFetchDocsByIds = vi.mocked(fetchDocsByIds);
 const mockFindDeletedDocIds = vi.mocked(findDeletedDocIds);
 const mockGetDriveClient = vi.mocked(getDriveClient);
 const mockGetChangesStartPageToken = vi.mocked(getChangesStartPageToken);
@@ -158,7 +160,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue([
       {
         googleDocId: "g1",
         title: "New Doc",
@@ -175,12 +177,14 @@ describe("POST /api/docs", () => {
     // Pre-fetch: no existing docs (so g1 is an "add")
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds query
-      .mockResolvedValueOnce([]) // missingDocs query (no docs missing from Drive)
-      .mockResolvedValueOnce([]); // activeDocs for comment sync (scoped to Drive-returned docs)
+      .mockResolvedValueOnce([]); // activeDocs for comment sync (scoped to fetched docs)
     mockDoc.upsert.mockResolvedValue({});
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
-    const res = await POST(postRequest("load"));
+    const res = await POST(postRequestWithBody("load", {
+      source: "drive",
+      selectedGoogleDocIds: ["g1"],
+    }));
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.mode).toBe("load");
@@ -195,7 +199,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue([
       {
         googleDocId: "g1",
         title: "Existing Doc",
@@ -212,38 +216,36 @@ describe("POST /api/docs", () => {
     // g1 already exists
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
-      .mockResolvedValueOnce([]) // missingDocs
-      .mockResolvedValueOnce([]); // activeDocs for comment sync (scoped to Drive-returned docs)
+      .mockResolvedValueOnce([]); // activeDocs for comment sync
     mockDoc.upsert.mockResolvedValue({});
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
-    const res = await POST(postRequest("load"));
+    const res = await POST(postRequestWithBody("load", {
+      source: "drive",
+      selectedGoogleDocIds: ["g1"],
+    }));
     const data = await res.json();
     expect(data.added).toBe(0);
     expect(data.updated).toBe(1);
   });
 
-  it("marks deleted docs from Drive", async () => {
+  it("load mode fetches only selected docs by ID", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([]); // no docs from Drive
+    mockFetchDocsByIds.mockResolvedValue([]);
 
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
-      .mockResolvedValueOnce([{ docId: "d1", googleDocId: "g1" }]) // missingDocs — one doc not in Drive
-      .mockResolvedValueOnce([]); // activeDocs for comment sync (scoped to Drive-returned docs)
-    mockFindDeletedDocIds.mockResolvedValue(new Set(["g1"]));
-    mockDoc.update.mockResolvedValue({});
+      .mockResolvedValueOnce([]); // activeDocs for comment sync
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
-    const res = await POST(postRequest("load"));
-    const data = await res.json();
-    expect(data.deleted).toBe(1);
-    expect(mockDoc.update).toHaveBeenCalledWith({
-      where: { docId: "d1" },
-      data: { isDeleted: true },
-    });
+    await POST(postRequestWithBody("load", {
+      source: "drive",
+      selectedGoogleDocIds: ["g1", "g2"],
+    }));
+    expect(mockFetchDocsByIds).toHaveBeenCalledWith("u1", ["g1", "g2"]);
+    expect(mockListRecentDocs).not.toHaveBeenCalled();
   });
 
   it("full-refresh mode syncs comments for all non-deleted docs", async () => {
@@ -381,7 +383,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue([
       {
         googleDocId: "g1",
         title: "Archived Doc",
@@ -398,13 +400,15 @@ describe("POST /api/docs", () => {
     const archivedDoc = { docId: "d1", googleDocId: "g1", status: "ARCHIVED" };
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
-      .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([archivedDoc]); // activeDocs for comment sync
     mockDoc.upsert.mockResolvedValue({});
     mockDoc.update.mockResolvedValue({});
     mockSyncComments.mockResolvedValue({ created: 1, shouldUnarchive: true, hasNonResolveActivity: true });
 
-    const res = await POST(postRequest("load"));
+    const res = await POST(postRequestWithBody("load", {
+      source: "drive",
+      selectedGoogleDocIds: ["g1"],
+    }));
     const data = await res.json();
     expect(data.unarchived).toBe(1);
     expect(mockDoc.update).toHaveBeenCalledWith({
@@ -417,7 +421,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue([
       {
         googleDocId: "g1",
         title: "Archived Doc",
@@ -434,12 +438,14 @@ describe("POST /api/docs", () => {
     const archivedDoc = { docId: "d1", googleDocId: "g1", status: "ARCHIVED" };
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
-      .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([archivedDoc]); // activeDocs for comment sync
     mockDoc.upsert.mockResolvedValue({});
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
-    const res = await POST(postRequest("load"));
+    const res = await POST(postRequestWithBody("load", {
+      source: "drive",
+      selectedGoogleDocIds: ["g1"],
+    }));
     const data = await res.json();
     expect(data.unarchived).toBe(0);
     // doc.update should NOT have been called to unarchive
@@ -509,11 +515,12 @@ describe("POST /api/docs", () => {
     expect(mockUpdateDriveChangesToken).toHaveBeenCalledTimes(1);
   });
 
-  it("load mode skips unselected new docs", async () => {
+  it("load mode only fetches selected docs by ID", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
+    // fetchDocsByIds returns only g1 (only selected doc)
+    mockFetchDocsByIds.mockResolvedValue([
       {
         googleDocId: "g1",
         title: "Selected Doc",
@@ -525,33 +532,21 @@ describe("POST /api/docs", () => {
         owner: "Owner",
 
       },
-      {
-        googleDocId: "g2",
-        title: "Unselected Doc",
-        driveUrl: "https://docs.google.com/document/d/g2/edit",
-        mimeType: "application/vnd.google-apps.document",
-        role: "REVIEWER" as const,
-        lastModifiedInDrive: new Date("2024-06-01"),
-        createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Someone",
-
-      },
     ]);
 
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
-      .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
     mockDoc.upsert.mockResolvedValue({});
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
+      source: "drive",
       selectedGoogleDocIds: ["g1"], // only g1 selected
     }));
     const data = await res.json();
-    expect(data.added).toBe(1); // only g1 added
-    expect(mockDoc.upsert).toHaveBeenCalledTimes(1);
-    expect(mockDoc.upsert.mock.calls[0][0].create.googleDocId).toBe("g1");
+    expect(data.added).toBe(1);
+    expect(mockFetchDocsByIds).toHaveBeenCalledWith("u1", ["g1"]);
   });
 
   it("load mode returns 400 for invalid label IDs", async () => {
@@ -572,7 +567,7 @@ describe("POST /api/docs", () => {
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
     mockLabel.findMany.mockResolvedValue([{ labelId: "l1" }]);
-    mockListRecentDocs.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue([
       {
         googleDocId: "g1",
         title: "New Doc",
@@ -588,12 +583,13 @@ describe("POST /api/docs", () => {
 
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
-      .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
     mockDoc.upsert.mockResolvedValue({});
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
+      source: "drive",
+      selectedGoogleDocIds: ["g1"],
       labelIds: ["l1"],
       notes: "Batch note",
     }));
@@ -610,7 +606,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue([
       {
         googleDocId: "g1",
         title: "New Doc",
@@ -626,12 +622,13 @@ describe("POST /api/docs", () => {
 
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
-      .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
     mockDoc.upsert.mockResolvedValue({});
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
+      source: "drive",
+      selectedGoogleDocIds: ["g1"],
       status: "ARCHIVED",
     }));
     expect(res.status).toBe(200);
@@ -644,7 +641,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue([
       {
         googleDocId: "g1",
         title: "Existing Doc",
@@ -661,12 +658,13 @@ describe("POST /api/docs", () => {
     // g1 already exists
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
-      .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
     mockDoc.upsert.mockResolvedValue({ docId: "d1", notes: null });
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
+      source: "drive",
+      selectedGoogleDocIds: ["g1"],
       status: "ARCHIVED",
     }));
     expect(res.status).toBe(200);
@@ -681,7 +679,7 @@ describe("POST /api/docs", () => {
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
     mockLabel.findMany.mockResolvedValue([{ labelId: "l1" }]);
-    mockListRecentDocs.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue([
       {
         googleDocId: "g1",
         title: "Existing Doc",
@@ -698,13 +696,13 @@ describe("POST /api/docs", () => {
     // g1 already exists
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
-      .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
     mockDoc.upsert.mockResolvedValue({ docId: "d1", notes: null });
     mockDocLabel.createMany.mockResolvedValue({ count: 1 });
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
+      source: "drive",
       selectedGoogleDocIds: ["g1"],
       labelIds: ["l1"],
     }));
@@ -719,7 +717,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue([
       {
         googleDocId: "g1",
         title: "Existing Doc",
@@ -736,13 +734,13 @@ describe("POST /api/docs", () => {
     // g1 already exists with existing notes
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
-      .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
     mockDoc.upsert.mockResolvedValue({ docId: "d1", notes: "Existing note" });
     mockDoc.update.mockResolvedValue({});
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
+      source: "drive",
       selectedGoogleDocIds: ["g1"],
       notes: "New note",
     }));
@@ -786,7 +784,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue([
       {
         googleDocId: "g1",
         title: "Some Doc",
@@ -802,12 +800,14 @@ describe("POST /api/docs", () => {
 
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
-      .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
     mockDoc.upsert.mockResolvedValue({});
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
-    const res = await POST(postRequest("load"));
+    const res = await POST(postRequestWithBody("load", {
+      source: "drive",
+      selectedGoogleDocIds: ["g1"],
+    }));
     expect(res.status).toBe(200);
 
     const upsertCall = mockDoc.upsert.mock.calls[0][0];
@@ -818,7 +818,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue([
       {
         googleDocId: "g1",
         title: "Archived Doc",
@@ -835,53 +835,42 @@ describe("POST /api/docs", () => {
     const archivedDoc = { docId: "d1", googleDocId: "g1", status: "ARCHIVED" };
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
-      .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([archivedDoc]); // activeDocs for comment sync
     mockDoc.upsert.mockResolvedValue({});
     // shouldUnarchive is true but hasNonResolveActivity is false (resolve-only)
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: true, hasNonResolveActivity: false });
 
-    const res = await POST(postRequest("load"));
+    const res = await POST(postRequestWithBody("load", {
+      source: "drive",
+      selectedGoogleDocIds: ["g1"],
+    }));
     const data = await res.json();
     expect(data.unarchived).toBe(0);
   });
 
-  it("load mode skips unselected existing docs entirely", async () => {
+  it("load mode with empty selection fetches no docs", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
     mockLabel.findMany.mockResolvedValue([{ labelId: "l1" }]);
-    mockListRecentDocs.mockResolvedValue([
-      {
-        googleDocId: "g1",
-        title: "Existing Doc",
-        driveUrl: "https://docs.google.com/document/d/g1/edit",
-        mimeType: "application/vnd.google-apps.document",
-        role: "AUTHOR" as const,
-        lastModifiedInDrive: new Date("2024-06-01"),
-        createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
+    mockFetchDocsByIds.mockResolvedValue([]); // no docs fetched
 
-      },
-    ]);
-
-    // g1 already exists but is NOT in selectedGoogleDocIds
     mockDoc.findMany
-      .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
-      .mockResolvedValueOnce([]) // missingDocs
+      .mockResolvedValueOnce([]) // existingDocIds
       .mockResolvedValueOnce([]); // commentDocs
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
-      selectedGoogleDocIds: [], // g1 not selected
+      source: "drive",
+      selectedGoogleDocIds: [], // nothing selected
       labelIds: ["l1"],
       notes: "Should not be applied",
     }));
     expect(res.status).toBe(200);
     const data = await res.json();
+    expect(data.added).toBe(0);
     expect(data.updated).toBe(0);
-    // No upsert, no labels, no notes
+    expect(mockFetchDocsByIds).toHaveBeenCalledWith("u1", []);
     expect(mockDoc.upsert).not.toHaveBeenCalled();
-    expect(mockDocLabel.createMany).not.toHaveBeenCalled();
   });
 });

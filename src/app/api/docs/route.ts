@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { listRecentDocs, fetchDocsByIds, findDeletedDocIds, getDriveClient, getChangesStartPageToken, listChanges, invalidGrantResponse } from "@/lib/google-drive";
+import { listRecentDocs, fetchDocsByIds, getDriveClient, getChangesStartPageToken, listChanges, invalidGrantResponse } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken } from "@/lib/status";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
@@ -86,19 +86,11 @@ export async function POST(req: NextRequest) {
   try {
     driveAuth = await getDriveClient(userId);
 
-    if (mode === "load" && source === "gmail") {
-      // Gmail load mode: fetch metadata directly by doc ID
+    if (mode === "load") {
+      // Load mode: fetch metadata directly by selected doc IDs
       const docIds = selectedSet ? [...selectedSet] : [];
-      console.log(`[Sync] Load (gmail): fetching metadata for ${docIds.length} docs by ID`);
+      console.log(`[Sync] Load (${source}): fetching metadata for ${docIds.length} docs by ID`);
       driveDocs = await fetchDocsByIds(userId, docIds);
-    } else if (mode === "load") {
-      // Drive load mode: scan via files.list with user-specified options
-      console.log(`[Sync] Load: scanning via files.list (${daysBack}-day window, ownership=${ownership})`);
-      driveDocs = await listRecentDocs(
-        userId,
-        new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000),
-        { ownership, includeSharedDrives },
-      );
     } else {
       // Refresh / full-refresh: use changes.list with saved token
       const status = await getStatus(userId);
@@ -250,31 +242,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Check active docs that didn't appear in Drive results — only in Drive load
-  // mode, since refresh/full-refresh detect deletions via changes.list and Gmail
-  // loads only fetch specific doc IDs (no meaningful "missing" set).
-  if (mode === "load" && source !== "gmail") {
-    const missingDocs = await prisma.doc.findMany({
-      where: {
-        userId,
-        isDeleted: false,
-        status: "INBOX",
-        googleDocId: { notIn: [...driveDocIds] },
-      },
-      select: { docId: true, googleDocId: true },
-    });
-
-    if (missingDocs.length > 0) {
-      console.log(`[Sync] Load: checking ${missingDocs.length} docs not in Drive results for deletion`);
-      const loadDeletedIds = await findDeletedDocIds(userId, missingDocs.map((d) => d.googleDocId));
-      for (const doc of missingDocs) {
-        if (loadDeletedIds.has(doc.googleDocId)) {
-          await prisma.doc.update({ where: { docId: doc.docId }, data: { isDeleted: true } });
-          deleted++;
-        }
-      }
-    }
-  }
+  // Note: deletion detection for existing docs is handled by refresh/full-refresh
+  // modes (via changes.list). Load mode only processes the specific docs the user
+  // selected, so there's no meaningful "missing from results" set to check.
 
   // Sync comments: full-refresh syncs ALL docs (including previously deleted
   // ones, so they can recover if a 403 was temporary); refresh syncs only

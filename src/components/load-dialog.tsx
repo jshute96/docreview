@@ -209,7 +209,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
           variant="outline"
           size="sm"
           disabled={adding}
-          title="Discover documents from Google Drive"
+          title="Scan Drive or Gmail for documents to add"
         >
           Load…
         </Button>
@@ -219,9 +219,9 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>Load from Drive</DialogTitle>
+          <DialogTitle>Load from Drive or Gmail</DialogTitle>
           <DialogDescription>
-            Discover documents from Google Drive and sync their comments.
+            Discover documents from Google Drive or Gmail and sync their comments.
           </DialogDescription>
         </DialogHeader>
 
@@ -241,6 +241,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                       setRemovedDocIds(new Set());
                     }
                   }}
+                  title="Find Google Drive documents updated in the last N days"
                   className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
                     source === "drive"
                       ? "bg-zinc-900 text-white"
@@ -257,6 +258,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                       setRemovedDocIds(new Set());
                     }
                   }}
+                  title="Find documents from Gmail notifications in the last N days"
                   className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
                     source === "gmail"
                       ? "bg-zinc-900 text-white"

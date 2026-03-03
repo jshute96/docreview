@@ -6,7 +6,7 @@ There are three sync modes, triggered from different UI paths:
 
 | Mode | Trigger | Doc discovery | Deletion detection | Comment sync scope |
 |------|---------|---------------|--------------------|--------------------|
-| **Load** | Load dialog ([`load-dialog.md`](./load-dialog.md)) | `files.list` — configurable window | `files.get` per missing doc | Docs returned by Drive |
+| **Load** | Load dialog ([`load-dialog.md`](./load-dialog.md)) | `files.get` per selected doc | None (handled by Refresh) | Selected docs |
 | **Refresh** | "Refresh" button | `changes.list` — incremental | Built into changes feed | Changed docs only |
 | **Full Refresh** | "Full Refresh" button | `changes.list` — incremental | Built into changes feed | All docs (including deleted) |
 | **Gmail Refresh** | "Refresh from Gmail" button ([`gmail.md`](./gmail.md)) | Gmail notification scan | `findDeletedDocIds` for missing docs | Upserted docs |
@@ -29,14 +29,20 @@ sync.
 
 Docreview uses three distinct Google APIs for syncing:
 
-### Drive API v3 — `files.list` (Load mode)
+### Drive API v3 — `files.list` (Scan + bootstrap)
 
-Queries for Docs, Sheets, and Slides modified in a time window. Used only by Load mode for
-the initial broad scan.
+Queries for Docs, Sheets, and Slides modified in a time window. Used by the Load dialog's
+scan phase (`POST /api/docs/scan`) and as a bootstrap fallback when no changes page token
+exists (Refresh with no prior sync).
 
 **Query:** `mimeType in (doc, sheet, slides) AND modifiedTime > cutoff AND trashed = false`
 **Fields:** `id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName)`
 **Pagination:** `pageSize: 100`, follows `nextPageToken` until exhausted.
+
+### Drive API v3 — `files.get` (Load mode)
+
+Fetches metadata for specific docs by ID. Used by Load mode to get fresh metadata for the
+user's selected docs (both Drive and Gmail sources).
 
 ### Drive API v3 — `changes.list` (Refresh / Full Refresh)
 
@@ -56,12 +62,6 @@ Changes with `removed: true` or `file.trashed: true` are treated as deletions.
 Returns a token representing "now" — all future `changes.list` calls with this token will
 return only changes that happen after it was issued. Called during bootstrap and after Load
 to establish the baseline for future refreshes.
-
-### Drive API v3 — `files.get` (Load mode deletion checks)
-
-Used only in Load mode to verify whether docs missing from the 30-day `files.list` window
-are actually deleted. Not needed for Refresh/Full Refresh since the changes feed reports
-deletions directly.
 
 ### Drive API v3 — `comments.list` / Docs API v1 — `documents.get`
 
@@ -96,7 +96,7 @@ is saved for the next refresh.
 handler falls back to bootstrap behavior: gets a fresh token and does a 7-day `listRecentDocs`
 scan. A warning is logged.
 
-**After Load:** Load mode uses `files.list` (not the changes feed), but after a successful
+**After Load:** Load mode fetches docs by ID (not the changes feed), but after a successful
 Load, `getStartPageToken` is called and saved. This means subsequent Refresh operations
 use `changes.list` even if the user's first sync was a Load.
 
@@ -108,10 +108,10 @@ partially handled.
 
 ## Phase 1 — Doc Discovery
 
-### Load mode: `files.list` (30-day scan)
+### Load mode: `files.get` per selected doc
 
-**Drive call:** `files.list` with a query matching Docs, Sheets, and Slides modified in the
-last 30 days and not trashed.
+**Drive call:** `files.get` for each doc ID the user selected in the Load dialog.
+Only the selected docs are fetched — no broad listing.
 
 ### Refresh / Full Refresh: `changes.list` (incremental)
 
@@ -158,22 +158,11 @@ For each file Drive returns:
 `file.trashed: true` is a deletion. The handler looks up matching non-deleted docs in the DB
 and marks them `isDeleted: true`. No extra API calls needed.
 
-### Load mode: `findDeletedDocIds` fallback
+### Load mode: no deletion detection
 
-A doc absent from the 30-day `files.list` is not necessarily deleted — it may simply not have
-been modified recently. So we don't flag missing docs directly.
-
-**Step 1:** Query the DB for INBOX, non-deleted docs whose `googleDocId` did not appear in
-the Drive results.
-
-**Step 2:** For each, call `files.get` with `fields: "trashed"`. All calls run in parallel
-(`Promise.all`). Three outcomes:
-
-| Drive response | Meaning | Action |
-|---|---|---|
-| `trashed: false` | File exists and is accessible | No change |
-| `trashed: true` | File is in the trash | `isDeleted = true` |
-| HTTP 404 / 403 | Permanently deleted or access revoked | `isDeleted = true` |
+Load mode only processes the specific docs the user selected — there is no "missing from
+results" set to check. Deletion detection for tracked docs is handled by Refresh and
+Full Refresh via the changes feed.
 
 ### Soft delete
 
@@ -194,7 +183,7 @@ the per-doc Refresh runs it for a single doc.
 
 | Mode | Which docs get comment sync |
 |------|----------------------------|
-| Load | Non-deleted docs returned by Drive |
+| Load | Non-deleted selected docs |
 | Refresh | Non-deleted docs returned by `changes.list` (changed docs only) |
 | Full Refresh | All docs in the DB (including deleted ones, so they can recover from temporary 403 errors) |
 
@@ -323,9 +312,8 @@ Key state transitions are logged:
 | `no saved token, bootstrapping` | First refresh or token was cleared — falling back to 7-day files.list |
 | `using changes.list with saved token` | Normal incremental refresh via changes feed |
 | `changes.list token expired, falling back to bootstrap` | Saved token was too old; re-bootstrapping |
-| `Load: scanning via files.list (30-day window)` | Load mode using broad files.list scan |
+| `Load (drive): fetching metadata for N docs by ID` | Load mode fetching selected docs |
 | `Processing N deletions from changes.list` | Deletions detected in the changes feed |
-| `Load: checking N docs not in Drive results for deletion` | Load mode checking missing docs individually |
 | `Saving changes token for future refreshes` | Token update after successful sync |
 | `Load complete, initializing changes token` | Load mode establishing baseline for future Refresh |
 | `Transient errors during comment sync, skipping token update` | Token preserved due to partial failure |
@@ -344,5 +332,5 @@ the new `access_token` (and `refresh_token` if rotated) back to the `Account` ta
 next request doesn't need to refresh again.
 
 `getDriveClient` is called once per refresh and the resulting client is reused for all phases
-(doc discovery, deletion checks, comment sync), so at most one token refresh happens per
+(doc discovery, comment sync), so at most one token refresh happens per
 Refresh operation.

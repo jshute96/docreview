@@ -29,7 +29,7 @@ hidden (not applicable). Switching sources clears any existing scan results.
     │
     ▼
 ┌──────────────────────────────┐
-│  Load from Drive             │
+│  Load from Drive or Gmail    │
 │                              │
 │  Source: [Drive] [Gmail]     │
 │  Time window: [30] days back │
@@ -41,7 +41,7 @@ hidden (not applicable). Switching sources clears any existing scan results.
     │
     ▼  (scan completes)
 ┌──────────────────────────────┐
-│  Load from Drive             │
+│  Load from Drive or Gmail    │
 │                              │
 │  Source / Time / Which / ...  │
 │  ─────────────────────────── │
@@ -90,10 +90,9 @@ The user can optionally assign labels, notes, and document status:
   otherwise it is set to `ARCHIVED`.
 
 Clicking **Add** calls `POST /api/docs?mode=load` with the visible (non-removed) doc
-IDs, options, source, labels, and notes. For Drive loads, the backend re-queries via
-`files.list` with the same options; for Gmail loads, it fetches metadata directly by
-doc ID via `files.get`. After the sync completes, the doc list refreshes and a toast
-summarizes results.
+IDs, source, labels, and notes. The backend fetches metadata for the selected docs by
+ID via `files.get` (both Drive and Gmail sources). After the sync completes, the doc
+list refreshes and a toast summarizes results.
 
 Clicking **Rescan** re-runs the scan with current options (useful after changing the
 time window or ownership filter).
@@ -169,38 +168,23 @@ could be extracted or Drive metadata could not be fetched.
 Adds documents and syncs comments. For full backend details (upsert logic, deletion
 detection, comment sync, token lifecycle), see [`refresh.md`](./refresh.md).
 
-**Request body (Drive load):**
+**Request body:**
 ```json
 {
   "source": "drive",
-  "daysBack": 30,
-  "ownership": "all",
-  "includeSharedDrives": false,
   "selectedGoogleDocIds": ["abc123", "def456"],
   "labelIds": ["label-1"],
-  "notes": "Q3 review batch"
-}
-```
-
-**Request body (Gmail load):**
-```json
-{
-  "source": "gmail",
-  "daysBack": 30,
-  "selectedGoogleDocIds": ["abc123", "def456"],
-  "labelIds": ["label-1"],
-  "notes": "Q3 review batch"
+  "notes": "Q3 review batch",
+  "status": "INBOX"
 }
 ```
 
 **Additional load-mode behavior:**
-- `source` — `"drive"` (default) re-queries via `files.list` with search options;
-  `"gmail"` fetches metadata directly by doc ID via `files.get` (since the docs
-  were discovered via email, not a Drive listing). Gmail loads also skip the
-  missing-docs deletion check (irrelevant when loading specific IDs).
-- `selectedGoogleDocIds` — docs not in this set are skipped entirely (no upsert,
-  no labels, no notes). For Gmail loads, this is the authoritative list of docs
-  to fetch.
+- Both Drive and Gmail loads fetch metadata by doc ID via `files.get` — only the
+  selected docs are fetched, regardless of source. Deletion detection is not
+  performed during loads (that's handled by refresh/full-refresh via `changes.list`).
+- `selectedGoogleDocIds` — the authoritative list of docs to fetch metadata for.
+  Docs not in this set are never fetched or processed.
 - `labelIds` — validated for ownership before processing. New docs: set on creation.
   Existing selected docs: added via `createMany` with `skipDuplicates`.
 - `notes` — New docs: set on creation. Existing selected docs: appended with a
@@ -231,12 +215,11 @@ comparison of Load vs Refresh flows, see [`gmail.md`](./gmail.md).
 
 ---
 
-## Re-query Design
+## Re-fetch Design
 
-The Add step re-queries Drive rather than passing the scanned doc metadata back
-from the client. For Drive loads, this uses `files.list` with the same search
-options; for Gmail loads, it fetches each doc by ID via `files.get`. This is
-consistent with the rest of the codebase's trust model: the server always fetches
-its own data from Drive and the client only sends IDs and user choices (selections,
-labels, notes). The cost is extra Drive API calls; the benefit is that the server
+The Add step fetches fresh metadata from Drive by doc ID (`files.get`) rather than
+passing the scanned doc metadata back from the client. This is consistent with the
+rest of the codebase's trust model: the server always fetches its own data from
+Drive and the client only sends IDs and user choices (selections, labels, notes).
+The cost is one `files.get` call per selected doc; the benefit is that the server
 never writes stale or client-tampered metadata to the database.
