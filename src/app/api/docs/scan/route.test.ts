@@ -60,6 +60,7 @@ describe("POST /api/docs/scan", () => {
         lastModifiedInDrive: new Date(),
         createdTimeInDrive: new Date(),
         owner: "Owner",
+
       },
       {
         googleDocId: "g2",
@@ -70,6 +71,7 @@ describe("POST /api/docs/scan", () => {
         lastModifiedInDrive: new Date(),
         createdTimeInDrive: new Date(),
         owner: "Someone",
+
       },
     ]);
     // g1 already in DB

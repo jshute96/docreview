@@ -83,6 +83,7 @@ function driveComment(overrides: Record<string, unknown> = {}) {
     driveCreatedAt: new Date("2024-06-01"),
     driveModifiedAt: new Date("2024-06-10"),
     replyCount: 0,
+    replyAuthorMeFlags: [] as boolean[],
     ...overrides,
   };
 }
@@ -95,7 +96,7 @@ describe("syncComments error handling", () => {
     const doc = makeDoc();
 
     const result = await suppressingErrors(() => syncComments(doc, driveAuth));
-    expect(result).toEqual({ created: 0, shouldUnarchive: false, transientError: true });
+    expect(result).toEqual({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false, transientError: true });
   });
 });
 
@@ -143,14 +144,15 @@ describe("syncComments isInteresting logic", () => {
     expect(shouldUnarchive).toBe(false);
   });
 
-  it("unarchives when resolved but NOT by me (someone else resolved my thread)", async () => {
+  it("does NOT unarchive for new already-resolved comment even on AUTHOR doc", async () => {
+    // New resolved comments always start ARCHIVED regardless of who resolved them
     const doc = makeDoc({ role: "AUTHOR" });
     mockFetchComments.mockResolvedValue([
       driveComment({ resolved: true, iResolvedIt: false }),
     ]);
 
     const { shouldUnarchive } = await syncComments(doc, driveAuth);
-    expect(shouldUnarchive).toBe(true);
+    expect(shouldUnarchive).toBe(false);
   });
 
   it("unarchives for new comment where isThreadAuthor implies iParticipated", async () => {
@@ -165,13 +167,13 @@ describe("syncComments isInteresting logic", () => {
 
   // --- Existing comment with new replies ---
 
-  it("unarchives when existing comment has new replies and isInteresting", async () => {
+  it("unarchives when existing INBOX comment on AUTHOR doc has new replies", async () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 1,
     }]);
     mockFetchComments.mockResolvedValue([
-      driveComment({ replyCount: 3 }),
+      driveComment({ replyCount: 3, replyAuthorMeFlags: [false, false, false] }),
     ]);
 
     const { shouldUnarchive, created } = await syncComments(doc, driveAuth);
@@ -179,13 +181,13 @@ describe("syncComments isInteresting logic", () => {
     expect(shouldUnarchive).toBe(true);
   });
 
-  it("does NOT unarchive when existing comment has new replies but not interesting", async () => {
+  it("does NOT unarchive when existing comment has new replies but not relevant (REVIEWER, no participation)", async () => {
     const doc = makeDoc({ role: "REVIEWER" });
     mockComment.findMany.mockResolvedValueOnce([{
-      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 1,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", replyCount: 1,
     }]);
     mockFetchComments.mockResolvedValue([
-      driveComment({ replyCount: 3, iParticipated: false }),
+      driveComment({ replyCount: 3, iParticipated: false, replyAuthorMeFlags: [false, false, false] }),
     ]);
 
     const { shouldUnarchive } = await syncComments(doc, driveAuth);
@@ -264,8 +266,26 @@ describe("syncComments isInteresting logic", () => {
 // --------------- Comment status assignment ---------------
 
 describe("syncComments comment status", () => {
-  it("creates new unresolved comment as INBOX", async () => {
+  it("creates new unresolved comment as ARCHIVED on REVIEWER doc when not participating", async () => {
     mockFetchComments.mockResolvedValue([driveComment()]);
+
+    await syncComments(makeDoc(), driveAuth);
+
+    const createCall = mockComment.createMany.mock.calls[0][0];
+    expect(createCall.data[0].status).toBe("ARCHIVED");
+  });
+
+  it("creates new unresolved comment as INBOX on AUTHOR doc", async () => {
+    mockFetchComments.mockResolvedValue([driveComment()]);
+
+    await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    const createCall = mockComment.createMany.mock.calls[0][0];
+    expect(createCall.data[0].status).toBe("INBOX");
+  });
+
+  it("creates new unresolved comment as INBOX when iParticipated", async () => {
+    mockFetchComments.mockResolvedValue([driveComment({ iParticipated: true })]);
 
     await syncComments(makeDoc(), driveAuth);
 
@@ -296,7 +316,7 @@ describe("syncComments comment status", () => {
     expect(updateCall.data.status).toBe("ARCHIVED");
   });
 
-  it("sets existing comment to INBOX when resolved by someone else", async () => {
+  it("sets existing comment to INBOX when resolved by someone else on AUTHOR doc", async () => {
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", replyCount: 0,
     }]);
@@ -304,10 +324,24 @@ describe("syncComments comment status", () => {
       driveComment({ resolved: true, iResolvedIt: false }),
     ]);
 
-    await syncComments(makeDoc(), driveAuth);
+    await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
 
     const updateCall = mockComment.update.mock.calls[0][0];
     expect(updateCall.data.status).toBe("INBOX");
+  });
+
+  it("preserves status when resolved by someone else on REVIEWER doc without participation", async () => {
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", replyCount: 0,
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({ resolved: true, iResolvedIt: false }),
+    ]);
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const updateCall = mockComment.update.mock.calls[0][0];
+    expect(updateCall.data.status).toBe("ARCHIVED");
   });
 
   it("preserves MUTED status — does not change it to INBOX or ARCHIVED", async () => {
@@ -328,7 +362,7 @@ describe("syncComments comment status", () => {
   it("preserves manual ARCHIVED status if no new activity", async () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
-      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", 
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
       resolved: false, replyCount: 0, driveModifiedAt: modDate,
     }]);
     mockFetchComments.mockResolvedValue([
@@ -344,24 +378,255 @@ describe("syncComments comment status", () => {
     }
   });
 
-  it("wakes up ARCHIVED comment if new reply added", async () => {
+  it("wakes up ARCHIVED comment on AUTHOR doc if new reply added", async () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
-      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", 
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
       resolved: false, replyCount: 0, driveModifiedAt: modDate,
     }]);
     mockFetchComments.mockResolvedValue([
-      driveComment({ 
-        resolved: false, 
-        replyCount: 1, 
-        driveModifiedAt: new Date("2024-06-10T11:00:00Z") 
+      driveComment({
+        resolved: false,
+        replyCount: 1,
+        replyAuthorMeFlags: [false],
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z")
       }),
     ]);
 
-    await syncComments(makeDoc(), driveAuth);
+    await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
 
     const updateCall = mockComment.update.mock.calls[0][0];
     expect(updateCall.data.status).toBe("INBOX");
+  });
+
+  it("preserves ARCHIVED on REVIEWER doc with new reply when not participating", async () => {
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
+      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        resolved: false,
+        replyCount: 1,
+        replyAuthorMeFlags: [false],
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z")
+      }),
+    ]);
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const updateCall = mockComment.update.mock.calls[0][0];
+    expect(updateCall.data.status).toBe("ARCHIVED");
+  });
+});
+
+// --------------- Self-reply detection (rule 5 exception) ---------------
+
+describe("syncComments self-reply detection", () => {
+  it("does NOT move own thread to INBOX when only I replied", async () => {
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
+      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        isThreadAuthor: true, iParticipated: true,
+        replyCount: 1, replyAuthorMeFlags: [true],
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
+      }),
+    ]);
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const updateCall = mockComment.update.mock.calls[0][0];
+    expect(updateCall.data.status).toBe("ARCHIVED");
+  });
+
+  it("moves own thread to INBOX when someone else replied", async () => {
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
+      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        isThreadAuthor: true, iParticipated: true,
+        replyCount: 2, replyAuthorMeFlags: [true, false],
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
+      }),
+    ]);
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const updateCall = mockComment.update.mock.calls[0][0];
+    expect(updateCall.data.status).toBe("INBOX");
+  });
+
+  it("moves to INBOX when I replied on someone else's thread (rule 6)", async () => {
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
+      resolved: false, replyCount: 1, driveModifiedAt: modDate,
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        isThreadAuthor: false, iParticipated: true,
+        replyCount: 2, replyAuthorMeFlags: [true, true],
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
+      }),
+    ]);
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const updateCall = mockComment.update.mock.calls[0][0];
+    expect(updateCall.data.status).toBe("INBOX");
+  });
+});
+
+// --------------- hasNonResolveActivity ---------------
+
+describe("syncComments hasNonResolveActivity", () => {
+  it("reports non-resolve activity for new unresolved comment", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockFetchComments.mockResolvedValue([driveComment()]);
+
+    const { hasNonResolveActivity } = await syncComments(doc, driveAuth);
+    expect(hasNonResolveActivity).toBe(true);
+  });
+
+  it("does NOT report non-resolve activity for resolve-only change", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX",
+      resolved: false, replyCount: 0, driveModifiedAt: new Date("2024-06-10"),
+    }]);
+    // Comment is now resolved with exactly 1 new reply (the resolve action)
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        resolved: true, iResolvedIt: false,
+        replyCount: 1, replyAuthorMeFlags: [false],
+        driveModifiedAt: new Date("2024-06-11"),
+      }),
+    ]);
+
+    const { hasNonResolveActivity } = await syncComments(doc, driveAuth);
+    expect(hasNonResolveActivity).toBe(false);
+  });
+
+  it("reports non-resolve activity when resolve has extra replies", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX",
+      resolved: false, replyCount: 0, driveModifiedAt: new Date("2024-06-10"),
+    }]);
+    // Comment resolved but 2 new replies (reply + resolve)
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        resolved: true, iResolvedIt: false,
+        replyCount: 2, replyAuthorMeFlags: [false, false],
+        driveModifiedAt: new Date("2024-06-11"),
+      }),
+    ]);
+
+    const { hasNonResolveActivity } = await syncComments(doc, driveAuth);
+    expect(hasNonResolveActivity).toBe(true);
+  });
+
+  it("reports non-resolve activity for re-opened comment", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
+      resolved: true, replyCount: 1, driveModifiedAt: new Date("2024-06-10"),
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        resolved: false,
+        replyCount: 2, replyAuthorMeFlags: [false, false],
+        driveModifiedAt: new Date("2024-06-11"),
+      }),
+    ]);
+
+    const { hasNonResolveActivity } = await syncComments(doc, driveAuth);
+    expect(hasNonResolveActivity).toBe(true);
+  });
+
+  it("reports non-resolve activity for new suggestion", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockFetchComments.mockResolvedValue([]);
+    mockFetchSuggestions.mockResolvedValue([
+      { id: "suggest.abc", suggestionType: "EDIT" },
+    ]);
+
+    const { hasNonResolveActivity } = await syncComments(doc, driveAuth);
+    expect(hasNonResolveActivity).toBe(true);
+  });
+
+  it("does NOT report non-resolve activity when no changes", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockFetchComments.mockResolvedValue([]);
+
+    const { hasNonResolveActivity } = await syncComments(doc, driveAuth);
+    expect(hasNonResolveActivity).toBe(false);
+  });
+});
+
+// --------------- shouldUnarchive status-based rules ---------------
+
+describe("syncComments shouldUnarchive doc-level rules", () => {
+  it("unarchives when existing comment transitions from ARCHIVED to INBOX", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
+      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        replyCount: 1, replyAuthorMeFlags: [false],
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
+      }),
+    ]);
+
+    const { shouldUnarchive } = await syncComments(doc, driveAuth);
+    expect(shouldUnarchive).toBe(true);
+  });
+
+  it("unarchives when INBOX comment resolved by someone else", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX",
+      resolved: false, replyCount: 0, driveModifiedAt: new Date("2024-06-10"),
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        resolved: true, iResolvedIt: false,
+        replyCount: 1, replyAuthorMeFlags: [false],
+        driveModifiedAt: new Date("2024-06-11"),
+      }),
+    ]);
+
+    const { shouldUnarchive } = await syncComments(doc, driveAuth);
+    expect(shouldUnarchive).toBe(true);
+  });
+
+  it("does NOT unarchive when INBOX comment resolved by me", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX",
+      resolved: false, replyCount: 0, driveModifiedAt: new Date("2024-06-10"),
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        resolved: true, iResolvedIt: true,
+        replyCount: 1, replyAuthorMeFlags: [true],
+        driveModifiedAt: new Date("2024-06-11"),
+      }),
+    ]);
+
+    const { shouldUnarchive } = await syncComments(doc, driveAuth);
+    expect(shouldUnarchive).toBe(false);
   });
 });
 

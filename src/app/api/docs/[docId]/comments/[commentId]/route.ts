@@ -35,9 +35,22 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
-  const updated = await prisma.comment.update({
-    where: { commentId },
-    data: { status },
+  // Update comment and (if needed) doc status in a single transaction
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.comment.update({
+      where: { commentId },
+      data: { status },
+    });
+
+    // Moving a comment to INBOX should also move the doc to INBOX if it's ARCHIVED
+    if (status === "INBOX" && comment.doc.status === "ARCHIVED") {
+      await tx.doc.update({
+        where: { docId: comment.docId },
+        data: { status: "INBOX" },
+      });
+    }
+
+    return result;
   });
 
   return NextResponse.json(updated);

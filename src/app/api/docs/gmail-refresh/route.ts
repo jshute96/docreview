@@ -67,6 +67,7 @@ export async function POST() {
           lastModifiedInDrive: doc.lastModifiedInDrive,
           owner: doc.owner,
           createdTimeInDrive: doc.createdTimeInDrive,
+          status: "INBOX",
         },
         update: {
           title: doc.title,
@@ -122,7 +123,7 @@ export async function POST() {
         deleted++;
         continue;
       }
-      if (upsertedDocs[i].status === "ARCHIVED" && res.shouldUnarchive) {
+      if (upsertedDocs[i].status === "ARCHIVED" && res.shouldUnarchive && res.hasNonResolveActivity) {
         await prisma.doc.update({ where: { docId: upsertedDocs[i].docId }, data: { status: "INBOX" } });
         unarchived++;
       }

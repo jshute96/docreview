@@ -521,7 +521,12 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div
+                className="flex items-center gap-2"
+                title={viewMode === "all"
+                  ? "When checked, all loaded docs move to Inbox. When unchecked, new docs start as Archived and existing docs keep their current status."
+                  : "When checked, new docs start in Inbox. When unchecked, new docs start as Archived."}
+              >
                 <Checkbox
                   id="load-to-inbox"
                   checked={addToInbox}

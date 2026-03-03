@@ -42,3 +42,27 @@ I am not longer interested in acting like the author.
   3. When a comment in Inbox gets resolved, but not by me
      * This overrides other rules.  If the comment is resolved and I resolved it, the comment becomes Archived, and this comment doesn't
        trigger moving the document to Inbox.
+  4. Exception: if the document is Archived and the only new comment activity is resolutions (no new
+     comments, no new non-resolve replies), the document stays Archived.  This prevents resolved
+     threads from resurfacing a document you've already dismissed.
+
+---
+
+## Deferred / Not Yet Implemented
+
+The following rules from this spec are not yet implemented:
+
+- **@mention detection** (rule 2): Detecting @mentions in comment/reply text requires parsing
+  HTML content from the Drive API. There is no dedicated `mentions` field — the HTML contains
+  `<a>` tags with mailto links for mentions. This is deferred until the HTML parsing
+  infrastructure is in place. Currently, @mentions are treated the same as any other reply.
+
+- **Document-level MUTED state**: No rules are defined yet for how document MUTED state
+  should interact with comment state changes. Currently only comment-level MUTED is
+  implemented.
+
+- **Shared-with-me detection** (rule 2): The Drive API's `sharedWithMe` is only available
+  as a query filter on `files.list`, not as a response field on any endpoint. Shared-with-me
+  docs are currently detected via Gmail notifications (gmail-refresh), which sets them to
+  INBOX. Drive-based refresh/load cannot determine sharing status, so non-AUTHOR docs
+  discovered that way start as ARCHIVED.

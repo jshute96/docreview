@@ -44,10 +44,14 @@ filter and sort controls.
 
 When a comment thread is seen for the first time:
 
-- **Unresolved** (`resolved = false`) → `INBOX`
 - **Already resolved** (`resolved = true`) → `ARCHIVED`
+- **Unresolved** and I'm the doc author (`doc.role === "AUTHOR"`) → `INBOX`
+- **Unresolved** and I participated (`iParticipated`) → `INBOX`
+- **Otherwise** (unresolved but not relevant to me) → `ARCHIVED`
 
-Already-resolved threads don't need action, so they start archived.
+Only comments relevant to the current user start in Inbox. Already-resolved threads
+don't need action, and unresolved threads on docs where I'm just a reviewer with no
+participation are archived until something involves me.
 
 ---
 
@@ -87,16 +91,21 @@ reflects current state.
 
 1. Compare `resolved`, `iParticipated`, `status`, `driveCreatedAt`, `driveModifiedAt`, and
    `replyCount` against the existing record. Skip the update if all match.
-2. If `resolved = true` AND I was the one who resolved it (the last reply with
-   `action = "resolve"` has `author.me = true`) → set status to `ARCHIVED`.
-3. Otherwise, if there is **new activity** (new reply added, thread re-opened, or any
-   other modification detected via `driveModifiedAt`) → set status to `INBOX`.
+2. If `resolved = true` AND I was the one who resolved it → set status to `ARCHIVED`.
+3. Otherwise, if there is **new activity** (new replies, thread re-opened, or modification
+   detected via `driveModifiedAt`), apply relevance-based rules:
+   - **I'm the doc author** → `INBOX` (rule 4: all activity is relevant)
+   - **I started the thread** and there are new replies → `INBOX` only if at least one
+     reply is from someone else. Self-replies on my own thread don't wake it up (rule 5
+     exception). Uses `replyAuthorMeFlags` to detect self vs. other replies.
+   - **I participated (replied) on someone else's thread** → `INBOX` (rule 6)
+   - **Not relevant to me** → preserve existing status
 4. Otherwise (no new activity), preserve the existing `status`. This ensures that if
    you manually archive an unresolved thread, it stays archived until someone replies
    to it or re-opens it.
 
-The effect: threads you close yourself get archived quietly. Manual archiving is preserved
-until new activity occurs. Anything else surfaces in Inbox.
+The effect: threads you close yourself get archived quietly. Manual archiving is preserved.
+Activity only surfaces in Inbox when it's relevant to you — not all activity on every thread.
 
 ---
 
@@ -118,32 +127,46 @@ reminded each refresh.
 When a doc has been archived by the user, it should only resurface if there's **new meaningful
 activity** during the current sync — not just because an old unresolved comment exists.
 
-During `syncComments`, a `shouldUnarchive` flag is tracked. An ARCHIVED doc moves back to
-INBOX only when this flag is set. Activity is evaluated using an `isInteresting` check:
+During `syncComments`, two flags are tracked:
+- `shouldUnarchive` — whether comment-level changes warrant moving the doc back to INBOX
+- `hasNonResolveActivity` — whether there was any activity beyond just resolving comments
 
-```ts
-const isInteresting = !(c.resolved && c.iResolvedIt) && (
-  doc.role === "AUTHOR" || c.iParticipated
-);
-```
+An ARCHIVED doc moves back to INBOX only when **both** flags are set. This prevents noise
+from resolved threads resurfacing a doc you've already dismissed.
 
-A comment is interesting if I'm the doc author or a participant in the thread, unless I
-resolved it myself. This replaces the previous XOR check (`isMine !== doc.role === "AUTHOR"`)
-with a simpler model: "does this activity concern me?"
+### shouldUnarchive triggers
 
-**New comment** (not previously in DB):
-- If `isInteresting` → unarchive.
-- Doc author sees all new threads; participants see threads they're involved in.
+`shouldUnarchive` is set based on the resulting comment status, not a separate heuristic:
 
-**New replies on existing thread** (`replyCount` increased):
-- If the thread is not MUTED and `isInteresting` → unarchive.
+1. **New comment with INBOX status** — a new comment that the relevance rules assigned to
+   INBOX (doc author or participant) triggers unarchive.
+2. **Existing comment transitions to INBOX** — a comment moving from ARCHIVED to INBOX
+   (e.g., someone replied on a thread I'm involved in) triggers unarchive.
+3. **Existing INBOX comment gets new replies** — even if the comment stays in INBOX, new
+   replies on an already-INBOX comment trigger unarchive (unless I resolved it myself).
+4. **INBOX comment resolved by someone else** — the resolve is new activity that the user
+   should see, even though the comment moves to ARCHIVED.
+
+### hasNonResolveActivity
+
+Tracks whether there's substantive activity beyond comment resolutions:
+- New unresolved comment → yes
+- New replies that aren't just a resolve action → yes
+- Re-opened comment → yes
+- New suggestion → yes
+- Comment resolved with exactly 1 new reply (the resolve itself) → no
 
 **New suggestion** (not previously in DB):
 - Unarchive only when `doc.role === "AUTHOR"` (new suggestions on my docs).
-- Suggestions have `isThreadAuthor=false` and `iParticipated=false`, so `isInteresting`
-  doesn't apply — the check is explicit.
+- Always counts as non-resolve activity.
 
 **MUTED threads**: never trigger unarchive, regardless of new activity.
+
+### Manual comment→doc propagation
+
+When a user manually moves a comment to INBOX (via the detail page), the doc is also moved
+to INBOX if it was ARCHIVED. This ensures the doc surfaces when the user explicitly marks
+a comment as needing attention.
 
 ---
 

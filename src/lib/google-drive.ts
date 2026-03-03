@@ -128,6 +128,7 @@ export interface DriveComment {
   driveCreatedAt: Date | null;
   driveModifiedAt: Date | null;
   replyCount: number;
+  replyAuthorMeFlags: boolean[];
 }
 
 // Derives ownership/participation flags from a Drive comment's author and replies.
@@ -180,6 +181,7 @@ export async function fetchComments(
         driveCreatedAt: c.createdTime ? new Date(c.createdTime) : null,
         driveModifiedAt: c.modifiedTime ? new Date(c.modifiedTime) : null,
         replyCount: replies.length,
+        replyAuthorMeFlags: replies.map((r) => r.author?.me === true),
       });
     }
 
@@ -668,8 +670,7 @@ export async function listRecentDocs(userId: string, since?: Date, options?: Lis
     });
     console.log(`[Drive] files.list (recent docs${pageToken ? ", page " + pageToken.slice(0, 8) + "…" : ""}) → ${res.data.files?.length ?? 0} files (${Date.now() - t0}ms)`);
 
-    const files = res.data.files ?? [];
-    for (const file of files) {
+    for (const file of res.data.files ?? []) {
       if (!file.id || !file.name) continue;
       const isOwner = file.owners?.some((o) => o.me === true) ?? false;
       docs.push({

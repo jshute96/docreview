@@ -157,7 +157,8 @@ export async function POST(req: NextRequest) {
   for (const doc of driveDocs) {
     const isExisting = existingDocIds.has(doc.googleDocId);
 
-    // Refresh/full-refresh: auto-add new docs I authored; skip other new docs
+    // Refresh/full-refresh: auto-add new docs I authored; skip others.
+    // Shared-with-me docs arrive via gmail-refresh notifications instead.
     if ((mode === "refresh" || mode === "full-refresh") && !isExisting && doc.role !== "AUTHOR") {
       console.log(`[Sync]   SKIP "${doc.title}" — new ${doc.role} doc (${mode} only auto-adds AUTHOR docs)`);
       continue;
@@ -182,7 +183,7 @@ export async function POST(req: NextRequest) {
         lastModifiedInDrive: doc.lastModifiedInDrive,
         owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
-        status: loadStatus ?? "INBOX",
+        status: loadStatus ?? (doc.role === "AUTHOR" ? "INBOX" : "ARCHIVED"),
         ...(loadNotes ? { notes: loadNotes } : {}),
         ...(loadLabelIds.length > 0
           ? { labels: { create: loadLabelIds.map((id) => ({ labelId: id })) } }
@@ -300,7 +301,7 @@ export async function POST(req: NextRequest) {
       deleted++;
       continue;
     }
-    if (commentDocs[i].status === "ARCHIVED" && res.shouldUnarchive) {
+    if (commentDocs[i].status === "ARCHIVED" && res.shouldUnarchive && res.hasNonResolveActivity) {
       await prisma.doc.update({ where: { docId: commentDocs[i].docId }, data: { status: "INBOX" } });
       unarchived++;
     }

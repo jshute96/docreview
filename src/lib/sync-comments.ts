@@ -12,11 +12,12 @@ function datesEqual(a: Date | null | undefined, b: Date | null | undefined): boo
 
 // Syncs all comments and suggestions for a single doc. Always does a full scan —
 // Drive API's startModifiedTime filter silently excludes suggestions.
-// Returns the number of new comment records created and whether the doc should be unarchived.
+// Returns the number of new comment records created, whether the doc should be unarchived,
+// and whether there was non-resolve activity (used to suppress unarchive for resolve-only changes).
 export async function syncComments(
   doc: Doc,
   driveAuth: Awaited<ReturnType<typeof getDriveClient>>
-): Promise<{ created: number; shouldUnarchive: boolean; isDeleted?: boolean; transientError?: boolean }> {
+): Promise<{ created: number; shouldUnarchive: boolean; hasNonResolveActivity: boolean; isDeleted?: boolean; transientError?: boolean }> {
   let comments;
   try {
     comments = await fetchComments(driveAuth, doc.googleDocId);
@@ -24,10 +25,10 @@ export async function syncComments(
     const code = (err as { code?: number })?.code;
     if (code === 404 || code === 403) {
       console.log(`[Comments] doc ${doc.googleDocId} is deleted or inaccessible (code ${code})`);
-      return { created: 0, shouldUnarchive: false, isDeleted: true };
+      return { created: 0, shouldUnarchive: false, hasNonResolveActivity: false, isDeleted: true };
     }
     console.error(`[Comments] failed for ${doc.googleDocId}:`, err);
-    return { created: 0, shouldUnarchive: false, transientError: true };
+    return { created: 0, shouldUnarchive: false, hasNonResolveActivity: false, transientError: true };
   }
 
   // All Drive API results are regular comments. Suggestions come exclusively from Docs API.
@@ -45,6 +46,7 @@ export async function syncComments(
   const toCreate: Prisma.CommentCreateManyInput[] = [];
   let updatedCount = 0;
   let shouldUnarchive = false;
+  let hasNonResolveActivity = false;
 
   // Batch-fetch all existing comments for this doc to avoid N+1 queries
   const existingComments = new Map(
@@ -56,14 +58,15 @@ export async function syncComments(
   for (const c of comments) {
     const existing = existingComments.get(c.id) ?? null;
 
-    // Activity is interesting if I'm the doc author or a participant in the thread,
-    // unless I resolved it myself.
-    const isInteresting = !(c.resolved && c.iResolvedIt) && (
-      doc.role === "AUTHOR" || c.iParticipated
-    );
-
     if (!existing) {
-      const status = c.resolved ? "ARCHIVED" : "INBOX";
+      // New comment initial status (spec rules 4/5/6):
+      // Only INBOX if relevant to me — I'm the doc author or I participated in the thread.
+      const status: "INBOX" | "ARCHIVED" = c.resolved
+        ? "ARCHIVED"
+        : (doc.role === "AUTHOR" || c.iParticipated)
+          ? "INBOX"
+          : "ARCHIVED";
+
       toCreate.push({
         docId: doc.docId,
         googleCommentId: c.id,
@@ -76,7 +79,11 @@ export async function syncComments(
         driveModifiedAt: c.driveModifiedAt,
         replyCount: c.replyCount,
       });
-      if (isInteresting) shouldUnarchive = true;
+
+      // Doc-level unarchive: new comment with INBOX status triggers unarchive
+      if (status === "INBOX") shouldUnarchive = true;
+      // Track non-resolve activity for new unresolved comments
+      if (!c.resolved) hasNonResolveActivity = true;
     } else {
       if (existing.status === "MUTED") {
         const changed =
@@ -100,24 +107,71 @@ export async function syncComments(
         }
         continue;
       }
-      // Existing comment with new replies: check for unarchive
-      if (c.replyCount > existing.replyCount) {
-        // MUTED comments already handled above (early continue), so status is INBOX or ARCHIVED here
-        if (isInteresting) shouldUnarchive = true;
-      }
 
-      // Determine the target status. We want to preserve manual ARCHIVED status
-      // unless there is new activity that should "wake up" the thread.
-      let status = existing.status as "INBOX" | "ARCHIVED";
+      const previousStatus = existing.status as "INBOX" | "ARCHIVED";
+      const hasNewReplies = c.replyCount > existing.replyCount;
       const hasNewActivity =
-        c.replyCount > existing.replyCount ||
+        hasNewReplies ||
+        (!existing.resolved && c.resolved) ||
         (existing.resolved && !c.resolved) ||
         !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
 
+      // Track non-resolve activity for existing comments
+      if (hasNewActivity) {
+        const isBeingResolved = c.resolved && !existing.resolved;
+        const newReplyCount = c.replyCount - existing.replyCount;
+        if (isBeingResolved && newReplyCount <= 1) {
+          // Resolve-only: exactly 1 new reply (the resolve action) and comment is now resolved
+        } else if (existing.resolved && !c.resolved) {
+          // Re-opened → non-resolve activity
+          hasNonResolveActivity = true;
+        } else {
+          // New replies beyond a resolve, or other activity
+          hasNonResolveActivity = true;
+        }
+      }
+
+      // Determine the target status using spec rules
+      let status = previousStatus;
+
       if (c.resolved && c.iResolvedIt) {
+        // Rule 1: I resolved it → ARCHIVED
         status = "ARCHIVED";
       } else if (hasNewActivity) {
-        status = "INBOX";
+        if (doc.role === "AUTHOR") {
+          // Rule 4: I'm the doc author → INBOX for all activity
+          status = "INBOX";
+        } else if (c.isThreadAuthor && hasNewReplies) {
+          // Rule 5: I started this thread — only INBOX if someone else replied
+          const newReplies = c.replyAuthorMeFlags.slice(existing.replyCount);
+          const hasReplyFromOther = newReplies.some((me) => !me);
+          if (hasReplyFromOther) {
+            status = "INBOX";
+          }
+          // If only self-replies, preserve existing status
+        } else if (c.iParticipated && !c.isThreadAuthor) {
+          // Rule 6: I participated (replied) on someone else's thread → INBOX
+          // No self-reply filtering here: the spec says any activity on a thread
+          // I replied on (that I didn't start) moves it to INBOX, including my
+          // own follow-up replies. The self-reply exception only applies to
+          // threads I started (rule 5).
+          status = "INBOX";
+        }
+        // Otherwise: not relevant to me → preserve existing status
+      }
+
+      // Doc-level unarchive rules (based on resulting comment status):
+      // 1. Comment transitions from non-INBOX to INBOX
+      if (previousStatus !== "INBOX" && status === "INBOX") {
+        shouldUnarchive = true;
+      }
+      // 2. Existing INBOX comment gets new replies (unless I resolved it myself)
+      if (previousStatus === "INBOX" && hasNewReplies && !(c.resolved && c.iResolvedIt)) {
+        shouldUnarchive = true;
+      }
+      // 3. INBOX comment resolved by someone else (before we transition it to ARCHIVED via rule 1)
+      if (previousStatus === "INBOX" && c.resolved && !c.iResolvedIt) {
+        shouldUnarchive = true;
       }
 
       const changed =
@@ -170,14 +224,14 @@ export async function syncComments(
 
   if (doc.mimeType !== DOCS_MIME_TYPE) {
     console.log(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated, ${deleted} deleted${shouldUnarchive ? " → unarchive" : ""}`);
-    return { created, shouldUnarchive };
+    return { created, shouldUnarchive, hasNonResolveActivity };
   }
 
   // If the Docs API fetch failed, skip suggestion sync entirely — we can't
   // tell which suggestions are still live, so resolving absent ones would be wrong.
   if (suggestionFetchFailed) {
     console.log(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated (suggestions skipped: fetch failed)`);
-    return { created, shouldUnarchive, transientError: true };
+    return { created, shouldUnarchive, hasNonResolveActivity, transientError: true };
   }
 
   // Docs API sync: ensures ALL pending suggestions are tracked.
@@ -207,6 +261,7 @@ export async function syncComments(
       // New suggestion: unarchive if I'm the doc author (suggestions have
       // isThreadAuthor=false and iParticipated=false)
       if (doc.role === "AUTHOR") shouldUnarchive = true;
+      hasNonResolveActivity = true;
     } else if (existing.suggestionType !== s.suggestionType) {
       await prisma.comment.update({
         where: { commentId: existing.commentId },
@@ -239,5 +294,5 @@ export async function syncComments(
 
   const totalCreated = created + suggestionsToCreate.length;
   console.log(`[Comments] ${doc.googleDocId}: ${comments.length} comments from Drive, ${totalCreated} new, ${updatedCount} updated, ${deleted} deleted; ${docsSuggestionsForSync.length} suggestions (${suggestionsToCreate.length} new, ${suggestionsUpdated} updated, ${suggestionsResolved} resolved)${shouldUnarchive ? " → unarchive" : ""}`);
-  return { created: totalCreated, shouldUnarchive };
+  return { created: totalCreated, shouldUnarchive, hasNonResolveActivity };
 }

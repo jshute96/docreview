@@ -168,6 +168,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
     ]);
 
@@ -177,7 +178,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([]) // missingDocs query (no docs missing from Drive)
       .mockResolvedValueOnce([]); // activeDocs for comment sync (scoped to Drive-returned docs)
     mockDoc.upsert.mockResolvedValue({});
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequest("load"));
     expect(res.status).toBe(200);
@@ -204,6 +205,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: null,
         owner: null,
+
       },
     ]);
 
@@ -213,7 +215,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // activeDocs for comment sync (scoped to Drive-returned docs)
     mockDoc.upsert.mockResolvedValue({});
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequest("load"));
     const data = await res.json();
@@ -233,7 +235,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([]); // activeDocs for comment sync (scoped to Drive-returned docs)
     mockFindDeletedDocIds.mockResolvedValue(new Set(["g1"]));
     mockDoc.update.mockResolvedValue({});
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequest("load"));
     const data = await res.json();
@@ -259,6 +261,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
     ]);
 
@@ -268,7 +271,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([{ googleDocId: "g1" }, { googleDocId: "g2" }]) // existingDocIds
       .mockResolvedValueOnce([dbDoc1, dbDoc2]); // activeDocs for comment sync (all non-deleted)
     mockDoc.upsert.mockResolvedValue({});
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequest("full-refresh"));
     const data = await res.json();
@@ -295,6 +298,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
     ]);
 
@@ -302,7 +306,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([]) // existingDocIds — g1 not in DB
       .mockResolvedValueOnce([]); // activeDocs for comment sync (all non-deleted)
     mockDoc.upsert.mockResolvedValue({});
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequest("full-refresh"));
     const data = await res.json();
@@ -325,6 +329,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
     ]);
 
@@ -332,7 +337,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([]) // existingDocIds — g1 not in DB
       .mockResolvedValueOnce([]); // activeDocs for comment sync
     mockDoc.upsert.mockResolvedValue({});
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequest("refresh"));
     const data = await res.json();
@@ -355,13 +360,14 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Someone",
+
       },
     ]);
 
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds — g1 not in DB, skipped as REVIEWER
       .mockResolvedValueOnce([]); // activeDocs for comment sync
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequest("refresh"));
     const data = await res.json();
@@ -385,6 +391,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
     ]);
 
@@ -395,7 +402,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([archivedDoc]); // activeDocs for comment sync
     mockDoc.upsert.mockResolvedValue({});
     mockDoc.update.mockResolvedValue({});
-    mockSyncComments.mockResolvedValue({ created: 1, shouldUnarchive: true });
+    mockSyncComments.mockResolvedValue({ created: 1, shouldUnarchive: true, hasNonResolveActivity: true });
 
     const res = await POST(postRequest("load"));
     const data = await res.json();
@@ -420,6 +427,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
     ]);
 
@@ -429,7 +437,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([archivedDoc]); // activeDocs for comment sync
     mockDoc.upsert.mockResolvedValue({});
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequest("load"));
     const data = await res.json();
@@ -454,6 +462,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
     ]);
 
@@ -463,7 +472,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([dbDoc]); // activeDocs for comment sync
     mockDoc.upsert.mockResolvedValue({});
     // syncComments reports a transient error (e.g. 429 rate limit)
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, transientError: true });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false, transientError: true });
 
     const res = await POST(postRequest("refresh"));
     expect(res.status).toBe(200);
@@ -484,6 +493,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
     ]);
 
@@ -492,7 +502,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([dbDoc]); // activeDocs for comment sync
     mockDoc.upsert.mockResolvedValue({});
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequest("refresh"));
     expect(res.status).toBe(200);
@@ -513,6 +523,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
       {
         googleDocId: "g2",
@@ -523,6 +534,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Someone",
+
       },
     ]);
 
@@ -531,7 +543,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
     mockDoc.upsert.mockResolvedValue({});
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
       selectedGoogleDocIds: ["g1"], // only g1 selected
@@ -570,6 +582,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
     ]);
 
@@ -578,7 +591,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
     mockDoc.upsert.mockResolvedValue({});
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
       labelIds: ["l1"],
@@ -607,6 +620,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
     ]);
 
@@ -615,7 +629,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
     mockDoc.upsert.mockResolvedValue({});
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
       status: "ARCHIVED",
@@ -640,6 +654,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
     ]);
 
@@ -649,7 +664,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
     mockDoc.upsert.mockResolvedValue({ docId: "d1", notes: null });
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
       status: "ARCHIVED",
@@ -676,6 +691,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
     ]);
 
@@ -686,7 +702,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([]); // commentDocs
     mockDoc.upsert.mockResolvedValue({ docId: "d1", notes: null });
     mockDocLabel.createMany.mockResolvedValue({ count: 1 });
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
       selectedGoogleDocIds: ["g1"],
@@ -713,6 +729,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
     ]);
 
@@ -723,7 +740,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([]); // commentDocs
     mockDoc.upsert.mockResolvedValue({ docId: "d1", notes: "Existing note" });
     mockDoc.update.mockResolvedValue({});
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
       selectedGoogleDocIds: ["g1"],
@@ -734,6 +751,99 @@ describe("POST /api/docs", () => {
       where: { docId: "d1" },
       data: { notes: "Existing note\nNew note" },
     });
+  });
+
+  it("refresh skips new non-AUTHOR docs", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
+    mockGetDriveClient.mockResolvedValue(driveAuth);
+    mockListRecentDocs.mockResolvedValue([
+      {
+        googleDocId: "g1",
+        title: "Some Doc",
+        driveUrl: "https://docs.google.com/document/d/g1/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "REVIEWER" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Someone",
+
+      },
+    ]);
+
+    mockDoc.findMany
+      .mockResolvedValueOnce([]) // existingDocIds
+      .mockResolvedValueOnce([]); // activeDocs for comment sync
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
+
+    const res = await POST(postRequest("refresh"));
+    const data = await res.json();
+    expect(data.added).toBe(0);
+    expect(mockDoc.upsert).not.toHaveBeenCalled();
+  });
+
+  it("load mode sets ARCHIVED for non-AUTHOR new docs (no loadStatus)", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
+    mockGetDriveClient.mockResolvedValue(driveAuth);
+    mockListRecentDocs.mockResolvedValue([
+      {
+        googleDocId: "g1",
+        title: "Some Doc",
+        driveUrl: "https://docs.google.com/document/d/g1/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "REVIEWER" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Someone",
+
+      },
+    ]);
+
+    mockDoc.findMany
+      .mockResolvedValueOnce([]) // existingDocIds
+      .mockResolvedValueOnce([]) // missingDocs
+      .mockResolvedValueOnce([]); // commentDocs
+    mockDoc.upsert.mockResolvedValue({});
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
+
+    const res = await POST(postRequest("load"));
+    expect(res.status).toBe(200);
+
+    const upsertCall = mockDoc.upsert.mock.calls[0][0];
+    expect(upsertCall.create.status).toBe("ARCHIVED");
+  });
+
+  it("does not unarchive when shouldUnarchive=true but hasNonResolveActivity=false", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
+    mockGetDriveClient.mockResolvedValue(driveAuth);
+    mockListRecentDocs.mockResolvedValue([
+      {
+        googleDocId: "g1",
+        title: "Archived Doc",
+        driveUrl: "https://docs.google.com/document/d/g1/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "AUTHOR" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Owner",
+
+      },
+    ]);
+
+    const archivedDoc = { docId: "d1", googleDocId: "g1", status: "ARCHIVED" };
+    mockDoc.findMany
+      .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
+      .mockResolvedValueOnce([]) // missingDocs
+      .mockResolvedValueOnce([archivedDoc]); // activeDocs for comment sync
+    mockDoc.upsert.mockResolvedValue({});
+    // shouldUnarchive is true but hasNonResolveActivity is false (resolve-only)
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: true, hasNonResolveActivity: false });
+
+    const res = await POST(postRequest("load"));
+    const data = await res.json();
+    expect(data.unarchived).toBe(0);
   });
 
   it("load mode skips unselected existing docs entirely", async () => {
@@ -751,6 +861,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
+
       },
     ]);
 
@@ -759,7 +870,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
+    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
       selectedGoogleDocIds: [], // g1 not selected
