@@ -90,8 +90,7 @@ function ensureStream(): WriteStream | null {
   // Log server start on first open (not on daily rotation)
   if (!hasLoggedStart) {
     hasLoggedStart = true;
-    const port = process.env.PORT || "3000";
-    writeToFile("INFO ", `[Server] Started on port ${port}`, []);
+    writeToFile("INFO ", "[Server] Started", []);
   }
 
   return currentStream;

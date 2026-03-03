@@ -48,7 +48,6 @@ status, comments, and suggestions via the Google Drive API.
    AUTH_SECRET="..."         # generate with: npx auth secret
    AUTH_GOOGLE_ID="..."
    AUTH_GOOGLE_SECRET="..."
-   PORT=3000
    ```
 
 5. **Proxy & HTTPS Setup:**
@@ -114,13 +113,11 @@ All Google Drive/Docs API calls return 502 errors in this mode. Labels, doc meta
 npm run dev
 ```
 
-To run a second instance (e.g. from a separate checkout), set `PORT` in that checkout's `.env`:
+To run a second instance (e.g. from a separate checkout), use the `-p` flag:
 
+```bash
+npm run dev -- -p 3001
 ```
-PORT=3001
-```
-
-Then run `npm run dev` as usual. 
 
 ## Log files
 
