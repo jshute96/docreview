@@ -2,33 +2,37 @@ import { PrismaClient } from "@prisma/client";
 import { logInfo } from "@/lib/log";
 import { getRequestId } from "@/lib/request-context";
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
-
 const READ_OPS = new Set([
   "findUnique", "findFirst", "findMany",
   "findRaw", "aggregate", "count", "groupBy",
 ]);
 
+// Use $extends (not the deprecated $use middleware) so the query handler runs
+// in the caller's async context and AsyncLocalStorage-based request IDs
+// propagate correctly.
 function makePrismaClient() {
-  const client = new PrismaClient({ log: ["error", "warn"] });
+  return new PrismaClient({ log: ["error", "warn"] }).$extends({
+    query: {
+      $allModels: {
+        async $allOperations({ model, operation, args, query }) {
+          if (process.env.NODE_ENV !== "development") return query(args);
 
-  if (process.env.NODE_ENV === "development") {
-    client.$use(async (params, next) => {
-      // Capture request ID before await — Prisma middleware can lose AsyncLocalStorage context
-      const reqId = getRequestId();
-      const start = Date.now();
-      const result = await next(params);
-      if (!READ_OPS.has(params.action)) {
-        logInfo(`[Prisma] ${params.model}.${params.action} (${Date.now() - start}ms)`, { _reqId: reqId });
-      }
-      return result;
-    });
-  }
-
-  return client;
+          const reqId = getRequestId();
+          const start = Date.now();
+          const result = await query(args);
+          if (!READ_OPS.has(operation)) {
+            logInfo(`[Prisma] ${model}.${operation} (${Date.now() - start}ms)`, { _reqId: reqId });
+          }
+          return result;
+        },
+      },
+    },
+  });
 }
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: ReturnType<typeof makePrismaClient> | undefined;
+};
 
 export const prisma = globalForPrisma.prisma ?? makePrismaClient();
 
