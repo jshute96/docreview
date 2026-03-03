@@ -120,7 +120,11 @@ To run a second instance (e.g. from a separate checkout), set `PORT` in that che
 PORT=3001
 ```
 
-Then run `npm run dev` as usual. The port is also used to name log files (`logs/docreview-YYYY-MM-DD.PORT.log`) so logs from different instances don't collide.
+Then run `npm run dev` as usual. 
+
+## Log files
+
+Log files are written to `logs/docreview-YYYY-MM-DD.log`.
 
 ## Usage
 
