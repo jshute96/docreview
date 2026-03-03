@@ -14,7 +14,6 @@ P1:
 * Refresh selected docs
 
 Easy:
-* X to clear search boxes
 * scroll bars for lots of docs
 * Button to open Drive
 * Button for search in Drive (from docs search box)
