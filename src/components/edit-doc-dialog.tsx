@@ -132,12 +132,12 @@ export function EditDocDialog({
                 </label>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setStatus(status === "ACTIVE" ? "ARCHIVED" : "ACTIVE")}
-                    title={status === "ACTIVE" ? "This document is active" : "This document is archived"}
+                    onClick={() => setStatus(status === "INBOX" ? "ARCHIVED" : "INBOX")}
+                    title={status === "INBOX" ? "This document is active" : "This document is archived"}
                     className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                      status === "ACTIVE"
-                        ? STATUS_COLORS.ACTIVE.activeFilter
-                        : STATUS_COLORS.ACTIVE.inactiveFilter
+                      status === "INBOX"
+                        ? STATUS_COLORS.INBOX.activeFilter
+                        : STATUS_COLORS.INBOX.inactiveFilter
                     }`}
                   >
                     Active

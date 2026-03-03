@@ -13,7 +13,7 @@ function makeDoc(overrides: Partial<DocWithLabels> & { title: string }): DocWith
     driveUrl: overrides.driveUrl ?? `https://docs.google.com/document/d/${overrides.title}/edit`,
     mimeType: overrides.mimeType ?? "application/vnd.google-apps.document",
     role: overrides.role ?? "REVIEWER",
-    status: overrides.status ?? "ACTIVE",
+    status: overrides.status ?? "INBOX",
     isDeleted: overrides.isDeleted ?? false,
     lastModifiedInDrive: "lastModifiedInDrive" in overrides ? overrides.lastModifiedInDrive! : new Date("2024-06-01"),
     createdTimeInDrive: overrides.createdTimeInDrive ?? null,
@@ -35,7 +35,7 @@ const defaultOpts: FilterOptions = {
 describe("filterDocs", () => {
   it("hides archived docs by default (isActive: include)", () => {
     const docs = [
-      makeDoc({ title: "Active", status: "ACTIVE" }),
+      makeDoc({ title: "Active", status: "INBOX" }),
       makeDoc({ title: "Archived", status: "ARCHIVED" }),
     ];
     const result = filterDocs(docs, defaultOpts);
@@ -45,7 +45,7 @@ describe("filterDocs", () => {
 
   it("shows all docs when isActive is off", () => {
     const docs = [
-      makeDoc({ title: "Active", status: "ACTIVE" }),
+      makeDoc({ title: "Active", status: "INBOX" }),
       makeDoc({ title: "Archived", status: "ARCHIVED" }),
     ];
     const result = filterDocs(docs, { ...defaultOpts, isActive: "off" });
@@ -54,7 +54,7 @@ describe("filterDocs", () => {
 
   it("shows only archived docs when isActive is exclude", () => {
     const docs = [
-      makeDoc({ title: "Active", status: "ACTIVE" }),
+      makeDoc({ title: "Active", status: "INBOX" }),
       makeDoc({ title: "Archived", status: "ARCHIVED" }),
     ];
     const result = filterDocs(docs, { ...defaultOpts, isActive: "exclude" });

@@ -98,7 +98,7 @@ enum DocRole {
 }
 
 enum DocStatus {
-  ACTIVE
+  INBOX
   ARCHIVED
 
   @@map("doc_status")
@@ -120,7 +120,7 @@ enum SuggestionType {
 }
 
 enum CommentStatus {
-  ACTIVE
+  INBOX
   ARCHIVED
   MUTED
 
@@ -149,7 +149,7 @@ model Doc {
   driveUrl             String     @map("drive_url")
   mimeType             String?    @map("mime_type")
   role                 DocRole    @default(REVIEWER)
-  status               DocStatus  @default(ACTIVE)
+  status               DocStatus  @default(INBOX)
   isDeleted            Boolean    @default(false) @map("is_deleted") // soft-delete; set when Drive reports 404/403/trashed, cleared if doc reappears
   lastModifiedInDrive  DateTime?  @map("last_modified_in_drive")    // Drive's modifiedTime (does NOT update when comments change)
   notes                String?    @map("notes")
@@ -174,7 +174,7 @@ model Comment {
   resolved        Boolean        @default(false)
   isThreadAuthor  Boolean        @default(false) @map("is_thread_author")
   iParticipated   Boolean        @default(false) @map("i_participated")
-  status          CommentStatus  @default(ACTIVE)
+  status          CommentStatus  @default(INBOX)
   driveCreatedAt  DateTime?      @map("drive_created_at")
   driveModifiedAt DateTime?      @map("drive_modified_at")
   replyCount      Int            @default(0) @map("reply_count")

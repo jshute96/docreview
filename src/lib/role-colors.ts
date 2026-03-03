@@ -12,7 +12,7 @@ export const ROLE_COLORS = {
 } as const;
 
 export const STATUS_COLORS = {
-  ACTIVE: {
+  INBOX: {
     badge: "bg-emerald-100 text-emerald-700",
     activeFilter: "bg-emerald-600 text-white",
     inactiveFilter: "bg-emerald-50 text-emerald-400 hover:bg-emerald-100",

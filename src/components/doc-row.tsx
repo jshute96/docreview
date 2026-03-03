@@ -29,7 +29,7 @@ export function DocRow({
   async function handleArchive() {
     setArchiving(true);
     try {
-      const newStatus = doc.status === "ACTIVE" ? "ARCHIVED" : "ACTIVE";
+      const newStatus = doc.status === "INBOX" ? "ARCHIVED" : "INBOX";
       const res = await fetch(`/api/docs/${doc.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -119,11 +119,11 @@ export function DocRow({
             variant="outline"
             size="sm"
             className="h-6 px-2 text-xs"
-            title={doc.status === "ACTIVE" ? "Hide this document" : "Unhide this document"}
+            title={doc.status === "INBOX" ? "Hide this document" : "Unhide this document"}
             onClick={handleArchive}
             disabled={archiving}
           >
-            {doc.status === "ACTIVE" ? "Archive" : "Unarchive"}
+            {doc.status === "INBOX" ? "Archive" : "Unarchive"}
           </Button>
         </div>
       </td>

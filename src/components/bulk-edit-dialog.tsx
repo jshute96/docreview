@@ -98,7 +98,7 @@ export function BulkEditDialog({
       setRoleState("as-is");
     }
 
-    const status = checkConsistency(next, d => d.status === "ACTIVE");
+    const status = checkConsistency(next, d => d.status === "INBOX");
     if ((statusState === "set" && status.all) || (statusState === "clear" && status.none)) {
       setStatusState("as-is");
     }
@@ -130,7 +130,7 @@ export function BulkEditDialog({
 
   function cycleStatus(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
-    const { all, none } = checkConsistency(selectedDocs, d => d.status === "ACTIVE");
+    const { all, none } = checkConsistency(selectedDocs, d => d.status === "INBOX");
     setStatusState(prev => {
       if (all) return prev === "as-is" ? "clear" : "as-is";
       if (none) return prev === "as-is" ? "set" : "as-is";
@@ -201,7 +201,7 @@ export function BulkEditDialog({
   }
 
   const role = checkConsistency(selectedDocs, d => d.role === "AUTHOR");
-  const status = checkConsistency(selectedDocs, d => d.status === "ACTIVE");
+  const status = checkConsistency(selectedDocs, d => d.status === "INBOX");
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -246,8 +246,8 @@ export function BulkEditDialog({
                     title="Toggle active/archived state for all selected documents"
                     className={`relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                       statusState === "set" || statusState === "clear" || (statusState === "as-is" && status.all)
-                        ? STATUS_COLORS.ACTIVE.activeFilter
-                        : STATUS_COLORS.ACTIVE.inactiveFilter
+                        ? STATUS_COLORS.INBOX.activeFilter
+                        : STATUS_COLORS.INBOX.inactiveFilter
                     }`}
                   >
                     Active

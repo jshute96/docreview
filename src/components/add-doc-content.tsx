@@ -176,7 +176,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
             url,
             labelIds: selectedLabelIds,
             notes,
-            status: addAsActive ? "ACTIVE" : "ARCHIVED",
+            status: addAsActive ? "INBOX" : "ARCHIVED",
           }),
         });
         if (!res.ok) throw new Error("Add failed");

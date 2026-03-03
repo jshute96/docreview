@@ -70,7 +70,7 @@ describe("POST /api/docs/add", () => {
     });
   }
 
-  it("adds a doc as ACTIVE by default", async () => {
+  it("adds a doc as INBOX by default", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValueOnce(null); // not existing
     mockDoc.create.mockResolvedValue({ id: "d1" });
@@ -81,7 +81,7 @@ describe("POST /api/docs/add", () => {
     
     expect(mockDoc.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
-        status: "ACTIVE",
+        status: "INBOX",
       }),
     }));
   });

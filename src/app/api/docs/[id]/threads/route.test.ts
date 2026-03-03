@@ -213,7 +213,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "c1",
-      type: "COMMENT", status: "ACTIVE", resolved: false,
+      type: "COMMENT", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
@@ -243,7 +243,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "c1",
-      type: "COMMENT", status: "ACTIVE", resolved: false,
+      type: "COMMENT", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
@@ -298,7 +298,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "suggest.abc",
-      type: "SUGGESTION", status: "ACTIVE", resolved: false,
+      type: "SUGGESTION", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
@@ -322,7 +322,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "suggest.abc",
-      type: "SUGGESTION", status: "ACTIVE", resolved: false,
+      type: "SUGGESTION", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
@@ -371,7 +371,7 @@ describe("POST /api/docs/[id]/threads", () => {
     });
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "suggest.abc",
-      type: "SUGGESTION", status: "ACTIVE", resolved: false,
+      type: "SUGGESTION", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
@@ -392,7 +392,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "c1",
-      type: "COMMENT", status: "ACTIVE", resolved: false,
+      type: "COMMENT", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
@@ -411,7 +411,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       id: "cr1", docId: "d1", googleCommentId: "c1",
-      type: "COMMENT", status: "ACTIVE", resolved: false,
+      type: "COMMENT", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockRejectedValue(new Error("Drive error"));

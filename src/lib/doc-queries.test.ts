@@ -7,14 +7,14 @@ describe("withCommentCounts", () => {
       id: "d1",
       role: "REVIEWER",
       comments: [
-        { isThreadAuthor: true, iParticipated: false, status: "ACTIVE", resolved: false },
-        { isThreadAuthor: false, iParticipated: true, status: "ACTIVE", resolved: false },
-        { isThreadAuthor: false, iParticipated: false, status: "ACTIVE", resolved: false },
-        { isThreadAuthor: true, iParticipated: true, status: "ACTIVE", resolved: false },
+        { isThreadAuthor: true, iParticipated: false, status: "INBOX", resolved: false },
+        { isThreadAuthor: false, iParticipated: true, status: "INBOX", resolved: false },
+        { isThreadAuthor: false, iParticipated: false, status: "INBOX", resolved: false },
+        { isThreadAuthor: true, iParticipated: true, status: "INBOX", resolved: false },
         // Manual ARCHIVED unresolved thread: should NOT be watched
         { isThreadAuthor: true, iParticipated: true, status: "ARCHIVED", resolved: false },
         // Resolved by someone else: should be watched if status is ACTIVE
-        { isThreadAuthor: true, iParticipated: true, status: "ACTIVE", resolved: true },
+        { isThreadAuthor: true, iParticipated: true, status: "INBOX", resolved: true },
       ],
     };
     const result = withCommentCounts(doc);
@@ -26,8 +26,8 @@ describe("withCommentCounts", () => {
       id: "d1",
       role: "AUTHOR",
       comments: [
-        { isThreadAuthor: false, iParticipated: false, status: "ACTIVE", resolved: false },
-        { isThreadAuthor: false, iParticipated: false, status: "ACTIVE", resolved: true },
+        { isThreadAuthor: false, iParticipated: false, status: "INBOX", resolved: false },
+        { isThreadAuthor: false, iParticipated: false, status: "INBOX", resolved: true },
         { isThreadAuthor: false, iParticipated: false, status: "ARCHIVED", resolved: false },
       ],
     };
@@ -40,7 +40,7 @@ describe("withCommentCounts", () => {
       id: "d1",
       role: "REVIEWER",
       comments: [
-        { isThreadAuthor: false, iParticipated: false, status: "ACTIVE", resolved: false },
+        { isThreadAuthor: false, iParticipated: false, status: "INBOX", resolved: false },
         { isThreadAuthor: false, iParticipated: false, status: "ARCHIVED", resolved: false },
         { isThreadAuthor: false, iParticipated: false, status: "MUTED", resolved: false },
         { isThreadAuthor: false, iParticipated: false, status: "ARCHIVED", resolved: true },
@@ -61,7 +61,7 @@ describe("withCommentCounts", () => {
       id: "d1",
       role: "REVIEWER",
       title: "Test",
-      comments: [{ isThreadAuthor: true, iParticipated: false, status: "ACTIVE", resolved: false }],
+      comments: [{ isThreadAuthor: true, iParticipated: false, status: "INBOX", resolved: false }],
     };
     const result = withCommentCounts(doc);
     expect(result).toHaveProperty("id", "d1");

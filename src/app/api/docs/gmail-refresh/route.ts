@@ -123,7 +123,7 @@ export async function POST() {
         continue;
       }
       if (upsertedDocs[i].status === "ARCHIVED" && res.shouldUnarchive) {
-        await prisma.doc.update({ where: { id: upsertedDocs[i].id }, data: { status: "ACTIVE" } });
+        await prisma.doc.update({ where: { id: upsertedDocs[i].id }, data: { status: "INBOX" } });
         unarchived++;
       }
     }

@@ -63,7 +63,7 @@ export async function syncComments(
     );
 
     if (!existing) {
-      const status = c.resolved ? "ARCHIVED" : "ACTIVE";
+      const status = c.resolved ? "ARCHIVED" : "INBOX";
       toCreate.push({
         docId: doc.id,
         googleCommentId: c.id,
@@ -108,7 +108,7 @@ export async function syncComments(
 
       // Determine the target status. We want to preserve manual ARCHIVED status
       // unless there is new activity that should "wake up" the thread.
-      let status = existing.status as "ACTIVE" | "ARCHIVED";
+      let status = existing.status as "INBOX" | "ARCHIVED";
       const hasNewActivity =
         c.replyCount > existing.replyCount ||
         (existing.resolved && !c.resolved) ||
@@ -117,7 +117,7 @@ export async function syncComments(
       if (c.resolved && c.iResolvedIt) {
         status = "ARCHIVED";
       } else if (hasNewActivity) {
-        status = "ACTIVE";
+        status = "INBOX";
       }
 
       const changed =
@@ -201,7 +201,7 @@ export async function syncComments(
         type: "SUGGESTION",
         suggestionType: s.suggestionType,
         resolved: false,
-        status: "ACTIVE",
+        status: "INBOX",
         driveCreatedAt: doc.lastModifiedInDrive ?? new Date(),
       });
       // New suggestion: unarchive if I'm the doc author (suggestions have
@@ -231,7 +231,7 @@ export async function syncComments(
     if (!liveDocsIds.has(s.googleCommentId)) {
       await prisma.comment.update({
         where: { id: s.id },
-        data: { resolved: true, status: s.status === "ACTIVE" ? "ARCHIVED" : s.status },
+        data: { resolved: true, status: s.status === "INBOX" ? "ARCHIVED" : s.status },
       });
       suggestionsResolved++;
     }

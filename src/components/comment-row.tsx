@@ -238,7 +238,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     );
   }
 
-  async function updateStatus(status: "ACTIVE" | "ARCHIVED" | "MUTED") {
+  async function updateStatus(status: "INBOX" | "ARCHIVED" | "MUTED") {
     setLoading(true);
     try {
       const res = await fetch(`/api/docs/${docId}/comments/${comment.id}`, {
@@ -349,7 +349,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             size="sm"
             className="h-6 px-2 text-xs"
             title={isArchived ? "Unhide this comment" : "Hide this comment"}
-            onClick={() => updateStatus(isArchived ? "ACTIVE" : "ARCHIVED")}
+            onClick={() => updateStatus(isArchived ? "INBOX" : "ARCHIVED")}
             disabled={loading}
           >
             {isArchived ? "Unarchive" : "Archive"}
@@ -359,7 +359,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             size="sm"
             className="h-6 px-2 text-xs"
             title={isMuted ? "Permanently hidden — click to unhide" : "Permanently hide this comment"}
-            onClick={() => updateStatus(isMuted ? "ACTIVE" : "MUTED")}
+            onClick={() => updateStatus(isMuted ? "INBOX" : "MUTED")}
             disabled={loading}
           >
             {isMuted ? "Unmute" : "Mute"}

@@ -14,7 +14,7 @@ export const docWithCountsInclude = {
   comments: {
     where: {
       OR: [
-        { status: "ACTIVE" as const },
+        { status: "INBOX" as const },
         { resolved: false as const }
       ]
     },
@@ -46,7 +46,7 @@ export function withCommentCounts<
     _count: {
       watchedComments: comments.filter(
         (c) =>
-          c.status === "ACTIVE" &&
+          c.status === "INBOX" &&
           (doc.role === "AUTHOR" || c.isThreadAuthor || c.iParticipated),
       ).length,
       openComments: comments.filter((c) => !c.resolved).length,

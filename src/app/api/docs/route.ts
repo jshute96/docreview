@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   const rawDocs = await prisma.doc.findMany({
     where: {
       userId,
-      ...(includeArchived ? {} : { status: "ACTIVE" }),
+      ...(includeArchived ? {} : { status: "INBOX" }),
       ...(labelIds.length > 0
         ? { labels: { some: { labelId: { in: labelIds } } } }
         : {}),
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     : null;
   const loadLabelIds: string[] = Array.isArray(loadBody.labelIds) ? loadBody.labelIds as string[] : [];
   const loadNotes: string = typeof loadBody.notes === "string" ? (loadBody.notes as string).trim() : "";
-  const loadStatus: "ACTIVE" | "ARCHIVED" | undefined = typeof loadBody.status === "string" && (loadBody.status === "ACTIVE" || loadBody.status === "ARCHIVED") ? (loadBody.status as "ACTIVE" | "ARCHIVED") : undefined;
+  const loadStatus: "INBOX" | "ARCHIVED" | undefined = typeof loadBody.status === "string" && (loadBody.status === "INBOX" || loadBody.status === "ARCHIVED") ? (loadBody.status as "INBOX" | "ARCHIVED") : undefined;
 
   // Validate label ownership before proceeding
   if (loadLabelIds.length > 0) {
@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
         lastModifiedInDrive: doc.lastModifiedInDrive,
         owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
-        status: loadStatus || "ACTIVE",
+        status: loadStatus || "INBOX",
         ...(loadNotes ? { notes: loadNotes } : {}),
         ...(loadLabelIds.length > 0
           ? { labels: { create: loadLabelIds.map((id) => ({ labelId: id })) } }
@@ -256,7 +256,7 @@ export async function POST(req: NextRequest) {
       where: {
         userId,
         isDeleted: false,
-        status: "ACTIVE",
+        status: "INBOX",
         googleDocId: { notIn: [...driveDocIds] },
       },
       select: { id: true, googleDocId: true },
@@ -301,7 +301,7 @@ export async function POST(req: NextRequest) {
       continue;
     }
     if (commentDocs[i].status === "ARCHIVED" && res.shouldUnarchive) {
-      await prisma.doc.update({ where: { id: commentDocs[i].id }, data: { status: "ACTIVE" } });
+      await prisma.doc.update({ where: { id: commentDocs[i].id }, data: { status: "INBOX" } });
       unarchived++;
     }
   }

@@ -101,7 +101,7 @@ describe("PATCH /api/docs/bulk-update", () => {
       id: "d1",
       userId: "u1",
       role: DocRole.AUTHOR,
-      status: DocStatus.ACTIVE,
+      status: DocStatus.INBOX,
       labels: [{ labelId: "l1" }],
       comments: [],
     };
@@ -129,7 +129,7 @@ describe("PATCH /api/docs/bulk-update", () => {
       id: "d1",
       userId: "u1",
       role: DocRole.REVIEWER,
-      status: DocStatus.ACTIVE,
+      status: DocStatus.INBOX,
       notes: "First line",
       labels: [],
       comments: [],
@@ -165,7 +165,7 @@ describe("PATCH /api/docs/bulk-update", () => {
     const doc = {
       id: "d1",
       userId: "u1",
-      status: DocStatus.ACTIVE,
+      status: DocStatus.INBOX,
       labels: [],
       comments: [],
     };
@@ -191,7 +191,7 @@ describe("PATCH /api/docs/bulk-update", () => {
       id: "d1",
       userId: "u1",
       role: DocRole.AUTHOR,
-      status: DocStatus.ACTIVE,
+      status: DocStatus.INBOX,
       labels: [],
       comments: [],
     };
@@ -217,7 +217,7 @@ describe("PATCH /api/docs/bulk-update", () => {
       id: "d1",
       userId: "u1",
       role: DocRole.AUTHOR,
-      status: DocStatus.ACTIVE,
+      status: DocStatus.INBOX,
       labels: [{ labelId: "l1" }],
       comments: [],
     };

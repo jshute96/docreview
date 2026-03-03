@@ -119,7 +119,7 @@ export async function POST(
       ? commentRecord.status
       : data.resolved && data.iResolvedIt
         ? "ARCHIVED"
-        : "ACTIVE";
+        : "INBOX";
 
     const updated = await prisma.comment.update({
       where: { id: commentRecord.id },

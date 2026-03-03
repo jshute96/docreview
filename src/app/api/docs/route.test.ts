@@ -86,7 +86,7 @@ describe("GET /api/docs", () => {
     expect(res.status).toBe(200);
 
     const call = mockDoc.findMany.mock.calls[0][0];
-    expect(call.where).toEqual({ userId: "u1", status: "ACTIVE" });
+    expect(call.where).toEqual({ userId: "u1", status: "INBOX" });
   });
 
   it("includes archived when includeArchived=true", async () => {
@@ -402,7 +402,7 @@ describe("POST /api/docs", () => {
     expect(data.unarchived).toBe(1);
     expect(mockDoc.update).toHaveBeenCalledWith({
       where: { id: "d1" },
-      data: { status: "ACTIVE" },
+      data: { status: "INBOX" },
     });
   });
 
@@ -436,7 +436,7 @@ describe("POST /api/docs", () => {
     expect(data.unarchived).toBe(0);
     // doc.update should NOT have been called to unarchive
     expect(mockDoc.update).not.toHaveBeenCalledWith(
-      expect.objectContaining({ data: { status: "ACTIVE" } })
+      expect.objectContaining({ data: { status: "INBOX" } })
     );
   });
 
@@ -457,7 +457,7 @@ describe("POST /api/docs", () => {
       },
     ]);
 
-    const dbDoc = { id: "d1", googleDocId: "g1", status: "ACTIVE" };
+    const dbDoc = { id: "d1", googleDocId: "g1", status: "INBOX" };
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([dbDoc]); // activeDocs for comment sync
@@ -487,7 +487,7 @@ describe("POST /api/docs", () => {
       },
     ]);
 
-    const dbDoc = { id: "d1", googleDocId: "g1", status: "ACTIVE" };
+    const dbDoc = { id: "d1", googleDocId: "g1", status: "INBOX" };
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([dbDoc]); // activeDocs for comment sync

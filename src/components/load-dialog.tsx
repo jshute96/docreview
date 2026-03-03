@@ -157,7 +157,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
           selectedGoogleDocIds: visibleDocs.map((d) => d.googleDocId),
           labelIds: selectedLabelIds,
           notes,
-          status: addAsActive ? "ACTIVE" : "ARCHIVED",
+          status: addAsActive ? "INBOX" : "ARCHIVED",
         }),
         signal: controller.signal,
       });

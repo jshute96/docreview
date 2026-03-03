@@ -218,7 +218,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   async function handleArchive() {
     setArchiving(true);
     try {
-      const newStatus = doc.status === "ACTIVE" ? "ARCHIVED" : "ACTIVE";
+      const newStatus = doc.status === "INBOX" ? "ARCHIVED" : "INBOX";
       const res = await fetch(`/api/docs/${doc.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -237,7 +237,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   }
 
   async function handleArchiveAll() {
-    const toArchive = filteredComments.filter((c) => c.status === "ACTIVE");
+    const toArchive = filteredComments.filter((c) => c.status === "INBOX");
     if (toArchive.length === 0) return;
 
     setBulkArchiving(true);
@@ -457,11 +457,11 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
             variant="outline"
             size="sm"
             className="h-6 px-2 text-xs text-zinc-900"
-            title={doc.status === "ACTIVE" ? "Hide this document in document list" : "Unhide this document in document list"}
+            title={doc.status === "INBOX" ? "Hide this document in document list" : "Unhide this document in document list"}
             onClick={handleArchive}
             disabled={archiving}
           >
-            {doc.status === "ACTIVE" ? "Archive" : "Unarchive"}
+            {doc.status === "INBOX" ? "Archive" : "Unarchive"}
           </Button>
         </div>
         {doc.notes?.trim() && (
@@ -543,7 +543,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                       className="h-5 px-1.5 text-[10px] text-zinc-900"
                       title="Archive all visible comments"
                       onClick={handleArchiveAll}
-                      disabled={bulkArchiving || !filteredComments.some((c) => c.status === "ACTIVE")}
+                      disabled={bulkArchiving || !filteredComments.some((c) => c.status === "INBOX")}
                     >
                       {bulkArchiving ? "Archiving..." : "Archive all"}
                     </Button>

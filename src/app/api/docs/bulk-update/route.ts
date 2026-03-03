@@ -80,7 +80,7 @@ export async function PATCH(req: NextRequest) {
     if (typedRole === "set") data.role = DocRole.AUTHOR;
     else if (typedRole === "clear") data.role = DocRole.REVIEWER;
 
-    if (typedStatus === "set") data.status = DocStatus.ACTIVE;
+    if (typedStatus === "set") data.status = DocStatus.INBOX;
     else if (typedStatus === "clear") data.status = DocStatus.ARCHIVED;
 
     if (typedAppendNotes && typedAppendNotes.trim().length > 0) {
