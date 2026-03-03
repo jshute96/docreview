@@ -119,7 +119,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
           if (data.title) setValidTitle(data.title);
           if (data.mimeType) setValidMimeType(data.mimeType);
           if (data.error === "already_exists") {
-            setExistingDocId(data.id ?? null);
+            setExistingDocId(data.docId ?? null);
           }
           setValidationState("invalid");
           setValidationError(errorMessageForCode(data.error));

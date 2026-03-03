@@ -8,16 +8,16 @@ import { docWithCommentsInclude } from "@/lib/doc-queries";
 
 export async function POST(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ docId: string }> }
 ) {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  const { id } = await params;
+  const { docId } = await params;
 
-  const doc = await prisma.doc.findUnique({ where: { id } });
+  const doc = await prisma.doc.findUnique({ where: { docId } });
   if (!doc || doc.userId !== userId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -45,7 +45,7 @@ export async function POST(
     const f = fileRes.data;
     const isTrashed = f.trashed === true;
     freshDoc = await prisma.doc.update({
-      where: { id },
+      where: { docId },
       data: {
         title: f.name ?? doc.title,
         mimeType: f.mimeType ?? doc.mimeType,
@@ -60,9 +60,9 @@ export async function POST(
     if (reauth) return reauth;
     const code = (err as { code?: number })?.code;
     if (code === 404 || code === 403) {
-      console.log(`[Refresh] doc ${doc.id} (${doc.googleDocId}) is deleted or inaccessible (code ${code})`);
+      console.log(`[Refresh] doc ${doc.docId} (${doc.googleDocId}) is deleted or inaccessible (code ${code})`);
       freshDoc = await prisma.doc.update({
-        where: { id },
+        where: { docId },
         data: { isDeleted: true },
       });
     } else {
@@ -75,14 +75,14 @@ export async function POST(
     const syncResult = await syncComments(freshDoc, driveAuth);
     if (syncResult.isDeleted && !freshDoc.isDeleted) {
       await prisma.doc.update({
-        where: { id },
+        where: { docId },
         data: { isDeleted: true },
       });
     }
   }
 
   const updated = await prisma.doc.findUnique({
-    where: { id },
+    where: { docId },
     include: docWithCommentsInclude,
   });
 

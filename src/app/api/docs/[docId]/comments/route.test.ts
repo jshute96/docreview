@@ -33,15 +33,15 @@ const mockComment = prisma.comment as unknown as {
 };
 const mockFetchAllThreads = vi.mocked(fetchAllThreads);
 
-function makeParams(id: string) {
-  return { params: Promise.resolve({ id }) };
+function makeParams(docId: string) {
+  return { params: Promise.resolve({ docId }) };
 }
 
 beforeEach(() => {
   vi.resetAllMocks();
 });
 
-describe("GET /api/docs/[id]/comments", () => {
+describe("GET /api/docs/[docId]/comments", () => {
   it("returns 401 when not authenticated", async () => {
     mockAuth.mockResolvedValue(null);
     const req = new NextRequest("http://localhost/api/docs/d1/comments");
@@ -59,7 +59,7 @@ describe("GET /api/docs/[id]/comments", () => {
 
   it("returns 200 with threads", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1", googleDocId: "g1" });
+    mockDoc.findUnique.mockResolvedValue({ docId: "d1", userId: "u1", googleDocId: "g1" });
     mockFetchAllThreads.mockResolvedValue([
       { id: "c1", author: "A", content: "C", createdTime: "T", resolved: false, replies: [] },
     ]);
@@ -71,7 +71,7 @@ describe("GET /api/docs/[id]/comments", () => {
   });
 });
 
-describe("PATCH /api/docs/[id]/comments", () => {
+describe("PATCH /api/docs/[docId]/comments", () => {
   function makePatchReq(id: string, body: unknown): [NextRequest, ReturnType<typeof makeParams>] {
     const req = new NextRequest(`http://localhost/api/docs/${id}/comments`, {
       method: "PATCH",
@@ -98,7 +98,7 @@ describe("PATCH /api/docs/[id]/comments", () => {
 
   it("returns 400 for invalid commentIds", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
+    mockDoc.findUnique.mockResolvedValue({ docId: "d1", userId: "u1" });
     const [req, params] = makePatchReq("d1", { commentIds: "not-array", status: "ARCHIVED" });
     const res = await PATCH(req, params);
     expect(res.status).toBe(400);
@@ -106,7 +106,7 @@ describe("PATCH /api/docs/[id]/comments", () => {
 
   it("returns 400 for invalid status", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
+    mockDoc.findUnique.mockResolvedValue({ docId: "d1", userId: "u1" });
     const [req, params] = makePatchReq("d1", { commentIds: ["c1"], status: "INVALID" });
     const res = await PATCH(req, params);
     expect(res.status).toBe(400);
@@ -114,7 +114,7 @@ describe("PATCH /api/docs/[id]/comments", () => {
 
   it("returns 200 on successful bulk update", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    mockDoc.findUnique.mockResolvedValue({ id: "d1", userId: "u1" });
+    mockDoc.findUnique.mockResolvedValue({ docId: "d1", userId: "u1" });
     mockComment.updateMany.mockResolvedValue({ count: 2 });
     const [req, params] = makePatchReq("d1", { commentIds: ["c1", "c2"], status: "ARCHIVED" });
     const res = await PATCH(req, params);
@@ -123,7 +123,7 @@ describe("PATCH /api/docs/[id]/comments", () => {
     expect(data.count).toBe(2);
     expect(mockComment.updateMany).toHaveBeenCalledWith({
       where: {
-        id: { in: ["c1", "c2"] },
+        commentId: { in: ["c1", "c2"] },
         docId: "d1",
       },
       data: { status: "ARCHIVED" },

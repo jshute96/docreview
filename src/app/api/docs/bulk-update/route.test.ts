@@ -98,7 +98,7 @@ describe("PATCH /api/docs/bulk-update", () => {
   it("performs no update when role, status, and labels are 'as-is' and no notes", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const doc = {
-      id: "d1",
+      docId: "d1",
       userId: "u1",
       role: DocRole.AUTHOR,
       status: DocStatus.INBOX,
@@ -119,14 +119,14 @@ describe("PATCH /api/docs/bulk-update", () => {
     // No writes should happen — $transaction should not be called with any updates
     expect(mockTransaction).not.toHaveBeenCalled();
     const data = await res.json();
-    expect(data.docs[0].id).toBe("d1");
+    expect(data.docs[0].docId).toBe("d1");
     expect(data.skipped).toBe(0);
   });
 
   it("updates role and appends notes", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const doc = {
-      id: "d1",
+      docId: "d1",
       userId: "u1",
       role: DocRole.REVIEWER,
       status: DocStatus.INBOX,
@@ -152,7 +152,7 @@ describe("PATCH /api/docs/bulk-update", () => {
 
     expect(res.status).toBe(200);
     expect(mockDoc.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: "d1" },
+      where: { docId: "d1" },
       data: expect.objectContaining({
         role: DocRole.AUTHOR,
         notes: "First line\nSecond line"
@@ -163,7 +163,7 @@ describe("PATCH /api/docs/bulk-update", () => {
   it("updates status to ARCHIVED", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const doc = {
-      id: "d1",
+      docId: "d1",
       userId: "u1",
       status: DocStatus.INBOX,
       labels: [],
@@ -188,7 +188,7 @@ describe("PATCH /api/docs/bulk-update", () => {
   it("reports skipped count for docs not found", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const doc = {
-      id: "d1",
+      docId: "d1",
       userId: "u1",
       role: DocRole.AUTHOR,
       status: DocStatus.INBOX,
@@ -214,7 +214,7 @@ describe("PATCH /api/docs/bulk-update", () => {
   it("adds and removes labels", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const doc = {
-      id: "d1",
+      docId: "d1",
       userId: "u1",
       role: DocRole.AUTHOR,
       status: DocStatus.INBOX,

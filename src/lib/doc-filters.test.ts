@@ -6,7 +6,7 @@ import type { DocWithLabels } from "@/types";
 // Helper to build a minimal DocWithLabels for testing
 function makeDoc(overrides: Partial<DocWithLabels> & { title: string }): DocWithLabels {
   return {
-    id: overrides.id ?? overrides.title,
+    docId: overrides.docId ?? overrides.title,
     userId: "user1",
     googleDocId: overrides.googleDocId ?? `gdoc-${overrides.title}`,
     title: overrides.title,
@@ -153,7 +153,7 @@ describe("filterDocs", () => {
     const docs = [
       makeDoc({
         title: "Labeled",
-        labels: [{ docId: "d1", labelId: "L1", label: { id: "L1", userId: "u", name: "Bug", color: null, position: 0 } }] as DocWithLabels["labels"],
+        labels: [{ docId: "d1", labelId: "L1", label: { labelId: "L1", userId: "u", name: "Bug", color: null, position: 0 } }] as DocWithLabels["labels"],
       }),
       makeDoc({ title: "Unlabeled" }),
     ];
@@ -169,7 +169,7 @@ describe("filterDocs", () => {
     const docs = [
       makeDoc({
         title: "Labeled",
-        labels: [{ docId: "d1", labelId: "L1", label: { id: "L1", userId: "u", name: "Bug", color: null, position: 0 } }] as DocWithLabels["labels"],
+        labels: [{ docId: "d1", labelId: "L1", label: { labelId: "L1", userId: "u", name: "Bug", color: null, position: 0 } }] as DocWithLabels["labels"],
       }),
       makeDoc({ title: "Unlabeled" }),
     ];
@@ -185,17 +185,17 @@ describe("filterDocs", () => {
     const docs = [
       makeDoc({
         title: "HasBug",
-        labels: [{ docId: "d1", labelId: "L1", label: { id: "L1", userId: "u", name: "Bug", color: null, position: 0 } }] as DocWithLabels["labels"],
+        labels: [{ docId: "d1", labelId: "L1", label: { labelId: "L1", userId: "u", name: "Bug", color: null, position: 0 } }] as DocWithLabels["labels"],
       }),
       makeDoc({
         title: "HasFeature",
-        labels: [{ docId: "d2", labelId: "L2", label: { id: "L2", userId: "u", name: "Feature", color: null, position: 1 } }] as DocWithLabels["labels"],
+        labels: [{ docId: "d2", labelId: "L2", label: { labelId: "L2", userId: "u", name: "Feature", color: null, position: 1 } }] as DocWithLabels["labels"],
       }),
       makeDoc({
         title: "HasBoth",
         labels: [
-          { docId: "d3", labelId: "L1", label: { id: "L1", userId: "u", name: "Bug", color: null, position: 0 } },
-          { docId: "d3", labelId: "L2", label: { id: "L2", userId: "u", name: "Feature", color: null, position: 1 } },
+          { docId: "d3", labelId: "L1", label: { labelId: "L1", userId: "u", name: "Bug", color: null, position: 0 } },
+          { docId: "d3", labelId: "L2", label: { labelId: "L2", userId: "u", name: "Feature", color: null, position: 1 } },
         ] as DocWithLabels["labels"],
       }),
       makeDoc({ title: "NoLabels" }),
@@ -217,17 +217,17 @@ describe("filterDocs", () => {
     const docs = [
       makeDoc({
         title: "HasL1",
-        labels: [{ docId: "d1", labelId: "L1", label: { id: "L1", name: "L1", userId: "u", color: null, position: 0 } }] as DocWithLabels["labels"],
+        labels: [{ docId: "d1", labelId: "L1", label: { labelId: "L1", name: "L1", userId: "u", color: null, position: 0 } }] as DocWithLabels["labels"],
       }),
       makeDoc({
         title: "HasL2",
-        labels: [{ docId: "d2", labelId: "L2", label: { id: "L2", name: "L2", userId: "u", color: null, position: 0 } }] as DocWithLabels["labels"],
+        labels: [{ docId: "d2", labelId: "L2", label: { labelId: "L2", name: "L2", userId: "u", color: null, position: 0 } }] as DocWithLabels["labels"],
       }),
       makeDoc({
         title: "HasBoth",
         labels: [
-          { docId: "d3", labelId: "L1", label: { id: "L1", name: "L1", userId: "u", color: null, position: 0 } },
-          { docId: "d3", labelId: "L2", label: { id: "L2", name: "L2", userId: "u", color: null, position: 1 } },
+          { docId: "d3", labelId: "L1", label: { labelId: "L1", name: "L1", userId: "u", color: null, position: 0 } },
+          { docId: "d3", labelId: "L2", label: { labelId: "L2", name: "L2", userId: "u", color: null, position: 1 } },
         ] as DocWithLabels["labels"],
       }),
     ];

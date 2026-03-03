@@ -11,7 +11,7 @@ One-line descriptions of every source file, grouped by layer.
 | `login/page.tsx` | Login page — Google OAuth button, or offline-mode button |
 | `docs/page.tsx` | Doc list page (server) — fetches docs+labels, renders `DocTable` |
 | `add/page.tsx` | Add document page (server) — standalone add-doc form, accepts optional `?url=` query param |
-| `comments/[id]/page.tsx` | Doc detail page (server) — fetches single doc with comments, renders `DocDetail`; `generateMetadata` sets page title |
+| `comments/[docId]/page.tsx` | Doc detail page (server) — fetches single doc with comments, renders `DocDetail`; `generateMetadata` sets page title |
 
 ## API Routes (`src/app/api/`)
 
@@ -24,15 +24,15 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/add/route.ts` | `POST` add a doc by URL — validates via Drive, creates DB record, syncs comments |
 | `docs/validate/route.ts` | `GET` validate a Google Drive URL — checks access, mime type, returns metadata |
 | `docs/bulk-update/route.ts` | `PATCH` bulk update multiple docs — optimized role/label/notes updates with no-op protection |
-| `docs/[id]/route.ts` | `GET` single doc; `PATCH` update role/status/labels |
-| `docs/[id]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata then syncs comments |
-| `docs/[id]/comments/route.ts` | `GET` fetch all comment threads from Drive (fast path — Drive `comments.list` only) |
-| `docs/[id]/content/route.ts` | `GET` fetch document text and suggestion content (slow path — Docs API `documents.get` or Drive `files.export`); for Docs, uses a single `SUGGESTIONS_INLINE` call for both |
-| `docs/[id]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (INBOX/ARCHIVED/MUTED) |
-| `docs/[id]/threads/route.ts` | `GET` fetch thread(s) from Drive; `POST` refresh a single thread (updates DB) |
-| `docs/[id]/threads/reply/route.ts` | `POST` reply to / resolve / reopen a comment thread via Drive API |
+| `docs/[docId]/route.ts` | `GET` single doc; `PATCH` update role/status/labels |
+| `docs/[docId]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata then syncs comments |
+| `docs/[docId]/comments/route.ts` | `GET` fetch all comment threads from Drive (fast path — Drive `comments.list` only) |
+| `docs/[docId]/content/route.ts` | `GET` fetch document text and suggestion content (slow path — Docs API `documents.get` or Drive `files.export`); for Docs, uses a single `SUGGESTIONS_INLINE` call for both |
+| `docs/[docId]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (INBOX/ARCHIVED/MUTED) |
+| `docs/[docId]/threads/route.ts` | `GET` fetch thread(s) from Drive; `POST` refresh a single thread (updates DB) |
+| `docs/[docId]/threads/reply/route.ts` | `POST` reply to / resolve / reopen a comment thread via Drive API |
 | `labels/route.ts` | `GET` list labels; `POST` create label |
-| `labels/[id]/route.ts` | `PATCH` update label color; `DELETE` delete label |
+| `labels/[labelId]/route.ts` | `PATCH` update label color; `DELETE` delete label |
 | `labels/reorder/route.ts` | `PATCH` reorder labels by position |
 
 ## Components (`src/components/`)

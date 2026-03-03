@@ -73,8 +73,8 @@ describe("POST /api/docs/add", () => {
   it("adds a doc as INBOX by default", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValueOnce(null); // not existing
-    mockDoc.create.mockResolvedValue({ id: "d1" });
-    mockDoc.findUnique.mockResolvedValueOnce({ id: "d1", labels: [], comments: [] }); // result fetch
+    mockDoc.create.mockResolvedValue({ docId: "d1" });
+    mockDoc.findUnique.mockResolvedValueOnce({ docId: "d1", labels: [], comments: [] }); // result fetch
 
     const res = await POST(makeReq({ url: "https://docs.google.com/document/d/test" }));
     expect(res.status).toBe(201);
@@ -89,8 +89,8 @@ describe("POST /api/docs/add", () => {
   it("adds a doc as ARCHIVED when specified", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValueOnce(null);
-    mockDoc.create.mockResolvedValue({ id: "d1" });
-    mockDoc.findUnique.mockResolvedValueOnce({ id: "d1", labels: [], comments: [] });
+    mockDoc.create.mockResolvedValue({ docId: "d1" });
+    mockDoc.findUnique.mockResolvedValueOnce({ docId: "d1", labels: [], comments: [] });
 
     const res = await POST(makeReq({ 
       url: "https://docs.google.com/document/d/test",

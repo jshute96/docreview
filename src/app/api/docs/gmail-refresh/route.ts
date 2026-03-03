@@ -118,12 +118,12 @@ export async function POST() {
     for (let i = 0; i < upsertedDocs.length; i++) {
       const res = syncResults[i];
       if (res.isDeleted) {
-        await prisma.doc.update({ where: { id: upsertedDocs[i].id }, data: { isDeleted: true } });
+        await prisma.doc.update({ where: { docId: upsertedDocs[i].docId }, data: { isDeleted: true } });
         deleted++;
         continue;
       }
       if (upsertedDocs[i].status === "ARCHIVED" && res.shouldUnarchive) {
-        await prisma.doc.update({ where: { id: upsertedDocs[i].id }, data: { status: "INBOX" } });
+        await prisma.doc.update({ where: { docId: upsertedDocs[i].docId }, data: { status: "INBOX" } });
         unarchived++;
       }
     }

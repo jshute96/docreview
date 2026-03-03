@@ -47,8 +47,8 @@ export async function POST(req: NextRequest) {
 
   if (labelIds.length > 0) {
     const ownedLabels = await prisma.label.findMany({
-      where: { id: { in: labelIds }, userId },
-      select: { id: true },
+      where: { labelId: { in: labelIds }, userId },
+      select: { labelId: true },
     });
     if (ownedLabels.length !== labelIds.length) {
       return NextResponse.json({ error: "Invalid label" }, { status: 400 });
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
   await syncComments(doc, driveAuth);
 
   const result = await prisma.doc.findUnique({
-    where: { id: doc.id },
+    where: { docId: doc.docId },
     include: docWithCountsInclude,
   });
 

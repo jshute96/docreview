@@ -49,7 +49,7 @@ export async function syncComments(
   // Batch-fetch all existing comments for this doc to avoid N+1 queries
   const existingComments = new Map(
     (await prisma.comment.findMany({
-      where: { docId: doc.id, type: "COMMENT" },
+      where: { docId: doc.docId, type: "COMMENT" },
     })).map((c) => [c.googleCommentId, c])
   );
 
@@ -65,7 +65,7 @@ export async function syncComments(
     if (!existing) {
       const status = c.resolved ? "ARCHIVED" : "INBOX";
       toCreate.push({
-        docId: doc.id,
+        docId: doc.docId,
         googleCommentId: c.id,
         type: "COMMENT",
         resolved: c.resolved,
@@ -87,7 +87,7 @@ export async function syncComments(
           existing.replyCount !== c.replyCount;
         if (changed) {
           await prisma.comment.update({
-            where: { id: existing.id },
+            where: { commentId: existing.commentId },
             data: {
               resolved: c.resolved,
               iParticipated: c.iParticipated,
@@ -129,7 +129,7 @@ export async function syncComments(
         existing.replyCount !== c.replyCount;
       if (changed) {
         await prisma.comment.update({
-          where: { id: existing.id },
+          where: { commentId: existing.commentId },
           data: {
             resolved: c.resolved,
             iParticipated: c.iParticipated,
@@ -154,17 +154,17 @@ export async function syncComments(
   const driveCommentIds = new Set(comments.map((c) => c.id));
   const deletedIds = [...existingComments.values()]
     .filter((c) => !driveCommentIds.has(c.googleCommentId))
-    .map((c) => c.id);
+    .map((c) => c.commentId);
   let deleted = 0;
   if (deletedIds.length > 0) {
     const result = await prisma.comment.deleteMany({
-      where: { id: { in: deletedIds } },
+      where: { commentId: { in: deletedIds } },
     });
     deleted = result.count;
   }
 
   await prisma.doc.update({
-    where: { id: doc.id },
+    where: { docId: doc.docId },
     data: { commentsLastSyncedAt: new Date() },
   });
 
@@ -183,8 +183,8 @@ export async function syncComments(
   // Docs API sync: ensures ALL pending suggestions are tracked.
   const existingSuggestions = new Map(
     (await prisma.comment.findMany({
-      where: { docId: doc.id, type: "SUGGESTION" },
-      select: { id: true, googleCommentId: true, suggestionType: true },
+      where: { docId: doc.docId, type: "SUGGESTION" },
+      select: { commentId: true, googleCommentId: true, suggestionType: true },
     })).map((r) => [r.googleCommentId, r])
   );
 
@@ -196,7 +196,7 @@ export async function syncComments(
     const existing = existingSuggestions.get(s.id);
     if (!existing) {
       suggestionsToCreate.push({
-        docId: doc.id,
+        docId: doc.docId,
         googleCommentId: s.id,
         type: "SUGGESTION",
         suggestionType: s.suggestionType,
@@ -209,7 +209,7 @@ export async function syncComments(
       if (doc.role === "AUTHOR") shouldUnarchive = true;
     } else if (existing.suggestionType !== s.suggestionType) {
       await prisma.comment.update({
-        where: { id: existing.id },
+        where: { commentId: existing.commentId },
         data: { suggestionType: s.suggestionType },
       });
       suggestionsUpdated++;
@@ -222,7 +222,7 @@ export async function syncComments(
   // Mark suggest.xxx suggestions no longer in the document as resolved.
   let suggestionsResolved = 0;
   const activeSuggestions = await prisma.comment.findMany({
-    where: { docId: doc.id, type: "SUGGESTION", resolved: false },
+    where: { docId: doc.docId, type: "SUGGESTION", resolved: false },
   });
   for (const s of activeSuggestions) {
     // Drive API comment IDs starting with "AAAB" are system-generated anchors
@@ -230,7 +230,7 @@ export async function syncComments(
     if (s.googleCommentId.startsWith("AAAB")) continue;
     if (!liveDocsIds.has(s.googleCommentId)) {
       await prisma.comment.update({
-        where: { id: s.id },
+        where: { commentId: s.commentId },
         data: { resolved: true, status: s.status === "INBOX" ? "ARCHIVED" : s.status },
       });
       suggestionsResolved++;

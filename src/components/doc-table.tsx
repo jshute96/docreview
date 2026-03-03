@@ -32,7 +32,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
   // When labels change (e.g. color update), propagate into docs state too
   function setLabels(newLabels: Label[]) {
     setLabelsRaw(newLabels);
-    const labelMap = new Map(newLabels.map((l) => [l.id, l]));
+    const labelMap = new Map(newLabels.map((l) => [l.labelId, l]));
     setDocs((prev) =>
       prev.map((doc) => ({
         ...doc,
@@ -94,12 +94,12 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
   }
 
   function handleDocUpdate(updated: DocWithLabels) {
-    setDocs((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+    setDocs((prev) => prev.map((d) => (d.docId === updated.docId ? updated : d)));
   }
 
   function handleBulkUpdate(updatedDocs: DocWithLabels[]) {
-    const updatedMap = new Map(updatedDocs.map((d) => [d.id, d]));
-    setDocs((prev) => prev.map((d) => updatedMap.get(d.id) ?? d));
+    const updatedMap = new Map(updatedDocs.map((d) => [d.docId, d]));
+    setDocs((prev) => prev.map((d) => updatedMap.get(d.docId) ?? d));
   }
 
   function handleDocAdded(newDoc: DocWithLabels) {
@@ -107,7 +107,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
   }
 
   function handleLabelDelete(id: string) {
-    setLabels(labels.filter((l) => l.id !== id));
+    setLabels(labels.filter((l) => l.labelId !== id));
     setDocs((prev) =>
       prev.map((d) => ({
         ...d,
@@ -239,7 +239,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
             <tbody className="bg-white">
               {filteredDocs.map((doc) => (
                 <DocRow
-                  key={doc.id}
+                  key={doc.docId}
                   doc={doc}
                   onUpdate={handleDocUpdate}
                   searchFilter={titleFilter}

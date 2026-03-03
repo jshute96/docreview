@@ -30,7 +30,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   function setLabels(newLabels: Label[]) {
     setLabelsRaw(newLabels);
-    const labelMap = new Map(newLabels.map((l) => [l.id, l]));
+    const labelMap = new Map(newLabels.map((l) => [l.labelId, l]));
     setDoc((prev) => ({
       ...prev,
       labels: prev.labels
@@ -43,7 +43,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   }
 
   function handleLabelDelete(id: string) {
-    setLabels(labels.filter((l) => l.id !== id));
+    setLabels(labels.filter((l) => l.labelId !== id));
     setDoc((prev) => ({
       ...prev,
       labels: prev.labels.filter((dl) => dl.labelId !== id),
@@ -86,7 +86,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   async function fetchThreads() {
     try {
-      const res = await apiFetch(`/api/docs/${doc.id}/comments`);
+      const res = await apiFetch(`/api/docs/${doc.docId}/comments`);
       if (res.ok) {
         const data = await res.json();
         setThreadMap(data.threads ?? {});
@@ -96,7 +96,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   async function fetchDocContent() {
     try {
-      const res = await apiFetch(`/api/docs/${doc.id}/content`);
+      const res = await apiFetch(`/api/docs/${doc.docId}/content`);
       if (res.ok) {
         const data = await res.json();
         setSuggestionContent(data.suggestions ?? {});
@@ -110,13 +110,13 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     void fetchDocContent();
   }
 
-  useEffect(() => { void fetchContent(); }, [doc.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void fetchContent(); }, [doc.docId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [notFound, setNotFound] = useState(false);
   const handleCrossTab = useCallback(async (event: CrossTabEvent) => {
     try {
       const refetchDoc = async () => {
-        const docRes = await fetch(`/api/docs/${initialDoc.id}`);
+        const docRes = await fetch(`/api/docs/${initialDoc.docId}`);
         if (docRes.ok) {
           const updated: DocWithComments = await docRes.json();
           setDoc(updated);
@@ -129,7 +129,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
       if (event.type === "docs") {
         // Skip if the event is for a different doc
-        if (event.docId && event.docId !== initialDoc.id) return;
+        if (event.docId && event.docId !== initialDoc.docId) return;
         const [labelsRes] = await Promise.all([
           fetch("/api/labels"),
           refetchDoc(),
@@ -141,12 +141,12 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
           refetchDoc(),
         ]);
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
-      } else if (event.type === "comments" && event.docId === initialDoc.id) {
+      } else if (event.type === "comments" && event.docId === initialDoc.docId) {
         await refetchDoc();
         void fetchContent();
       }
     } catch { /* cross-tab sync is best-effort */ }
-  }, [initialDoc.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initialDoc.docId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useCrossTabListener(handleCrossTab);
 
@@ -195,14 +195,14 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   async function handleRefresh() {
     setRefreshing(true);
     try {
-      const res = await apiFetch(`/api/docs/${doc.id}/refresh`, { method: "POST" });
+      const res = await apiFetch(`/api/docs/${doc.docId}/refresh`, { method: "POST" });
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithComments = await res.json();
       setDoc(updated);
       setComments(updated.comments);
       setSortActive(true);
       void fetchContent();
-      broadcastChange({ type: "comments", docId: doc.id });
+      broadcastChange({ type: "comments", docId: doc.docId });
       toast.success("Comments synced");
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to sync comments");
@@ -219,7 +219,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     setArchiving(true);
     try {
       const newStatus = doc.status === "INBOX" ? "ARCHIVED" : "INBOX";
-      const res = await fetch(`/api/docs/${doc.id}`, {
+      const res = await fetch(`/api/docs/${doc.docId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
@@ -242,8 +242,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
     setBulkArchiving(true);
     try {
-      const commentIds = toArchive.map((c) => c.id);
-      const res = await apiFetch(`/api/docs/${doc.id}/comments`, {
+      const commentIds = toArchive.map((c) => c.commentId);
+      const res = await apiFetch(`/api/docs/${doc.docId}/comments`, {
         method: "PATCH",
         body: JSON.stringify({ commentIds, status: "ARCHIVED" }),
       });
@@ -252,7 +252,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       const { count } = await res.json();
       setComments((prev) =>
         prev.map((c) =>
-          commentIds.includes(c.id) ? { ...c, status: "ARCHIVED" } : c
+          commentIds.includes(c.commentId) ? { ...c, status: "ARCHIVED" } : c
         )
       );
       
@@ -260,19 +260,19 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       toArchive.forEach(c => {
         const updated = { ...c, status: "ARCHIVED" as const };
         if (wouldBeFilteredOut(updated)) {
-          setExitingIds((prev) => new Set(prev).add(updated.id));
+          setExitingIds((prev) => new Set(prev).add(updated.commentId));
         }
       });
-      
+
       setTimeout(() => {
         setExitingIds((prev) => {
           const next = new Set(prev);
-          toArchive.forEach(c => next.delete(c.id));
+          toArchive.forEach(c => next.delete(c.commentId));
           return next;
         });
       }, 200);
 
-      broadcastChange({ type: "comments", docId: doc.id });
+      broadcastChange({ type: "comments", docId: doc.docId });
       toast.success(`Archived ${count} comments`);
     } catch {
       toast.error("Failed to archive comments");
@@ -284,23 +284,23 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   function handleCommentUpdate(updated: Comment) {
     setSortActive(false);
     if (wouldBeFilteredOut(updated)) {
-      setExitingIds((prev) => new Set(prev).add(updated.id));
+      setExitingIds((prev) => new Set(prev).add(updated.commentId));
       setTimeout(() => {
         setExitingIds((prev) => {
-          if (!prev.has(updated.id)) return prev;
+          if (!prev.has(updated.commentId)) return prev;
           const next = new Set(prev);
-          next.delete(updated.id);
+          next.delete(updated.commentId);
           return next;
         });
       }, 200);
     }
-    setComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    setComments((prev) => prev.map((c) => (c.commentId === updated.commentId ? updated : c)));
   }
 
   const matcher = useMemo(() => createMatcher(searchFilter), [searchFilter]);
 
   const filteredComments = comments
-    .filter((c) => exitingIds.has(c.id) || !wouldBeFilteredOut(c))
+    .filter((c) => exitingIds.has(c.commentId) || !wouldBeFilteredOut(c))
     .filter((c) => {
       if (!searchFilter) return true;
       // commentContent and threadText both derive from threadMap so the initial
@@ -314,8 +314,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     })
     .sort((a, b) => {
       if (!sortActive) {
-        const aPos = frozenOrderRef.current.get(a.id) ?? Infinity;
-        const bPos = frozenOrderRef.current.get(b.id) ?? Infinity;
+        const aPos = frozenOrderRef.current.get(a.commentId) ?? Infinity;
+        const bPos = frozenOrderRef.current.get(b.commentId) ?? Infinity;
         return aPos - bPos;
       }
       let cmp = 0;
@@ -333,7 +333,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   // Snapshot display order while sort is active so we can freeze it later
   if (sortActive) {
-    frozenOrderRef.current = new Map(filteredComments.map((c, i) => [c.id, i]));
+    frozenOrderRef.current = new Map(filteredComments.map((c, i) => [c.commentId, i]));
   }
 
   function SortIcon({ col }: { col: SortCol }) {
@@ -554,16 +554,16 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
             <tbody className="bg-white">
               {filteredComments.map((comment) => (
                 <CommentRow
-                  key={comment.id}
+                  key={comment.commentId}
                   comment={comment}
-                  docId={doc.id}
+                  docId={doc.docId}
                   driveUrl={doc.driveUrl}
                   content={comment.type === "COMMENT" ? commentContent[comment.googleCommentId] : undefined}
                   suggestionContent={comment.type === "SUGGESTION" ? suggestionContent[comment.googleCommentId] : undefined}
                   initialThread={comment.type === "COMMENT" ? threadMap[comment.googleCommentId] : undefined}
                   onUpdate={handleCommentUpdate}
                   onThreadUpdate={handleThreadUpdate}
-                  isExiting={exitingIds.has(comment.id)}
+                  isExiting={exitingIds.has(comment.commentId)}
                   searchFilter={searchFilter}
                   documentText={documentText}
                   expandSignal={expandSignal}

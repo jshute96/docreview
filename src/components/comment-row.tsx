@@ -241,7 +241,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   async function updateStatus(status: "INBOX" | "ARCHIVED" | "MUTED") {
     setLoading(true);
     try {
-      const res = await fetch(`/api/docs/${docId}/comments/${comment.id}`, {
+      const res = await fetch(`/api/docs/${docId}/comments/${comment.commentId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),

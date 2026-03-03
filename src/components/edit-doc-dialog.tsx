@@ -55,7 +55,7 @@ export function EditDocDialog({
   async function handleSave() {
     setSaving(true);
     try {
-      const res = await fetch(`/api/docs/${doc.id}`, {
+      const res = await fetch(`/api/docs/${doc.docId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role, status, labelIds: selectedLabelIds, notes }),
@@ -64,7 +64,7 @@ export function EditDocDialog({
       const updated: DocWithLabels = await res.json();
       onSave(updated);
       setOpen(false);
-      broadcastChange({ type: "docs", docId: doc.id });
+      broadcastChange({ type: "docs", docId: doc.docId });
       toast.success("Saved");
     } catch {
       toast.error("Failed to save changes");

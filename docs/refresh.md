@@ -17,7 +17,7 @@ Gmail Refresh has its own handler (`POST /api/docs/gmail-refresh`). Per-doc refr
 
 ## Per-doc Refresh (detail page)
 
-The doc detail page has its own **Refresh** button that calls `POST /api/docs/[id]/refresh`.
+The doc detail page has its own **Refresh** button that calls `POST /api/docs/[docId]/refresh`.
 This fetches fresh file metadata from Drive (`files.get`), updates the doc record, then syncs
 comments — all for that one doc — and returns the updated doc + comments in a single response.
 No separate GET needed. Useful for quickly checking a single doc without waiting for a full
@@ -262,7 +262,7 @@ docs, so the user's current filter state is respected by the client-side filter 
 rather than being silently dropped). The fresh list is passed to `DocTable` via the
 `onRefresh` callback, which calls `setDocs(newDocs)` directly.
 
-**Per-doc refresh:** The `POST /api/docs/[id]/refresh` response includes the full updated doc
+**Per-doc refresh:** The `POST /api/docs/[docId]/refresh` response includes the full updated doc
 with its comments array. `DocDetail` calls `setDoc(updated)` and `setComments(updated.comments)`
 directly, so the title, owner, and modified date in the header also reflect the latest Drive
 data without a page reload.

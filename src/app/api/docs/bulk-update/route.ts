@@ -66,7 +66,7 @@ export async function PATCH(req: NextRequest) {
 
   // Batch read: fetch all docs at once instead of N+1
   const docs = await prisma.doc.findMany({
-    where: { id: { in: docIds as string[] }, userId },
+    where: { docId: { in: docIds as string[] }, userId },
     include: docWithCountsInclude,
   });
   const skipped = (docIds as string[]).length - docs.length;
@@ -114,10 +114,10 @@ export async function PATCH(req: NextRequest) {
       continue;
     }
 
-    updateOrder.push(doc.id);
+    updateOrder.push(doc.docId);
     updates.push(
       prisma.doc.update({
-        where: { id: doc.id },
+        where: { docId: doc.docId },
         data: {
           ...data,
           labels: {
@@ -145,7 +145,7 @@ export async function PATCH(req: NextRequest) {
 
   // Return all docs (updated ones from transaction, unchanged ones from initial read)
   const allDocs = docs.map((d) => {
-    const updated = updatedMap.get(d.id) as typeof d | undefined;
+    const updated = updatedMap.get(d.docId) as typeof d | undefined;
     return withCommentCounts(updated ?? d);
   });
 

@@ -88,11 +88,11 @@ export function FilterBar({
         <div className="flex flex-wrap items-center gap-1">
           {labels.map((label) => (
             <TriStateLabelButton
-              key={label.id}
+              key={label.labelId}
               label={label.name}
               color={label.color}
-              value={labelsFilter[label.id] ?? "off"}
-              onChange={(v) => onLabelChange(label.id, v)}
+              value={labelsFilter[label.labelId] ?? "off"}
+              onChange={(v) => onLabelChange(label.labelId, v)}
               title="Filter by label"
             />
           ))}

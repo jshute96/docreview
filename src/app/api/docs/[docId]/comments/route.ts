@@ -7,16 +7,16 @@ import { CommentStatus } from "@prisma/client";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ docId: string }> }
 ) {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  const { id } = await params;
+  const { docId } = await params;
 
-  const doc = await prisma.doc.findUnique({ where: { id } });
+  const doc = await prisma.doc.findUnique({ where: { docId } });
   if (!doc || doc.userId !== userId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -50,17 +50,17 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ docId: string }> }
 ) {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  const { id: docId } = await params;
+  const { docId } = await params;
 
   // Verify the doc belongs to this user
-  const doc = await prisma.doc.findUnique({ where: { id: docId } });
+  const doc = await prisma.doc.findUnique({ where: { docId } });
   if (!doc || doc.userId !== userId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -86,7 +86,7 @@ export async function PATCH(
   // Update only comments that belong to this document
   const result = await prisma.comment.updateMany({
     where: {
-      id: { in: commentIds },
+      commentId: { in: commentIds },
       docId,
     },
     data: { status },

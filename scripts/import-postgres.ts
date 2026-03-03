@@ -87,7 +87,7 @@ async function main() {
   for (const l of data.labels) {
     await prisma.label.create({
       data: {
-        id: l.id,
+        labelId: l.id,
         userId: l.userId,
         name: l.name,
         color: l.color,
@@ -101,7 +101,7 @@ async function main() {
   for (const d of data.docs) {
     await prisma.doc.create({
       data: {
-        id: d.id,
+        docId: d.id,
         userId: d.userId,
         googleDocId: d.googleDocId,
         title: d.title,
@@ -135,7 +135,7 @@ async function main() {
   for (const c of data.comments) {
     await prisma.comment.create({
       data: {
-        id: c.id,
+        commentId: c.id,
         docId: c.docId,
         googleCommentId: c.googleCommentId,
         type: c.type,

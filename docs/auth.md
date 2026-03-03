@@ -20,7 +20,7 @@ The identity table. One row per person, created on first sign-in. All app data b
 
 | Column           | Purpose                                    |
 |------------------|--------------------------------------------|
-| `id`             | Primary key (cuid)                         |
+| `user_id`        | Primary key (cuid)                         |
 | `name`           | Display name from Google profile           |
 | `email`          | Email from Google profile (unique)         |
 | `email_verified` | When email was verified (set by NextAuth)  |
@@ -34,7 +34,7 @@ Links a user to an OAuth provider. Stores the Google API credentials. One row pe
 
 | Column                | Purpose                                         |
 |-----------------------|-------------------------------------------------|
-| `id`                  | Primary key                                     |
+| `account_id`          | Primary key                                     |
 | `user_id`             | FK to `users`                                   |
 | `provider`            | `"google"`                                      |
 | `provider_account_id` | Google's unique ID for this user                |
@@ -52,7 +52,7 @@ Maps a browser cookie to a user. This is how NextAuth identifies who is making e
 
 | Column         | Purpose                                    |
 |----------------|--------------------------------------------|
-| `id`           | Primary key                                |
+| `session_id`   | Primary key                                |
 | `session_token`| Random string; stored as browser cookie    |
 | `user_id`      | FK to `users`                              |
 | `expires`      | When the session becomes invalid            |

@@ -41,7 +41,7 @@ const mockFetchSuggestions = vi.mocked(fetchSuggestions);
 // Minimal doc factory — only fields syncComments reads
 function makeDoc(overrides: Partial<Doc> = {}): Doc {
   return {
-    id: "d1",
+    docId: "d1",
     userId: "u1",
     googleDocId: "gdoc1",
     title: "Test Doc",
@@ -168,7 +168,7 @@ describe("syncComments isInteresting logic", () => {
   it("unarchives when existing comment has new replies and isInteresting", async () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockComment.findMany.mockResolvedValueOnce([{
-      id: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 1,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 1,
     }]);
     mockFetchComments.mockResolvedValue([
       driveComment({ replyCount: 3 }),
@@ -182,7 +182,7 @@ describe("syncComments isInteresting logic", () => {
   it("does NOT unarchive when existing comment has new replies but not interesting", async () => {
     const doc = makeDoc({ role: "REVIEWER" });
     mockComment.findMany.mockResolvedValueOnce([{
-      id: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 1,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 1,
     }]);
     mockFetchComments.mockResolvedValue([
       driveComment({ replyCount: 3, iParticipated: false }),
@@ -195,7 +195,7 @@ describe("syncComments isInteresting logic", () => {
   it("does NOT unarchive when replyCount has not increased", async () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockComment.findMany.mockResolvedValueOnce([{
-      id: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 3,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 3,
     }]);
     mockFetchComments.mockResolvedValue([
       driveComment({ replyCount: 3 }),
@@ -210,7 +210,7 @@ describe("syncComments isInteresting logic", () => {
   it("does NOT unarchive for MUTED existing comment even with new replies", async () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockComment.findMany.mockResolvedValueOnce([{
-      id: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED", replyCount: 1,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED", replyCount: 1,
     }]);
     mockFetchComments.mockResolvedValue([
       driveComment({ replyCount: 5 }),
@@ -253,7 +253,7 @@ describe("syncComments isInteresting logic", () => {
     ]);
     mockComment.findMany
       .mockResolvedValueOnce([])  // batch fetch comments
-      .mockResolvedValueOnce([{ id: "cr1", googleCommentId: "suggest.abc", suggestionType: "DELETE" }]);
+      .mockResolvedValueOnce([{ commentId: "cr1", googleCommentId: "suggest.abc", suggestionType: "DELETE" }]);
 
     const { shouldUnarchive, created } = await syncComments(doc, driveAuth);
     expect(created).toBe(0);
@@ -284,7 +284,7 @@ describe("syncComments comment status", () => {
 
   it("archives existing comment when I resolved it", async () => {
     mockComment.findMany.mockResolvedValueOnce([{
-      id: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 0,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 0,
     }]);
     mockFetchComments.mockResolvedValue([
       driveComment({ resolved: true, iResolvedIt: true }),
@@ -298,7 +298,7 @@ describe("syncComments comment status", () => {
 
   it("sets existing comment to INBOX when resolved by someone else", async () => {
     mockComment.findMany.mockResolvedValueOnce([{
-      id: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", replyCount: 0,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", replyCount: 0,
     }]);
     mockFetchComments.mockResolvedValue([
       driveComment({ resolved: true, iResolvedIt: false }),
@@ -312,7 +312,7 @@ describe("syncComments comment status", () => {
 
   it("preserves MUTED status — does not change it to INBOX or ARCHIVED", async () => {
     mockComment.findMany.mockResolvedValueOnce([{
-      id: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED", replyCount: 0,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED", replyCount: 0,
     }]);
     mockFetchComments.mockResolvedValue([
       driveComment({ resolved: true, iResolvedIt: true }),
@@ -328,7 +328,7 @@ describe("syncComments comment status", () => {
   it("preserves manual ARCHIVED status if no new activity", async () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
-      id: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", 
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", 
       resolved: false, replyCount: 0, driveModifiedAt: modDate,
     }]);
     mockFetchComments.mockResolvedValue([
@@ -347,7 +347,7 @@ describe("syncComments comment status", () => {
   it("wakes up ARCHIVED comment if new reply added", async () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
-      id: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", 
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", 
       resolved: false, replyCount: 0, driveModifiedAt: modDate,
     }]);
     mockFetchComments.mockResolvedValue([
@@ -374,9 +374,9 @@ describe("syncComments suggestion resolution", () => {
     mockFetchSuggestions.mockResolvedValue([]); // suggestion disappeared
     mockComment.findMany
       .mockResolvedValueOnce([])                                                            // batch fetch comments
-      .mockResolvedValueOnce([{ id: "cr1", googleCommentId: "suggest.abc", suggestionType: "EDIT" }]) // existingSuggestions
+      .mockResolvedValueOnce([{ commentId: "cr1", googleCommentId: "suggest.abc", suggestionType: "EDIT" }]) // existingSuggestions
       .mockResolvedValueOnce([{                                                             // activeSuggestions
-        id: "cr1", googleCommentId: "suggest.abc", resolved: false, status: "INBOX",
+        commentId: "cr1", googleCommentId: "suggest.abc", resolved: false, status: "INBOX",
       }]);
 
     await syncComments(doc, driveAuth);
@@ -392,9 +392,9 @@ describe("syncComments suggestion resolution", () => {
     mockFetchSuggestions.mockResolvedValue([]);
     mockComment.findMany
       .mockResolvedValueOnce([])                                                            // batch fetch comments
-      .mockResolvedValueOnce([{ id: "cr1", googleCommentId: "suggest.abc", suggestionType: "EDIT" }])
+      .mockResolvedValueOnce([{ commentId: "cr1", googleCommentId: "suggest.abc", suggestionType: "EDIT" }])
       .mockResolvedValueOnce([{
-        id: "cr1", googleCommentId: "suggest.abc", resolved: false, status: "MUTED",
+        commentId: "cr1", googleCommentId: "suggest.abc", resolved: false, status: "MUTED",
       }]);
 
     await syncComments(doc, driveAuth);
@@ -421,7 +421,7 @@ describe("syncComments suggestion resolution", () => {
       .mockResolvedValueOnce([])  // batch fetch comments
       .mockResolvedValueOnce([])  // existingSuggestions
       .mockResolvedValueOnce([{
-        id: "cr1", googleCommentId: "AAAB0xyz", resolved: false, status: "INBOX",
+        commentId: "cr1", googleCommentId: "AAAB0xyz", resolved: false, status: "INBOX",
       }]);
 
     await syncComments(doc, driveAuth);
@@ -438,8 +438,8 @@ describe("syncComments deleted comment cleanup", () => {
     const doc = makeDoc({ mimeType: "application/vnd.google-apps.spreadsheet" });
     // DB has two comments, but Drive only returns one of them
     mockComment.findMany.mockResolvedValueOnce([
-      { id: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 0 },
-      { id: "cr2", docId: "d1", googleCommentId: "c2", status: "ARCHIVED", replyCount: 3 },
+      { commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 0 },
+      { commentId: "cr2", docId: "d1", googleCommentId: "c2", status: "ARCHIVED", replyCount: 3 },
     ]);
     mockFetchComments.mockResolvedValue([driveComment({ id: "c1" })]);
     mockComment.deleteMany.mockResolvedValue({ count: 1 });
@@ -447,14 +447,14 @@ describe("syncComments deleted comment cleanup", () => {
     await syncComments(doc, driveAuth);
 
     expect(mockComment.deleteMany).toHaveBeenCalledWith({
-      where: { id: { in: ["cr2"] } },
+      where: { commentId: { in: ["cr2"] } },
     });
   });
 
   it("does not call deleteMany when all DB comments are still in Drive", async () => {
     const doc = makeDoc({ mimeType: "application/vnd.google-apps.spreadsheet" });
     mockComment.findMany.mockResolvedValueOnce([
-      { id: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 0 },
+      { commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 0 },
     ]);
     mockFetchComments.mockResolvedValue([driveComment({ id: "c1" })]);
 
@@ -466,7 +466,7 @@ describe("syncComments deleted comment cleanup", () => {
   it("deletes MUTED comments that were deleted from Drive", async () => {
     const doc = makeDoc({ mimeType: "application/vnd.google-apps.spreadsheet" });
     mockComment.findMany.mockResolvedValueOnce([
-      { id: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED", replyCount: 0 },
+      { commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED", replyCount: 0 },
     ]);
     mockFetchComments.mockResolvedValue([]); // Drive returns nothing
     mockComment.deleteMany.mockResolvedValue({ count: 1 });
@@ -474,7 +474,7 @@ describe("syncComments deleted comment cleanup", () => {
     await syncComments(doc, driveAuth);
 
     expect(mockComment.deleteMany).toHaveBeenCalledWith({
-      where: { id: { in: ["cr1"] } },
+      where: { commentId: { in: ["cr1"] } },
     });
   });
 });

@@ -1,11 +1,9 @@
 P0:
-* Bug: When I refresh a doc, the archived comments all come back.
 * Distinguish a comment state for "last comment is by me".
 
 P1:
 * how do I notice @mentions?
 * refine gmail flows
-* schema change, rename all "id" columns
 * ~~change to "Inbox" terminology~~ (done — ACTIVE→INBOX rename, UI labels updated)
   * ~~Change "Active" filter on main page to Inbox~~ (done)
   * ~~Add and Load controls can choose to add in inbox.~~ (done)

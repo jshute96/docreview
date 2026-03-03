@@ -63,8 +63,8 @@ export async function POST(req: NextRequest) {
   // Validate label ownership before proceeding
   if (loadLabelIds.length > 0) {
     const ownedLabels = await prisma.label.findMany({
-      where: { id: { in: loadLabelIds }, userId },
-      select: { id: true },
+      where: { labelId: { in: loadLabelIds }, userId },
+      select: { labelId: true },
     });
     if (ownedLabels.length !== loadLabelIds.length) {
       return NextResponse.json({ error: "Invalid label" }, { status: 400 });
@@ -198,14 +198,14 @@ export async function POST(req: NextRequest) {
         isDeleted: false,
         ...(loadStatus === "INBOX" ? { status: "INBOX" as const } : {}),
       },
-      select: { id: true, notes: true },
+      select: { docId: true, notes: true },
     });
 
     // For existing docs selected in load mode, add labels and append notes
     if (isExisting && mode === "load" && isSelected) {
       if (loadLabelIds.length > 0) {
         await prisma.docLabel.createMany({
-          data: loadLabelIds.map((labelId) => ({ docId: result.id, labelId })),
+          data: loadLabelIds.map((labelId) => ({ docId: result.docId, labelId })),
           skipDuplicates: true,
         });
       }
@@ -216,7 +216,7 @@ export async function POST(req: NextRequest) {
         }
         newNotes += loadNotes;
         await prisma.doc.update({
-          where: { id: result.id },
+          where: { docId: result.docId },
           data: { notes: newNotes },
         });
       }
@@ -240,10 +240,10 @@ export async function POST(req: NextRequest) {
         isDeleted: false,
         googleDocId: { in: [...deletedDocIds] },
       },
-      select: { id: true },
+      select: { docId: true },
     });
     for (const doc of docsToDelete) {
-      await prisma.doc.update({ where: { id: doc.id }, data: { isDeleted: true } });
+      await prisma.doc.update({ where: { docId: doc.docId }, data: { isDeleted: true } });
       deleted++;
     }
   }
@@ -259,7 +259,7 @@ export async function POST(req: NextRequest) {
         status: "INBOX",
         googleDocId: { notIn: [...driveDocIds] },
       },
-      select: { id: true, googleDocId: true },
+      select: { docId: true, googleDocId: true },
     });
 
     if (missingDocs.length > 0) {
@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
       const loadDeletedIds = await findDeletedDocIds(userId, missingDocs.map((d) => d.googleDocId));
       for (const doc of missingDocs) {
         if (loadDeletedIds.has(doc.googleDocId)) {
-          await prisma.doc.update({ where: { id: doc.id }, data: { isDeleted: true } });
+          await prisma.doc.update({ where: { docId: doc.docId }, data: { isDeleted: true } });
           deleted++;
         }
       }
@@ -296,12 +296,12 @@ export async function POST(req: NextRequest) {
   for (let i = 0; i < commentDocs.length; i++) {
     const res = syncResults[i];
     if (res.isDeleted) {
-      await prisma.doc.update({ where: { id: commentDocs[i].id }, data: { isDeleted: true } });
+      await prisma.doc.update({ where: { docId: commentDocs[i].docId }, data: { isDeleted: true } });
       deleted++;
       continue;
     }
     if (commentDocs[i].status === "ARCHIVED" && res.shouldUnarchive) {
-      await prisma.doc.update({ where: { id: commentDocs[i].id }, data: { status: "INBOX" } });
+      await prisma.doc.update({ where: { docId: commentDocs[i].docId }, data: { status: "INBOX" } });
       unarchived++;
     }
   }

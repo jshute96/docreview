@@ -19,7 +19,7 @@ interface AddDocPageClientProps {
 }
 
 interface LastAdded {
-  id: string;
+  docId: string;
   title: string;
   mimeType: string | null;
 }
@@ -33,7 +33,7 @@ export function AddDocPageClient({
   const [lastAdded, setLastAdded] = useState<LastAdded | null>(null);
 
   function handleLabelDelete(id: string) {
-    setLabels((prev) => prev.filter((l) => l.id !== id));
+    setLabels((prev) => prev.filter((l) => l.labelId !== id));
   }
 
   const refetchLabels = useCallback(async () => {
@@ -47,7 +47,7 @@ export function AddDocPageClient({
 
   const handleSuccess = useCallback((doc: DocWithLabels) => {
     contentRef.current?.reset();
-    setLastAdded({ id: doc.id, title: doc.title, mimeType: doc.mimeType });
+    setLastAdded({ docId: doc.docId, title: doc.title, mimeType: doc.mimeType });
     broadcastChange({ type: "docs" });
     toast.success(`Added "${doc.title}"`);
   }, []);
@@ -87,7 +87,7 @@ export function AddDocPageClient({
                     disabled={!isValid || adding}
                     onClick={async () => {
                       const doc = await handleAdd();
-                      if (doc) window.open(`/comments/${doc.id}`, "_blank");
+                      if (doc) window.open(`/comments/${doc.docId}`, "_blank");
                     }}
                     title="Add the document and open its comments page"
                   >
@@ -116,7 +116,7 @@ export function AddDocPageClient({
             <div className="mt-4 flex items-center gap-1.5 text-sm text-zinc-700">
               <span>Document added:</span>
               <a
-                href={`/comments/${lastAdded.id}`}
+                href={`/comments/${lastAdded.docId}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline"

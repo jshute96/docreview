@@ -11,7 +11,7 @@ export function useLabelSync(
 ) {
   useEffect(() => {
     setSelectedLabelIds((prev) =>
-      prev.filter((id) => allLabels.some((l) => l.id === id))
+      prev.filter((id) => allLabels.some((l) => l.labelId === id))
     );
   }, [allLabels, setSelectedLabelIds]);
 }

@@ -22,9 +22,9 @@ export async function PATCH(req: NextRequest) {
   // Validate all IDs belong to the current user
   const labels = await prisma.label.findMany({
     where: { userId },
-    select: { id: true },
+    select: { labelId: true },
   });
-  const ownedIds = new Set(labels.map((l) => l.id));
+  const ownedIds = new Set(labels.map((l) => l.labelId));
   if (order.length !== ownedIds.size || new Set(order).size !== order.length) {
     return NextResponse.json({ error: "order must include all labels exactly once" }, { status: 400 });
   }
@@ -36,8 +36,8 @@ export async function PATCH(req: NextRequest) {
 
   // Update each label's position to its index
   await prisma.$transaction(
-    order.map((id, index) =>
-      prisma.label.update({ where: { id }, data: { position: index } })
+    order.map((labelId, index) =>
+      prisma.label.update({ where: { labelId }, data: { position: index } })
     )
   );
 

@@ -4,16 +4,16 @@ import { prisma } from "@/lib/prisma";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ labelId: string }> }
 ) {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  const { id } = await params;
+  const { labelId } = await params;
 
-  const label = await prisma.label.findUnique({ where: { id } });
+  const label = await prisma.label.findUnique({ where: { labelId } });
   if (!label || label.userId !== userId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -25,7 +25,7 @@ export async function PATCH(
   const { color } = body as { color?: string };
 
   const updated = await prisma.label.update({
-    where: { id },
+    where: { labelId },
     data: { color: color ?? null },
   });
 
@@ -34,20 +34,20 @@ export async function PATCH(
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ labelId: string }> }
 ) {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  const { id } = await params;
+  const { labelId } = await params;
 
-  const label = await prisma.label.findUnique({ where: { id } });
+  const label = await prisma.label.findUnique({ where: { labelId } });
   if (!label || label.userId !== userId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await prisma.label.delete({ where: { id } });
+  await prisma.label.delete({ where: { labelId } });
   return new NextResponse(null, { status: 204 });
 }

@@ -10,16 +10,16 @@ import {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ docId: string }> }
 ) {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  const { id } = await params;
+  const { docId } = await params;
 
-  const doc = await prisma.doc.findUnique({ where: { id } });
+  const doc = await prisma.doc.findUnique({ where: { docId } });
   if (!doc || doc.userId !== userId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -36,7 +36,7 @@ export async function POST(
   }
 
   const commentRecord = await prisma.comment.findFirst({
-    where: { docId: id, googleCommentId: commentId },
+    where: { docId, googleCommentId: commentId },
   });
   if (!commentRecord) {
     return NextResponse.json({ error: "Comment not found" }, { status: 404 });
@@ -69,7 +69,7 @@ export async function POST(
         : "INBOX";
 
     const updated = await prisma.comment.update({
-      where: { id: commentRecord.id },
+      where: { commentId: commentRecord.commentId },
       data: {
         resolved: data.resolved,
         isThreadAuthor: data.isThreadAuthor,
@@ -85,7 +85,7 @@ export async function POST(
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
-    console.error(`[API] Failed to reply/resolve comment ${commentId} for doc ${id}:`, err);
+    console.error(`[API] Failed to reply/resolve comment ${commentId} for doc ${docId}:`, err);
     return NextResponse.json(
       { error: "Failed to reply/resolve comment" },
       { status: 502 }

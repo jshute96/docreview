@@ -39,8 +39,8 @@ describe("GET /api/labels", () => {
   it("returns labels ordered by position", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const labels = [
-      { id: "l1", name: "Bug", color: "#ff0000", position: 0, userId: "u1" },
-      { id: "l2", name: "Feature", color: "#00ff00", position: 1, userId: "u1" },
+      { labelId: "l1", name: "Bug", color: "#ff0000", position: 0, userId: "u1" },
+      { labelId: "l2", name: "Feature", color: "#00ff00", position: 1, userId: "u1" },
     ];
     mockLabel.findMany.mockResolvedValue(labels);
 
@@ -100,7 +100,7 @@ describe("POST /api/labels", () => {
 
   it("returns 201 on success", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    const label = { id: "l1", name: "Bug", color: null, position: 0, userId: "u1" };
+    const label = { labelId: "l1", name: "Bug", color: null, position: 0, userId: "u1" };
     mockLabel.create.mockResolvedValue(label);
 
     const res = await POST(makeReq({ name: "Bug" }));
@@ -111,7 +111,7 @@ describe("POST /api/labels", () => {
 
   it("trims the name", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    mockLabel.create.mockResolvedValue({ id: "l1", name: "Bug", color: null, position: 0, userId: "u1" });
+    mockLabel.create.mockResolvedValue({ labelId: "l1", name: "Bug", color: null, position: 0, userId: "u1" });
 
     await POST(makeReq({ name: "  Bug  " }));
     expect(mockLabel.create).toHaveBeenCalledWith({
@@ -121,7 +121,7 @@ describe("POST /api/labels", () => {
 
   it("passes color when provided", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    mockLabel.create.mockResolvedValue({ id: "l1", name: "Bug", color: "#ff0000", position: 0, userId: "u1" });
+    mockLabel.create.mockResolvedValue({ labelId: "l1", name: "Bug", color: "#ff0000", position: 0, userId: "u1" });
 
     await POST(makeReq({ name: "Bug", color: "#ff0000" }));
     expect(mockLabel.create).toHaveBeenCalledWith({

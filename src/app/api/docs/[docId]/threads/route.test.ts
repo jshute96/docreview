@@ -53,12 +53,12 @@ const mockFetchAllThreads = vi.mocked(fetchAllThreads);
 const mockCommentsGet = (google as unknown as { _commentsGet: ReturnType<typeof vi.fn> })
   ._commentsGet;
 
-function makeParams(id: string) {
-  return { params: Promise.resolve({ id }) };
+function makeParams(docId: string) {
+  return { params: Promise.resolve({ docId }) };
 }
 
 const docRecord = {
-  id: "d1",
+  docId: "d1",
   userId: "u1",
   googleDocId: "gdoc1",
   mimeType: "application/vnd.google-apps.document",
@@ -70,7 +70,7 @@ beforeEach(() => {
 
 // --------------- GET ---------------
 
-describe("GET /api/docs/[id]/threads", () => {
+describe("GET /api/docs/[docId]/threads", () => {
   it("returns 401 when not authenticated", async () => {
     mockAuth.mockResolvedValue(null);
     const req = new NextRequest("http://localhost/api/docs/d1/threads");
@@ -170,7 +170,7 @@ describe("GET /api/docs/[id]/threads", () => {
 
 // --------------- POST ---------------
 
-describe("POST /api/docs/[id]/threads", () => {
+describe("POST /api/docs/[docId]/threads", () => {
   it("returns 401 when not authenticated", async () => {
     mockAuth.mockResolvedValue(null);
     const req = new NextRequest("http://localhost/api/docs/d1/threads", { method: "POST" });
@@ -212,7 +212,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
-      id: "cr1", docId: "d1", googleCommentId: "c1",
+      commentId: "cr1", docId: "d1", googleCommentId: "c1",
       type: "COMMENT", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
@@ -242,7 +242,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
-      id: "cr1", docId: "d1", googleCommentId: "c1",
+      commentId: "cr1", docId: "d1", googleCommentId: "c1",
       type: "COMMENT", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
@@ -269,7 +269,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
-      id: "cr1", docId: "d1", googleCommentId: "c1",
+      commentId: "cr1", docId: "d1", googleCommentId: "c1",
       type: "COMMENT", status: "MUTED", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
@@ -297,7 +297,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
-      id: "cr1", docId: "d1", googleCommentId: "suggest.abc",
+      commentId: "cr1", docId: "d1", googleCommentId: "suggest.abc",
       type: "SUGGESTION", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
@@ -321,7 +321,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
-      id: "cr1", docId: "d1", googleCommentId: "suggest.abc",
+      commentId: "cr1", docId: "d1", googleCommentId: "suggest.abc",
       type: "SUGGESTION", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
@@ -344,7 +344,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
-      id: "cr1", docId: "d1", googleCommentId: "suggest.abc",
+      commentId: "cr1", docId: "d1", googleCommentId: "suggest.abc",
       type: "SUGGESTION", status: "MUTED", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
@@ -370,7 +370,7 @@ describe("POST /api/docs/[id]/threads", () => {
       mimeType: "application/vnd.google-apps.spreadsheet",
     });
     const commentRecord = {
-      id: "cr1", docId: "d1", googleCommentId: "suggest.abc",
+      commentId: "cr1", docId: "d1", googleCommentId: "suggest.abc",
       type: "SUGGESTION", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
@@ -391,7 +391,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
-      id: "cr1", docId: "d1", googleCommentId: "c1",
+      commentId: "cr1", docId: "d1", googleCommentId: "c1",
       type: "COMMENT", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
@@ -410,7 +410,7 @@ describe("POST /api/docs/[id]/threads", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
-      id: "cr1", docId: "d1", googleCommentId: "c1",
+      commentId: "cr1", docId: "d1", googleCommentId: "c1",
       type: "COMMENT", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);

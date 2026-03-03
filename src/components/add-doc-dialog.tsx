@@ -78,7 +78,7 @@ export function AddDocDialog({
                     disabled={!isValid || adding}
                     onClick={async () => {
                       const doc = await handleAdd();
-                      if (doc) window.open(`/comments/${doc.id}`, "_blank");
+                      if (doc) window.open(`/comments/${doc.docId}`, "_blank");
                     }}
                     title="Add the document and open its comments page"
                   >

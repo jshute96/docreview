@@ -130,7 +130,7 @@ export function ManageLabelsDialog({
     }
     const tempId = `__temp_${nextTempId.current++}`;
     const newLabel: Label = {
-      id: tempId,
+      labelId: tempId,
       userId: "",
       name: trimmed,
       color: randomPrimaryColor(),
@@ -143,15 +143,15 @@ export function ManageLabelsDialog({
 
   function handleColorChange(label: Label, color: string) {
     setDraft((prev) =>
-      prev.map((l) => (l.id === label.id ? { ...l, color } : l))
+      prev.map((l) => (l.labelId === label.labelId ? { ...l, color } : l))
     );
-    if (!addedIds.has(label.id)) {
-      setColorChanges((prev) => new Map(prev).set(label.id, color));
+    if (!addedIds.has(label.labelId)) {
+      setColorChanges((prev) => new Map(prev).set(label.labelId, color));
     }
   }
 
   function handleDelete(id: string) {
-    setDraft((prev) => prev.filter((l) => l.id !== id));
+    setDraft((prev) => prev.filter((l) => l.labelId !== id));
     if (addedIds.has(id)) {
       // Was never persisted — just remove from added set
       setAddedIds((prev) => {
@@ -187,7 +187,7 @@ export function ManageLabelsDialog({
       // 2. Create new labels
       const tempToReal = new Map<string, Label>();
       for (const tempId of addedIds) {
-        const tempLabel = draft.find((l) => l.id === tempId);
+        const tempLabel = draft.find((l) => l.labelId === tempId);
         if (!tempLabel) continue;
         const res = await fetch("/api/labels", {
           method: "POST",
@@ -213,10 +213,10 @@ export function ManageLabelsDialog({
       }
 
       // Build final labels list: start from draft, replace temp IDs with real ones
-      const finalLabels = draft.map((l) => tempToReal.get(l.id) ?? l);
+      const finalLabels = draft.map((l) => tempToReal.get(l.labelId) ?? l);
 
       // 4. Persist label order
-      const orderIds = finalLabels.map((l) => l.id);
+      const orderIds = finalLabels.map((l) => l.labelId);
       const reorderRes = await fetch("/api/labels/reorder", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -275,7 +275,7 @@ export function ManageLabelsDialog({
             )}
             {draft.map((label, index) => (
               <div
-                key={label.id}
+                key={label.labelId}
                 data-label-row
                 className={`flex items-center justify-between rounded-md px-2 py-1.5 select-none touch-none ${
                   dragActiveIndex === index
@@ -288,7 +288,7 @@ export function ManageLabelsDialog({
                   <button
                     type="button"
                     onPointerDown={(e) => e.stopPropagation()}
-                    onClick={() => handleDelete(label.id)}
+                    onClick={() => handleDelete(label.labelId)}
                     className={`text-zinc-500 ${dragging ? "" : "hover:text-red-500"}`}
                     aria-label={`Delete ${label.name}`}
                   >

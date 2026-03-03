@@ -80,14 +80,14 @@ export function BulkEditDialog({
       setRoleState("as-is");
       setStatusState("as-is");
       const initialLabelStates: Record<string, BulkEditState> = {};
-      allLabels.forEach(label => { initialLabelStates[label.id] = "as-is"; });
+      allLabels.forEach(label => { initialLabelStates[label.labelId] = "as-is"; });
       setLabelStates(initialLabelStates);
     }
     setOpen(isOpen);
   }, [initialDocs, allLabels]);
 
   function handleRemoveDoc(id: string) {
-    const next = selectedDocs.filter(d => d.id !== id);
+    const next = selectedDocs.filter(d => d.docId !== id);
     setSelectedDocs(next);
 
     // Revert role/label states to 'as-is' if they've become redundant (no-op)
@@ -106,9 +106,9 @@ export function BulkEditDialog({
     setLabelStates(current => {
       const updated = { ...current };
       allLabels.forEach(l => {
-        const label = checkConsistency(next, d => d.labels.some(dl => dl.labelId === l.id));
-        if ((updated[l.id] === "set" && label.all) || (updated[l.id] === "clear" && label.none)) {
-          updated[l.id] = "as-is";
+        const label = checkConsistency(next, d => d.labels.some(dl => dl.labelId === l.labelId));
+        if ((updated[l.labelId] === "set" && label.all) || (updated[l.labelId] === "clear" && label.none)) {
+          updated[l.labelId] = "as-is";
         }
       });
       return updated;
@@ -174,7 +174,7 @@ export function BulkEditDialog({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          docIds: selectedDocs.map(d => d.id),
+          docIds: selectedDocs.map(d => d.docId),
           role: roleState,
           status: statusState,
           labelUpdates: labelStates,
@@ -273,15 +273,15 @@ export function BulkEditDialog({
               <div className="flex flex-wrap gap-3 pt-1">
                 {allLabels.map((label) => {
                   const bg = label.color ?? "#e4e4e7";
-                  const state = labelStates[label.id] ?? "as-is";
-                  const { all: allHave, mixed: isMixed } = checkConsistency(selectedDocs, d => d.labels.some(dl => dl.labelId === label.id));
+                  const state = labelStates[label.labelId] ?? "as-is";
+                  const { all: allHave, mixed: isMixed } = checkConsistency(selectedDocs, d => d.labels.some(dl => dl.labelId === label.labelId));
                   const active = state === "set" || state === "clear" || (state === "as-is" && allHave);
 
                   return (
                     <button
-                      key={label.id}
+                      key={label.labelId}
                       type="button"
-                      onClick={(e) => cycleLabel(label.id, e)}
+                      onClick={(e) => cycleLabel(label.labelId, e)}
                       className={`relative rounded-full px-2 py-0.5 text-xs font-medium transition-opacity ${
                         active ? "opacity-100 ring-2 ring-offset-1 ring-zinc-400" : "opacity-40 hover:opacity-70"
                       }`}
@@ -322,9 +322,9 @@ export function BulkEditDialog({
                 ) : (
                   <div className="flex flex-col">
                     {selectedDocs.map((doc) => (
-                      <div key={doc.id} className="flex h-6 min-w-max items-center gap-2 px-2 transition-colors hover:bg-zinc-100">
+                      <div key={doc.docId} className="flex h-6 min-w-max items-center gap-2 px-2 transition-colors hover:bg-zinc-100">
                         <button
-                          onClick={() => handleRemoveDoc(doc.id)}
+                          onClick={() => handleRemoveDoc(doc.docId)}
                           className="rounded p-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-600"
                           title="Remove from list"
                           aria-label={`Remove ${doc.title}`}
@@ -332,7 +332,7 @@ export function BulkEditDialog({
                           <X className="h-3 w-3" />
                         </button>
                         <a 
-                          href={`/comments/${doc.id}`}
+                          href={`/comments/${doc.docId}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           title="Open document comments page"

@@ -78,7 +78,7 @@ describe("GET /api/docs", () => {
 
   it("returns docs excluding archived by default", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    const docs = [{ id: "d1", title: "Active Doc", comments: [] }];
+    const docs = [{ docId: "d1", title: "Active Doc", comments: [] }];
     mockDoc.findMany.mockResolvedValue(docs);
 
     const req = new NextRequest("http://localhost/api/docs");
@@ -229,7 +229,7 @@ describe("POST /api/docs", () => {
 
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
-      .mockResolvedValueOnce([{ id: "d1", googleDocId: "g1" }]) // missingDocs — one doc not in Drive
+      .mockResolvedValueOnce([{ docId: "d1", googleDocId: "g1" }]) // missingDocs — one doc not in Drive
       .mockResolvedValueOnce([]); // activeDocs for comment sync (scoped to Drive-returned docs)
     mockFindDeletedDocIds.mockResolvedValue(new Set(["g1"]));
     mockDoc.update.mockResolvedValue({});
@@ -239,7 +239,7 @@ describe("POST /api/docs", () => {
     const data = await res.json();
     expect(data.deleted).toBe(1);
     expect(mockDoc.update).toHaveBeenCalledWith({
-      where: { id: "d1" },
+      where: { docId: "d1" },
       data: { isDeleted: true },
     });
   });
@@ -262,8 +262,8 @@ describe("POST /api/docs", () => {
       },
     ]);
 
-    const dbDoc1 = { id: "d1", googleDocId: "g1" };
-    const dbDoc2 = { id: "d2", googleDocId: "g2" };
+    const dbDoc1 = { docId: "d1", googleDocId: "g1" };
+    const dbDoc2 = { docId: "d2", googleDocId: "g2" };
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }, { googleDocId: "g2" }]) // existingDocIds
       .mockResolvedValueOnce([dbDoc1, dbDoc2]); // activeDocs for comment sync (all non-deleted)
@@ -388,7 +388,7 @@ describe("POST /api/docs", () => {
       },
     ]);
 
-    const archivedDoc = { id: "d1", googleDocId: "g1", status: "ARCHIVED" };
+    const archivedDoc = { docId: "d1", googleDocId: "g1", status: "ARCHIVED" };
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([]) // missingDocs
@@ -401,7 +401,7 @@ describe("POST /api/docs", () => {
     const data = await res.json();
     expect(data.unarchived).toBe(1);
     expect(mockDoc.update).toHaveBeenCalledWith({
-      where: { id: "d1" },
+      where: { docId: "d1" },
       data: { status: "INBOX" },
     });
   });
@@ -423,7 +423,7 @@ describe("POST /api/docs", () => {
       },
     ]);
 
-    const archivedDoc = { id: "d1", googleDocId: "g1", status: "ARCHIVED" };
+    const archivedDoc = { docId: "d1", googleDocId: "g1", status: "ARCHIVED" };
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([]) // missingDocs
@@ -457,7 +457,7 @@ describe("POST /api/docs", () => {
       },
     ]);
 
-    const dbDoc = { id: "d1", googleDocId: "g1", status: "INBOX" };
+    const dbDoc = { docId: "d1", googleDocId: "g1", status: "INBOX" };
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([dbDoc]); // activeDocs for comment sync
@@ -487,7 +487,7 @@ describe("POST /api/docs", () => {
       },
     ]);
 
-    const dbDoc = { id: "d1", googleDocId: "g1", status: "INBOX" };
+    const dbDoc = { docId: "d1", googleDocId: "g1", status: "INBOX" };
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([dbDoc]); // activeDocs for comment sync
@@ -545,7 +545,7 @@ describe("POST /api/docs", () => {
   it("load mode returns 400 for invalid label IDs", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     // User owns label l1 but not l2
-    mockLabel.findMany.mockResolvedValue([{ id: "l1" }]);
+    mockLabel.findMany.mockResolvedValue([{ labelId: "l1" }]);
 
     const res = await POST(postRequestWithBody("load", {
       labelIds: ["l1", "l2"],
@@ -559,7 +559,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockLabel.findMany.mockResolvedValue([{ id: "l1" }]);
+    mockLabel.findMany.mockResolvedValue([{ labelId: "l1" }]);
     mockListRecentDocs.mockResolvedValue([
       {
         googleDocId: "g1",
@@ -648,7 +648,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
-    mockDoc.upsert.mockResolvedValue({ id: "d1", notes: null });
+    mockDoc.upsert.mockResolvedValue({ docId: "d1", notes: null });
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
 
     const res = await POST(postRequestWithBody("load", {
@@ -665,7 +665,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockLabel.findMany.mockResolvedValue([{ id: "l1" }]);
+    mockLabel.findMany.mockResolvedValue([{ labelId: "l1" }]);
     mockListRecentDocs.mockResolvedValue([
       {
         googleDocId: "g1",
@@ -684,7 +684,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
-    mockDoc.upsert.mockResolvedValue({ id: "d1", notes: null });
+    mockDoc.upsert.mockResolvedValue({ docId: "d1", notes: null });
     mockDocLabel.createMany.mockResolvedValue({ count: 1 });
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
 
@@ -721,7 +721,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([]) // missingDocs
       .mockResolvedValueOnce([]); // commentDocs
-    mockDoc.upsert.mockResolvedValue({ id: "d1", notes: "Existing note" });
+    mockDoc.upsert.mockResolvedValue({ docId: "d1", notes: "Existing note" });
     mockDoc.update.mockResolvedValue({});
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false });
 
@@ -731,7 +731,7 @@ describe("POST /api/docs", () => {
     }));
     expect(res.status).toBe(200);
     expect(mockDoc.update).toHaveBeenCalledWith({
-      where: { id: "d1" },
+      where: { docId: "d1" },
       data: { notes: "Existing note\nNew note" },
     });
   });
@@ -740,7 +740,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockLabel.findMany.mockResolvedValue([{ id: "l1" }]);
+    mockLabel.findMany.mockResolvedValue([{ labelId: "l1" }]);
     mockListRecentDocs.mockResolvedValue([
       {
         googleDocId: "g1",

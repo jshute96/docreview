@@ -30,7 +30,7 @@ export function DocRow({
     setArchiving(true);
     try {
       const newStatus = doc.status === "INBOX" ? "ARCHIVED" : "INBOX";
-      const res = await fetch(`/api/docs/${doc.id}`, {
+      const res = await fetch(`/api/docs/${doc.docId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
@@ -58,7 +58,7 @@ export function DocRow({
       <td className={`pl-4 pr-4 ${hasNotes ? "pt-1.5 pb-0.5" : "py-1.5"}`}>
         <div className="flex flex-wrap items-center gap-2">
           <a
-            href={`/comments/${doc.id}`}
+            href={`/comments/${doc.docId}`}
             target="_blank"
             rel="noopener noreferrer"
             title="Open document comments page"

@@ -5,22 +5,22 @@ import { CommentStatus } from "@prisma/client";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string; commentId: string }> }
+  { params }: { params: Promise<{ docId: string; commentId: string }> }
 ) {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  const { id, commentId } = await params;
+  const { docId, commentId } = await params;
 
   // Verify the comment belongs to a doc owned by this user
   const comment = await prisma.comment.findUnique({
-    where: { id: commentId },
+    where: { commentId },
     include: { doc: true },
   });
 
-  if (!comment || comment.doc.userId !== userId || comment.docId !== id) {
+  if (!comment || comment.doc.userId !== userId || comment.docId !== docId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -36,7 +36,7 @@ export async function PATCH(
   }
 
   const updated = await prisma.comment.update({
-    where: { id: commentId },
+    where: { commentId },
     data: { status },
   });
 

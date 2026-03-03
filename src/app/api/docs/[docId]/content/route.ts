@@ -8,16 +8,16 @@ const SLIDES_MIME_TYPE = "application/vnd.google-apps.presentation";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ docId: string }> }
 ) {
   const session = await getValidSession();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  const { id } = await params;
+  const { docId } = await params;
 
-  const doc = await prisma.doc.findUnique({ where: { id } });
+  const doc = await prisma.doc.findUnique({ where: { docId } });
   if (!doc || doc.userId !== userId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

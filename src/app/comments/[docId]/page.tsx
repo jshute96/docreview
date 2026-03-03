@@ -6,26 +6,26 @@ import { requireAuth } from "@/lib/auth-utils";
 import { docWithCommentsInclude } from "@/lib/doc-queries";
 import type { DocWithComments } from "@/types";
 
-type PageProps = { params: Promise<{ id: string }> };
+type PageProps = { params: Promise<{ docId: string }> };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { id } = await params;
+  const { docId } = await params;
   const session = await requireAuth();
   const doc = await prisma.doc.findUnique({
-    where: { id, userId: session.user.id },
+    where: { docId, userId: session.user.id },
     select: { title: true },
   });
   return { title: doc ? `${doc.title} - Docreview` : "Unknown doc - Docreview" };
 }
 
 export default async function DocDetailPage({ params }: PageProps) {
-  const { id } = await params;
+  const { docId } = await params;
   const session = await requireAuth();
   const userId = session.user.id;
 
   const [doc, allLabels] = await Promise.all([
     prisma.doc.findUnique({
-      where: { id },
+      where: { docId },
       include: docWithCommentsInclude,
     }),
     prisma.label.findMany({

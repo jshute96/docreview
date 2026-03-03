@@ -29,12 +29,12 @@ export async function GET(req: NextRequest) {
 
   const existing = await prisma.doc.findUnique({
     where: { userId_googleDocId: { userId, googleDocId: fileId } },
-    select: { id: true, title: true, mimeType: true },
+    select: { docId: true, title: true, mimeType: true },
   });
   if (existing) {
     return NextResponse.json({
       error: "already_exists",
-      id: existing.id,
+      docId: existing.docId,
       title: existing.title,
       mimeType: existing.mimeType,
     }, { status: 409 });
