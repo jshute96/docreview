@@ -131,7 +131,7 @@ owns the file, not something we infer.
 For each file Drive returns:
 
 - **New AUTHOR doc (not in DB, user owns it):** created with `role: "AUTHOR"` and
-  `createdTimeInDrive` / `owner`. Default status is `ACTIVE`. This happens in all modes
+  `createdTimeInDrive` / `owner`. Default status is `INBOX`. This happens in all modes
   (load, refresh, full-refresh) so authored docs are auto-tracked.
 - **New REVIEWER doc (not in DB, someone else owns it):** only added during **load** mode.
   Refresh and full-refresh skip these — reviewer docs must already be tracked in the DB or
@@ -139,7 +139,7 @@ For each file Drive returns:
 - **Existing doc:** `title`, `driveUrl`, `mimeType`, `lastModifiedInDrive`, `owner`,
   `createdTimeInDrive`, and `isDeleted` are updated. `role` and `labels` are
   never touched; they belong to the user. `status` is only updated during **load**
-  mode if the user specifies a status (via "Add as Active" or "Move to Active");
+  mode if the user specifies a status (via "Add to Inbox" or "Move to Inbox");
   otherwise it is preserved. Setting `isDeleted: false` on upsert means a doc
   that re-appears in Drive (e.g., shared again) is automatically restored.
 
@@ -163,7 +163,7 @@ and marks them `isDeleted: true`. No extra API calls needed.
 A doc absent from the 30-day `files.list` is not necessarily deleted — it may simply not have
 been modified recently. So we don't flag missing docs directly.
 
-**Step 1:** Query the DB for ACTIVE, non-deleted docs whose `googleDocId` did not appear in
+**Step 1:** Query the DB for INBOX, non-deleted docs whose `googleDocId` did not appear in
 the Drive results.
 
 **Step 2:** For each, call `files.get` with `fields: "trashed"`. All calls run in parallel
@@ -226,7 +226,7 @@ results are stored as `type: "COMMENT"`.
 whose `googleCommentId` was not returned by Drive are deleted. We don't store comment text
 in the database (it's fetched from Drive on page load), so orphaned records have nothing
 useful to show. This runs regardless of
-comment status (ACTIVE, ARCHIVED, MUTED). It is safe from transient errors because
+comment status (INBOX, ARCHIVED, MUTED). It is safe from transient errors because
 `fetchComments` either returns a complete paginated result or throws — and if it throws, we
 return early before reaching the deletion code.
 
@@ -237,7 +237,7 @@ Existing suggestions are only updated if `suggestionType` changed (which is rare
 skipped entirely otherwise — no write at all. Any previously-active suggestion no longer
 returned by the Docs API is marked resolved.
 
-For full details on comment status logic (ACTIVE / ARCHIVED / MUTED, who-resolved-it
+For full details on comment status logic (INBOX / ARCHIVED / MUTED, who-resolved-it
 detection, `isThreadAuthor` / `iParticipated`), see [`comment-tracking.md`](./comment-tracking.md).
 For the full picture on suggestions specifically, see [`suggestions.md`](./suggestions.md).
 
@@ -247,7 +247,7 @@ For the full picture on suggestions specifically, see [`suggestions.md`](./sugge
 
 After comment sync completes, each doc's sync result includes a `shouldUnarchive` flag
 indicating whether meaningful new activity was detected. ARCHIVED docs are moved back to
-ACTIVE only when this flag is true — not merely because they have unresolved comments.
+INBOX only when this flag is true — not merely because they have unresolved comments.
 
 See [Doc Unarchive Rules](./comment-tracking.md#doc-unarchive-rules) for the full logic
 (`isInteresting` check, MUTED handling, self-resolved exceptions).
@@ -329,7 +329,7 @@ Key state transitions are logged:
 | `Saving changes token for future refreshes` | Token update after successful sync |
 | `Load complete, initializing changes token` | Load mode establishing baseline for future Refresh |
 | `Transient errors during comment sync, skipping token update` | Token preserved due to partial failure |
-| `→ unarchive` suffix on comment sync line | Doc will be moved from ARCHIVED back to ACTIVE |
+| `→ unarchive` suffix on comment sync line | Doc will be moved from ARCHIVED back to INBOX |
 
 ---
 

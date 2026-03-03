@@ -6,11 +6,15 @@ P1:
 * how do I notice @mentions?
 * refine gmail flows
 * schema change, rename all "id" columns
-* change to "Inbox" terminology
-  * Change "Active" filter on main page to Inbox|All (or not muted?)
-  * Add and Load controls can choose to add in inbox.
+* ~~change to "Inbox" terminology~~ (done — ACTIVE→INBOX rename, UI labels updated)
+  * ~~Change "Active" filter on main page to Inbox~~ (done)
+  * ~~Add and Load controls can choose to add in inbox.~~ (done)
   * Also change "Open" to "Unresolved"?
 * refine flows for what comes into Inbox (for comments and docs)
+  * implement doc default-state rules from inbox-states.md (author/shared → INBOX, otherwise → ARCHIVED)
+  * auto-move doc to Inbox when a comment enters Inbox or has new replies
+  * move Muted → Inbox on @-mention (the one exception to Muted stickiness)
+  * new comment default should be ARCHIVED not INBOX when user is not involved
   * my docs
   * shared with me explicitly
   * reply to my comment
@@ -55,7 +59,7 @@ Easy:
 * Star a comment or doc?
 * "No comments on this doc" still shows if we try to load and fail.
 * Make refresh on a doc faster, and probably cheaper, by doing fewer API calls.
-* If someone else resolves my thread, that comment should stay active/watched?
+* If someone else resolves my thread, that comment should stay in inbox?
 * Mute state on docs
 * Track what comments I've seen, and show the new ones in a different color
 * keyboard shortcuts

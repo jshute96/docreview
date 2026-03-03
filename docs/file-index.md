@@ -28,7 +28,7 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/[id]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata then syncs comments |
 | `docs/[id]/comments/route.ts` | `GET` fetch all comment threads from Drive (fast path — Drive `comments.list` only) |
 | `docs/[id]/content/route.ts` | `GET` fetch document text and suggestion content (slow path — Docs API `documents.get` or Drive `files.export`); for Docs, uses a single `SUGGESTIONS_INLINE` call for both |
-| `docs/[id]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (ACTIVE/ARCHIVED/MUTED) |
+| `docs/[id]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (INBOX/ARCHIVED/MUTED) |
 | `docs/[id]/threads/route.ts` | `GET` fetch thread(s) from Drive; `POST` refresh a single thread (updates DB) |
 | `docs/[id]/threads/reply/route.ts` | `POST` reply to / resolve / reopen a comment thread via Drive API |
 | `labels/route.ts` | `GET` list labels; `POST` create label |
@@ -90,7 +90,7 @@ Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `
 | `auth-utils.ts` | Centralized authentication helpers for Server Components and API routes |
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates/deletes DB records, computes unarchive signals |
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
-| `doc-filters.ts` | Client-side doc filtering (tri-state logic for active/comments/author/mimeType/labels/title regex) and sorting |
+| `doc-filters.ts` | Client-side doc filtering (tri-state logic for inbox/comments/author/mimeType/labels/title regex) and sorting |
 | `doc-queries.ts` | Shared Prisma include constants (`labelInclude`, `docWithCountsInclude`, `docWithCommentsInclude`) + `withCommentCounts` transform |
 | `highlight.tsx` | `highlightText()` — regex/substring highlighter for plain text; `highlightHtml()` — same for HTML strings (highlights text outside tags, returns null if no match); `matchesFilter()` — centralized dual regex/substring search; `createMatcher()` — compiled reusable matcher |
 | `prisma.ts` | Singleton PrismaClient with dev-mode write-op logging |

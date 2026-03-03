@@ -42,7 +42,7 @@ Every Refresh calls `fetchSuggestions`, which calls `documents.get` with
 pending suggestion IDs (`suggest.xxx`). Each is upserted into the Comment table:
 
 - **Create** (new): `type: "SUGGESTION"`, `suggestionType` set, `resolved: false`,
-  `status: "ACTIVE"`. No timestamps — Docs API doesn't provide them.
+  `status: "INBOX"`. No timestamps — Docs API doesn't provide them.
 - **Update** (existing): only `suggestionType` is updated (preserves user-set status).
 
 After upserting, any `suggest.xxx` records **no longer in the Docs API response** are

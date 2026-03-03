@@ -6,7 +6,7 @@ Docreview syncs comment threads from Google Drive on every refresh. The goal is 
 comments that need your attention — threads where someone replied to you, re-opened a
 discussion, or where a conversation is still active.
 
-**Active comment count** is shown per doc in the main table. A comment is "Active" if it's a
+**Inbox comment count** is shown per doc in the main table. A comment is in "Inbox" if it's a
 thread you care about that hasn't been resolved (or that was resolved by someone else, meaning
 it may need follow-up). A blank cell means no threads currently demand attention.
 
@@ -26,7 +26,7 @@ filter and sort controls.
 | `driveCreatedAt` | Drive | When the comment was originally created |
 | `driveModifiedAt` | Drive | When the comment (or any reply) was last modified |
 | `replyCount` | Drive | Number of replies to the comment (not counting the original) |
-| `status` | User | `ACTIVE`, `ARCHIVED`, or `MUTED` — see below |
+| `status` | User | `INBOX`, `ARCHIVED`, or `MUTED` — see below |
 
 ---
 
@@ -34,9 +34,9 @@ filter and sort controls.
 
 | Status     | Meaning |
 |------------|---------|
-| `ACTIVE`   | Needs attention — unresolved or updated by someone else |
+| `INBOX`    | Needs attention — unresolved or updated by someone else |
 | `ARCHIVED` | Resolved; you resolved it yourself, or it was already resolved on first sync |
-| `MUTED`    | Permanently hidden from the Active count; user-set, never changed by sync |
+| `MUTED`    | Permanently hidden from the Inbox count; user-set, never changed by sync |
 
 ---
 
@@ -44,7 +44,7 @@ filter and sort controls.
 
 When a comment thread is seen for the first time:
 
-- **Unresolved** (`resolved = false`) → `ACTIVE`
+- **Unresolved** (`resolved = false`) → `INBOX`
 - **Already resolved** (`resolved = true`) → `ARCHIVED`
 
 Already-resolved threads don't need action, so they start archived.
@@ -58,7 +58,7 @@ don't store comment text in the database (it's fetched from Drive on page load),
 nothing useful left to show — the "Open" link would point at nothing, expanding would 404,
 and only bare metadata (dates, reply count) would remain. So during sync, any COMMENT records
 in the DB whose `googleCommentId` was not returned by Drive are deleted outright, regardless
-of status (ACTIVE, ARCHIVED, or MUTED).
+of status (INBOX, ARCHIVED, or MUTED).
 
 This only runs when `fetchComments` succeeds — if the API call throws, we return early before
 reaching the deletion code, so a transient error can never wipe out all comments.
@@ -83,20 +83,20 @@ of new Drive activity. Drive-side fields (`resolved`, `iParticipated`, `driveCre
 `driveModifiedAt`, `replyCount`) are still updated when they differ, so the detail page
 reflects current state.
 
-**For all other statuses**, apply this logic:
+**For all other statuses (INBOX, ARCHIVED)**, apply this logic:
 
 1. Compare `resolved`, `iParticipated`, `status`, `driveCreatedAt`, `driveModifiedAt`, and
    `replyCount` against the existing record. Skip the update if all match.
 2. If `resolved = true` AND I was the one who resolved it (the last reply with
    `action = "resolve"` has `author.me = true`) → set status to `ARCHIVED`.
 3. Otherwise, if there is **new activity** (new reply added, thread re-opened, or any
-   other modification detected via `driveModifiedAt`) → set status to `ACTIVE`.
+   other modification detected via `driveModifiedAt`) → set status to `INBOX`.
 4. Otherwise (no new activity), preserve the existing `status`. This ensures that if
    you manually archive an unresolved thread, it stays archived until someone replies
    to it or re-opens it.
 
 The effect: threads you close yourself get archived quietly. Manual archiving is preserved
-until new activity occurs. Anything else surfaces as Active.
+until new activity occurs. Anything else surfaces in Inbox.
 
 ---
 
@@ -104,7 +104,7 @@ until new activity occurs. Anything else surfaces as Active.
 
 `MUTED` is a user-set status, not set by sync logic. Once muted:
 
-- The comment never appears in the Active count.
+- The comment never appears in the Inbox count.
 - Sync never changes its status, even if Drive reports new activity.
 - The user must explicitly un-mute to restore tracking.
 
@@ -119,7 +119,7 @@ When a doc has been archived by the user, it should only resurface if there's **
 activity** during the current sync — not just because an old unresolved comment exists.
 
 During `syncComments`, a `shouldUnarchive` flag is tracked. An ARCHIVED doc moves back to
-ACTIVE only when this flag is set. Activity is evaluated using an `isInteresting` check:
+INBOX only when this flag is set. Activity is evaluated using an `isInteresting` check:
 
 ```ts
 const isInteresting = !(c.resolved && c.iResolvedIt) && (
@@ -152,7 +152,7 @@ with a simpler model: "does this activity concern me?"
 The doc detail page provides three ways to narrow the comment table:
 
 **Show mode** (mutually exclusive):
-- **Active** — only comments with `status = ACTIVE` (default)
+- **Inbox** — only comments with `status = INBOX` (default)
 - **Open** — all unresolved comments regardless of status
 - **All** — every comment, including archived and muted
 

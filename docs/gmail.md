@@ -76,7 +76,7 @@ The **Refresh from Gmail** button in the toolbar (`RefreshButton` with
    checked via `findDeletedDocIds` (reuses existing 404/403 logic)
 8. Sync comments for upserted docs via `syncComments`
 9. Unarchive: if a doc is ARCHIVED and `syncResult.shouldUnarchive` is true, set
-   it back to ACTIVE (MUTED comments stay muted — existing `syncComments` behavior)
+   it back to INBOX (MUTED comments stay muted — existing `syncComments` behavior)
 10. Handle `isDeleted` from syncComments results
 11. Update `lastGmailUpdateTimestamp` to now
 12. Return `{ added, updated, deleted, unarchived, errorCount, comments }`

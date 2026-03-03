@@ -83,10 +83,10 @@ Doc titles are clickable links that open in Google Drive.
 If any docs were removed, a "N documents selected" line appears below the list.
 
 The user can optionally assign labels, notes, and document status:
-- **New docs:** labels and notes are set on creation. If **Add as Active** is checked (default),
-  status is set to `ACTIVE`; otherwise `ARCHIVED`.
+- **New docs:** labels and notes are set on creation. If **Add to Inbox** is checked (default),
+  status is set to `INBOX`; otherwise `ARCHIVED`.
 - **Existing docs:** labels are added (duplicates skipped), notes are appended with a
-  newline separator. If **Move to Active** is checked, status is updated to `ACTIVE`;
+  newline separator. If **Move to Inbox** is checked, status is updated to `INBOX`;
   otherwise it is set to `ARCHIVED`.
 
 Clicking **Add** calls `POST /api/docs?mode=load` with the visible (non-removed) doc
