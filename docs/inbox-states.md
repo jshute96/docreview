@@ -52,11 +52,6 @@ I am not longer interested in acting like the author.
 
 The following rules from this spec are not yet implemented:
 
-- **@mention detection** (rule 2): Detecting @mentions in comment/reply text requires parsing
-  HTML content from the Drive API. There is no dedicated `mentions` field — the HTML contains
-  `<a>` tags with mailto links for mentions. This is deferred until the HTML parsing
-  infrastructure is in place. Currently, @mentions are treated the same as any other reply.
-
 - **Document-level MUTED state**: No rules are defined yet for how document MUTED state
   should interact with comment state changes. Currently only comment-level MUTED is
   implemented.

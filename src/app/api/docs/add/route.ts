@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
+  const userEmail = session.user.email ?? undefined;
 
   let body;
   try { body = await req.json(); } catch {
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  await syncComments(doc, driveAuth);
+  await syncComments(doc, driveAuth, userEmail);
 
   const result = await prisma.doc.findUnique({
     where: { docId: doc.docId },

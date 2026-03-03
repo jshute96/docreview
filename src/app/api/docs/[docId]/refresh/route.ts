@@ -15,6 +15,7 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
+  const userEmail = session.user.email ?? undefined;
   const { docId } = await params;
 
   const doc = await prisma.doc.findUnique({ where: { docId } });
@@ -72,7 +73,7 @@ export async function POST(
 
   // If we already confirmed it's deleted, skip comment sync
   if (!freshDoc.isDeleted) {
-    const syncResult = await syncComments(freshDoc, driveAuth);
+    const syncResult = await syncComments(freshDoc, driveAuth, userEmail);
     if (syncResult.isDeleted && !freshDoc.isDeleted) {
       await prisma.doc.update({
         where: { docId },

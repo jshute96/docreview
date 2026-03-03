@@ -16,11 +16,12 @@ function datesEqual(a: Date | null | undefined, b: Date | null | undefined): boo
 // and whether there was non-resolve activity (used to suppress unarchive for resolve-only changes).
 export async function syncComments(
   doc: Doc,
-  driveAuth: Awaited<ReturnType<typeof getDriveClient>>
+  driveAuth: Awaited<ReturnType<typeof getDriveClient>>,
+  userEmail?: string
 ): Promise<{ created: number; shouldUnarchive: boolean; hasNonResolveActivity: boolean; isDeleted?: boolean; transientError?: boolean }> {
   let comments;
   try {
-    comments = await fetchComments(driveAuth, doc.googleDocId);
+    comments = await fetchComments(driveAuth, doc.googleDocId, undefined, userEmail);
   } catch (err: unknown) {
     const code = (err as { code?: number })?.code;
     if (code === 404 || code === 403) {
@@ -59,13 +60,18 @@ export async function syncComments(
     const existing = existingComments.get(c.id) ?? null;
 
     if (!existing) {
-      // New comment initial status (spec rules 4/5/6):
-      // Only INBOX if relevant to me — I'm the doc author or I participated in the thread.
-      const status: "INBOX" | "ARCHIVED" = c.resolved
-        ? "ARCHIVED"
-        : (doc.role === "AUTHOR" || c.iParticipated)
-          ? "INBOX"
-          : "ARCHIVED";
+      // New comment initial status (spec rules 1-6, first match wins):
+      // Rule 2: @-mention of me → INBOX (even if resolved, overrides everything)
+      // Rule 4: I'm the doc author → INBOX (if not resolved)
+      // Rule 5/6: I participated → INBOX (if not resolved)
+      const mentionedInThread = c.mentionedMe || c.replyMentionedMeFlags.some(Boolean);
+      const status: "INBOX" | "ARCHIVED" = mentionedInThread
+        ? "INBOX"
+        : c.resolved
+          ? "ARCHIVED"
+          : (doc.role === "AUTHOR" || c.iParticipated)
+            ? "INBOX"
+            : "ARCHIVED";
 
       toCreate.push({
         docId: doc.docId,
@@ -82,10 +88,22 @@ export async function syncComments(
 
       // Doc-level unarchive: new comment with INBOX status triggers unarchive
       if (status === "INBOX") shouldUnarchive = true;
-      // Track non-resolve activity for new unresolved comments
-      if (!c.resolved) hasNonResolveActivity = true;
+      // Track non-resolve activity: unresolved comments or @-mentions (even on resolved)
+      if (!c.resolved || mentionedInThread) hasNonResolveActivity = true;
     } else {
-      if (existing.status === "MUTED") {
+      const hasNewReplies = c.replyCount > existing.replyCount;
+      const hasNewActivity =
+        hasNewReplies ||
+        (!existing.resolved && c.resolved) ||
+        (existing.resolved && !c.resolved) ||
+        !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
+
+      // Rule 2: @-mention in new replies breaks out of MUTED (spec: "only case
+      // when a comment moves out of Muted state").
+      const newReplyMentionsMe = hasNewReplies &&
+        c.replyMentionedMeFlags.slice(existing.replyCount).some(Boolean);
+
+      if (existing.status === "MUTED" && !newReplyMentionsMe) {
         const changed =
           existing.resolved !== c.resolved ||
           existing.iParticipated !== c.iParticipated ||
@@ -108,13 +126,7 @@ export async function syncComments(
         continue;
       }
 
-      const previousStatus = existing.status as "INBOX" | "ARCHIVED";
-      const hasNewReplies = c.replyCount > existing.replyCount;
-      const hasNewActivity =
-        hasNewReplies ||
-        (!existing.resolved && c.resolved) ||
-        (existing.resolved && !c.resolved) ||
-        !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
+      const previousStatus = existing.status as "INBOX" | "ARCHIVED" | "MUTED";
 
       // Track non-resolve activity for existing comments
       if (hasNewActivity) {
@@ -131,10 +143,14 @@ export async function syncComments(
         }
       }
 
-      // Determine the target status using spec rules
-      let status = previousStatus;
+      // Determine the target status using spec rules (first matching rule wins)
+      let status: "INBOX" | "ARCHIVED" | "MUTED" = previousStatus;
 
-      if (c.resolved && c.iResolvedIt) {
+      if (newReplyMentionsMe) {
+        // Rule 2: @-mention in new reply → INBOX (overrides MUTED and all other rules)
+        status = "INBOX";
+        hasNonResolveActivity = true;
+      } else if (c.resolved && c.iResolvedIt) {
         // Rule 1: I resolved it → ARCHIVED
         status = "ARCHIVED";
       } else if (hasNewActivity) {

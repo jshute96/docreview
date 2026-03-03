@@ -125,10 +125,12 @@ export interface DriveComment {
   isThreadAuthor: boolean;
   iParticipated: boolean;
   iResolvedIt: boolean;
+  mentionedMe: boolean;
   driveCreatedAt: Date | null;
   driveModifiedAt: Date | null;
   replyCount: number;
   replyAuthorMeFlags: boolean[];
+  replyMentionedMeFlags: boolean[];
 }
 
 // Derives ownership/participation flags from a Drive comment's author and replies.
@@ -150,11 +152,13 @@ export function deriveCommentFlags(
 export async function fetchComments(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string,
-  since?: Date
+  since?: Date,
+  userEmail?: string
 ): Promise<DriveComment[]> {
   const drive = google.drive({ version: "v3", auth });
   const sinceStr = since ? since.toISOString() : undefined;
   const t0 = Date.now();
+  const emailLower = userEmail?.toLowerCase();
 
   const comments: DriveComment[] = [];
   let pageToken: string | undefined;
@@ -163,7 +167,7 @@ export async function fetchComments(
     const res = await drive.comments.list({
       fileId: googleDocId,
       fields:
-        "nextPageToken, comments(id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me)))",
+        "nextPageToken, comments(id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me), mentionedEmailAddresses), mentionedEmailAddresses)",
       ...(sinceStr ? { startModifiedTime: sinceStr } : {}),
       ...(pageToken ? { pageToken } : {}),
     });
@@ -174,14 +178,27 @@ export async function fetchComments(
       const replies = c.replies ?? [];
       const flags = deriveCommentFlags(c.author, replies);
 
+      const mentionedMe = emailLower
+        ? (c.mentionedEmailAddresses ?? []).some((e) => e.toLowerCase() === emailLower)
+        : false;
+      const replyMentionedMeFlags = replies.map((r) =>
+        emailLower
+          ? ((r as { mentionedEmailAddresses?: string[] }).mentionedEmailAddresses ?? []).some(
+              (e) => e.toLowerCase() === emailLower
+            )
+          : false
+      );
+
       comments.push({
         id: c.id,
         resolved: c.resolved === true,
         ...flags,
+        mentionedMe,
         driveCreatedAt: c.createdTime ? new Date(c.createdTime) : null,
         driveModifiedAt: c.modifiedTime ? new Date(c.modifiedTime) : null,
         replyCount: replies.length,
         replyAuthorMeFlags: replies.map((r) => r.author?.me === true),
+        replyMentionedMeFlags,
       });
     }
 

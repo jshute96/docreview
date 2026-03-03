@@ -2,28 +2,10 @@ P0:
 * Distinguish a comment state for "last comment is by me".
 
 P1:
-* how do I notice @mentions?
 * refine gmail flows
-* ~~change to "Inbox" terminology~~ (done — ACTIVE→INBOX rename, UI labels updated)
-  * ~~Change "Active" filter on main page to Inbox~~ (done)
-  * ~~Add and Load controls can choose to add in inbox.~~ (done)
-  * Also change "Open" to "Unresolved"?
-* refine flows for what comes into Inbox (for comments and docs)
-  * implement doc default-state rules from inbox-states.md (author/shared → INBOX, otherwise → ARCHIVED)
-  * auto-move doc to Inbox when a comment enters Inbox or has new replies
-  * move Muted → Inbox on @-mention (the one exception to Muted stickiness)
-  * new comment default should be ARCHIVED not INBOX when user is not involved
-  * my docs
-  * shared with me explicitly
-  * reply to my comment
-  * I commented?
-  * @mention me
-  * doc: add to inbox if a comment goes to inbox
-  * check and refine rules for detecting hasNewActivity on comment threads - reply count, change timestamp, etc.
-* State/tag for @mentioned on comment, with mine/replied and resolved
+* Remember state/tag for @mentioned on comment, with mine/replied and resolved
 * Status column in comments view: Mine, Replied, Open, Inbox, Muted
-* Load - when I click Add, it rescans and re-resolves all the docs, not just
-  the selected ones.
+* Bug: Load - when I click Add, it rescans and re-resolves all the docs, not just the selected ones.
 * Main app title in the top level.
 * More decoration - favicon.
 * Hamburger menus for some of the buttons for extra actions.
@@ -118,6 +100,7 @@ Easy:
   * if there are a lot of comments, it might make sense to split that up
   * maybe just fetch the initial comments first
 * add a screen for labeling new docs that appeared during a refresh?
+* check and refine rules for detecting hasNewActivity on comment threads - reply count, change timestamp, etc.
 
 ## low priority
 * rename a label

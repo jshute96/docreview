@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
+  const userEmail = session.user.email ?? undefined;
 
   const { searchParams } = new URL(req.url);
   const modeParam = searchParams.get("mode");
@@ -287,7 +288,7 @@ export async function POST(req: NextRequest) {
       });
   console.log(`[Sync] Syncing comments for ${commentDocs.length} docs (${mode === "full-refresh" ? "all docs" : "changed docs only"})`);
   const syncResults = await Promise.all(
-    commentDocs.map((doc) => syncComments(doc, driveAuth))
+    commentDocs.map((doc) => syncComments(doc, driveAuth, userEmail))
   );
   const comments = syncResults.reduce((sum, r) => sum + r.created, 0);
 

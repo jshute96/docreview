@@ -80,10 +80,12 @@ function driveComment(overrides: Record<string, unknown> = {}) {
     isThreadAuthor: false,
     iParticipated: false,
     iResolvedIt: false,
+    mentionedMe: false,
     driveCreatedAt: new Date("2024-06-01"),
     driveModifiedAt: new Date("2024-06-10"),
     replyCount: 0,
     replyAuthorMeFlags: [] as boolean[],
+    replyMentionedMeFlags: [] as boolean[],
     ...overrides,
   };
 }
@@ -482,6 +484,139 @@ describe("syncComments self-reply detection", () => {
 
     const updateCall = mockComment.update.mock.calls[0][0];
     expect(updateCall.data.status).toBe("INBOX");
+  });
+});
+
+// --------------- @-mention detection (rule 2) ---------------
+
+describe("syncComments @-mention detection", () => {
+  it("new comment mentioning me → INBOX even on REVIEWER doc with no participation", async () => {
+    mockFetchComments.mockResolvedValue([
+      driveComment({ mentionedMe: true, iParticipated: false }),
+    ]);
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const createCall = mockComment.createMany.mock.calls[0][0];
+    expect(createCall.data[0].status).toBe("INBOX");
+  });
+
+  it("new resolved comment mentioning me → INBOX (mention overrides resolved)", async () => {
+    mockFetchComments.mockResolvedValue([
+      driveComment({ mentionedMe: true, resolved: true }),
+    ]);
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const createCall = mockComment.createMany.mock.calls[0][0];
+    expect(createCall.data[0].status).toBe("INBOX");
+  });
+
+  it("new comment with mention in reply → INBOX", async () => {
+    mockFetchComments.mockResolvedValue([
+      driveComment({ replyCount: 1, replyMentionedMeFlags: [true], replyAuthorMeFlags: [false] }),
+    ]);
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const createCall = mockComment.createMany.mock.calls[0][0];
+    expect(createCall.data[0].status).toBe("INBOX");
+  });
+
+  it("existing MUTED comment → INBOX when new reply mentions me", async () => {
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED",
+      resolved: false, replyCount: 1, driveModifiedAt: modDate,
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        replyCount: 2,
+        replyAuthorMeFlags: [false, false],
+        replyMentionedMeFlags: [false, true],
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
+      }),
+    ]);
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const updateCall = mockComment.update.mock.calls[0][0];
+    expect(updateCall.data.status).toBe("INBOX");
+  });
+
+  it("existing MUTED comment stays MUTED when no new reply mentions me", async () => {
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED",
+      resolved: false, replyCount: 1, driveModifiedAt: modDate,
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        replyCount: 2,
+        replyAuthorMeFlags: [false, false],
+        replyMentionedMeFlags: [false, false],
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
+      }),
+    ]);
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const updateCall = mockComment.update.mock.calls[0][0];
+    // MUTED path doesn't set status
+    expect(updateCall.data.status).toBeUndefined();
+  });
+
+  it("@-mention in new reply unarchives the document", async () => {
+    const doc = makeDoc({ role: "REVIEWER", status: "ARCHIVED" });
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
+      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        replyCount: 1,
+        replyAuthorMeFlags: [false],
+        replyMentionedMeFlags: [true],
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
+      }),
+    ]);
+
+    const { shouldUnarchive, hasNonResolveActivity } = await syncComments(doc, driveAuth);
+    expect(shouldUnarchive).toBe(true);
+    expect(hasNonResolveActivity).toBe(true);
+  });
+
+  it("new resolved comment with @-mention triggers hasNonResolveActivity", async () => {
+    const doc = makeDoc({ role: "REVIEWER", status: "ARCHIVED" });
+    mockFetchComments.mockResolvedValue([
+      driveComment({ mentionedMe: true, resolved: true }),
+    ]);
+
+    const { shouldUnarchive, hasNonResolveActivity } = await syncComments(doc, driveAuth);
+    expect(shouldUnarchive).toBe(true);
+    expect(hasNonResolveActivity).toBe(true);
+  });
+
+  it("@-mention breaking MUTED triggers shouldUnarchive", async () => {
+    const doc = makeDoc({ role: "REVIEWER", status: "ARCHIVED" });
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED",
+      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        replyCount: 1,
+        replyAuthorMeFlags: [false],
+        replyMentionedMeFlags: [true],
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
+      }),
+    ]);
+
+    const { shouldUnarchive, hasNonResolveActivity } = await syncComments(doc, driveAuth);
+    expect(shouldUnarchive).toBe(true);
+    expect(hasNonResolveActivity).toBe(true);
   });
 });
 

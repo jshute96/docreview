@@ -14,6 +14,7 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
+  const userEmail = session.user.email ?? undefined;
 
   console.log("[GmailRefresh] Starting incremental Gmail refresh");
   const t0 = Date.now();
@@ -110,7 +111,7 @@ export async function POST() {
     });
     console.log(`[GmailRefresh] Syncing comments for ${upsertedDocs.length} docs`);
     const syncResults = await Promise.all(
-      upsertedDocs.map((doc) => syncComments(doc, driveAuth))
+      upsertedDocs.map((doc) => syncComments(doc, driveAuth, userEmail))
     );
     const comments = syncResults.reduce((sum, r) => sum + r.created, 0);
 

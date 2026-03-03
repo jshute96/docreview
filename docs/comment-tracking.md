@@ -36,14 +36,15 @@ filter and sort controls.
 |------------|---------|
 | `INBOX`    | Needs attention — unresolved or updated by someone else |
 | `ARCHIVED` | Resolved; you resolved it yourself, or it was already resolved on first sync |
-| `MUTED`    | Permanently hidden from the Inbox count; user-set, never changed by sync |
+| `MUTED`    | Hidden from the Inbox count; user-set, only overridden by sync when @-mentioned |
 
 ---
 
 ## Status on First Sync (New Comment)
 
-When a comment thread is seen for the first time:
+When a comment thread is seen for the first time (first matching rule wins):
 
+- **@-mention of me** anywhere in the thread → `INBOX` (even if resolved)
 - **Already resolved** (`resolved = true`) → `ARCHIVED`
 - **Unresolved** and I'm the doc author (`doc.role === "AUTHOR"`) → `INBOX`
 - **Unresolved** and I participated (`iParticipated`) → `INBOX`
@@ -51,7 +52,8 @@ When a comment thread is seen for the first time:
 
 Only comments relevant to the current user start in Inbox. Already-resolved threads
 don't need action, and unresolved threads on docs where I'm just a reviewer with no
-participation are archived until something involves me.
+participation are archived until something involves me. @-mentions override all other
+rules — if someone mentions me, I see it regardless.
 
 ---
 
@@ -82,17 +84,23 @@ against the existing record. If nothing changed, the update is skipped entirely.
 unnecessary writes and makes the "N updated" log count accurate. Date fields are compared
 via `.getTime()` with null-handling.
 
-**MUTED**: If status is `MUTED`, it is left unchanged. Muted threads stay hidden regardless
-of new Drive activity. Drive-side fields (`resolved`, `iParticipated`, `driveCreatedAt`,
-`driveModifiedAt`, `replyCount`) are still updated when they differ, so the detail page
-reflects current state.
+**@-mention in new reply**: If any new reply mentions the current user (via
+`mentionedEmailAddresses`), the comment moves to `INBOX` — even if it was `MUTED`. This
+is the only case where a comment exits MUTED state.
 
-**For all other statuses (INBOX, ARCHIVED)**, apply this logic:
+**MUTED** (without @-mention): If status is `MUTED` and no new reply mentions me, it is
+left unchanged. Muted threads stay hidden regardless of new Drive activity. Drive-side
+fields (`resolved`, `iParticipated`, `driveCreatedAt`, `driveModifiedAt`, `replyCount`)
+are still updated when they differ, so the detail page reflects current state.
+
+**For all other statuses (INBOX, ARCHIVED, or MUTED with @-mention)**, apply this logic
+(first matching rule wins):
 
 1. Compare `resolved`, `iParticipated`, `status`, `driveCreatedAt`, `driveModifiedAt`, and
    `replyCount` against the existing record. Skip the update if all match.
-2. If `resolved = true` AND I was the one who resolved it → set status to `ARCHIVED`.
-3. Otherwise, if there is **new activity** (new replies, thread re-opened, or modification
+2. If a **new reply @-mentions me** → `INBOX` (overrides all other rules, including MUTED).
+3. If `resolved = true` AND I was the one who resolved it → set status to `ARCHIVED`.
+4. Otherwise, if there is **new activity** (new replies, thread re-opened, or modification
    detected via `driveModifiedAt`), apply relevance-based rules:
    - **I'm the doc author** → `INBOX` (rule 4: all activity is relevant)
    - **I started the thread** and there are new replies → `INBOX` only if at least one
@@ -100,7 +108,7 @@ reflects current state.
      exception). Uses `replyAuthorMeFlags` to detect self vs. other replies.
    - **I participated (replied) on someone else's thread** → `INBOX` (rule 6)
    - **Not relevant to me** → preserve existing status
-4. Otherwise (no new activity), preserve the existing `status`. This ensures that if
+5. Otherwise (no new activity), preserve the existing `status`. This ensures that if
    you manually archive an unresolved thread, it stays archived until someone replies
    to it or re-opens it.
 
@@ -111,11 +119,12 @@ Activity only surfaces in Inbox when it's relevant to you — not all activity o
 
 ## MUTED Behavior
 
-`MUTED` is a user-set status, not set by sync logic. Once muted:
+`MUTED` is a user-set status, not normally changed by sync logic. Once muted:
 
 - The comment never appears in the Inbox count.
-- Sync never changes its status, even if Drive reports new activity.
-- The user must explicitly un-mute to restore tracking.
+- Sync never changes its status, even if Drive reports new activity — **except** when a
+  new reply @-mentions the current user. This is the only case where MUTED is overridden.
+- The user can explicitly un-mute to restore tracking.
 
 This is useful for comment threads that are noisy or irrelevant, where you don't want to be
 reminded each refresh.
@@ -160,7 +169,8 @@ Tracks whether there's substantive activity beyond comment resolutions:
 - Unarchive only when `doc.role === "AUTHOR"` (new suggestions on my docs).
 - Always counts as non-resolve activity.
 
-**MUTED threads**: never trigger unarchive, regardless of new activity.
+**MUTED threads**: never trigger unarchive, unless an @-mention breaks the thread out of
+MUTED (at which point the MUTED→INBOX transition triggers unarchive like any other).
 
 ### Manual comment→doc propagation
 
@@ -223,7 +233,7 @@ their own sync logic. They are displayed in the comment table and can be filtere
 
 - **Endpoint**: `GET /drive/v3/files/{fileId}/comments`
 - **`fields` is mandatory** — Drive returns nothing without it.
-- **Fields used for sync**: `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me))`
+- **Fields used for sync**: `id, resolved, createdTime, modifiedTime, author(me), mentionedEmailAddresses, replies(action, author(me), mentionedEmailAddresses)`
 - **Fields used for thread display**: adds `content, htmlContent, quotedFileContent(mimeType, value), author(displayName), replies(content, htmlContent, createdTime, author(displayName))`
 - **`htmlContent`**: Read-only field with HTML formatting of comment/reply text (bold, italics, @mention links). The API recommends displaying `htmlContent` over plain `content`.
 - **`quotedFileContent`**: The document text the comment was anchored to at creation time. MIME type is typically `text/html` but in practice the value appears to contain no formatting markup. This is a snapshot — the text may have been edited or deleted since. The Drive API may also truncate long quoted text (the truncation format is undocumented). When the thread panel is shown, the quoted text is checked against the current document body (fetched once on page load via `/api/docs/[docId]/content`). If the text is no longer found, a warning is displayed. For Docs, the text is fetched via `fetchDocContent` (a single Docs API `documents.get` call that also extracts suggestion content); for Slides, via `fetchFileTextViaExport` (Drive `files.export` as `text/plain`). Sheets are not checked. Note: `fetchDocContent` uses `SUGGESTIONS_INLINE` mode, so the document text includes pending suggestion text — anchor-text matching may false-positive if a suggestion overlaps the anchor region, but the consequence is only a spurious warning.
@@ -250,3 +260,8 @@ once and used for three derived fields:
   `author.me === true`.
 - **`replyCount`** — `replies.length`: total number of replies to the original comment,
   including resolve actions. No extra API call; derived from the already-fetched replies.
+- **`mentionedMe`** — whether the initial comment's `mentionedEmailAddresses` includes
+  the current user's email (case-insensitive).
+- **`replyMentionedMeFlags`** — per-reply boolean array: whether each reply's
+  `mentionedEmailAddresses` includes the current user's email. Used alongside
+  `replyAuthorMeFlags` to detect new @-mentions in new replies (via `.slice(existing.replyCount)`).
