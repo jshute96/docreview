@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { OFFLINE_MODE, OfflineModeError } from "@/lib/offline";
 import { logError, logWarning, logInfo } from "@/lib/log";
+import { withProgressLogging } from "./promise-utils";
 
 export const SUPPORTED_MIME_TYPES = new Set([
   "application/vnd.google-apps.document",
@@ -171,13 +172,16 @@ export async function fetchComments(
   let pageToken: string | undefined;
 
   do {
-    const res = await drive.comments.list({
-      fileId: googleDocId,
-      fields:
-        "nextPageToken, comments(id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me), mentionedEmailAddresses), mentionedEmailAddresses)",
-      ...(sinceStr ? { startModifiedTime: sinceStr } : {}),
-      ...(pageToken ? { pageToken } : {}),
-    });
+    const res = await withProgressLogging(
+      drive.comments.list({
+        fileId: googleDocId,
+        fields:
+          "nextPageToken, comments(id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me), mentionedEmailAddresses), mentionedEmailAddresses)",
+        ...(sinceStr ? { startModifiedTime: sinceStr } : {}),
+        ...(pageToken ? { pageToken } : {}),
+      }),
+      `[Drive] comments.list ${googleDocId}${pageToken ? " (page)" : ""}`
+    );
 
     const items = res.data.comments ?? [];
     for (const c of items) {
@@ -237,11 +241,14 @@ export async function fetchSuggestions(
   const docs = createDocs({ version: "v1", auth });
   const t0 = Date.now();
 
-  const res = await docs.documents.get({
-    documentId: googleDocId,
-    suggestionsViewMode: "SUGGESTIONS_INLINE",
-    fields: "body(content(paragraph(elements(textRun(suggestedInsertionIds,suggestedDeletionIds)))))",
-  });
+  const res = await withProgressLogging(
+    docs.documents.get({
+      documentId: googleDocId,
+      suggestionsViewMode: "SUGGESTIONS_INLINE",
+      fields: "body(content(paragraph(elements(textRun(suggestedInsertionIds,suggestedDeletionIds)))))",
+    }),
+    `[Docs] documents.get ${googleDocId} (suggestions)`
+  );
   const elapsed = Date.now() - t0;
 
   const insertionIds = new Set<string>();
@@ -288,11 +295,14 @@ export async function fetchDocContent(
 
   let res;
   try {
-    res = await docs.documents.get({
-      documentId: googleDocId,
-      suggestionsViewMode: "SUGGESTIONS_INLINE",
-      fields: "body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds)))))",
-    });
+    res = await withProgressLogging(
+      docs.documents.get({
+        documentId: googleDocId,
+        suggestionsViewMode: "SUGGESTIONS_INLINE",
+        fields: "body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds)))))",
+      }),
+      `[Docs] documents.get ${googleDocId} (content)`
+    );
   } catch (err) {
     logError(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
     return { documentText: null, suggestions: {} };
@@ -447,13 +457,16 @@ export async function fetchAllThreads(
   let pageToken: string | undefined;
 
   do {
-    const res = await drive.comments.list({
-      fileId: googleDocId,
-      fields:
-        "nextPageToken, comments(id, resolved, content, htmlContent, quotedFileContent(mimeType, value), createdTime, modifiedTime, author(displayName), replies(content, htmlContent, createdTime, action, author(displayName)))",
-      pageSize: 100,
-      ...(pageToken ? { pageToken } : {}),
-    });
+    const res = await withProgressLogging(
+      drive.comments.list({
+        fileId: googleDocId,
+        fields:
+          "nextPageToken, comments(id, resolved, content, htmlContent, quotedFileContent(mimeType, value), createdTime, modifiedTime, author(displayName), replies(content, htmlContent, createdTime, action, author(displayName)))",
+        pageSize: 100,
+        ...(pageToken ? { pageToken } : {}),
+      }),
+      `[Drive] comments.list ${googleDocId} (threads${pageToken ? " page" : ""})`
+    );
 
     for (const c of res.data.comments ?? []) {
       if (!c.id || c.content == null) continue;
@@ -559,12 +572,15 @@ export async function listChanges(userId: string, pageToken: string): Promise<Dr
 
   do {
     const t0 = Date.now();
-    const res = await drive.changes.list({
-      pageToken: currentToken,
-      fields: "nextPageToken, newStartPageToken, changes(removed, fileId, file(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed))",
-      pageSize: 100,
-      includeRemoved: true,
-    });
+    const res = await withProgressLogging(
+      drive.changes.list({
+        pageToken: currentToken,
+        fields: "nextPageToken, newStartPageToken, changes(removed, fileId, file(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed))",
+        pageSize: 100,
+        includeRemoved: true,
+      }),
+      `[Drive] changes.list${currentToken ? " (page)" : ""}`
+    );
     logInfo(`[Drive] changes.list (page ${currentToken.slice(0, 8)}…) → ${res.data.changes?.length ?? 0} changes (${Date.now() - t0}ms)`);
 
     for (const change of res.data.changes ?? []) {
@@ -682,16 +698,19 @@ export async function listRecentDocs(userId: string, since?: Date, options?: Lis
 
   do {
     const t0 = Date.now();
-    const res = await drive.files.list({
-      q,
-      fields:
-        "nextPageToken, files(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName))",
-      pageSize: 100,
-      pageToken,
-      ...(includeSharedDrives
-        ? { corpora: "allDrives", includeItemsFromAllDrives: true, supportsAllDrives: true }
-        : {}),
-    });
+    const res = await withProgressLogging(
+      drive.files.list({
+        q,
+        fields:
+          "nextPageToken, files(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName))",
+        pageSize: 100,
+        pageToken,
+        ...(includeSharedDrives
+          ? { corpora: "allDrives", includeItemsFromAllDrives: true, supportsAllDrives: true }
+          : {}),
+      }),
+      `[Drive] files.list (recent docs${pageToken ? " page" : ""})`
+    );
     logInfo(`[Drive] files.list (recent docs${pageToken ? ", page " + pageToken.slice(0, 8) + "…" : ""}) → ${res.data.files?.length ?? 0} files (${Date.now() - t0}ms)`);
 
     for (const file of res.data.files ?? []) {

@@ -11,6 +11,7 @@ P1:
 * ergonomics of control placement in comments view
   - archive at the bottom, etc.
 * Refresh selected docs
+* Cancel API requests and other work on tab close?
 
 Easy:
 * scroll bars for lots of docs
