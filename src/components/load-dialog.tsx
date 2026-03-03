@@ -73,7 +73,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
   const [viewMode, setViewMode] = useState<"new" | "all">("new");
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
-  const [addAsActive, setAddAsActive] = useState(true);
+  const [addToInbox, setAddAsActive] = useState(true);
   const [adding, setAdding] = useState(false);
   const [source, setSource] = useState<"drive" | "gmail">("drive");
   const [daysBackText, setDaysBackText] = useState(
@@ -157,7 +157,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
           selectedGoogleDocIds: visibleDocs.map((d) => d.googleDocId),
           labelIds: selectedLabelIds,
           notes,
-          status: addAsActive ? "INBOX" : "ARCHIVED",
+          status: addToInbox ? "INBOX" : "ARCHIVED",
         }),
         signal: controller.signal,
       });
@@ -523,15 +523,15 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
 
               <div className="flex items-center gap-2">
                 <Checkbox
-                  id="load-as-active"
-                  checked={addAsActive}
+                  id="load-to-inbox"
+                  checked={addToInbox}
                   onCheckedChange={(checked) => setAddAsActive(checked === true)}
                 />
                 <label
-                  htmlFor="load-as-active"
+                  htmlFor="load-to-inbox"
                   className="text-sm text-zinc-700 cursor-pointer"
                 >
-                  {viewMode === "all" ? "Move to Active" : "Add as Active"}
+                  {viewMode === "all" ? "Move to Inbox" : "Add to Inbox"}
                 </label>
               </div>
             </div>

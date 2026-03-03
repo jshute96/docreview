@@ -133,14 +133,14 @@ export function EditDocDialog({
                 <div className="flex gap-2">
                   <button
                     onClick={() => setStatus(status === "INBOX" ? "ARCHIVED" : "INBOX")}
-                    title={status === "INBOX" ? "This document is active" : "This document is archived"}
+                    title={status === "INBOX" ? "This document is in inbox" : "This document is archived"}
                     className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                       status === "INBOX"
                         ? STATUS_COLORS.INBOX.activeFilter
                         : STATUS_COLORS.INBOX.inactiveFilter
                     }`}
                   >
-                    Active
+                    Inbox
                   </button>
                 </div>
               </div>

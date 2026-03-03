@@ -2,7 +2,7 @@ import type { Doc, Label, DocLabel, Comment } from "@prisma/client";
 
 export type DocWithLabels = Doc & {
   labels: (DocLabel & { label: Label })[];
-  _count: { watchedComments: number; openComments: number };
+  _count: { inboxComments: number; openComments: number };
 };
 
 export type DocWithComments = Doc & {

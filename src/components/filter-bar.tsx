@@ -18,13 +18,13 @@ const DOC_TYPES = [
 
 interface FilterBarProps {
   labels: Label[];
-  isActive: TriState;
+  isInbox: TriState;
   hasComments: TriState;
   isAuthor: TriState;
   mimeTypes: Record<string, TriState>;
   labelsFilter: Record<string, TriState>;
   titleFilter: string;
-  onIsActiveChange: (v: TriState) => void;
+  onIsInboxChange: (v: TriState) => void;
   onHasCommentsChange: (v: TriState) => void;
   onIsAuthorChange: (v: TriState) => void;
   onMimeTypeChange: (mimeType: string, v: TriState) => void;
@@ -34,13 +34,13 @@ interface FilterBarProps {
 
 export function FilterBar({
   labels,
-  isActive,
+  isInbox,
   hasComments,
   isAuthor,
   mimeTypes,
   labelsFilter,
   titleFilter,
-  onIsActiveChange,
+  onIsInboxChange,
   onHasCommentsChange,
   onIsAuthorChange,
   onMimeTypeChange,
@@ -100,14 +100,14 @@ export function FilterBar({
 
         <div className="h-4 w-px bg-zinc-200" />
 
-        {/* Active */}
+        {/* Inbox */}
         <TriStateButton
-          label="Active"
-          value={isActive}
-          onChange={onIsActiveChange}
+          label="Inbox"
+          value={isInbox}
+          onChange={onIsInboxChange}
           colors={TRISTATE_COLORS.author}
           className="rounded"
-          title="Active (unarchived) docs"
+          title="Inbox (unarchived) docs"
         />
 
         <div className="h-4 w-px bg-zinc-200" />

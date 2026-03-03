@@ -66,7 +66,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
     const [existingDocId, setExistingDocId] = useState<string | null>(null);
     const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
     const [notes, setNotes] = useState("");
-    const [addAsActive, setAddAsActive] = useState(true);
+    const [addToInbox, setAddAsActive] = useState(true);
     const [adding, setAdding] = useState(false);
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -176,7 +176,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
             url,
             labelIds: selectedLabelIds,
             notes,
-            status: addAsActive ? "INBOX" : "ARCHIVED",
+            status: addToInbox ? "INBOX" : "ARCHIVED",
           }),
         });
         if (!res.ok) throw new Error("Add failed");
@@ -282,15 +282,15 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
 
           <div className="flex items-center gap-2">
             <Checkbox
-              id="add-as-active"
-              checked={addAsActive}
+              id="add-to-inbox"
+              checked={addToInbox}
               onCheckedChange={(checked) => setAddAsActive(checked === true)}
             />
             <label
-              htmlFor="add-as-active"
+              htmlFor="add-to-inbox"
               className="text-sm text-zinc-700 cursor-pointer"
             >
-              Add as Active
+              Add to Inbox
             </label>
           </div>
         </div>

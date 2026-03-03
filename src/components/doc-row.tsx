@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { highlightText } from "@/lib/highlight";
 import { broadcastChange } from "@/lib/cross-tab";
-import { WATCHED_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
+import { INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 
 interface DocRowProps {
   doc: DocWithLabels;
@@ -88,9 +88,9 @@ export function DocRow({
       <td className="py-1.5 px-4 text-sm text-zinc-500">
         <div 
           className="mx-auto w-8 text-right -translate-x-2" 
-          title={doc._count.watchedComments > 0 ? WATCHED_COMMENTS_TOOLTIP : ""}
+          title={doc._count.inboxComments > 0 ? INBOX_COMMENTS_TOOLTIP : ""}
         >
-          {doc._count.watchedComments > 0 ? doc._count.watchedComments : ""}
+          {doc._count.inboxComments > 0 ? doc._count.inboxComments : ""}
         </div>
       </td>
       <td className="py-1.5 px-4 text-sm text-zinc-500">
@@ -119,7 +119,7 @@ export function DocRow({
             variant="outline"
             size="sm"
             className="h-6 px-2 text-xs"
-            title={doc.status === "INBOX" ? "Hide this document" : "Unhide this document"}
+            title={doc.status === "INBOX" ? "Archive this document" : "Move to inbox"}
             onClick={handleArchive}
             disabled={archiving}
           >

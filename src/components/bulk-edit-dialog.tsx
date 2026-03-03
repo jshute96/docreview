@@ -250,7 +250,7 @@ export function BulkEditDialog({
                         : STATUS_COLORS.INBOX.inactiveFilter
                     }`}
                   >
-                    Active
+                    Inbox
                     <StateIndicator state={statusState} isMixed={status.mixed} />
                   </button>
                 </div>

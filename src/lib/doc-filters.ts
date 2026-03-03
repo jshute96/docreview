@@ -3,11 +3,11 @@ import type { TriState } from "./tri-state";
 import { partitionTriState } from "./tri-state";
 import { matchesFilter } from "./highlight";
 
-export type SortCol = "title" | "lastModifiedInDrive" | "watched" | "open";
+export type SortCol = "title" | "lastModifiedInDrive" | "inbox" | "open";
 export type SortDir = "asc" | "desc";
 
 export interface FilterOptions {
-  isActive: TriState;
+  isInbox: TriState;
   hasComments: TriState;
   isAuthor: TriState;
   mimeTypes: Record<string, TriState>;
@@ -24,8 +24,8 @@ export function filterDocs(
 
   return docs.filter((doc) => {
     // isActive: include = active only, exclude = archived only, off = all
-    if (opts.isActive === "include" && doc.status === "ARCHIVED") return false;
-    if (opts.isActive === "exclude" && doc.status !== "ARCHIVED") return false;
+    if (opts.isInbox === "include" && doc.status === "ARCHIVED") return false;
+    if (opts.isInbox === "exclude" && doc.status !== "ARCHIVED") return false;
 
     // hasComments: include = only with comments, exclude = only without
     if (opts.hasComments === "include" && doc._count.openComments === 0)
@@ -73,8 +73,8 @@ export function sortDocs(
     let cmp = 0;
     if (col === "title") {
       cmp = a.title.localeCompare(b.title);
-    } else if (col === "watched") {
-      cmp = a._count.watchedComments - b._count.watchedComments;
+    } else if (col === "inbox") {
+      cmp = a._count.inboxComments - b._count.inboxComments;
     } else if (col === "open") {
       cmp = a._count.openComments - b._count.openComments;
     } else {

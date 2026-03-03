@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { filterDocs, sortDocs } from "@/lib/doc-filters";
 import type { SortCol, SortDir } from "@/lib/doc-filters";
 import { LabelProvider } from "@/contexts/label-context";
-import { WATCHED_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
+import { INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 
 interface DocTableProps {
   initialDocs: DocWithLabels[];
@@ -60,7 +60,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
 
   useCrossTabListener(refetchAll);
 
-  const [isActive, setIsActive] = useState<TriState>("include");
+  const [isInbox, setIsInbox] = useState<TriState>("include");
   const [hasComments, setHasComments] = useState<TriState>("off");
   const [isAuthor, setIsAuthor] = useState<TriState>("off");
   const [mimeTypes, setMimeTypes] = useState<Record<string, TriState>>({});
@@ -74,7 +74,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortCol(col);
-      setSortDir(col === "lastModifiedInDrive" || col === "watched" || col === "open" ? "desc" : "asc");
+      setSortDir(col === "lastModifiedInDrive" || col === "inbox" || col === "open" ? "desc" : "asc");
     }
   }
 
@@ -122,7 +122,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
 
   const filteredDocs = sortDocs(
     filterDocs(docs, {
-      isActive,
+      isInbox,
       hasComments,
       isAuthor,
       mimeTypes,
@@ -187,13 +187,13 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
 
       <FilterBar
         labels={labels}
-        isActive={isActive}
+        isInbox={isInbox}
         hasComments={hasComments}
         isAuthor={isAuthor}
         mimeTypes={mimeTypes}
         labelsFilter={labelsFilter}
         titleFilter={titleFilter}
-        onIsActiveChange={setIsActive}
+        onIsInboxChange={setIsInbox}
         onHasCommentsChange={setHasComments}
         onIsAuthorChange={setIsAuthor}
         onMimeTypeChange={(mt, v) => handleTriStateChange(setMimeTypes, mt, v)}
@@ -232,7 +232,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
                 </th>
               </tr>
               <tr className="border-b border-zinc-200 bg-zinc-50">
-                <ThButton col="watched" title={WATCHED_COMMENTS_TOOLTIP}>Watched</ThButton>
+                <ThButton col="inbox" title={INBOX_COMMENTS_TOOLTIP}>Inbox</ThButton>
                 <ThButton col="open" title={OPEN_COMMENTS_TOOLTIP}>Open</ThButton>
               </tr>
             </thead>

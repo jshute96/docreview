@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { withCommentCounts } from "./doc-queries";
 
 describe("withCommentCounts", () => {
-  it("counts watched comments (status ACTIVE and (isThreadAuthor or iParticipated)) for REVIEWER", () => {
+  it("counts inbox comments (status ACTIVE and (isThreadAuthor or iParticipated)) for REVIEWER", () => {
     const doc = {
       id: "d1",
       role: "REVIEWER",
@@ -18,7 +18,7 @@ describe("withCommentCounts", () => {
       ],
     };
     const result = withCommentCounts(doc);
-    expect(result._count.watchedComments).toBe(4); // 1, 2, 4, 6
+    expect(result._count.inboxComments).toBe(4); // 1, 2, 4, 6
   });
 
   it("counts ALL active comments for AUTHOR", () => {
@@ -32,7 +32,7 @@ describe("withCommentCounts", () => {
       ],
     };
     const result = withCommentCounts(doc);
-    expect(result._count.watchedComments).toBe(2); // first 2 are ACTIVE
+    expect(result._count.inboxComments).toBe(2); // first 2 are ACTIVE
   });
 
   it("counts all unresolved comments as open", () => {
@@ -53,7 +53,7 @@ describe("withCommentCounts", () => {
   it("returns zero counts for empty comments", () => {
     const doc = { id: "d1", role: "REVIEWER", comments: [] };
     const result = withCommentCounts(doc);
-    expect(result._count).toEqual({ watchedComments: 0, openComments: 0 });
+    expect(result._count).toEqual({ inboxComments: 0, openComments: 0 });
   });
 
   it("strips the comments array from the result", () => {

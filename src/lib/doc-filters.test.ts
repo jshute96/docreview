@@ -19,12 +19,12 @@ function makeDoc(overrides: Partial<DocWithLabels> & { title: string }): DocWith
     createdTimeInDrive: overrides.createdTimeInDrive ?? null,
     owner: overrides.owner ?? null,
     labels: overrides.labels ?? [],
-    _count: overrides._count ?? { watchedComments: 0, openComments: 0 },
+    _count: overrides._count ?? { inboxComments: 0, openComments: 0 },
   } as DocWithLabels;
 }
 
 const defaultOpts: FilterOptions = {
-  isActive: "include",
+  isInbox: "include",
   hasComments: "off",
   isAuthor: "off",
   mimeTypes: {},
@@ -33,7 +33,7 @@ const defaultOpts: FilterOptions = {
 };
 
 describe("filterDocs", () => {
-  it("hides archived docs by default (isActive: include)", () => {
+  it("hides archived docs by default (isInbox: include)", () => {
     const docs = [
       makeDoc({ title: "Active", status: "INBOX" }),
       makeDoc({ title: "Archived", status: "ARCHIVED" }),
@@ -43,29 +43,29 @@ describe("filterDocs", () => {
     expect(result[0].title).toBe("Active");
   });
 
-  it("shows all docs when isActive is off", () => {
+  it("shows all docs when isInbox is off", () => {
     const docs = [
       makeDoc({ title: "Active", status: "INBOX" }),
       makeDoc({ title: "Archived", status: "ARCHIVED" }),
     ];
-    const result = filterDocs(docs, { ...defaultOpts, isActive: "off" });
+    const result = filterDocs(docs, { ...defaultOpts, isInbox: "off" });
     expect(result).toHaveLength(2);
   });
 
-  it("shows only archived docs when isActive is exclude", () => {
+  it("shows only archived docs when isInbox is exclude", () => {
     const docs = [
       makeDoc({ title: "Active", status: "INBOX" }),
       makeDoc({ title: "Archived", status: "ARCHIVED" }),
     ];
-    const result = filterDocs(docs, { ...defaultOpts, isActive: "exclude" });
+    const result = filterDocs(docs, { ...defaultOpts, isInbox: "exclude" });
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe("Archived");
   });
 
   it("filters by hasComments include (only with comments)", () => {
     const docs = [
-      makeDoc({ title: "NoComments", _count: { watchedComments: 0, openComments: 0 } }),
-      makeDoc({ title: "HasComments", _count: { watchedComments: 1, openComments: 3 } }),
+      makeDoc({ title: "NoComments", _count: { inboxComments: 0, openComments: 0 } }),
+      makeDoc({ title: "HasComments", _count: { inboxComments: 1, openComments: 3 } }),
     ];
     const result = filterDocs(docs, { ...defaultOpts, hasComments: "include" });
     expect(result).toHaveLength(1);
@@ -74,8 +74,8 @@ describe("filterDocs", () => {
 
   it("filters by hasComments exclude (only without comments)", () => {
     const docs = [
-      makeDoc({ title: "NoComments", _count: { watchedComments: 0, openComments: 0 } }),
-      makeDoc({ title: "HasComments", _count: { watchedComments: 1, openComments: 3 } }),
+      makeDoc({ title: "NoComments", _count: { inboxComments: 0, openComments: 0 } }),
+      makeDoc({ title: "HasComments", _count: { inboxComments: 1, openComments: 3 } }),
     ];
     const result = filterDocs(docs, { ...defaultOpts, hasComments: "exclude" });
     expect(result).toHaveLength(1);
@@ -302,31 +302,31 @@ describe("sortDocs", () => {
     expect(result.map((d) => d.title)).toEqual(["Charlie", "Bravo", "Alpha"]);
   });
 
-  it("sorts by watched comments ascending", () => {
+  it("sorts by inbox comments ascending", () => {
     const docs = [
-      makeDoc({ title: "Many", _count: { watchedComments: 5, openComments: 10 } }),
-      makeDoc({ title: "Few", _count: { watchedComments: 1, openComments: 3 } }),
-      makeDoc({ title: "None", _count: { watchedComments: 0, openComments: 2 } }),
+      makeDoc({ title: "Many", _count: { inboxComments: 5, openComments: 10 } }),
+      makeDoc({ title: "Few", _count: { inboxComments: 1, openComments: 3 } }),
+      makeDoc({ title: "None", _count: { inboxComments: 0, openComments: 2 } }),
     ];
-    const result = sortDocs(docs, "watched", "asc");
+    const result = sortDocs(docs, "inbox", "asc");
     expect(result.map((d) => d.title)).toEqual(["None", "Few", "Many"]);
   });
 
-  it("sorts by watched comments descending", () => {
+  it("sorts by inbox comments descending", () => {
     const docs = [
-      makeDoc({ title: "None", _count: { watchedComments: 0, openComments: 2 } }),
-      makeDoc({ title: "Many", _count: { watchedComments: 5, openComments: 10 } }),
-      makeDoc({ title: "Few", _count: { watchedComments: 1, openComments: 3 } }),
+      makeDoc({ title: "None", _count: { inboxComments: 0, openComments: 2 } }),
+      makeDoc({ title: "Many", _count: { inboxComments: 5, openComments: 10 } }),
+      makeDoc({ title: "Few", _count: { inboxComments: 1, openComments: 3 } }),
     ];
-    const result = sortDocs(docs, "watched", "desc");
+    const result = sortDocs(docs, "inbox", "desc");
     expect(result.map((d) => d.title)).toEqual(["Many", "Few", "None"]);
   });
 
   it("sorts by open comments ascending", () => {
     const docs = [
-      makeDoc({ title: "Many", _count: { watchedComments: 5, openComments: 10 } }),
-      makeDoc({ title: "Few", _count: { watchedComments: 0, openComments: 1 } }),
-      makeDoc({ title: "None", _count: { watchedComments: 0, openComments: 0 } }),
+      makeDoc({ title: "Many", _count: { inboxComments: 5, openComments: 10 } }),
+      makeDoc({ title: "Few", _count: { inboxComments: 0, openComments: 1 } }),
+      makeDoc({ title: "None", _count: { inboxComments: 0, openComments: 0 } }),
     ];
     const result = sortDocs(docs, "open", "asc");
     expect(result.map((d) => d.title)).toEqual(["None", "Few", "Many"]);
@@ -334,9 +334,9 @@ describe("sortDocs", () => {
 
   it("sorts by open comments descending", () => {
     const docs = [
-      makeDoc({ title: "None", _count: { watchedComments: 0, openComments: 0 } }),
-      makeDoc({ title: "Many", _count: { watchedComments: 5, openComments: 10 } }),
-      makeDoc({ title: "Few", _count: { watchedComments: 0, openComments: 1 } }),
+      makeDoc({ title: "None", _count: { inboxComments: 0, openComments: 0 } }),
+      makeDoc({ title: "Many", _count: { inboxComments: 5, openComments: 10 } }),
+      makeDoc({ title: "Few", _count: { inboxComments: 0, openComments: 1 } }),
     ];
     const result = sortDocs(docs, "open", "desc");
     expect(result.map((d) => d.title)).toEqual(["Many", "Few", "None"]);

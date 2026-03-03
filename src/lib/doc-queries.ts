@@ -44,7 +44,7 @@ export function withCommentCounts<
   return {
     ...rest,
     _count: {
-      watchedComments: comments.filter(
+      inboxComments: comments.filter(
         (c) =>
           c.status === "INBOX" &&
           (doc.role === "AUTHOR" || c.isThreadAuthor || c.iParticipated),

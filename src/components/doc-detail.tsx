@@ -152,7 +152,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   const [myThreadsFilter, setMyThreadsFilter] = useState(false);
   const [myCommentsFilter, setMyCommentsFilter] = useState(false);
-  const [showMode, setShowMode] = useState<"active" | "open" | "resolved" | "all">("active");
+  const [showMode, setShowMode] = useState<"inbox" | "open" | "resolved" | "all">("inbox");
   const [suggestionsOnly, setSuggestionsOnly] = useState(false);
   const [searchFilter, setSearchFilter] = useState("");
   type SortCol = "driveCreatedAt" | "driveModifiedAt" | "replyCount" | "iParticipated" | "resolved";
@@ -173,7 +173,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   function wouldBeFilteredOut(c: Comment): boolean {
     if (suggestionsOnly && c.type !== "SUGGESTION") return true;
-    if (showMode === "active" && (c.status === "ARCHIVED" || c.status === "MUTED")) return true;
+    if (showMode === "inbox" && (c.status === "ARCHIVED" || c.status === "MUTED")) return true;
     if (showMode === "open" && c.resolved) return true;
     if (showMode === "resolved" && !c.resolved) return true;
     if (myThreadsFilter && !c.iParticipated) return true;
@@ -457,7 +457,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
             variant="outline"
             size="sm"
             className="h-6 px-2 text-xs text-zinc-900"
-            title={doc.status === "INBOX" ? "Hide this document in document list" : "Unhide this document in document list"}
+            title={doc.status === "INBOX" ? "Archive this document" : "Move this document to inbox"}
             onClick={handleArchive}
             disabled={archiving}
           >
