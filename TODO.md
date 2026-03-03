@@ -5,7 +5,6 @@ P1:
 * refine gmail flows
 * Remember state/tag for @mentioned on comment, with mine/replied and resolved
 * Status column in comments view: Mine, Replied, Open, Inbox, Muted
-* Bug: Load - when I click Add, it rescans and re-resolves all the docs, not just the selected ones.
 * Main app title in the top level.
 * More decoration - favicon.
 * Hamburger menus for some of the buttons for extra actions.
@@ -46,6 +45,7 @@ Easy:
 * keyboard shortcuts
 * consider saving loaded comments
 * consider preloading comments earlier (maybe from docs page too)
+* consider Comment/Reply vs Ask states - am I expecting an answer?
 
 * hosting
   * cloud run
