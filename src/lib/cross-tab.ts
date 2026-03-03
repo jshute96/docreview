@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useRef, useLayoutEffect } from "react";
 
 const CHANNEL_NAME = "docreview-sync";

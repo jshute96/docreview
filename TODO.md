@@ -21,6 +21,7 @@ P1:
   * I commented?
   * @mention me
   * doc: add to inbox if a comment goes to inbox
+  * check and refine rules for detecting hasNewActivity on comment threads - reply count, change timestamp, etc.
 * State/tag for @mentioned on comment, with mine/replied and resolved
 * Status column in comments view: Mine, Replied, Open, Inbox, Muted
 * Load - when I click Add, it rescans and re-resolves all the docs, not just

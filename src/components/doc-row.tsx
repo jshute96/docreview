@@ -88,7 +88,7 @@ export function DocRow({
       <td className="py-1.5 px-4 text-sm text-zinc-500">
         <div 
           className="mx-auto w-8 text-right -translate-x-2" 
-          title={doc._count.inboxComments > 0 ? INBOX_COMMENTS_TOOLTIP : ""}
+          title={doc._count.inboxComments > 0 ? INBOX_COMMENTS_TOOLTIP : undefined}
         >
           {doc._count.inboxComments > 0 ? doc._count.inboxComments : ""}
         </div>
@@ -96,7 +96,7 @@ export function DocRow({
       <td className="py-1.5 px-4 text-sm text-zinc-500">
         <div 
           className="mx-auto w-8 text-right -translate-x-3" 
-          title={doc._count.openComments > 0 ? OPEN_COMMENTS_TOOLTIP : ""}
+          title={doc._count.openComments > 0 ? OPEN_COMMENTS_TOOLTIP : undefined}
         >
           {doc._count.openComments > 0 ? doc._count.openComments : ""}
         </div>

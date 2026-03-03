@@ -56,35 +56,20 @@ const googleProviders = [
   }),
 ];
 
+const useSecureCookies = process.env.AUTH_URL?.startsWith("https://") ?? false;
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // Required for Auth.js to correctly identify the public URL and protocol 
+  // Required for Auth.js to correctly identify the public URL and protocol
   // (https) when running behind a proxy like ÜberProxy.
   trustHost: true,
-  // Enforce secure cookies because the app is accessed via an HTTPS proxy.
+  // Enforce secure cookies when the app is accessed via HTTPS (e.g. behind a proxy).
   // Without this, PKCE/state checks fail on the callback redirect.
-  useSecureCookies: true,
+  useSecureCookies,
   adapter: PrismaAdapter(prisma),
   providers: OFFLINE_MODE ? offlineProviders : googleProviders,
   // CredentialsProvider doesn't work with database sessions (PrismaAdapter
   // won't create a DB session for it), so use JWT in offline mode.
   session: { strategy: OFFLINE_MODE ? "jwt" : "database" },
-  cookies: {
-    sessionToken: {
-      options: {
-        secure: true,
-      },
-    },
-    callbackUrl: {
-      options: {
-        secure: true,
-      },
-    },
-    csrfToken: {
-      options: {
-        secure: true,
-      },
-    },
-  },
   callbacks: {
     session({ session, user, token }) {
       // Database strategy passes `user`; JWT strategy passes `token`

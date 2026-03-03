@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
         lastModifiedInDrive: doc.lastModifiedInDrive,
         owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
-        status: loadStatus || "INBOX",
+        status: loadStatus ?? "INBOX",
         ...(loadNotes ? { notes: loadNotes } : {}),
         ...(loadLabelIds.length > 0
           ? { labels: { create: loadLabelIds.map((id) => ({ labelId: id })) } }
@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
         owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
         isDeleted: false,
-        ...(loadStatus ? { status: loadStatus } : {}),
+        ...(loadStatus === "INBOX" ? { status: "INBOX" as const } : {}),
       },
       select: { id: true, notes: true },
     });

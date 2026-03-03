@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
     status?: "INBOX" | "ARCHIVED";
   };
 
+  if (status !== undefined && status !== "INBOX" && status !== "ARCHIVED") {
+    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  }
+
   const fileId = parseGoogleDocId(url);
   if (!fileId) {
     return NextResponse.json({ error: "invalid_url" }, { status: 400 });
@@ -85,7 +89,7 @@ export async function POST(req: NextRequest) {
       driveUrl: f.webViewLink ?? `https://docs.google.com/document/d/${fileId}/edit`,
       mimeType: f.mimeType,
       role: isOwner ? "AUTHOR" : "REVIEWER",
-      status: status || "INBOX",
+      status: status ?? "INBOX",
       owner: f.owners?.[0]?.displayName ?? null,
       lastModifiedInDrive: f.modifiedTime ? new Date(f.modifiedTime) : null,
       createdTimeInDrive: f.createdTime ? new Date(f.createdTime) : null,

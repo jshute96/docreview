@@ -626,7 +626,7 @@ describe("POST /api/docs", () => {
     expect(upsertCall.create.status).toBe("ARCHIVED");
   });
 
-  it("load mode updates status (ARCHIVED) for existing docs", async () => {
+  it("load mode does not force-archive existing docs when status is ARCHIVED", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
@@ -657,7 +657,8 @@ describe("POST /api/docs", () => {
     expect(res.status).toBe(200);
 
     const upsertCall = mockDoc.upsert.mock.calls[0][0];
-    expect(upsertCall.update.status).toBe("ARCHIVED");
+    // ARCHIVED should not be applied to existing docs — only INBOX moves them
+    expect(upsertCall.update.status).toBeUndefined();
   });
 
   it("load mode adds labels to existing docs via createMany skipDuplicates", async () => {
