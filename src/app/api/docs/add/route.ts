@@ -3,12 +3,12 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import {
   getDriveClient,
+  createDriveService,
   parseGoogleDocId,
   SUPPORTED_MIME_TYPES,
   invalidGrantResponse,
 } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
-import { google } from "googleapis";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 import { runWithRequestId } from "@/lib/request-context";
 
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
   let driveAuth;
   try {
     driveAuth = await getDriveClient(userId);
-    const drive = google.drive({ version: "v3", auth: driveAuth });
+    const drive = createDriveService(driveAuth);
     const res = await drive.files.get({
       fileId,
       fields: "name,mimeType,webViewLink,modifiedTime,createdTime,owners(me,displayName),trashed",

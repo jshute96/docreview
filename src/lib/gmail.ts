@@ -1,4 +1,5 @@
-import { google } from "googleapis";
+import { gmail as createGmail } from "@googleapis/gmail";
+import { drive as createDrive } from "@googleapis/drive";
 import { getDriveClient, parseGoogleDocId } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 
@@ -22,8 +23,8 @@ export async function scanGmailNotifications(
   since: Date
 ): Promise<GmailScanResult> {
   const auth = await getDriveClient(userId);
-  const gmail = google.gmail({ version: "v1", auth });
-  const drive = google.drive({ version: "v3", auth });
+  const gmailClient = createGmail({ version: "v1", auth });
+  const driveClient = createDrive({ version: "v3", auth });
 
   // Build date cutoff for Gmail query (day-level precision)
   const afterDate = `${since.getFullYear()}/${String(since.getMonth() + 1).padStart(2, "0")}/${String(since.getDate()).padStart(2, "0")}`;
@@ -38,7 +39,7 @@ export async function scanGmailNotifications(
 
   do {
     const t0 = Date.now();
-    const res = await gmail.users.messages.list({
+    const res = await gmailClient.users.messages.list({
       userId: "me",
       q: query,
       maxResults: 100,
@@ -67,7 +68,7 @@ export async function scanGmailNotifications(
     messageIds.map(async (messageId) => {
       const t0 = Date.now();
       try {
-        const res = await gmail.users.messages.get({
+        const res = await gmailClient.users.messages.get({
           userId: "me",
           id: messageId,
           format: "full",
@@ -117,7 +118,7 @@ export async function scanGmailNotifications(
     Array.from(docIdMap.entries()).map(async ([docId]) => {
       const t0 = Date.now();
       try {
-        const res = await drive.files.get({
+        const res = await driveClient.files.get({
           fileId: docId,
           fields: "id, name, mimeType, webViewLink, owners(me, displayName)",
           supportsAllDrives: true,

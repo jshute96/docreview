@@ -11,33 +11,29 @@ vi.mock("@/lib/prisma", () => ({
     comment: { findFirst: vi.fn(), update: vi.fn() },
   },
 }));
-vi.mock("googleapis", () => {
+vi.mock("@/lib/google-drive", () => {
   const commentsGet = vi.fn();
   return {
-    google: {
-      drive: () => ({ comments: { get: commentsGet } }),
-      _commentsGet: commentsGet,
-    },
+    getDriveClient: vi.fn(),
+    createDriveService: vi.fn(() => ({ comments: { get: commentsGet } })),
+    fetchThreadDetail: vi.fn(),
+    fetchSuggestions: vi.fn(),
+    fetchAllThreads: vi.fn(),
+    invalidGrantResponse: vi.fn(() => null),
+    _commentsGet: commentsGet,
   };
 });
-vi.mock("@/lib/google-drive", () => ({
-  getDriveClient: vi.fn(),
-  fetchThreadDetail: vi.fn(),
-  fetchSuggestions: vi.fn(),
-  fetchAllThreads: vi.fn(),
-  invalidGrantResponse: vi.fn(() => null),
-}));
 
 import { GET, POST } from "./route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { google } from "googleapis";
 import {
   getDriveClient,
   fetchThreadDetail,
   fetchSuggestions,
   fetchAllThreads,
 } from "@/lib/google-drive";
+import * as googleDriveMod from "@/lib/google-drive";
 
 const mockAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
 const mockDoc = prisma.doc as unknown as { findUnique: ReturnType<typeof vi.fn> };
@@ -49,8 +45,8 @@ const mockGetDriveClient = vi.mocked(getDriveClient);
 const mockFetchThreadDetail = vi.mocked(fetchThreadDetail);
 const mockFetchSuggestions = vi.mocked(fetchSuggestions);
 const mockFetchAllThreads = vi.mocked(fetchAllThreads);
-// Access the mock comments.get via the helper we attached
-const mockCommentsGet = (google as unknown as { _commentsGet: ReturnType<typeof vi.fn> })
+// Access the mock comments.get via the helper we attached to the mock module
+const mockCommentsGet = (googleDriveMod as unknown as { _commentsGet: ReturnType<typeof vi.fn> })
   ._commentsGet;
 
 function makeParams(docId: string) {

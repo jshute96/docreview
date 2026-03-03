@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { google } from "googleapis";
-import { getDriveClient, fetchThreadDetail, fetchSuggestions, fetchAllThreads, invalidGrantResponse } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, fetchThreadDetail, fetchSuggestions, fetchAllThreads, invalidGrantResponse } from "@/lib/google-drive";
 import { logError } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 
@@ -32,7 +31,7 @@ export async function GET(
     const driveAuth = await getDriveClient(userId);
 
     if (commentId && checkOnly) {
-      const drive = google.drive({ version: "v3", auth: driveAuth });
+      const drive = createDriveService(driveAuth);
       const commentRes = await drive.comments.get({
         fileId: doc.googleDocId,
         commentId,

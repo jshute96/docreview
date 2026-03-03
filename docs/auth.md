@@ -104,7 +104,7 @@ Sign-out only affects the session. The `accounts` row (with Google tokens) is ke
 ### Access Token (short-lived, ~1 hour)
 
 - Sent with every Google Drive/Docs API call
-- When it expires, the `googleapis` client library automatically uses the refresh token to get a new one
+- When it expires, the `google-auth-library` OAuth2 client automatically uses the refresh token to get a new one
 - The `oauth2Client.on("tokens", ...)` handler in `getDriveClient()` (`src/lib/google-drive.ts`) persists refreshed tokens back to the `accounts` table
 - No user interaction needed for this refresh — it's invisible
 

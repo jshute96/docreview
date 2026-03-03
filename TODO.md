@@ -104,3 +104,6 @@ Easy:
 
 ## low priority
 * rename a label
+
+## tools
+* Figure out how to get playwrite MCP to work so it can look at a browser

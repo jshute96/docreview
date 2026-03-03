@@ -1,7 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 
-// Mock heavy side-effect imports before importing the module under test
-vi.mock("googleapis", () => ({ google: {} }));
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
 import { parseGoogleDocId, deriveCommentFlags } from "./google-drive";

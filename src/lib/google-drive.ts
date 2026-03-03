@@ -1,4 +1,6 @@
-import { google } from "googleapis";
+import { drive as createDrive } from "@googleapis/drive";
+import { docs as createDocs } from "@googleapis/docs";
+import { OAuth2Client } from "google-auth-library";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { OFFLINE_MODE, OfflineModeError } from "@/lib/offline";
@@ -42,7 +44,7 @@ export async function getDriveClient(userId: string) {
     throw new Error("No Google account found for user");
   }
 
-  const oauth2Client = new google.auth.OAuth2(
+  const oauth2Client = new OAuth2Client(
     process.env.AUTH_GOOGLE_ID,
     process.env.AUTH_GOOGLE_SECRET
   );
@@ -74,6 +76,10 @@ export async function getDriveClient(userId: string) {
   return oauth2Client;
 }
 
+export function createDriveService(auth: Awaited<ReturnType<typeof getDriveClient>>) {
+  return createDrive({ version: "v3", auth });
+}
+
 export interface DriveDoc {
   googleDocId: string;
   title: string;
@@ -94,7 +100,7 @@ export async function findDeletedDocIds(
   if (googleDocIds.length === 0) return new Set();
 
   const auth = await getDriveClient(userId);
-  const drive = google.drive({ version: "v3", auth });
+  const drive = createDrive({ version: "v3", auth });
 
   const results = await Promise.all(
     googleDocIds.map(async (id) => {
@@ -156,7 +162,7 @@ export async function fetchComments(
   since?: Date,
   userEmail?: string
 ): Promise<DriveComment[]> {
-  const drive = google.drive({ version: "v3", auth });
+  const drive = createDrive({ version: "v3", auth });
   const sinceStr = since ? since.toISOString() : undefined;
   const t0 = Date.now();
   const emailLower = userEmail?.toLowerCase();
@@ -228,7 +234,7 @@ export async function fetchSuggestions(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string
 ): Promise<DriveSuggestion[]> {
-  const docs = google.docs({ version: "v1", auth });
+  const docs = createDocs({ version: "v1", auth });
   const t0 = Date.now();
 
   const res = await docs.documents.get({
@@ -277,7 +283,7 @@ export async function fetchDocContent(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string
 ): Promise<{ documentText: string | null; suggestions: Record<string, SuggestionContent> }> {
-  const docs = google.docs({ version: "v1", auth });
+  const docs = createDocs({ version: "v1", auth });
   const t0 = Date.now();
 
   let res;
@@ -385,7 +391,7 @@ export async function fetchThreadDetail(
   googleDocId: string,
   commentId: string
 ): Promise<DriveThreadDetail | null> {
-  const drive = google.drive({ version: "v3", auth });
+  const drive = createDrive({ version: "v3", auth });
   const t0 = Date.now();
 
   const res = await drive.comments.get({
@@ -434,7 +440,7 @@ export async function fetchAllThreads(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string
 ): Promise<CommentThread[]> {
-  const drive = google.drive({ version: "v3", auth });
+  const drive = createDrive({ version: "v3", auth });
   const t0 = Date.now();
 
   const threads: CommentThread[] = [];
@@ -491,7 +497,7 @@ export async function replyToComment(
   content: string,
   resolve?: boolean
 ): Promise<void> {
-  const drive = google.drive({ version: "v3", auth });
+  const drive = createDrive({ version: "v3", auth });
   const tag = resolve ? " (resolve)" : "";
   const t0 = Date.now();
   await drive.replies.create({
@@ -510,7 +516,7 @@ export async function fetchFileTextViaExport(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   fileId: string
 ): Promise<string | null> {
-  const drive = google.drive({ version: "v3", auth });
+  const drive = createDrive({ version: "v3", auth });
   const t0 = Date.now();
 
   try {
@@ -529,7 +535,7 @@ export async function fetchFileTextViaExport(
 
 export async function getChangesStartPageToken(userId: string): Promise<string> {
   const auth = await getDriveClient(userId);
-  const drive = google.drive({ version: "v3", auth });
+  const drive = createDrive({ version: "v3", auth });
   const t0 = Date.now();
   const res = await drive.changes.getStartPageToken({});
   logInfo(`[Drive] changes.getStartPageToken → ${res.data.startPageToken} (${Date.now() - t0}ms)`);
@@ -544,7 +550,7 @@ export interface DriveChangesResult {
 
 export async function listChanges(userId: string, pageToken: string): Promise<DriveChangesResult> {
   const auth = await getDriveClient(userId);
-  const drive = google.drive({ version: "v3", auth });
+  const drive = createDrive({ version: "v3", auth });
 
   // Collect all changes, deduplicating by fileId (keep last entry per file)
   const changesByFileId = new Map<string, { removed: boolean; file?: { id?: string | null; name?: string | null; mimeType?: string | null; webViewLink?: string | null; modifiedTime?: string | null; createdTime?: string | null; owners?: { me?: boolean | null; displayName?: string | null }[] | null; trashed?: boolean | null } | null }>();
@@ -611,7 +617,7 @@ export async function fetchDocsByIds(userId: string, docIds: string[]): Promise<
   if (docIds.length === 0) return [];
 
   const auth = await getDriveClient(userId);
-  const drive = google.drive({ version: "v3", auth });
+  const drive = createDrive({ version: "v3", auth });
 
   const results = await Promise.all(
     docIds.map(async (id) => {
@@ -652,7 +658,7 @@ export interface ListRecentDocsOptions {
 
 export async function listRecentDocs(userId: string, since?: Date, options?: ListRecentDocsOptions): Promise<DriveDoc[]> {
   const auth = await getDriveClient(userId);
-  const drive = google.drive({ version: "v3", auth });
+  const drive = createDrive({ version: "v3", auth });
 
   const cutoff = since ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const modifiedAfter = cutoff.toISOString();

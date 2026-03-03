@@ -3,11 +3,11 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import {
   getDriveClient,
+  createDriveService,
   parseGoogleDocId,
   SUPPORTED_MIME_TYPES,
   invalidGrantResponse,
 } from "@/lib/google-drive";
-import { google } from "googleapis";
 import { runWithRequestId } from "@/lib/request-context";
 
 export async function GET(req: NextRequest) {
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   let f;
   try {
     const driveAuth = await getDriveClient(userId);
-    const drive = google.drive({ version: "v3", auth: driveAuth });
+    const drive = createDriveService(driveAuth);
     const res = await drive.files.get({
       fileId,
       fields: "name,mimeType,webViewLink,modifiedTime,createdTime,owners(me,displayName),trashed",

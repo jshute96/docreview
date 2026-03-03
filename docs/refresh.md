@@ -323,9 +323,9 @@ Key state transitions are logged:
 
 ## OAuth Token Refresh
 
-`getDriveClient` builds a `google.auth.OAuth2` client, seeded with the `access_token`,
-`refresh_token`, and `expires_at` from the `Account` table. The googleapis library handles
-token refresh automatically when the access token is expired.
+`getDriveClient` builds an `OAuth2Client` (from `google-auth-library`), seeded with the
+`access_token`, `refresh_token`, and `expires_at` from the `Account` table. The auth library
+handles token refresh automatically when the access token is expired.
 
 When a new token is issued, the `OAuth2Client` emits a `"tokens"` event. The handler writes
 the new `access_token` (and `refresh_token` if rotated) back to the `Account` table so the

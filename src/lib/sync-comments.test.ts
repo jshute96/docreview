@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { suppressingErrors } from "@/test-utils";
 
-vi.mock("googleapis", () => ({ google: {} }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     comment: {

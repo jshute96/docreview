@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { google } from "googleapis";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, invalidGrantResponse } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, invalidGrantResponse } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { docWithCommentsInclude } from "@/lib/doc-queries";
 import { logError, logWarning } from "@/lib/log";
@@ -41,7 +40,7 @@ export async function POST(
   // timestamp for newly discovered suggestions.
   let freshDoc = doc;
   try {
-    const drive = google.drive({ version: "v3", auth: driveAuth });
+    const drive = createDriveService(driveAuth);
     const fileRes = await drive.files.get({
       fileId: doc.googleDocId,
       fields: "name, mimeType, webViewLink, modifiedTime, owners(displayName), trashed",

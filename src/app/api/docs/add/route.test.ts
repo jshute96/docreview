@@ -20,6 +20,19 @@ vi.mock("@/lib/prisma", () => ({
 
 vi.mock("@/lib/google-drive", () => ({
   getDriveClient: vi.fn(),
+  createDriveService: vi.fn(() => ({
+    files: {
+      get: vi.fn().mockResolvedValue({
+        data: {
+          name: "Test Doc",
+          mimeType: "application/vnd.google-apps.document",
+          webViewLink: "https://docs.google.com/document/d/test/edit",
+          owners: [{ me: true, displayName: "Owner" }],
+          trashed: false,
+        },
+      }),
+    },
+  })),
   parseGoogleDocId: vi.fn((url) => url.split("/").pop()),
   SUPPORTED_MIME_TYPES: new Set(["application/vnd.google-apps.document"]),
   invalidGrantResponse: vi.fn(() => null),
@@ -27,24 +40,6 @@ vi.mock("@/lib/google-drive", () => ({
 
 vi.mock("@/lib/sync-comments", () => ({
   syncComments: vi.fn(),
-}));
-
-vi.mock("googleapis", () => ({
-  google: {
-    drive: vi.fn(() => ({
-      files: {
-        get: vi.fn().mockResolvedValue({
-          data: {
-            name: "Test Doc",
-            mimeType: "application/vnd.google-apps.document",
-            webViewLink: "https://docs.google.com/document/d/test/edit",
-            owners: [{ me: true, displayName: "Owner" }],
-            trashed: false,
-          },
-        }),
-      },
-    })),
-  },
 }));
 
 import { POST } from "./route";
