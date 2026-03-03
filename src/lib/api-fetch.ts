@@ -2,6 +2,7 @@ import { toast } from "sonner";
 
 const REAUTH_TOAST_ID = "reauth-required";
 const CONTEXT_ID_HEADER = "x-context-id";
+const CONTEXT_REASON_HEADER = "x-context-reason";
 
 /** Generate an 8-char hex context ID for grouping related API requests. */
 export function generateContextId(): string {
@@ -19,12 +20,13 @@ export function generateContextId(): string {
  */
 export async function apiFetch(
   input: RequestInfo | URL,
-  init?: RequestInit & { contextId?: string },
+  init?: RequestInit & { contextId?: string; reason?: string },
 ): Promise<Response> {
-  const { contextId, ...fetchInit } = init ?? {};
+  const { contextId, reason, ...fetchInit } = init ?? {};
   const id = contextId ?? generateContextId();
   const headers = new Headers(fetchInit.headers);
   headers.set(CONTEXT_ID_HEADER, id);
+  if (reason) headers.set(CONTEXT_REASON_HEADER, reason);
 
   const res = await fetch(input, { ...fetchInit, headers });
   if (res.status === 401) {

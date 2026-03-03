@@ -7,7 +7,8 @@ import type { DocWithLabels } from "@/types";
 import { Button } from "@/components/ui/button";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { LabelProvider } from "@/contexts/label-context";
-import { broadcastChange, useCrossTabListener } from "@/lib/cross-tab";
+import { broadcastChange, useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
+import { apiFetch } from "@/lib/api-fetch";
 import {
   AddDocContent,
   type AddDocContentHandle,
@@ -36,9 +37,10 @@ export function AddDocPageClient({
     setLabels((prev) => prev.filter((l) => l.labelId !== id));
   }
 
-  const refetchLabels = useCallback(async () => {
+  const refetchLabels = useCallback(async (event?: CrossTabReceivedEvent) => {
     try {
-      const res = await fetch("/api/labels");
+      const reason = event ? crossTabReason(event) : undefined;
+      const res = await apiFetch("/api/labels", { reason });
       if (res.ok) setLabels(await res.json());
     } catch { /* cross-tab sync is best-effort */ }
   }, []);

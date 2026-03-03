@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
-import { useCrossTabListener } from "@/lib/cross-tab";
+import { useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
 import type { TriState } from "@/lib/tri-state";
 import { DocRow } from "@/components/doc-row";
 import { FilterBar } from "@/components/filter-bar";
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { filterDocs, sortDocs } from "@/lib/doc-filters";
 import type { SortCol, SortDir } from "@/lib/doc-filters";
 import { LabelProvider } from "@/contexts/label-context";
+import { apiFetch, generateContextId } from "@/lib/api-fetch";
 import { INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 
 interface DocTableProps {
@@ -47,11 +48,13 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
   }
 
   // Any cross-tab mutation warrants a full refresh since DocTable shows aggregate data
-  const refetchAll = useCallback(async () => {
+  const refetchAll = useCallback(async (event?: CrossTabReceivedEvent) => {
     try {
+      const contextId = generateContextId();
+      const reason = event ? crossTabReason(event) : undefined;
       const [docsRes, labelsRes] = await Promise.all([
-        fetch("/api/docs?includeArchived=true"),
-        fetch("/api/labels"),
+        apiFetch("/api/docs?includeArchived=true", { contextId, reason }),
+        apiFetch("/api/labels", { contextId }),
       ]);
       if (docsRes.ok) setDocs(await docsRes.json());
       if (labelsRes.ok) setLabelsRaw(await labelsRes.json());

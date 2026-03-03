@@ -175,7 +175,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       const docs: DocWithLabels[] = await docsRes.json();
 
       onRefresh(docs);
-      broadcastChange({ type: "docs" });
+      broadcastChange({ type: "docs" }, contextId);
       setOpen(false);
 
       const parts = [

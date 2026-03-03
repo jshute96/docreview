@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { highlightText } from "@/lib/highlight";
 import { broadcastChange } from "@/lib/cross-tab";
+import { apiFetch, generateContextId } from "@/lib/api-fetch";
 import { INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 
 interface DocRowProps {
@@ -28,17 +29,19 @@ export function DocRow({
 
   async function handleArchive() {
     setArchiving(true);
+    const contextId = generateContextId();
     try {
       const newStatus = doc.status === "INBOX" ? "ARCHIVED" : "INBOX";
-      const res = await fetch(`/api/docs/${doc.docId}`, {
+      const res = await apiFetch(`/api/docs/${doc.docId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
+        contextId,
       });
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithLabels = await res.json();
       onUpdate(updated);
-      broadcastChange({ type: "docs" });
+      broadcastChange({ type: "docs" }, contextId);
       toast.success(newStatus === "ARCHIVED" ? "Archived" : "Unarchived");
     } catch {
       toast.error("Failed to update status");

@@ -20,6 +20,7 @@ import { contrastText } from "@/lib/utils";
 import { ManageLabelsDialog } from "@/components/manage-labels-dialog";
 import { Button } from "@/components/ui/button";
 import { broadcastChange } from "@/lib/cross-tab";
+import { apiFetch, generateContextId } from "@/lib/api-fetch";
 import { useLabels } from "@/contexts/label-context";
 
 interface BulkEditDialogProps {
@@ -169,8 +170,9 @@ export function BulkEditDialog({
       return;
     }
     setSaving(true);
+    const contextId = generateContextId();
     try {
-      const res = await fetch("/api/docs/bulk-update", {
+      const res = await apiFetch("/api/docs/bulk-update", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -180,6 +182,7 @@ export function BulkEditDialog({
           labelUpdates: labelStates,
           appendNotes: appendNotes.trim(),
         }),
+        contextId,
       });
       if (!res.ok) throw new Error("Bulk update failed");
       const { docs: updatedDocs, skipped } = (await res.json()) as {
@@ -188,7 +191,7 @@ export function BulkEditDialog({
       };
       onSave(updatedDocs);
       setOpen(false);
-      broadcastChange({ type: "docs" });
+      broadcastChange({ type: "docs" }, contextId);
       toast.success(`Updated ${updatedDocs.length} documents`);
       if (skipped > 0) {
         toast.warning(`${skipped} document${skipped === 1 ? " was" : "s were"} not found`);

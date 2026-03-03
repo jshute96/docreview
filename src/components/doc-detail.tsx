@@ -15,7 +15,7 @@ import { CommentRow } from "@/components/comment-row";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { createMatcher } from "@/lib/highlight";
-import { broadcastChange, useCrossTabListener, type CrossTabEvent } from "@/lib/cross-tab";
+import { broadcastChange, useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { LabelProvider } from "@/contexts/label-context";
 
@@ -113,10 +113,12 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   useEffect(() => { void fetchContent(generateContextId()); }, [doc.docId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [notFound, setNotFound] = useState(false);
-  const handleCrossTab = useCallback(async (event: CrossTabEvent) => {
+  const handleCrossTab = useCallback(async (event: CrossTabReceivedEvent) => {
     try {
+      const contextId = generateContextId();
+      const reason = crossTabReason(event);
       const refetchDoc = async () => {
-        const docRes = await fetch(`/api/docs/${initialDoc.docId}`);
+        const docRes = await apiFetch(`/api/docs/${initialDoc.docId}`, { contextId, reason });
         if (docRes.ok) {
           const updated: DocWithComments = await docRes.json();
           setDoc(updated);
@@ -131,19 +133,19 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
         // Skip if the event is for a different doc
         if (event.docId && event.docId !== initialDoc.docId) return;
         const [labelsRes] = await Promise.all([
-          fetch("/api/labels"),
+          apiFetch("/api/labels", { contextId }),
           refetchDoc(),
         ]);
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
       } else if (event.type === "labels") {
         const [labelsRes] = await Promise.all([
-          fetch("/api/labels"),
+          apiFetch("/api/labels", { contextId }),
           refetchDoc(),
         ]);
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
       } else if (event.type === "comments" && event.docId === initialDoc.docId) {
         await refetchDoc();
-        void fetchContent();
+        void fetchContent(contextId);
       }
     } catch { /* cross-tab sync is best-effort */ }
   }, [initialDoc.docId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -203,7 +205,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       setComments(updated.comments);
       setSortActive(true);
       void fetchContent(contextId);
-      broadcastChange({ type: "comments", docId: doc.docId });
+      broadcastChange({ type: "comments", docId: doc.docId }, contextId);
       toast.success("Comments synced");
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to sync comments");
@@ -218,17 +220,19 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   async function handleArchive() {
     setArchiving(true);
+    const contextId = generateContextId();
     try {
       const newStatus = doc.status === "INBOX" ? "ARCHIVED" : "INBOX";
-      const res = await fetch(`/api/docs/${doc.docId}`, {
+      const res = await apiFetch(`/api/docs/${doc.docId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
+        contextId,
       });
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithLabels = await res.json();
       setDoc((prev) => ({ ...prev, status: updated.status }));
-      broadcastChange({ type: "docs" });
+      broadcastChange({ type: "docs" }, contextId);
       toast.success(newStatus === "ARCHIVED" ? "Archived" : "Unarchived");
     } catch {
       toast.error("Failed to update status");
@@ -242,11 +246,13 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     if (toArchive.length === 0) return;
 
     setBulkArchiving(true);
+    const contextId = generateContextId();
     try {
       const commentIds = toArchive.map((c) => c.commentId);
       const res = await apiFetch(`/api/docs/${doc.docId}/comments`, {
         method: "PATCH",
         body: JSON.stringify({ commentIds, status: "ARCHIVED" }),
+        contextId,
       });
       if (!res.ok) throw new Error("Failed");
       
@@ -273,7 +279,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
         });
       }, 200);
 
-      broadcastChange({ type: "comments", docId: doc.docId });
+      broadcastChange({ type: "comments", docId: doc.docId }, contextId);
       toast.success(`Archived ${count} comments`);
     } catch {
       toast.error("Failed to archive comments");

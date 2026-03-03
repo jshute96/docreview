@@ -22,6 +22,7 @@ import { logSilent } from "./log";
 // returning "--------".
 
 const CONTEXT_ID_HEADER = "x-context-id";
+const CONTEXT_REASON_HEADER = "x-context-reason";
 
 const globalForStore = globalThis as unknown as {
   _requestIdStore: AsyncLocalStorage<string> | undefined;
@@ -43,7 +44,9 @@ interface RequestLike {
  *  getRequestId() without needing it passed as an argument. */
 export function runWithRequestId<T>(method: string, req: RequestLike, fn: () => T): T {
   const id = req.headers.get(CONTEXT_ID_HEADER) || randomUUID().replace(/-/g, "").slice(0, 8);
+  const reason = req.headers.get(CONTEXT_REASON_HEADER);
   return requestIdStore.run(id, () => {
+    if (reason) logSilent(`[CrossTab] ${reason}`);
     logSilent(`[API] ${method} ${req.nextUrl.pathname}`);
     return fn();
   });

@@ -41,7 +41,7 @@ export function RefreshButton({ mode, onRefresh }: RefreshButtonProps) {
       const docs: DocWithLabels[] = await docsRes.json();
 
       onRefresh(docs);
-      broadcastChange({ type: "docs" });
+      broadcastChange({ type: "docs" }, contextId);
 
       if (mode === "gmail-refresh") {
         const parts = [

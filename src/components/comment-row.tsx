@@ -10,7 +10,7 @@ import { CommentThreadPanel } from "@/components/comment-thread-panel";
 import { highlightText } from "@/lib/highlight";
 import { formatDate } from "@/lib/utils";
 import { broadcastChange } from "@/lib/cross-tab";
-import { apiFetch, isAuthError } from "@/lib/api-fetch";
+import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 
 interface CommentRowProps {
   comment: Comment;
@@ -200,17 +200,19 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     errorMsg: string,
     successMsg: string,
   ) {
+    const contextId = generateContextId();
     const res = await apiFetch(`/api/docs/${docId}/threads/reply`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      contextId,
     });
     if (!res.ok) {
       toast.error(errorMsg);
       throw new Error("Failed");
     }
     applyThreadUpdate(await res.json());
-    broadcastChange({ type: "comments", docId });
+    broadcastChange({ type: "comments", docId }, contextId);
     toast.success(successMsg);
   }
 
@@ -240,16 +242,18 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
 
   async function updateStatus(status: "INBOX" | "ARCHIVED" | "MUTED") {
     setLoading(true);
+    const contextId = generateContextId();
     try {
-      const res = await fetch(`/api/docs/${docId}/comments/${comment.commentId}`, {
+      const res = await apiFetch(`/api/docs/${docId}/comments/${comment.commentId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
+        contextId,
       });
       if (!res.ok) throw new Error("Failed");
       const updated: Comment = await res.json();
       onUpdate(updated);
-      broadcastChange({ type: "comments", docId });
+      broadcastChange({ type: "comments", docId }, contextId);
       toast.success(`Comment ${status.toLowerCase()}`);
     } catch {
       toast.error("Failed to update comment");

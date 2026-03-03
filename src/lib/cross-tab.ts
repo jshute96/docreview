@@ -9,19 +9,34 @@ export type CrossTabEvent =
   | { type: "labels" }
   | { type: "comments"; docId: string };
 
-export function broadcastChange(event: CrossTabEvent) {
+/** Payload sent over BroadcastChannel — event data plus optional sender context ID. */
+type CrossTabMessage = CrossTabEvent & { fromContextId?: string };
+
+export function broadcastChange(event: CrossTabEvent, contextId?: string) {
   if (typeof window === "undefined") return;
   const ch = new BroadcastChannel(CHANNEL_NAME);
-  ch.postMessage(event);
+  const message: CrossTabMessage = contextId ? { ...event, fromContextId: contextId } : event;
+  ch.postMessage(message);
   ch.close();
 }
 
+/** Event as received by cross-tab listeners, with optional sender context ID. */
+export type CrossTabReceivedEvent = CrossTabEvent & { fromContextId?: string };
+
+/** Build a reason string for server logging from a received cross-tab event. */
+export function crossTabReason(event: CrossTabReceivedEvent): string {
+  let reason = `cross-tab: ${event.type}`;
+  if ("docId" in event && event.docId) reason += ` docId=${event.docId}`;
+  if (event.fromContextId) reason += ` (from ${event.fromContextId})`;
+  return reason;
+}
+
 export function useCrossTabListener(
-  handler: (event: CrossTabEvent) => void,
+  handler: (event: CrossTabReceivedEvent) => void,
   debounceMs = 300,
 ) {
   const handlerRef = useRef(handler);
-  
+
   useLayoutEffect(() => {
     handlerRef.current = handler;
   });
@@ -29,9 +44,9 @@ export function useCrossTabListener(
   useEffect(() => {
     const ch = new BroadcastChannel(CHANNEL_NAME);
     let timer: ReturnType<typeof setTimeout> | null = null;
-    let pending: CrossTabEvent | null = null;
+    let pending: CrossTabMessage | null = null;
 
-    ch.onmessage = (e: MessageEvent<CrossTabEvent>) => {
+    ch.onmessage = (e: MessageEvent<CrossTabMessage>) => {
       pending = e.data;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {

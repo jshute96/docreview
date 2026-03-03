@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { ColorPicker, PRIMARY_COLORS } from "@/components/color-picker";
 import { DialogButtons } from "@/components/dialog-buttons";
 import { broadcastChange } from "@/lib/cross-tab";
+import { apiFetch, generateContextId } from "@/lib/api-fetch";
 import { useLabels } from "@/contexts/label-context";
 
 function randomPrimaryColor(): string {
@@ -176,10 +177,11 @@ export function ManageLabelsDialog({
 
   async function handleSave() {
     setSaving(true);
+    const contextId = generateContextId();
     try {
       // 1. Delete labels
       for (const id of deletedIds) {
-        const res = await fetch(`/api/labels/${id}`, { method: "DELETE" });
+        const res = await apiFetch(`/api/labels/${id}`, { method: "DELETE", contextId });
         if (!res.ok) throw new Error("Failed to delete label");
         onLabelDelete(id);
       }
@@ -189,10 +191,11 @@ export function ManageLabelsDialog({
       for (const tempId of addedIds) {
         const tempLabel = draft.find((l) => l.labelId === tempId);
         if (!tempLabel) continue;
-        const res = await fetch("/api/labels", {
+        const res = await apiFetch("/api/labels", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: tempLabel.name, color: tempLabel.color }),
+          contextId,
         });
         if (!res.ok) {
           const err = await res.json();
@@ -204,10 +207,11 @@ export function ManageLabelsDialog({
 
       // 3. Update colors
       for (const [id, color] of colorChanges) {
-        const res = await fetch(`/api/labels/${id}`, {
+        const res = await apiFetch(`/api/labels/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ color }),
+          contextId,
         });
         if (!res.ok) throw new Error("Failed to update label color");
       }
@@ -217,16 +221,17 @@ export function ManageLabelsDialog({
 
       // 4. Persist label order
       const orderIds = finalLabels.map((l) => l.labelId);
-      const reorderRes = await fetch("/api/labels/reorder", {
+      const reorderRes = await apiFetch("/api/labels/reorder", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ order: orderIds }),
+        contextId,
       });
       if (!reorderRes.ok) throw new Error("Failed to save label order");
 
       onLabelsChange(finalLabels);
       setOpen(false);
-      broadcastChange({ type: "labels" });
+      broadcastChange({ type: "labels" }, contextId);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to save labels");
     } finally {

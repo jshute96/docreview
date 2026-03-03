@@ -16,6 +16,7 @@ import { DialogButtons } from "@/components/dialog-buttons";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { broadcastChange } from "@/lib/cross-tab";
+import { apiFetch, generateContextId } from "@/lib/api-fetch";
 import { useAutoResize } from "@/hooks/use-auto-resize";
 import { useLabelSync } from "@/hooks/use-label-sync";
 import { useLabels } from "@/contexts/label-context";
@@ -54,17 +55,19 @@ export function EditDocDialog({
 
   async function handleSave() {
     setSaving(true);
+    const contextId = generateContextId();
     try {
-      const res = await fetch(`/api/docs/${doc.docId}`, {
+      const res = await apiFetch(`/api/docs/${doc.docId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role, status, labelIds: selectedLabelIds, notes }),
+        contextId,
       });
       if (!res.ok) throw new Error("Save failed");
       const updated: DocWithLabels = await res.json();
       onSave(updated);
       setOpen(false);
-      broadcastChange({ type: "docs", docId: doc.docId });
+      broadcastChange({ type: "docs", docId: doc.docId }, contextId);
       toast.success("Saved");
     } catch {
       toast.error("Failed to save changes");
