@@ -64,8 +64,8 @@ function logFileName(dateStr: string): string {
 }
 
 function ensureStream(): WriteStream | null {
-  // Only run file logging on the server
-  if (typeof window !== "undefined") return null;
+  if (typeof window !== "undefined") return null; // no file logging if bundled into a client component (Node fs APIs unavailable)
+  if (process.env.NODE_ENV === "test") return null; // no file logging during tests
 
   const today = pstDateString(pstNow());
 
