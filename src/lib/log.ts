@@ -59,8 +59,10 @@ let currentStream: WriteStream | null = null;
 let currentDateStr = "";
 let hasLoggedStart = false;
 
+const PORT = process.env.PORT || "3000";
+
 function logFileName(dateStr: string): string {
-  return `docreview-${dateStr}.log`;
+  return `docreview-${dateStr}.${PORT}.log`;
 }
 
 function ensureStream(): WriteStream | null {
@@ -90,7 +92,7 @@ function ensureStream(): WriteStream | null {
   // Log server start on first open (not on daily rotation)
   if (!hasLoggedStart) {
     hasLoggedStart = true;
-    writeToFile("INFO ", "[Server] Started", []);
+    writeToFile("INFO ", `[Server] Started on port ${PORT}`, []);
   }
 
   return currentStream;
@@ -101,7 +103,7 @@ function cleanupOldLogs() {
     const cutoff = Date.now() - MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
     const files = readdirSync(LOG_DIR);
     for (const f of files) {
-      const match = f.match(/^docreview-(\d{4}-\d{2}-\d{2})\.log$/);
+      const match = f.match(/^docreview-(\d{4}-\d{2}-\d{2})\.\d+\.log$/);
       if (match) {
         const fileDate = new Date(match[1] + "T00:00:00");
         if (fileDate.getTime() < cutoff) {

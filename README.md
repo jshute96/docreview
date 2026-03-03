@@ -48,6 +48,7 @@ status, comments, and suggestions via the Google Drive API.
    AUTH_SECRET="..."         # generate with: npx auth secret
    AUTH_GOOGLE_ID="..."
    AUTH_GOOGLE_SECRET="..."
+   PORT=3000
    ```
 
 5. **Proxy & HTTPS Setup:**
@@ -113,11 +114,13 @@ All Google Drive/Docs API calls return 502 errors in this mode. Labels, doc meta
 npm run dev
 ```
 
-To run a second instance (e.g. from a separate checkout), use the `-p` flag:
+To run a second instance (e.g. from a separate checkout), set `PORT` in that checkout's `.env`:
 
-```bash
-npm run dev -- -p 3001
 ```
+PORT=3001
+```
+
+Then run `npm run dev` as usual. The port is also used to name log files (`logs/docreview-YYYY-MM-DD.PORT.log`) so logs from different instances don't collide.
 
 ## Usage
 
