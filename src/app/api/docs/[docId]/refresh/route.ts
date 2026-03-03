@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getDriveClient, invalidGrantResponse } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { docWithCommentsInclude } from "@/lib/doc-queries";
+import { logError, logWarning } from "@/lib/log";
 
 export async function POST(
   _req: NextRequest,
@@ -29,7 +30,7 @@ export async function POST(
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
-    console.error("Drive auth error:", err);
+    logError("[Refresh] Drive auth error:", err);
     return NextResponse.json({ error: "Failed to connect to Google Drive" }, { status: 502 });
   }
 
@@ -61,13 +62,13 @@ export async function POST(
     if (reauth) return reauth;
     const code = (err as { code?: number })?.code;
     if (code === 404 || code === 403) {
-      console.log(`[Refresh] doc ${doc.docId} (${doc.googleDocId}) is deleted or inaccessible (code ${code})`);
+      logWarning(`[Refresh] doc ${doc.docId} (${doc.googleDocId}) is deleted or inaccessible (code ${code})`);
       freshDoc = await prisma.doc.update({
         where: { docId },
         data: { isDeleted: true },
       });
     } else {
-      console.error("Failed to refresh file metadata:", err);
+      logError("[Refresh] Failed to refresh file metadata:", err);
     }
   }
 

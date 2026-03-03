@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { listRecentDocs, invalidGrantResponse } from "@/lib/google-drive";
 import { scanGmailNotifications } from "@/lib/gmail";
 import { parseLoadOptions } from "@/lib/load-options";
+import { logError, logInfo } from "@/lib/log";
 
 export async function POST(req: NextRequest) {
   const session = await getValidSession();
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   if (source === "gmail") {
     const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
-    console.log(`[Scan] Starting Gmail scan: daysBack=${daysBack}, since=${since.toISOString()}`);
+    logInfo(`[Scan] Starting Gmail scan: daysBack=${daysBack}, since=${since.toISOString()}`);
 
     try {
       const { docs: gmailDocs, errorCount } = await scanGmailNotifications(userId, since);
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
       }));
 
       const existingCount = docs.filter(d => !d.isNew).length;
-      console.log(`[Scan] Gmail scan found ${gmailDocs.length} total docs, ${gmailDocs.length - existingCount} new, ${errorCount} errors`);
+      logInfo(`[Scan] Gmail scan found ${gmailDocs.length} total docs, ${gmailDocs.length - existingCount} new, ${errorCount} errors`);
 
       return NextResponse.json({
         total: gmailDocs.length,
@@ -53,12 +54,12 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       const reauth = invalidGrantResponse(err);
       if (reauth) return reauth;
-      console.error("[Scan] Gmail error:", err);
+      logError("[Scan] Gmail error:", err);
       return NextResponse.json({ error: "Failed to scan Gmail" }, { status: 502 });
     }
   }
 
-  console.log(`[Scan] Starting Drive scan: daysBack=${daysBack}, ownership=${ownership}, includeSharedDrives=${includeSharedDrives}`);
+  logInfo(`[Scan] Starting Drive scan: daysBack=${daysBack}, ownership=${ownership}, includeSharedDrives=${includeSharedDrives}`);
 
   try {
     const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
     }));
 
     const existingCount = docs.filter(d => !d.isNew).length;
-    console.log(`[Scan] Found ${driveDocs.length} total docs, ${driveDocs.length - existingCount} new`);
+    logInfo(`[Scan] Found ${driveDocs.length} total docs, ${driveDocs.length - existingCount} new`);
 
     return NextResponse.json({
       total: driveDocs.length,
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
-    console.error("[Scan] Drive error:", err);
+    logError("[Scan] Drive error:", err);
     return NextResponse.json({ error: "Failed to scan Google Drive" }, { status: 502 });
   }
 }

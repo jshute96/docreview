@@ -7,6 +7,7 @@ import {
   fetchThreadDetail,
   invalidGrantResponse,
 } from "@/lib/google-drive";
+import { logError } from "@/lib/log";
 
 export async function POST(
   req: NextRequest,
@@ -85,7 +86,7 @@ export async function POST(
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
-    console.error(`[API] Failed to reply/resolve comment ${commentId} for doc ${docId}:`, err);
+    logError(`[API] Failed to reply/resolve comment ${commentId} for doc ${docId}:`, err);
     return NextResponse.json(
       { error: "Failed to reply/resolve comment" },
       { status: 502 }

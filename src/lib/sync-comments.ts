@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { fetchComments, fetchSuggestions, getDriveClient } from "@/lib/google-drive";
+import { logError, logWarning, logInfo } from "@/lib/log";
 import type { Doc, Prisma } from "@prisma/client";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
@@ -25,10 +26,10 @@ export async function syncComments(
   } catch (err: unknown) {
     const code = (err as { code?: number })?.code;
     if (code === 404 || code === 403) {
-      console.log(`[Comments] doc ${doc.googleDocId} is deleted or inaccessible (code ${code})`);
+      logWarning(`[Comments] doc ${doc.googleDocId} is deleted or inaccessible (code ${code})`);
       return { created: 0, shouldUnarchive: false, hasNonResolveActivity: false, isDeleted: true };
     }
-    console.error(`[Comments] failed for ${doc.googleDocId}:`, err);
+    logError(`[Comments] failed for ${doc.googleDocId}:`, err);
     return { created: 0, shouldUnarchive: false, hasNonResolveActivity: false, transientError: true };
   }
 
@@ -39,7 +40,7 @@ export async function syncComments(
     try {
       docsSuggestionsForSync = await fetchSuggestions(driveAuth, doc.googleDocId);
     } catch (err) {
-      console.error(`[Suggestions] fetch failed for ${doc.googleDocId}:`, err);
+      logError(`[Suggestions] fetch failed for ${doc.googleDocId}:`, err);
       suggestionFetchFailed = true;
     }
   }
@@ -64,7 +65,7 @@ export async function syncComments(
       // Rule 2: @-mention of me → INBOX (even if resolved, overrides everything)
       // Rule 4: I'm the doc author → INBOX (if not resolved)
       // Rule 5/6: I participated → INBOX (if not resolved)
-      const mentionedInThread = c.mentionedMe || c.replyMentionedMeFlags.some(Boolean);
+      const mentionedInThread = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
       const status: "INBOX" | "ARCHIVED" = mentionedInThread
         ? "INBOX"
         : c.resolved
@@ -101,7 +102,7 @@ export async function syncComments(
       // Rule 2: @-mention in new replies breaks out of MUTED (spec: "only case
       // when a comment moves out of Muted state").
       const newReplyMentionsMe = hasNewReplies &&
-        c.replyMentionedMeFlags.slice(existing.replyCount).some(Boolean);
+        (c.replyMentionedMeFlags ?? []).slice(existing.replyCount).some(Boolean);
 
       if (existing.status === "MUTED" && !newReplyMentionsMe) {
         const changed =
@@ -239,14 +240,14 @@ export async function syncComments(
   });
 
   if (doc.mimeType !== DOCS_MIME_TYPE) {
-    console.log(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated, ${deleted} deleted${shouldUnarchive ? " → unarchive" : ""}`);
+    logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated, ${deleted} deleted${shouldUnarchive ? " → unarchive" : ""}`);
     return { created, shouldUnarchive, hasNonResolveActivity };
   }
 
   // If the Docs API fetch failed, skip suggestion sync entirely — we can't
   // tell which suggestions are still live, so resolving absent ones would be wrong.
   if (suggestionFetchFailed) {
-    console.log(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated (suggestions skipped: fetch failed)`);
+    logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated (suggestions skipped: fetch failed)`);
     return { created, shouldUnarchive, hasNonResolveActivity, transientError: true };
   }
 
@@ -309,6 +310,6 @@ export async function syncComments(
   }
 
   const totalCreated = created + suggestionsToCreate.length;
-  console.log(`[Comments] ${doc.googleDocId}: ${comments.length} comments from Drive, ${totalCreated} new, ${updatedCount} updated, ${deleted} deleted; ${docsSuggestionsForSync.length} suggestions (${suggestionsToCreate.length} new, ${suggestionsUpdated} updated, ${suggestionsResolved} resolved)${shouldUnarchive ? " → unarchive" : ""}`);
+  logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} comments from Drive, ${totalCreated} new, ${updatedCount} updated, ${deleted} deleted; ${docsSuggestionsForSync.length} suggestions (${suggestionsToCreate.length} new, ${suggestionsUpdated} updated, ${suggestionsResolved} resolved)${shouldUnarchive ? " → unarchive" : ""}`);
   return { created: totalCreated, shouldUnarchive, hasNonResolveActivity };
 }

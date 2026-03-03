@@ -67,6 +67,15 @@ dropped `url = env(...)` support in schema.prisma).
 - **Client components**: Use `apiFetch()` from `src/lib/api-fetch.ts` instead of raw `fetch()` for any request to a Drive-backed API route. It intercepts 401 responses, shows a single deduplicated reauth toast, and throws `ApiAuthError`.
 - **Catch blocks**: When a catch block shows a `toast.error`, guard it with `if (!isAuthError(err))` so generic error toasts are suppressed when the real cause is an expired token — otherwise the user sees duplicate/confusing toasts.
 
+### Logging
+- **Errors:** Use `logError(message, ...args)` from `src/lib/log.ts` — prints red with `ERROR:` prefix via `console.error`.
+- **Warnings:** Use `logWarning(message, ...args)` from `src/lib/log.ts` — prints yellow with `WARNING:` prefix via `console.warn`.
+- **Info:** Use `logInfo(message, ...args)` from `src/lib/log.ts` — currently wraps `console.log` but centralizes for future file/structured logging.
+- **Never** use raw `console.log()`, `console.error()`, or `console.warn()` in application code; always use the helpers in `log.ts`.
+- **Prefix** every log message with a bracketed tag: `[Drive]`, `[Gmail]`, `[Sync]`, `[Comments]`, `[Suggestions]`, `[Scan]`, `[Refresh]`, `[Prisma]`, `[Auth]`, `[API]`, `[GmailRefresh]`, `[Docs]`.
+- **Include timing** for external API calls: `(${Date.now() - t0}ms)`.
+- Client-side toasts don't need corresponding `console.log` — the server-side API route already logs the operation or error.
+
 ### Code Logic
 - **Documentation**: Where code has subtle or surprising logic, add comments to explain the "why" and intended behavior.
 

@@ -12,6 +12,7 @@ P1:
 * ergonomics of control placement in comments view
   - archive at the bottom, etc.
 * Refresh selected docs
+* Capture logs into a file, with additional metadata like timestamps
 
 Easy:
 * scroll bars for lots of docs

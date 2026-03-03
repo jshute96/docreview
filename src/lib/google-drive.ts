@@ -2,6 +2,7 @@ import { google } from "googleapis";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { OFFLINE_MODE, OfflineModeError } from "@/lib/offline";
+import { logError, logWarning, logInfo } from "@/lib/log";
 
 export const SUPPORTED_MIME_TYPES = new Set([
   "application/vnd.google-apps.document",
@@ -21,7 +22,7 @@ const REAUTH_MESSAGE = "Google authorization expired. Please sign out and sign b
 /** If err is an invalid_grant error, return a 401 NextResponse; otherwise return null. */
 export function invalidGrantResponse(err: unknown): NextResponse | null {
   if (!isInvalidGrantError(err)) return null;
-  console.warn("[Auth] Google authorization expired (invalid_grant)");
+  logWarning("[Auth] Google authorization expired (invalid_grant)");
   return NextResponse.json({ error: REAUTH_MESSAGE }, { status: 401 });
 }
 
@@ -66,7 +67,7 @@ export async function getDriveClient(userId: string) {
         },
       });
     } catch (err) {
-      console.error("[Auth] Failed to persist refreshed tokens:", err);
+      logError("[Auth] Failed to persist refreshed tokens:", err);
     }
   });
 
@@ -101,16 +102,16 @@ export async function findDeletedDocIds(
       try {
         const res = await drive.files.get({ fileId: id, fields: "trashed" });
         const deleted = res.data.trashed === true;
-        console.log(`[Drive] files.get ${id} → ${deleted ? "deleted/trashed" : "ok"} (${Date.now() - t0}ms)`);
+        logInfo(`[Drive] files.get ${id} → ${deleted ? "deleted/trashed" : "ok"} (${Date.now() - t0}ms)`);
         return { id, deleted };
       } catch (err: unknown) {
         // Only treat 404/403 as deleted; skip transient errors (429, 5xx, network)
         const code = (err as { code?: number | string })?.code;
         if (code === 404 || code === "404" || code === 403 || code === "403") {
-          console.log(`[Drive] files.get ${id} → not found/access revoked (${Date.now() - t0}ms)`);
+          logWarning(`[Drive] files.get ${id} → not found/access revoked (${Date.now() - t0}ms)`);
           return { id, deleted: true };
         }
-        console.error(`[Drive] files.get ${id} → transient error (skipping, ${Date.now() - t0}ms):`, err);
+        logError(`[Drive] files.get ${id} → transient error (skipping, ${Date.now() - t0}ms):`, err);
         return { id, deleted: false };
       }
     })
@@ -205,7 +206,7 @@ export async function fetchComments(
     pageToken = res.data.nextPageToken ?? undefined;
   } while (pageToken);
 
-  console.log(
+  logInfo(
     `[Drive] comments.list ${googleDocId} (since ${sinceStr ?? "all"}) → ${comments.length} comments (${Date.now() - t0}ms)`
   );
   return comments;
@@ -263,7 +264,7 @@ export async function fetchSuggestions(
     });
   }
 
-  console.log(`[Docs] documents.get ${googleDocId} → ${suggestions.length} suggestions (${elapsed}ms)`);
+  logInfo(`[Docs] documents.get ${googleDocId} → ${suggestions.length} suggestions (${elapsed}ms)`);
   return suggestions;
 }
 
@@ -287,7 +288,7 @@ export async function fetchDocContent(
       fields: "body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds)))))",
     });
   } catch (err) {
-    console.error(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
+    logError(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
     return { documentText: null, suggestions: {} };
   }
 
@@ -322,7 +323,7 @@ export async function fetchDocContent(
     };
   }
 
-  console.log(`[Docs] documents.get ${googleDocId} (doc content: ${documentText.length} chars, ${allIds.size} suggestions) (${Date.now() - t0}ms)`);
+  logInfo(`[Docs] documents.get ${googleDocId} (doc content: ${documentText.length} chars, ${allIds.size} suggestions) (${Date.now() - t0}ms)`);
   return { documentText, suggestions };
 }
 
@@ -360,7 +361,7 @@ function extractQuotedFileContent(
   if (!qfc?.value) return null;
   const mime = qfc.mimeType ?? "text/plain";
   if (mime === "text/plain" || mime === "text/html") return { mimeType: mime, value: qfc.value };
-  console.log(`[Drive] Unexpected quotedFileContent mimeType: ${mime} on comment ${commentId}`);
+  logInfo(`[Drive] Unexpected quotedFileContent mimeType: ${mime} on comment ${commentId}`);
   return null;
 }
 
@@ -393,7 +394,7 @@ export async function fetchThreadDetail(
     fields:
       "id, resolved, content, htmlContent, quotedFileContent(mimeType, value), createdTime, modifiedTime, author(me, displayName), replies(content, htmlContent, createdTime, action, author(me, displayName))",
   });
-  console.log(`[Drive] comments.get ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
+  logInfo(`[Drive] comments.get ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
 
   const c = res.data;
   if (!c.id || c.content == null) return null;
@@ -475,7 +476,7 @@ export async function fetchAllThreads(
     pageToken = res.data.nextPageToken ?? undefined;
   } while (pageToken);
 
-  console.log(
+  logInfo(
     `[Drive] comments.list ${googleDocId} (threads) → ${threads.length} threads (${Date.now() - t0}ms)`
   );
   return threads;
@@ -499,7 +500,7 @@ export async function replyToComment(
     fields: "id",
     requestBody: resolve ? { action: "resolve" } : { content },
   });
-  console.log(`[Drive] replies.create${tag} ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
+  logInfo(`[Drive] replies.create${tag} ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
 }
 
 // Exports a Google Workspace file as plain text via the Drive API.
@@ -518,10 +519,10 @@ export async function fetchFileTextViaExport(
       mimeType: "text/plain",
     });
     const text = typeof res.data === "string" ? res.data : String(res.data ?? "");
-    console.log(`[Drive] files.export ${fileId} (plain text, ${text.length} chars) (${Date.now() - t0}ms)`);
+    logInfo(`[Drive] files.export ${fileId} (plain text, ${text.length} chars) (${Date.now() - t0}ms)`);
     return text;
   } catch (err) {
-    console.error(`[Drive] files.export ${fileId} (plain text) failed (${Date.now() - t0}ms):`, err);
+    logError(`[Drive] files.export ${fileId} (plain text) failed (${Date.now() - t0}ms):`, err);
     return null;
   }
 }
@@ -531,7 +532,7 @@ export async function getChangesStartPageToken(userId: string): Promise<string> 
   const drive = google.drive({ version: "v3", auth });
   const t0 = Date.now();
   const res = await drive.changes.getStartPageToken({});
-  console.log(`[Drive] changes.getStartPageToken → ${res.data.startPageToken} (${Date.now() - t0}ms)`);
+  logInfo(`[Drive] changes.getStartPageToken → ${res.data.startPageToken} (${Date.now() - t0}ms)`);
   return res.data.startPageToken!;
 }
 
@@ -558,7 +559,7 @@ export async function listChanges(userId: string, pageToken: string): Promise<Dr
       pageSize: 100,
       includeRemoved: true,
     });
-    console.log(`[Drive] changes.list (page ${currentToken.slice(0, 8)}…) → ${res.data.changes?.length ?? 0} changes (${Date.now() - t0}ms)`);
+    logInfo(`[Drive] changes.list (page ${currentToken.slice(0, 8)}…) → ${res.data.changes?.length ?? 0} changes (${Date.now() - t0}ms)`);
 
     for (const change of res.data.changes ?? []) {
       if (!change.fileId) continue;
@@ -601,7 +602,7 @@ export async function listChanges(userId: string, pageToken: string): Promise<Dr
     });
   }
 
-  console.log(`[Drive] changes summary: ${docs.length} changed docs, ${deletedDocIds.size} deleted (${changesByFileId.size} total changes)`);
+  logInfo(`[Drive] changes summary: ${docs.length} changed docs, ${deletedDocIds.size} deleted (${changesByFileId.size} total changes)`);
   return { docs, deletedDocIds, newPageToken };
 }
 
@@ -623,7 +624,7 @@ export async function fetchDocsByIds(userId: string, docIds: string[]): Promise<
         });
         const file = res.data;
         const isOwner = file.owners?.some((o) => o.me === true) ?? false;
-        console.log(`[Drive] files.get ${id} → "${file.name}" (${Date.now() - t0}ms)`);
+        logInfo(`[Drive] files.get ${id} → "${file.name}" (${Date.now() - t0}ms)`);
         return {
           googleDocId: id,
           title: file.name ?? id,
@@ -635,7 +636,7 @@ export async function fetchDocsByIds(userId: string, docIds: string[]): Promise<
           owner: file.owners?.[0]?.displayName ?? null,
         };
       } catch (err) {
-        console.error(`[Drive] files.get ${id} failed (${Date.now() - t0}ms):`, err);
+        logError(`[Drive] files.get ${id} failed (${Date.now() - t0}ms):`, err);
         return null;
       }
     })
@@ -668,7 +669,7 @@ export async function listRecentDocs(userId: string, since?: Date, options?: Lis
   if (ownership === "shared-with-me") qParts.push("sharedWithMe");
   const q = qParts.join(" and ");
 
-  console.log(`[Drive] files.list query: ${q}${includeSharedDrives ? " (including shared drives)" : ""}`);
+  logInfo(`[Drive] files.list query: ${q}${includeSharedDrives ? " (including shared drives)" : ""}`);
 
   const docs: DriveDoc[] = [];
   let pageToken: string | undefined;
@@ -685,7 +686,7 @@ export async function listRecentDocs(userId: string, since?: Date, options?: Lis
         ? { corpora: "allDrives", includeItemsFromAllDrives: true, supportsAllDrives: true }
         : {}),
     });
-    console.log(`[Drive] files.list (recent docs${pageToken ? ", page " + pageToken.slice(0, 8) + "…" : ""}) → ${res.data.files?.length ?? 0} files (${Date.now() - t0}ms)`);
+    logInfo(`[Drive] files.list (recent docs${pageToken ? ", page " + pageToken.slice(0, 8) + "…" : ""}) → ${res.data.files?.length ?? 0} files (${Date.now() - t0}ms)`);
 
     for (const file of res.data.files ?? []) {
       if (!file.id || !file.name) continue;

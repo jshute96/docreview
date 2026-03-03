@@ -6,6 +6,7 @@ import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken } from "@/lib/status";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 import { parseLoadOptions } from "@/lib/load-options";
+import { logError, logWarning, logInfo } from "@/lib/log";
 
 export async function GET(req: NextRequest) {
   const session = await getValidSession();
@@ -72,9 +73,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  console.log(`[Sync] Starting ${mode} sync`);
+  logInfo(`[Sync] Starting ${mode} sync`);
   if (mode === "load") {
-    console.log(`[Sync] Load options: source=${source}, daysBack=${daysBack}, ownership=${ownership}, includeSharedDrives=${includeSharedDrives}${selectedSet ? `, ${selectedSet.size} docs selected` : ""}`);
+    logInfo(`[Sync] Load options: source=${source}, daysBack=${daysBack}, ownership=${ownership}, includeSharedDrives=${includeSharedDrives}${selectedSet ? `, ${selectedSet.size} docs selected` : ""}`);
   }
   const t0 = Date.now();
 
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
     if (mode === "load") {
       // Load mode: fetch metadata directly by selected doc IDs
       const docIds = selectedSet ? [...selectedSet] : [];
-      console.log(`[Sync] Load (${source}): fetching metadata for ${docIds.length} docs by ID`);
+      logInfo(`[Sync] Load (${source}): fetching metadata for ${docIds.length} docs by ID`);
       driveDocs = await fetchDocsByIds(userId, docIds);
     } else {
       // Refresh / full-refresh: use changes.list with saved token
@@ -97,18 +98,18 @@ export async function POST(req: NextRequest) {
       const savedToken = status?.driveChangesPageToken;
 
       if (savedToken) {
-        console.log(`[Sync] ${mode}: using changes.list with saved token`);
+        logInfo(`[Sync] ${mode}: using changes.list with saved token`);
         try {
           const result = await listChanges(userId, savedToken);
           driveDocs = result.docs;
           deletedDocIds = result.deletedDocIds;
           newPageToken = result.newPageToken;
-          console.log(`[Sync] changes.list → ${driveDocs.length} changed docs, ${deletedDocIds.size} deletions`);
+          logInfo(`[Sync] changes.list → ${driveDocs.length} changed docs, ${deletedDocIds.size} deletions`);
         } catch (err: unknown) {
           // Expired/invalid token → fall back to bootstrap
           const code = (err as { code?: number | string })?.code;
           if (code === 404 || code === "404") {
-            console.warn("[Sync] changes.list token expired, falling back to bootstrap (7-day files.list)");
+            logWarning("[Sync] changes.list token expired, falling back to bootstrap (7-day files.list)");
             newPageToken = await getChangesStartPageToken(userId);
             driveDocs = await listRecentDocs(userId); // default 7-day window
           } else {
@@ -117,7 +118,7 @@ export async function POST(req: NextRequest) {
         }
       } else {
         // Bootstrap: no saved token — establish baseline and do a 7-day scan
-        console.log(`[Sync] ${mode}: no saved token, bootstrapping (7-day files.list)`);
+        logInfo(`[Sync] ${mode}: no saved token, bootstrapping (7-day files.list)`);
         newPageToken = await getChangesStartPageToken(userId);
         driveDocs = await listRecentDocs(userId); // default 7-day window
       }
@@ -125,7 +126,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
-    console.error("[Sync] Drive error:", err);
+    logError("[Sync] Drive error:", err);
     return NextResponse.json(
       { error: "Failed to fetch from Google Drive" },
       { status: 502 }
@@ -137,7 +138,7 @@ export async function POST(req: NextRequest) {
   let deleted = 0;
 
   const driveDocIds = new Set(driveDocs.map((d) => d.googleDocId));
-  console.log(`[Sync] Drive returned ${driveDocs.length} docs — processing each:`);
+  logInfo(`[Sync] Drive returned ${driveDocs.length} docs — processing each:`);
 
   // Pre-fetch existing doc IDs to distinguish adds from updates
   const existingDocIds = new Set(
@@ -153,14 +154,14 @@ export async function POST(req: NextRequest) {
     // Refresh/full-refresh: auto-add new docs I authored; skip others.
     // Shared-with-me docs arrive via gmail-refresh notifications instead.
     if ((mode === "refresh" || mode === "full-refresh") && !isExisting && doc.role !== "AUTHOR") {
-      console.log(`[Sync]   SKIP "${doc.title}" — new ${doc.role} doc (${mode} only auto-adds AUTHOR docs)`);
+      logInfo(`[Sync]   SKIP "${doc.title}" — new ${doc.role} doc (${mode} only auto-adds AUTHOR docs)`);
       continue;
     }
 
     // Load mode with selection: skip docs not selected by user
     const isSelected = !selectedSet || selectedSet.has(doc.googleDocId);
     if (mode === "load" && !isSelected) {
-      console.log(`[Sync]   SKIP "${doc.title}" — not selected by user`);
+      logInfo(`[Sync]   SKIP "${doc.title}" — not selected by user`);
       continue;
     }
 
@@ -217,17 +218,17 @@ export async function POST(req: NextRequest) {
     }
 
     if (isExisting) {
-      console.log(`[Sync]   UPDATE "${doc.title}" — already tracked, metadata updated`);
+      logInfo(`[Sync]   UPDATE "${doc.title}" — already tracked, metadata updated`);
       updated++;
     } else {
-      console.log(`[Sync]   ADD "${doc.title}" — new ${doc.role} doc (owner: ${doc.owner ?? "unknown"})`);
+      logInfo(`[Sync]   ADD "${doc.title}" — new ${doc.role} doc (owner: ${doc.owner ?? "unknown"})`);
       added++;
     }
   }
 
   // Handle deletions detected by changes.list (refresh/full-refresh)
   if (deletedDocIds.size > 0) {
-    console.log(`[Sync] Processing ${deletedDocIds.size} deletions from changes.list`);
+    logInfo(`[Sync] Processing ${deletedDocIds.size} deletions from changes.list`);
     const docsToDelete = await prisma.doc.findMany({
       where: {
         userId,
@@ -256,7 +257,7 @@ export async function POST(req: NextRequest) {
     : await prisma.doc.findMany({
         where: { userId, isDeleted: false, googleDocId: { in: [...driveDocIds] } },
       });
-  console.log(`[Sync] Syncing comments for ${commentDocs.length} docs (${mode === "full-refresh" ? "all docs" : "changed docs only"})`);
+  logInfo(`[Sync] Syncing comments for ${commentDocs.length} docs (${mode === "full-refresh" ? "all docs" : "changed docs only"})`);
   const syncResults = await Promise.all(
     commentDocs.map((doc) => syncComments(doc, driveAuth, userEmail))
   );
@@ -283,18 +284,18 @@ export async function POST(req: NextRequest) {
   const anyTransientError = syncResults.some(r => r.transientError);
   if (!anyTransientError) {
     if (newPageToken) {
-      console.log(`[Sync] Saving changes token for future refreshes`);
+      logInfo(`[Sync] Saving changes token for future refreshes`);
       await updateDriveChangesToken(userId, newPageToken);
     } else if (mode === "load") {
-      console.log("[Sync] Load complete, initializing changes token for future refreshes");
+      logInfo("[Sync] Load complete, initializing changes token for future refreshes");
       const token = await getChangesStartPageToken(userId);
       await updateDriveChangesToken(userId, token);
     }
   } else {
-    console.warn("[Sync] Transient errors during comment sync, skipping token update");
+    logWarning("[Sync] Transient errors during comment sync, skipping token update");
   }
 
   const elapsed = Date.now() - t0;
-  console.log(`[Sync] ${mode} complete in ${elapsed}ms: ${added} added, ${updated} updated, ${deleted} deleted, ${unarchived} unarchived, ${comments} comments synced`);
+  logInfo(`[Sync] ${mode} complete in ${elapsed}ms: ${added} added, ${updated} updated, ${deleted} deleted, ${unarchived} unarchived, ${comments} comments synced`);
   return NextResponse.json({ mode, added, updated, deleted, unarchived, total: driveDocs.length, comments });
 }

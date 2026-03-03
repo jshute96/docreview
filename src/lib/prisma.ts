@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { logInfo } from "@/lib/log";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -17,7 +18,7 @@ function makePrismaClient() {
       const start = Date.now();
       const result = await next(params);
       if (!READ_OPS.has(params.action)) {
-        console.log(`[Prisma] ${params.model}.${params.action} (${Date.now() - start}ms)`);
+        logInfo(`[Prisma] ${params.model}.${params.action} (${Date.now() - start}ms)`);
       }
       return result;
     });

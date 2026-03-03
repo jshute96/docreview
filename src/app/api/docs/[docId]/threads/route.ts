@@ -3,6 +3,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { google } from "googleapis";
 import { getDriveClient, fetchThreadDetail, fetchSuggestions, fetchAllThreads, invalidGrantResponse } from "@/lib/google-drive";
+import { logError } from "@/lib/log";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 
@@ -48,7 +49,7 @@ export async function GET(
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
-    console.error(`[API] Failed to fetch threads for doc ${docId}:`, err);
+    logError(`[API] Failed to fetch threads for doc ${docId}:`, err);
     return NextResponse.json(
       { error: "Failed to fetch comment threads from Drive" },
       { status: 502 }
@@ -138,7 +139,7 @@ export async function POST(
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
-    console.error(`[API] Failed to refresh comment ${commentId} for doc ${docId}:`, err);
+    logError(`[API] Failed to refresh comment ${commentId} for doc ${docId}:`, err);
     return NextResponse.json(
       { error: "Failed to refresh comment from Drive" },
       { status: 502 }

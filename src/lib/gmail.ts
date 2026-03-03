@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import { getDriveClient, parseGoogleDocId } from "@/lib/google-drive";
+import { logError, logWarning, logInfo } from "@/lib/log";
 
 export interface GmailScanDoc {
   googleDocId: string;
@@ -29,7 +30,7 @@ export async function scanGmailNotifications(
   const sinceMs = since.getTime();
 
   const query = `from:drive-shares-dm-noreply@google.com OR from:comments-noreply@docs.google.com after:${afterDate}`;
-  console.log(`[Gmail] Searching: ${query}`);
+  logInfo(`[Gmail] Searching: ${query}`);
 
   // Collect all message IDs (paginated)
   const messageIds: string[] = [];
@@ -43,7 +44,7 @@ export async function scanGmailNotifications(
       maxResults: 100,
       ...(pageToken ? { pageToken } : {}),
     });
-    console.log(`[Gmail] messages.list → ${res.data.messages?.length ?? 0} messages (${Date.now() - t0}ms)`);
+    logInfo(`[Gmail] messages.list → ${res.data.messages?.length ?? 0} messages (${Date.now() - t0}ms)`);
 
     for (const msg of res.data.messages ?? []) {
       if (msg.id) messageIds.push(msg.id);
@@ -52,11 +53,11 @@ export async function scanGmailNotifications(
   } while (pageToken);
 
   if (messageIds.length === 0) {
-    console.log("[Gmail] No notification emails found");
+    logInfo("[Gmail] No notification emails found");
     return { docs: [], errorCount: 0 };
   }
 
-  console.log(`[Gmail] Total messages to process: ${messageIds.length}`);
+  logInfo(`[Gmail] Total messages to process: ${messageIds.length}`);
 
   // Fetch each message and extract doc links
   let errorCount = 0;
@@ -75,7 +76,7 @@ export async function scanGmailNotifications(
         // Filter by internalDate for timestamp-level precision (Gmail after: is day-level only)
         const internalDate = Number(res.data.internalDate);
         if (internalDate && internalDate < sinceMs) {
-          console.log(`[Gmail] ${messageId}: skipped — internalDate ${new Date(internalDate).toISOString()} < since (${Date.now() - t0}ms)`);
+          logInfo(`[Gmail] ${messageId}: skipped — internalDate ${new Date(internalDate).toISOString()} < since (${Date.now() - t0}ms)`);
           return;
         }
 
@@ -87,27 +88,27 @@ export async function scanGmailNotifications(
         const docId = body ? extractDocId(body) : null;
 
         if (docId) {
-          console.log(`[Gmail] ${messageId}: "${subject}" → doc ${docId} (${Date.now() - t0}ms)`);
+          logInfo(`[Gmail] ${messageId}: "${subject}" → doc ${docId} (${Date.now() - t0}ms)`);
           if (!docIdMap.has(docId)) {
             docIdMap.set(docId, { subject, messageId });
           }
         } else {
-          console.error(`[Gmail] ${messageId}: "${subject}" → no doc link found in body (${Date.now() - t0}ms)`);
+          logError(`[Gmail] ${messageId}: "${subject}" → no doc link found in body (${Date.now() - t0}ms)`);
           errorCount++;
         }
       } catch (err) {
-        console.error(`[Gmail] Failed to fetch message ${messageId} (${Date.now() - t0}ms):`, err);
+        logError(`[Gmail] Failed to fetch message ${messageId} (${Date.now() - t0}ms):`, err);
         errorCount++;
       }
     })
   );
 
   if (docIdMap.size === 0) {
-    console.log(`[Gmail] No doc links found in any messages (${errorCount} errors)`);
+    logInfo(`[Gmail] No doc links found in any messages (${errorCount} errors)`);
     return { docs: [], errorCount };
   }
 
-  console.log(`[Gmail] Unique docs found: ${docIdMap.size}`);
+  logInfo(`[Gmail] Unique docs found: ${docIdMap.size}`);
 
   // Fetch Drive metadata for each doc
   const results: GmailScanDoc[] = [];
@@ -134,15 +135,20 @@ export async function scanGmailNotifications(
           role: isOwner ? "AUTHOR" : "REVIEWER",
         });
 
-        console.log(`[Gmail] Drive metadata for ${docId}: "${file.name}" (${Date.now() - t0}ms)`);
-      } catch (err) {
-        console.error(`[Gmail] Drive metadata failed for ${docId} (${Date.now() - t0}ms):`, err);
+        logInfo(`[Gmail] Drive metadata for ${docId}: "${file.name}" (${Date.now() - t0}ms)`);
+      } catch (err: unknown) {
+        const code = (err as { code?: number })?.code;
+        if (code === 404) {
+          logWarning(`[Gmail] Drive file not found: ${docId} (${Date.now() - t0}ms)`);
+        } else {
+          logError(`[Gmail] Drive metadata failed for ${docId} (${Date.now() - t0}ms):`, err);
+        }
         errorCount++;
       }
     })
   );
 
-  console.log(`[Gmail] Scan complete: ${results.length} docs, ${errorCount} errors`);
+  logInfo(`[Gmail] Scan complete: ${results.length} docs, ${errorCount} errors`);
   return { docs: results, errorCount };
 }
 
