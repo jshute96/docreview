@@ -46,8 +46,9 @@ scripts/data-export.json
 # log files
 /logs/
 
-# claude code
-.claude/
+# claude code - actually, include config and commands
+# .claude/
+
 .gemini/
 
 .playwright-mcp/
