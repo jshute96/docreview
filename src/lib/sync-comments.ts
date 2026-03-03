@@ -102,7 +102,7 @@ export async function syncComments(
       }
       // Existing comment with new replies: check for unarchive
       if (c.replyCount > existing.replyCount) {
-        // MUTED comments already handled above (early continue), so status is ACTIVE or ARCHIVED here
+        // MUTED comments already handled above (early continue), so status is INBOX or ARCHIVED here
         if (isInteresting) shouldUnarchive = true;
       }
 

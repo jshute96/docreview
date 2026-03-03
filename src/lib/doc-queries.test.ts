@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { withCommentCounts } from "./doc-queries";
 
 describe("withCommentCounts", () => {
-  it("counts inbox comments (status ACTIVE and (isThreadAuthor or iParticipated)) for REVIEWER", () => {
+  it("counts inbox comments (status INBOX and (isThreadAuthor or iParticipated)) for REVIEWER", () => {
     const doc = {
       id: "d1",
       role: "REVIEWER",
@@ -13,7 +13,7 @@ describe("withCommentCounts", () => {
         { isThreadAuthor: true, iParticipated: true, status: "INBOX", resolved: false },
         // Manual ARCHIVED unresolved thread: should NOT be watched
         { isThreadAuthor: true, iParticipated: true, status: "ARCHIVED", resolved: false },
-        // Resolved by someone else: should be watched if status is ACTIVE
+        // Resolved by someone else: should be watched if status is INBOX
         { isThreadAuthor: true, iParticipated: true, status: "INBOX", resolved: true },
       ],
     };
@@ -32,7 +32,7 @@ describe("withCommentCounts", () => {
       ],
     };
     const result = withCommentCounts(doc);
-    expect(result._count.inboxComments).toBe(2); // first 2 are ACTIVE
+    expect(result._count.inboxComments).toBe(2); // first 2 are INBOX
   });
 
   it("counts all unresolved comments as open", () => {

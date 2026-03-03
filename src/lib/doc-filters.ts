@@ -23,7 +23,7 @@ export function filterDocs(
   const lbl = partitionTriState(opts.labels);
 
   return docs.filter((doc) => {
-    // isActive: include = active only, exclude = archived only, off = all
+    // isInbox: include = inbox only, exclude = archived only, off = all
     if (opts.isInbox === "include" && doc.status === "ARCHIVED") return false;
     if (opts.isInbox === "exclude" && doc.status !== "ARCHIVED") return false;
 
