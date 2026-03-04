@@ -116,7 +116,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   const handleCrossTab = useCallback(async (event: CrossTabReceivedEvent) => {
     try {
       const contextId = generateContextId();
-      const reason = crossTabReason(event);
+      const reason = crossTabReason(event, "doc-detail");
       const refetchDoc = async () => {
         const docRes = await apiFetch(`/api/docs/${initialDoc.docId}`, { contextId, reason });
         if (docRes.ok) {
@@ -232,7 +232,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithLabels = await res.json();
       setDoc((prev) => ({ ...prev, status: updated.status }));
-      broadcastChange({ type: "docs" }, contextId);
+      broadcastChange({ type: "docs", docId: doc.docId }, contextId);
       toast.success(newStatus === "ARCHIVED" ? "Archived" : "Unarchived");
     } catch {
       toast.error("Failed to update status");

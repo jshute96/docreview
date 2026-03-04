@@ -24,11 +24,11 @@ export function broadcastChange(event: CrossTabEvent, contextId?: string) {
 export type CrossTabReceivedEvent = CrossTabEvent & { fromContextId?: string };
 
 /** Build a reason string for server logging from a received cross-tab event. */
-export function crossTabReason(event: CrossTabReceivedEvent): string {
-  let reason = `cross-tab: ${event.type}`;
-  if ("docId" in event && event.docId) reason += ` docId=${event.docId}`;
-  if (event.fromContextId) reason += ` (from ${event.fromContextId})`;
-  return reason;
+export function crossTabReason(event: CrossTabReceivedEvent, receiver: string): string {
+  let payload = event.type as string;
+  if ("docId" in event && event.docId) payload += ` docId=${event.docId}`;
+  const from = event.fromContextId ? ` from ${event.fromContextId}` : "";
+  return `${receiver} got notification${from}: ${payload}`;
 }
 
 export function useCrossTabListener(

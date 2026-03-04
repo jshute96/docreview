@@ -51,7 +51,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
   const refetchAll = useCallback(async (event?: CrossTabReceivedEvent) => {
     try {
       const contextId = generateContextId();
-      const reason = event ? crossTabReason(event) : undefined;
+      const reason = event ? crossTabReason(event, "doc-list") : undefined;
       const [docsRes, labelsRes] = await Promise.all([
         apiFetch("/api/docs?includeArchived=true", { contextId, reason }),
         apiFetch("/api/labels", { contextId }),

@@ -58,7 +58,7 @@ export function AddDocDialog({
               onSuccess={(newDoc) => {
                 onDocAdded(newDoc);
                 setOpen(false);
-                broadcastChange({ type: "docs" });
+                broadcastChange({ type: "docs", docId: newDoc.docId });
                 toast.success(`Added "${newDoc.title}"`);
               }}
               buttons={({ handleAdd, adding, isValid }) => (

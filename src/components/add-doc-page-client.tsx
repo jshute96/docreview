@@ -39,7 +39,7 @@ export function AddDocPageClient({
 
   const refetchLabels = useCallback(async (event?: CrossTabReceivedEvent) => {
     try {
-      const reason = event ? crossTabReason(event) : undefined;
+      const reason = event ? crossTabReason(event, "add-doc") : undefined;
       const res = await apiFetch("/api/labels", { reason });
       if (res.ok) setLabels(await res.json());
     } catch { /* cross-tab sync is best-effort */ }
@@ -50,7 +50,7 @@ export function AddDocPageClient({
   const handleSuccess = useCallback((doc: DocWithLabels) => {
     contentRef.current?.reset();
     setLastAdded({ docId: doc.docId, title: doc.title, mimeType: doc.mimeType });
-    broadcastChange({ type: "docs" });
+    broadcastChange({ type: "docs", docId: doc.docId });
     toast.success(`Added "${doc.title}"`);
   }, []);
 
