@@ -124,6 +124,6 @@ describe("deriveCommentFlags", () => {
 
   it("handles empty replies array", () => {
     const result = deriveCommentFlags({ me: true }, []);
-    expect(result).toEqual({ isThreadAuthor: true, iParticipated: true, iResolvedIt: false });
+    expect(result).toEqual({ isThreadAuthor: true, iParticipated: true, iResolvedIt: false, iCommentedLast: true });
   });
 });

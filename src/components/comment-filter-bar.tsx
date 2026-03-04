@@ -6,11 +6,13 @@ interface CommentFilterBarProps {
   myCommentsFilter: boolean;
   showMode: ShowMode;
   suggestionsOnly: boolean;
+  unrepliedFilter: boolean;
   searchFilter: string;
   onMyThreadsChange: (v: boolean) => void;
   onMyCommentsChange: (v: boolean) => void;
   onShowModeChange: (v: ShowMode) => void;
   onSuggestionsOnlyChange: (v: boolean) => void;
+  onUnrepliedChange: (v: boolean) => void;
   onSearchFilterChange: (v: string) => void;
 }
 
@@ -19,11 +21,13 @@ export function CommentFilterBar({
   myCommentsFilter,
   showMode,
   suggestionsOnly,
+  unrepliedFilter,
   searchFilter,
   onMyThreadsChange,
   onMyCommentsChange,
   onShowModeChange,
   onSuggestionsOnlyChange,
+  onUnrepliedChange,
   onSearchFilterChange,
 }: CommentFilterBarProps) {
   function toggleBtn(active: boolean, label: string, onClick: () => void, title?: string) {
@@ -51,7 +55,9 @@ export function CommentFilterBar({
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
 
         {toggleBtn(myThreadsFilter, "My threads", () => onMyThreadsChange(!myThreadsFilter), "Threads I participated in")}
+        <div className="h-4 w-px bg-zinc-200" />
         {toggleBtn(myCommentsFilter, "My comments", () => onMyCommentsChange(!myCommentsFilter), "Threads I started")}
+        <div className="h-4 w-px bg-zinc-200" />
         {toggleBtn(suggestionsOnly, "Suggestions", () => onSuggestionsOnlyChange(!suggestionsOnly), "Show suggestions")}
 
         <div className="h-4 w-px bg-zinc-200" />
@@ -77,6 +83,9 @@ export function CommentFilterBar({
             </button>
           ))}
         </div>
+
+        <div className="h-4 w-px bg-zinc-200" />
+        {toggleBtn(unrepliedFilter, "Unreplied", () => onUnrepliedChange(!unrepliedFilter), "Exclude threads where I wrote the last reply")}
 
       </div>
 

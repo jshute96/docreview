@@ -77,6 +77,7 @@ export async function POST(
         resolved: data.resolved,
         isThreadAuthor: data.isThreadAuthor,
         iParticipated: data.iParticipated,
+        iCommentedLast: data.iCommentedLast,
         ...(isMuted ? {} : { status }),
         driveCreatedAt: data.driveCreatedAt,
         driveModifiedAt: data.driveModifiedAt,

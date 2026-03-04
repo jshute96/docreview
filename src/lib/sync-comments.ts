@@ -88,6 +88,7 @@ export async function syncComments(
         resolved: c.resolved,
         isThreadAuthor: c.isThreadAuthor,
         iParticipated: c.iParticipated,
+        iCommentedLast: c.iCommentedLast,
         status,
         driveCreatedAt: c.driveCreatedAt,
         driveModifiedAt: c.driveModifiedAt,
@@ -115,6 +116,7 @@ export async function syncComments(
         const changed =
           existing.resolved !== c.resolved ||
           existing.iParticipated !== c.iParticipated ||
+          existing.iCommentedLast !== c.iCommentedLast ||
           !datesEqual(existing.driveCreatedAt, c.driveCreatedAt) ||
           !datesEqual(existing.driveModifiedAt, c.driveModifiedAt) ||
           existing.replyCount !== c.replyCount;
@@ -124,6 +126,7 @@ export async function syncComments(
             data: {
               resolved: c.resolved,
               iParticipated: c.iParticipated,
+              iCommentedLast: c.iCommentedLast,
               driveCreatedAt: c.driveCreatedAt,
               driveModifiedAt: c.driveModifiedAt,
               replyCount: c.replyCount,
@@ -201,6 +204,7 @@ export async function syncComments(
       const changed =
         existing.resolved !== c.resolved ||
         existing.iParticipated !== c.iParticipated ||
+        existing.iCommentedLast !== c.iCommentedLast ||
         existing.status !== status ||
         !datesEqual(existing.driveCreatedAt, c.driveCreatedAt) ||
         !datesEqual(existing.driveModifiedAt, c.driveModifiedAt) ||
@@ -211,6 +215,7 @@ export async function syncComments(
           data: {
             resolved: c.resolved,
             iParticipated: c.iParticipated,
+            iCommentedLast: c.iCommentedLast,
             status,
             driveCreatedAt: c.driveCreatedAt,
             driveModifiedAt: c.driveModifiedAt,

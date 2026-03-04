@@ -156,6 +156,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   const [myCommentsFilter, setMyCommentsFilter] = useState(false);
   const [showMode, setShowMode] = useState<"inbox" | "open" | "resolved" | "all">("inbox");
   const [suggestionsOnly, setSuggestionsOnly] = useState(false);
+  const [unrepliedFilter, setUnrepliedFilter] = useState(false);
   const [searchFilter, setSearchFilter] = useState("");
   type SortCol = "driveCreatedAt" | "driveModifiedAt" | "replyCount" | "iParticipated" | "resolved";
   type SortDir = "asc" | "desc";
@@ -186,6 +187,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     if (showMode === "resolved" && !c.resolved) return true;
     if (myThreadsFilter && !c.iParticipated) return true;
     if (myCommentsFilter && !c.isThreadAuthor) return true;
+    if (unrepliedFilter && c.iCommentedLast) return true;
     return false;
   }
 
@@ -496,11 +498,13 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
         myCommentsFilter={myCommentsFilter}
         showMode={showMode}
         suggestionsOnly={suggestionsOnly}
+        unrepliedFilter={unrepliedFilter}
         searchFilter={searchFilter}
         onMyThreadsChange={setMyThreadsFilter}
         onMyCommentsChange={setMyCommentsFilter}
         onShowModeChange={setShowMode}
         onSuggestionsOnlyChange={setSuggestionsOnly}
+        onUnrepliedChange={setUnrepliedFilter}
         onSearchFilterChange={setSearchFilter}
       />
 

@@ -1,5 +1,4 @@
 P0:
-* Distinguish a comment state for "last comment is by me".
 
 P1:
 * refine gmail flows
