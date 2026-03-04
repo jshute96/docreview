@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Menu, Archive, ArchiveRestore } from "lucide-react";
 import type { Comment, Label } from "@prisma/client";
 import type { DocWithComments, DocWithLabels } from "@/types";
 import type { CommentThread, SuggestionContent } from "@/lib/google-drive";
@@ -13,6 +13,12 @@ import { ROLE_COLORS } from "@/lib/role-colors";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatDate } from "@/lib/utils";
 import { createMatcher } from "@/lib/highlight";
 import { broadcastChange, useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
@@ -53,6 +59,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   const [comments, setComments] = useState<Comment[]>(initialDoc.comments);
   const [archiving, setArchiving] = useState(false);
   const [bulkArchiving, setBulkArchiving] = useState(false);
+  const [bulkUnarchiving, setBulkUnarchiving] = useState(false);
   const [threadMap, setThreadMap] = useState<Record<string, CommentThread>>({});
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
   const [documentText, setDocumentText] = useState<string | undefined>(undefined);
@@ -249,31 +256,35 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     }
   }
 
-  async function handleArchiveAll() {
-    const toArchive = filteredComments.filter((c) => c.status === "INBOX");
-    if (toArchive.length === 0) return;
+  async function handleBulkStatusChange(fromStatus: "INBOX" | "ARCHIVED", toStatus: "INBOX" | "ARCHIVED") {
+    const targets = filteredComments.filter((c) => c.status === fromStatus);
+    if (targets.length === 0) return;
 
-    setBulkArchiving(true);
+    const setBusy = toStatus === "ARCHIVED" ? setBulkArchiving : setBulkUnarchiving;
+    const verb = toStatus === "ARCHIVED" ? "archive" : "unarchive";
+    const pastVerb = toStatus === "ARCHIVED" ? "Archived" : "Unarchived";
+
+    setBusy(true);
     const contextId = generateContextId();
     try {
-      const commentIds = toArchive.map((c) => c.commentId);
+      const commentIds = targets.map((c) => c.commentId);
       const res = await apiFetch(`/api/docs/${doc.docId}/comments`, {
         method: "PATCH",
-        body: JSON.stringify({ commentIds, status: "ARCHIVED" }),
+        body: JSON.stringify({ commentIds, status: toStatus }),
         contextId,
       });
       if (!res.ok) throw new Error("Failed");
-      
+
       const { count } = await res.json();
       setComments((prev) =>
         prev.map((c) =>
-          commentIds.includes(c.commentId) ? { ...c, status: "ARCHIVED" } : c
+          commentIds.includes(c.commentId) ? { ...c, status: toStatus } : c
         )
       );
-      
+
       // Trigger animations for comments that are now filtered out
-      toArchive.forEach(c => {
-        const updated = { ...c, status: "ARCHIVED" as const };
+      targets.forEach(c => {
+        const updated = { ...c, status: toStatus };
         if (wouldBeFilteredOut(updated)) {
           setExitingIds((prev) => new Set(prev).add(updated.commentId));
         }
@@ -282,19 +293,22 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       setTimeout(() => {
         setExitingIds((prev) => {
           const next = new Set(prev);
-          toArchive.forEach(c => next.delete(c.commentId));
+          targets.forEach(c => next.delete(c.commentId));
           return next;
         });
       }, 200);
 
       broadcastChange({ type: "comments", docId: doc.docId }, contextId);
-      toast.success(`Archived ${count} comments`);
+      toast.success(`${pastVerb} ${count} comments`);
     } catch {
-      toast.error("Failed to archive comments");
+      toast.error(`Failed to ${verb} comments`);
     } finally {
-      setBulkArchiving(false);
+      setBusy(false);
     }
   }
+
+  function handleArchiveAll() { void handleBulkStatusChange("INBOX", "ARCHIVED"); }
+  function handleUnarchiveAll() { void handleBulkStatusChange("ARCHIVED", "INBOX"); }
 
   function handleCommentUpdate(updated: Comment) {
     setSortActive(false);
@@ -554,16 +568,34 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                     >
                       Collapse all
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-5 px-1.5 text-[10px] text-zinc-900"
-                      title="Archive all visible comments"
-                      onClick={handleArchiveAll}
-                      disabled={bulkArchiving || !filteredComments.some((c) => c.status === "INBOX")}
-                    >
-                      {bulkArchiving ? "Archiving..." : "Archive all"}
-                    </Button>
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-5 px-1 text-zinc-900"
+                          title="More actions"
+                        >
+                          <Menu className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onSelect={handleArchiveAll}
+                          disabled={bulkArchiving || !filteredComments.some((c) => c.status === "INBOX")}
+                        >
+                          <Archive className="h-4 w-4 mr-2" />
+                          {bulkArchiving ? "Archiving..." : "Archive all"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={handleUnarchiveAll}
+                          disabled={bulkUnarchiving || !filteredComments.some((c) => c.status === "ARCHIVED")}
+                        >
+                          <ArchiveRestore className="h-4 w-4 mr-2" />
+                          {bulkUnarchiving ? "Unarchiving..." : "Unarchive all"}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </th>
               </tr>

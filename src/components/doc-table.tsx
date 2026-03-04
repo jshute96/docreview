@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
-import { useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
+import { useCrossTabListener, crossTabReason, broadcastChange, type CrossTabReceivedEvent } from "@/lib/cross-tab";
 import type { TriState } from "@/lib/tri-state";
 import { DocRow } from "@/components/doc-row";
 import { FilterBar } from "@/components/filter-bar";
@@ -13,11 +13,20 @@ import { RefreshButton } from "@/components/refresh-button";
 import { LoadDialog } from "@/components/load-dialog";
 import { BulkEditDialog } from "@/components/bulk-edit-dialog";
 import { signOut } from "next-auth/react";
+import { Menu, RefreshCw, LogOut } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { filterDocs, sortDocs } from "@/lib/doc-filters";
 import type { SortCol, SortDir } from "@/lib/doc-filters";
 import { LabelProvider } from "@/contexts/label-context";
-import { apiFetch, generateContextId } from "@/lib/api-fetch";
+import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 
 interface DocTableProps {
@@ -123,6 +132,37 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
     });
   }
 
+  const [fullRefreshing, setFullRefreshing] = useState(false);
+
+  async function handleFullRefresh() {
+    setFullRefreshing(true);
+    const contextId = generateContextId();
+    try {
+      const syncRes = await apiFetch("/api/docs?mode=full-refresh", { method: "POST", contextId });
+      if (!syncRes.ok) throw new Error("Sync failed");
+      const data = await syncRes.json();
+
+      const docsRes = await apiFetch("/api/docs?includeArchived=true", { contextId });
+      if (!docsRes.ok) throw new Error("Failed to reload docs");
+      const newDocs: DocWithLabels[] = await docsRes.json();
+
+      setDocs(newDocs);
+      broadcastChange({ type: "docs" }, contextId);
+
+      const parts = [
+        data.added > 0 ? `${data.added} new` : "",
+        data.updated > 0 ? `${data.updated} updated` : "",
+        data.deleted > 0 ? `${data.deleted} deleted` : "",
+        data.unarchived > 0 ? `${data.unarchived} unarchived` : "",
+      ].filter(Boolean).join(", ");
+      toast.success(`Full refresh complete — ${parts || "no updates"}`, { duration: 8000 });
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to sync with Google Drive");
+    } finally {
+      setFullRefreshing(false);
+    }
+  }
+
   const filteredDocs = sortDocs(
     filterDocs(docs, {
       isInbox,
@@ -172,19 +212,50 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
           />
           <RefreshButton mode="refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
           <RefreshButton mode="gmail-refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
-          <RefreshButton mode="full-refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
           <LoadDialog onRefresh={(newDocs) => setDocs(newDocs)} />
           <ManageLabelsDialog />
           <Button
             variant="outline"
             size="sm"
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            disabled={isOffline}
-            title="Sign out of your account"
-            className={isOffline ? "opacity-50 cursor-not-allowed" : ""}
+            onClick={() => window.open("https://drive.google.com", "_blank")}
+            title="Open Google Drive"
+            className="px-2"
           >
-            Sign out
+            <img
+              src="https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_48dp.png"
+              alt="Google Drive"
+              className="h-4 w-4"
+            />
           </Button>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                title="More options"
+                className="px-2"
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={handleFullRefresh}
+                disabled={fullRefreshing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${fullRefreshing ? "animate-spin" : ""}`} />
+                Full Refresh
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => signOut({ callbackUrl: "/login" })}
+                disabled={isOffline}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

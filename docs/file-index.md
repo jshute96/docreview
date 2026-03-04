@@ -65,7 +65,18 @@ One-line descriptions of every source file, grouped by layer.
 
 ### UI primitives (`src/components/ui/`)
 
-Shadcn/ui components: `badge.tsx`, `button.tsx`, `checkbox.tsx`, `dialog.tsx`, `popover.tsx`, `select.tsx`, `sonner.tsx`
+Shadcn/ui components:
+
+| File | Description |
+|------|-------------|
+| `badge.tsx` | Badge component |
+| `button.tsx` | Button component with variant/size props |
+| `checkbox.tsx` | Checkbox input |
+| `dialog.tsx` | Modal dialog (Radix) |
+| `dropdown-menu.tsx` | Dropdown menu (Radix) |
+| `popover.tsx` | Popover (Radix) |
+| `select.tsx` | Select dropdown (Radix) |
+| `sonner.tsx` | Toast notifications (Sonner) |
 
 ## Hooks (`src/hooks/`)
 

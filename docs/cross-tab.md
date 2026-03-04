@@ -99,7 +99,7 @@ broadcastChange({ type: "docs", docId: doc.docId }, contextId);
 | Source | Trigger |
 |--------|---------|
 | `doc-detail.tsx` handleRefresh | Per-doc comment sync |
-| `doc-detail.tsx` handleArchiveAll | Bulk archive visible comments |
+| `doc-detail.tsx` handleBulkStatusChange | Bulk archive/unarchive visible comments |
 | `comment-row.tsx` postReply | Reply, resolve, or reopen a thread |
 | `comment-row.tsx` updateStatus | Change comment status (inbox/archive/mute) |
 

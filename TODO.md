@@ -1,12 +1,14 @@
 P0:
 
 P1:
+* handle gmail notifications
+  * share request emails - from me, to me
+  * I shared with you emails
 * refine gmail flows
 * Remember state/tag for @mentioned on comment, with mine/replied and resolved
 * Status column in comments view: Mine, Replied, Open, Inbox, Muted
 * Main app title in the top level.
 * More decoration - favicon.
-* Hamburger menus for some of the buttons for extra actions.
 * ergonomics of control placement in comments view
   - archive at the bottom, etc.
 * Refresh selected docs
