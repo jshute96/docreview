@@ -29,8 +29,12 @@ export function invalidGrantResponse(err: unknown): NextResponse | null {
   return NextResponse.json({ error: REAUTH_MESSAGE }, { status: 401 });
 }
 
+const BARE_DOC_ID_RE = /^[a-zA-Z0-9_-]{20,}$/;
+
 export function parseGoogleDocId(url: string): string | null {
-  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  const trimmed = url.trim();
+  if (BARE_DOC_ID_RE.test(trimmed)) return trimmed;
+  const match = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
   return match?.[1] ?? null;
 }
 

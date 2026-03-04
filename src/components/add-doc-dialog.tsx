@@ -41,7 +41,7 @@ export function AddDocDialog({
     >
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button variant="outline" size="sm" title="Add a Google Drive document by URL">
+          <Button variant="outline" size="sm" title="Add a Google Drive document by URL or doc ID">
             Add doc
           </Button>
         )}

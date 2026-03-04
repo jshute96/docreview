@@ -25,7 +25,7 @@ type ValidationState = "idle" | "validating" | "valid" | "invalid";
 function errorMessageForCode(code: string): string {
   switch (code) {
     case "invalid_url":
-      return "Not a recognized Google Drive URL";
+      return "Not a recognized Google Drive URL or doc ID";
     case "invalid_mime_type":
       return "Only Docs, Sheets, and Slides are supported";
     case "already_exists":
@@ -218,8 +218,8 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
           <div>
             <div className="flex items-center gap-2">
               <input
-                type="url"
-                placeholder="https://docs.google.com/..."
+                type="text"
+                placeholder="URL or doc ID"
                 value={url}
                 onChange={(e) => handleUrlChange(e.target.value)}
                 className="flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
