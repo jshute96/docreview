@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import { useCrossTabListener, crossTabReason, broadcastChange, type CrossTabReceivedEvent } from "@/lib/cross-tab";
@@ -80,6 +80,49 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
   const [titleFilter, setTitleFilter] = useState("");
   const [sortCol, setSortCol] = useState<SortCol>("lastModifiedInDrive");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  // Update document title to reflect active filters
+  useEffect(() => {
+    const MIME_NAMES: Record<string, string> = {
+      "application/vnd.google-apps.document": "Docs",
+      "application/vnd.google-apps.spreadsheet": "Sheets",
+      "application/vnd.google-apps.presentation": "Slides",
+    };
+    const parts: string[] = [];
+
+    for (const [mime, state] of Object.entries(mimeTypes)) {
+      const name = MIME_NAMES[mime] ?? mime;
+      if (state === "include") parts.push(name);
+      else if (state === "exclude") parts.push(`!${name}`);
+    }
+
+    if (isAuthor === "include") parts.push("Author");
+    else if (isAuthor === "exclude") parts.push("!Author");
+
+    for (const label of labels) {
+      const state = labelsFilter[label.labelId];
+      if (state === "include") parts.push(label.name);
+      else if (state === "exclude") parts.push(`!${label.name}`);
+    }
+
+    if (isInbox === "exclude") parts.push("!Inbox");
+    else if (isInbox === "off") parts.push("All docs");
+
+    if (hasComments === "include") parts.push("Comments");
+    else if (hasComments === "exclude") parts.push("!Comments");
+
+    if (titleFilter) {
+      const truncated = titleFilter.length > 20
+        ? titleFilter.slice(0, 20) + "..."
+        : titleFilter;
+      parts.push(`"${truncated}"`);
+    }
+
+    // Inbox "include" is the default view — only show it when it's the sole filter
+    if (isInbox === "include" && parts.length === 0) parts.push("Inbox");
+
+    document.title = "Docreview: " + parts.join(", ");
+  }, [isInbox, hasComments, isAuthor, mimeTypes, labelsFilter, titleFilter, labels]);
 
   function handleSort(col: SortCol) {
     if (sortCol === col) {
