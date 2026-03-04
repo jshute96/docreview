@@ -620,7 +620,7 @@ export async function listChanges(userId: string, pageToken: string): Promise<Dr
       drive.changes.list({
         pageToken: currentToken,
         fields: "nextPageToken, newStartPageToken, changes(removed, fileId, file(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed))",
-        pageSize: 100,
+        pageSize: 1000,
         includeRemoved: true,
       }),
       `[Drive] changes.list${currentToken ? " (page)" : ""}`
@@ -747,7 +747,7 @@ export async function listRecentDocs(userId: string, since?: Date, options?: Lis
         q,
         fields:
           "nextPageToken, files(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName))",
-        pageSize: 100,
+        pageSize: 1000,
         pageToken,
         ...(includeSharedDrives
           ? { corpora: "allDrives", includeItemsFromAllDrives: true, supportsAllDrives: true }
