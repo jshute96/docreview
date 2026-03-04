@@ -94,3 +94,12 @@ Suggestion text (inserted and deleted strings) is fetched on page load via `fetc
 which makes a single `documents.get` call with `SUGGESTIONS_INLINE` to extract both suggestion
 content and document body text. Results are keyed by `suggest.xxx` and display correctly for
 all suggestion records.
+
+### Permissions and View-Only Access
+
+If a user has "Viewer" access to a document but lacks permission to view suggestions or comments, the Docs API call with `suggestionsViewMode: "SUGGESTIONS_INLINE"` will fail with a `403 Forbidden` error indicating `permission to access the document suggestions`. 
+
+Docreview handles this gracefully:
+- In `fetchDocContent`, it logs a warning and retries the fetch *without* requesting suggestions so the document text can still be displayed.
+- In `syncComments`, the suggestion fetch is skipped, and a warning is logged. Existing suggestions in the database are left untouched (not incorrectly marked as resolved).
+- In `fetchAllThreads` (which powers the thread view for the UI), 403 errors are caught and logged as warnings, returning empty lists so the page can continue functioning and load the document text.

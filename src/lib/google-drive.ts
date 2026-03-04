@@ -299,13 +299,42 @@ export async function fetchDocContent(
       docs.documents.get({
         documentId: googleDocId,
         suggestionsViewMode: "SUGGESTIONS_INLINE",
-        fields: "body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds)))))",
+        fields:
+          "body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds)))))",
       }),
       `[Docs] documents.get ${googleDocId} (content)`
     );
-  } catch (err) {
-    logError(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
-    return { documentText: null, suggestions: {} };
+  } catch (err: any) {
+    // If we have view-only access but no permission for comments/suggestions,
+    // Google might fail the entire call. Retry without asking for suggestions.
+    if (
+      err.code === 403 &&
+      err.message?.includes("permission to access the document suggestions")
+    ) {
+      logWarning(
+        `[Docs] Permission denied for suggestions on ${googleDocId}, retrying without suggestions.`
+      );
+      try {
+        res = await withProgressLogging(
+          docs.documents.get({
+            documentId: googleDocId,
+            fields: "body(content(paragraph(elements(textRun(content)))))",
+          }),
+          `[Docs] documents.get ${googleDocId} (content, no suggestions)`
+        );
+      } catch (innerErr) {
+        logError(
+          `[Docs] documents.get ${googleDocId} failed even without suggestions (${
+            Date.now() - t0
+          }ms):`,
+          innerErr
+        );
+        return { documentText: null, suggestions: {} };
+      }
+    } else {
+      logError(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
+      return { documentText: null, suggestions: {} };
+    }
   }
 
   const textParts: string[] = [];
@@ -456,47 +485,57 @@ export async function fetchAllThreads(
   const threads: CommentThread[] = [];
   let pageToken: string | undefined;
 
-  do {
-    const res = await withProgressLogging(
-      drive.comments.list({
-        fileId: googleDocId,
-        fields:
-          "nextPageToken, comments(id, resolved, content, htmlContent, quotedFileContent(mimeType, value), createdTime, modifiedTime, author(displayName), replies(content, htmlContent, createdTime, action, author(displayName)))",
-        pageSize: 100,
-        ...(pageToken ? { pageToken } : {}),
-      }),
-      `[Drive] comments.list ${googleDocId} (threads${pageToken ? " page" : ""})`
-    );
+  try {
+    do {
+      const res = await withProgressLogging(
+        drive.comments.list({
+          fileId: googleDocId,
+          fields:
+            "nextPageToken, comments(id, resolved, content, htmlContent, quotedFileContent(mimeType, value), createdTime, modifiedTime, author(displayName), replies(content, htmlContent, createdTime, action, author(displayName)))",
+          pageSize: 100,
+          ...(pageToken ? { pageToken } : {}),
+        }),
+        `[Drive] comments.list ${googleDocId} (threads${pageToken ? " page" : ""})`
+      );
 
-    for (const c of res.data.comments ?? []) {
-      if (!c.id || c.content == null) continue;
+      for (const c of res.data.comments ?? []) {
+        if (!c.id || c.content == null) continue;
 
-      const replies: ThreadReply[] = (c.replies ?? []).map((r) => ({
-        author: r.author?.displayName ?? "Unknown",
-        content: r.content ?? "",
-        ...(r.htmlContent ? { htmlContent: r.htmlContent } : {}),
-        createdTime: r.createdTime ?? "",
-        ...(r.action === "resolve" || r.action === "reopen" ? { action: r.action } : {}),
-      }));
+        const replies: ThreadReply[] = (c.replies ?? []).map((r) => ({
+          author: r.author?.displayName ?? "Unknown",
+          content: r.content ?? "",
+          ...(r.htmlContent ? { htmlContent: r.htmlContent } : {}),
+          createdTime: r.createdTime ?? "",
+          ...(r.action === "resolve" || r.action === "reopen" ? { action: r.action } : {}),
+        }));
 
-      threads.push({
-        id: c.id,
-        author: c.author?.displayName ?? "Unknown",
-        content: c.content,
-        ...(c.htmlContent ? { htmlContent: c.htmlContent } : {}),
-        createdTime: c.createdTime ?? "",
-        ...(c.modifiedTime ? { modifiedTime: c.modifiedTime } : {}),
-        resolved: c.resolved === true,
-        replies,
-        quotedFileContent: extractQuotedFileContent(c.quotedFileContent, c.id),
-      });
+        threads.push({
+          id: c.id,
+          author: c.author?.displayName ?? "Unknown",
+          content: c.content,
+          ...(c.htmlContent ? { htmlContent: c.htmlContent } : {}),
+          createdTime: c.createdTime ?? "",
+          ...(c.modifiedTime ? { modifiedTime: c.modifiedTime } : {}),
+          resolved: c.resolved === true,
+          replies,
+          quotedFileContent: extractQuotedFileContent(c.quotedFileContent, c.id),
+        });
+      }
+
+      pageToken = res.data.nextPageToken ?? undefined;
+    } while (pageToken);
+  } catch (err: any) {
+    if (err.code === 403) {
+      logWarning(`[Drive] Permission denied for comments on ${googleDocId}.`);
+      return [];
     }
-
-    pageToken = res.data.nextPageToken ?? undefined;
-  } while (pageToken);
+    throw err;
+  }
 
   logInfo(
-    `[Drive] comments.list ${googleDocId} (threads) → ${threads.length} threads (${Date.now() - t0}ms)`
+    `[Drive] comments.list ${googleDocId} (threads) → ${
+      threads.length
+    } threads (${Date.now() - t0}ms)`
   );
   return threads;
 }

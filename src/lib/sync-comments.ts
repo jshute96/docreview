@@ -39,8 +39,15 @@ export async function syncComments(
   if (doc.mimeType === DOCS_MIME_TYPE) {
     try {
       docsSuggestionsForSync = await fetchSuggestions(driveAuth, doc.googleDocId);
-    } catch (err) {
-      logError(`[Suggestions] fetch failed for ${doc.googleDocId}:`, err);
+    } catch (err: any) {
+      if (
+        err.code === 403 &&
+        err.message?.includes("permission to access the document suggestions")
+      ) {
+        logWarning(`[Suggestions] permission denied for ${doc.googleDocId}`);
+      } else {
+        logError(`[Suggestions] fetch failed for ${doc.googleDocId}:`, err);
+      }
       suggestionFetchFailed = true;
     }
   }
