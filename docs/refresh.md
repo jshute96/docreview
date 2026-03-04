@@ -37,7 +37,7 @@ exists (Refresh with no prior sync).
 
 **Query:** `mimeType in (doc, sheet, slides) AND modifiedTime > cutoff AND trashed = false`
 **Fields:** `id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName)`
-**Pagination:** `pageSize: 100`, follows `nextPageToken` until exhausted.
+**Pagination:** `pageSize: 1000`, follows `nextPageToken` until exhausted.
 
 ### Drive API v3 — `files.get` (Load mode)
 
@@ -51,7 +51,7 @@ since a saved page token. Purpose-built for incremental sync — cheap to poll w
 has changed.
 
 **Fields:** `removed, fileId, file(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed)`
-**Pagination:** `pageSize: 100`, follows `nextPageToken` until `newStartPageToken` is returned.
+**Pagination:** `pageSize: 1000`, follows `nextPageToken` until `newStartPageToken` is returned.
 **Deduplication:** Active editing produces multiple change entries per file. Results are
 deduplicated by `fileId`, keeping the last entry per file.
 **Filtering:** Only changes to supported MIME types (Docs, Sheets, Slides) are processed.
