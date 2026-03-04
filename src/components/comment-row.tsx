@@ -115,9 +115,11 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
 
   // Cheap background check: ask Drive for modifiedTime only, full refresh if changed
   async function backgroundCheck() {
+    const contextId = generateContextId();
     try {
       const res = await apiFetch(
-        `/api/docs/${docId}/threads?commentId=${comment.googleCommentId}&checkOnly=true`
+        `/api/docs/${docId}/threads?commentId=${comment.googleCommentId}&checkOnly=true`,
+        { contextId }
       );
       if (!res.ok) return;
       const data = await res.json();
@@ -126,7 +128,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         // Drive has newer data — do a full silent refresh
         const refreshRes = await apiFetch(
           `/api/docs/${docId}/threads?commentId=${comment.googleCommentId}`,
-          { method: "POST" }
+          { method: "POST", contextId }
         );
         if (!refreshRes.ok) return;
         applyThreadUpdate(await refreshRes.json());

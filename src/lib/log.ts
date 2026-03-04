@@ -26,28 +26,29 @@ function formatArgs(args: unknown[]): string {
 
 // --- PST date helpers ---
 
-function pstNow(): Date {
-  // Get current time in PST/PDT by formatting in that timezone
-  const s = new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" });
-  return new Date(s);
+const pstFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Los_Angeles",
+  year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", second: "2-digit",
+  hour12: false,
+});
+
+interface PstParts { year: string; month: string; day: string; hour: string; minute: string; second: string }
+
+function pstParts(): PstParts {
+  const parts = pstFormatter.formatToParts(new Date());
+  const get = (t: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === t)!.value;
+  return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour"), minute: get("minute"), second: get("second") };
 }
 
-function pstDateString(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+function pstDateString(): string {
+  const { year, month, day } = pstParts();
+  return `${year}-${month}-${day}`;
 }
 
 function pstTimestamp(): string {
-  const d = pstNow();
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const h = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  const sec = String(d.getSeconds()).padStart(2, "0");
-  return `${y}-${mo}-${day} ${h}:${mi}:${sec}`;
+  const { year, month, day, hour, minute, second } = pstParts();
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
 }
 
 // --- Log file management ---
@@ -67,7 +68,7 @@ function ensureStream(): WriteStream | null {
   if (typeof window !== "undefined") return null; // no file logging if bundled into a client component (Node fs APIs unavailable)
   if (process.env.NODE_ENV === "test") return null; // no file logging during tests
 
-  const today = pstDateString(pstNow());
+  const today = pstDateString();
 
   if (currentStream && currentDateStr === today) {
     return currentStream;
@@ -103,7 +104,7 @@ function cleanupOldLogs() {
     for (const f of files) {
       const match = f.match(/^docreview-(\d{4}-\d{2}-\d{2})\.log$/);
       if (match) {
-        const fileDate = new Date(match[1] + "T00:00:00");
+        const fileDate = new Date(match[1] + "T00:00:00Z");
         if (fileDate.getTime() < cutoff) {
           unlinkSync(join(LOG_DIR, f));
         }
