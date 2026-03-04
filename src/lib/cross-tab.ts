@@ -12,12 +12,30 @@ export type CrossTabEvent =
 /** Payload sent over BroadcastChannel — event data plus optional sender context ID. */
 type CrossTabMessage = CrossTabEvent & { fromContextId?: string };
 
+/**
+ * Per-tab singleton BroadcastChannel used for both sending and listening.
+ *
+ * Why a singleton matters: the BroadcastChannel spec delivers messages to every
+ * BroadcastChannel object on the same channel name EXCEPT the one that called
+ * postMessage(). By using a single shared instance for both broadcastChange()
+ * and useCrossTabListener(), the sending tab's own listener never fires — only
+ * other tabs receive the message. Without this, creating a separate channel per
+ * call would cause same-tab self-delivery (the listener's channel object is
+ * different from the sender's), triggering unwanted refetches.
+ */
+let sharedChannel: BroadcastChannel | null = null;
+
+function getChannel(): BroadcastChannel | null {
+  if (typeof window === "undefined") return null;
+  if (!sharedChannel) sharedChannel = new BroadcastChannel(CHANNEL_NAME);
+  return sharedChannel;
+}
+
 export function broadcastChange(event: CrossTabEvent, contextId?: string) {
-  if (typeof window === "undefined") return;
-  const ch = new BroadcastChannel(CHANNEL_NAME);
+  const ch = getChannel();
+  if (!ch) return;
   const message: CrossTabMessage = contextId ? { ...event, fromContextId: contextId } : event;
   ch.postMessage(message);
-  ch.close();
 }
 
 /** Event as received by cross-tab listeners, with optional sender context ID. */
@@ -42,11 +60,13 @@ export function useCrossTabListener(
   });
 
   useEffect(() => {
-    const ch = new BroadcastChannel(CHANNEL_NAME);
+    const ch = getChannel();
+    if (!ch) return;
+
     let timer: ReturnType<typeof setTimeout> | null = null;
     let pending: CrossTabMessage | null = null;
 
-    ch.onmessage = (e: MessageEvent<CrossTabMessage>) => {
+    const listener = (e: MessageEvent<CrossTabMessage>) => {
       pending = e.data;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
@@ -56,9 +76,11 @@ export function useCrossTabListener(
       }, debounceMs);
     };
 
+    ch.addEventListener("message", listener);
+
     return () => {
       if (timer) clearTimeout(timer);
-      ch.close();
+      ch.removeEventListener("message", listener);
     };
   }, [debounceMs]);
 }

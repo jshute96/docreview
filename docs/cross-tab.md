@@ -18,6 +18,27 @@ User action
                                                 → Update local state
 ```
 
+### Singleton channel (self-delivery prevention)
+
+Both `broadcastChange()` and `useCrossTabListener()` share a **single `BroadcastChannel` instance per tab**, created lazily by `getChannel()`. This is critical for correctness.
+
+The BroadcastChannel spec says `postMessage()` delivers to every `BroadcastChannel` object on the same channel name **except the object that called `postMessage()`**. By using one shared instance, the sending tab's own listener never fires — only other tabs receive the message.
+
+If sending and listening used separate `BroadcastChannel` objects (e.g. creating a new one per `broadcastChange()` call), the listener's object is different from the sender's, so the spec considers it a valid recipient and delivers the message. This caused same-tab self-delivery: after replying to a comment, the same tab would receive its own broadcast, trigger a full refetch, and undo the frozen sort order (causing the comment to jump in the table).
+
+```
+WRONG — separate instances, same tab receives its own broadcast:
+  broadcastChange():  new BroadcastChannel("docreview-sync").postMessage(...)  ──┐
+  useCrossTabListener(): ch = new BroadcastChannel("docreview-sync")             │
+                          ch.onmessage ← fires! (different object)  ←────────────┘
+
+RIGHT — shared singleton, same tab is excluded by spec:
+  broadcastChange():     sharedCh.postMessage(...)  ──── not delivered to sharedCh
+  useCrossTabListener(): sharedCh.addEventListener(...)  ← only fires from OTHER tabs
+```
+
+The singleton is a module-level variable (`let sharedChannel`), so it lives for the lifetime of the page. Each tab gets its own module scope, so each tab has its own singleton — there is one `BroadcastChannel` object per tab, not one shared across tabs.
+
 Key files:
 - `src/lib/cross-tab.ts` — `broadcastChange()`, `useCrossTabListener()`, `crossTabReason()`, event types
 - `src/lib/api-fetch.ts` — `apiFetch()` wrapper that sends context ID + reason headers

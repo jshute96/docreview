@@ -167,6 +167,12 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   // reactivates sorting.
   const [sortActive, setSortActive] = useState(true);
   const frozenOrderRef = useRef<Map<string, number>>(new Map());
+
+  // Re-enable sorting when any filter changes so the new view is properly sorted
+  useEffect(() => {
+    setSortActive(true);
+  }, [showMode, myThreadsFilter, myCommentsFilter, suggestionsOnly, searchFilter]);
+
   // IDs of comments animating out (slide collapse) before removal from the filtered list
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
   // Increment to signal all rows to expand or collapse

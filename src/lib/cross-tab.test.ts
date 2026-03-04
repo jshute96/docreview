@@ -14,6 +14,10 @@ beforeEach(() => {
     // @ts-expect-error - mock
     this.close = mockClose;
     // @ts-expect-error - mock
+    this.addEventListener = vi.fn();
+    // @ts-expect-error - mock
+    this.removeEventListener = vi.fn();
+    // @ts-expect-error - mock
     this.onmessage = null;
   }
 
@@ -30,17 +34,38 @@ afterEach(() => {
 });
 
 describe("broadcastChange", () => {
-  it("posts message and closes channel", async () => {
+  it("posts message on shared singleton (no close)", async () => {
     const { broadcastChange } = await import("./cross-tab");
     broadcastChange({ type: "docs" });
     expect(mockPostMessage).toHaveBeenCalledWith({ type: "docs" });
-    expect(mockClose).toHaveBeenCalled();
+    expect(mockClose).not.toHaveBeenCalled();
   });
 
   it("includes docId when provided", async () => {
     const { broadcastChange } = await import("./cross-tab");
     broadcastChange({ type: "docs", docId: "abc123" });
     expect(mockPostMessage).toHaveBeenCalledWith({ type: "docs", docId: "abc123" });
+  });
+
+  it("reuses the same BroadcastChannel instance across calls", async () => {
+    let ctorCount = 0;
+    function CountingChannel() {
+      ctorCount++;
+      // @ts-expect-error - mock
+      this.postMessage = vi.fn();
+      // @ts-expect-error - mock
+      this.close = vi.fn();
+      // @ts-expect-error - mock
+      this.addEventListener = vi.fn();
+      // @ts-expect-error - mock
+      this.removeEventListener = vi.fn();
+    }
+    vi.stubGlobal("BroadcastChannel", CountingChannel);
+    const { broadcastChange } = await import("./cross-tab");
+    broadcastChange({ type: "docs" });
+    broadcastChange({ type: "labels" });
+    broadcastChange({ type: "comments", docId: "x" });
+    expect(ctorCount).toBe(1);
   });
 
   it("is a no-op during SSR (no window)", async () => {
