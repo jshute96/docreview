@@ -2,17 +2,21 @@
 
 ## Sync Modes
 
-There are three sync modes, triggered from different UI paths:
+There are four sync modes, triggered from different UI paths:
 
 | Mode | Trigger | Doc discovery | Deletion detection | Comment sync scope |
 |------|---------|---------------|--------------------|--------------------|
 | **Load** | Load dialog ([`load-dialog.md`](./load-dialog.md)) | `files.get` per selected doc | None (handled by Refresh) | Selected docs |
-| **Refresh** | "Refresh" button | `changes.list` — incremental | Built into changes feed | Changed docs only |
-| **Full Refresh** | "Full Refresh" button | `changes.list` — incremental | Built into changes feed | All docs (including deleted) |
-| **Gmail Refresh** | "Refresh from Gmail" button ([`gmail.md`](./gmail.md)) | Gmail notification scan | `findDeletedDocIds` for missing docs | Upserted docs |
+| **Refresh** | "Refresh" button | Drive `changes.list` + Gmail scan (parallel) | Drive changes feed + `findDeletedDocIds` for Gmail-only | Changed/discovered docs |
+| **Full Refresh** | "Full Refresh" hamburger item | `changes.list` — incremental | Built into changes feed | All docs (including deleted) |
+| **Source Refresh** | "Refresh from Drive/Gmail" hamburger items | Drive or Gmail only | Same as Refresh, for active source | Changed/discovered docs |
 
-Load, Refresh, and Full Refresh share the same POST handler (`POST /api/docs?mode=...`).
-Gmail Refresh has its own handler (`POST /api/docs/gmail-refresh`). Per-doc refresh
+**Refresh** (the toolbar button) calls `POST /api/docs/refresh` which runs the combined
+engine in `src/lib/refresh.ts`. It scans both Drive and Gmail in parallel by default.
+The hamburger menu offers source-specific refreshes (Drive-only or Gmail-only) via the
+same endpoint with `{ sources: ["drive"] }` or `{ sources: ["gmail"] }`.
+
+**Load** and **Full Refresh** still use `POST /api/docs?mode=...`. Per-doc refresh
 (detail page) is separate — see below.
 
 ## Per-doc Refresh (detail page)
@@ -245,11 +249,12 @@ See [Doc Unarchive Rules](./comment-tracking.md#doc-unarchive-rules) for the ful
 
 ## Phase 4 — UI Update (no page reload)
 
-**Main refresh:** After `POST /api/docs` returns, `RefreshButton` immediately calls
+**Main refresh:** After `POST /api/docs/refresh` returns, `RefreshButton` immediately calls
 `GET /api/docs?includeArchived=true` to fetch the full updated doc list (including archived
 docs, so the user's current filter state is respected by the client-side filter in `DocTable`
 rather than being silently dropped). The fresh list is passed to `DocTable` via the
-`onRefresh` callback, which calls `setDocs(newDocs)` directly.
+`onRefresh` callback, which calls `setDocs(newDocs)` directly. Source-specific refreshes
+from the hamburger menu follow the same pattern via `handleSourceRefresh`.
 
 **Per-doc refresh:** The `POST /api/docs/[docId]/refresh` response includes the full updated doc
 with its comments array. `DocDetail` calls `setDoc(updated)` and `setComments(updated.comments)`

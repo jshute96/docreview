@@ -19,6 +19,7 @@
       "Bash(npm run test:*)",
       "Bash(npm run typecheck:*)",
       "Bash(npm test:*)",
+      "Bash(npx next lint:*)",
       "Bash(npx jest:*)",
       "Bash(npx prisma generate:*)",
       "Bash(npx shadcn@latest add:*)",
@@ -39,7 +40,8 @@
       "WebFetch(domain:support.google.com)",
       "WebFetch(domain:www.prisma.io)",
       "WebSearch",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npx eslint:*)"
     ]
   }
 }

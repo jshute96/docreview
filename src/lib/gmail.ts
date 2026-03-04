@@ -3,6 +3,11 @@ import { drive as createDrive } from "@googleapis/drive";
 import { getDriveClient, parseGoogleDocId } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 
+export interface GmailDocIdResult {
+  docIds: string[];
+  errorCount: number;
+}
+
 export interface GmailScanDoc {
   googleDocId: string;
   title: string;
@@ -17,14 +22,13 @@ export interface GmailScanResult {
   errorCount: number;
 }
 
-/** Scan Gmail for Google Doc notification emails and resolve doc metadata via Drive. */
-export async function scanGmailNotifications(
+/** Scan Gmail for Google Doc notification emails and return just doc IDs (no Drive API calls). */
+export async function scanGmailForDocIds(
   userId: string,
   since: Date
-): Promise<GmailScanResult> {
+): Promise<GmailDocIdResult> {
   const auth = await getDriveClient(userId);
   const gmailClient = createGmail({ version: "v1", auth });
-  const driveClient = createDrive({ version: "v3", auth });
 
   // Build date cutoff for Gmail query (day-level precision)
   const afterDate = `${since.getFullYear()}/${String(since.getMonth() + 1).padStart(2, "0")}/${String(since.getDate()).padStart(2, "0")}`;
@@ -55,14 +59,14 @@ export async function scanGmailNotifications(
 
   if (messageIds.length === 0) {
     logInfo("[Gmail] No notification emails found");
-    return { docs: [], errorCount: 0 };
+    return { docIds: [], errorCount: 0 };
   }
 
   logInfo(`[Gmail] Total messages to process: ${messageIds.length}`);
 
   // Fetch each message and extract doc links
   let errorCount = 0;
-  const docIdMap = new Map<string, { subject: string; messageId: string }>();
+  const docIdSet = new Set<string>();
 
   await Promise.all(
     messageIds.map(async (messageId) => {
@@ -90,9 +94,7 @@ export async function scanGmailNotifications(
 
         if (docId) {
           logInfo(`[Gmail] ${messageId}: "${subject}" → doc ${docId} (${Date.now() - t0}ms)`);
-          if (!docIdMap.has(docId)) {
-            docIdMap.set(docId, { subject, messageId });
-          }
+          docIdSet.add(docId);
         } else {
           logError(`[Gmail] ${messageId}: "${subject}" → no doc link found in body (${Date.now() - t0}ms)`);
           errorCount++;
@@ -104,18 +106,27 @@ export async function scanGmailNotifications(
     })
   );
 
-  if (docIdMap.size === 0) {
-    logInfo(`[Gmail] No doc links found in any messages (${errorCount} errors)`);
-    return { docs: [], errorCount };
-  }
+  const docIds = [...docIdSet];
+  logInfo(`[Gmail] Scan complete: ${docIds.length} unique doc IDs, ${errorCount} errors`);
+  return { docIds, errorCount };
+}
 
-  logInfo(`[Gmail] Unique docs found: ${docIdMap.size}`);
+/** Scan Gmail for Google Doc notification emails and resolve doc metadata via Drive. */
+export async function scanGmailNotifications(
+  userId: string,
+  since: Date
+): Promise<GmailScanResult> {
+  const { docIds, errorCount: scanErrors } = await scanGmailForDocIds(userId, since);
+  if (docIds.length === 0) return { docs: [], errorCount: scanErrors };
 
-  // Fetch Drive metadata for each doc
+  const auth = await getDriveClient(userId);
+  const driveClient = createDrive({ version: "v3", auth });
+
+  let errorCount = scanErrors;
   const results: GmailScanDoc[] = [];
 
   await Promise.all(
-    Array.from(docIdMap.entries()).map(async ([docId]) => {
+    docIds.map(async (docId) => {
       const t0 = Date.now();
       try {
         const res = await driveClient.files.get({

@@ -215,7 +215,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
           disabled={adding}
           title="Scan Drive or Gmail for documents to add"
         >
-          Load…
+          Load docs
         </Button>
       </DialogTrigger>
       <DialogContent

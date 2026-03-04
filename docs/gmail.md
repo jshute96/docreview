@@ -1,20 +1,28 @@
 # Gmail Integration
 
 Gmail is used to discover Google Docs that the user has interacted with via
-notification emails. There are two ways Gmail scanning is triggered:
+notification emails. There are three ways Gmail scanning is triggered:
 
-1. **Load dialog** — user-initiated, selective: scan Gmail, review results, choose
+1. **Refresh button** — combined Drive+Gmail sync: scans both sources in parallel,
+   merges results, upserts all discovered docs automatically
+2. **Refresh from Gmail** (hamburger menu) — Gmail-only sync via the same combined
+   engine with `sources: ["gmail"]`
+3. **Load dialog** — user-initiated, selective: scan Gmail, review results, choose
    which docs to add (see [`load-dialog.md`](./load-dialog.md))
-2. **Refresh from Gmail button** — one-click incremental sync: scan Gmail since
-   last timestamp, upsert all discovered docs automatically
 
-Both paths use the same scanner (`src/lib/gmail.ts`).
+The combined refresh engine (`src/lib/refresh.ts`) uses `scanGmailForDocIds()` from
+`src/lib/gmail.ts` to get doc IDs without fetching Drive metadata (avoiding
+double-fetch when Drive has already returned metadata for the same docs). The Load
+dialog scan route still uses the full `scanGmailNotifications()` wrapper.
 
 ---
 
-## Scanner — `scanGmailNotifications(userId, since)`
+## Scanner — `scanGmailForDocIds(userId, since)`
 
-The scanner accepts a `Date` and returns `{ docs: GmailScanDoc[], errorCount }`.
+The low-level scanner accepts a `Date` and returns `{ docIds: string[], errorCount }`.
+It performs only Gmail API calls (no Drive metadata fetch). The convenience wrapper
+`scanGmailNotifications()` calls it then fetches Drive metadata, returning
+`{ docs: GmailScanDoc[], errorCount }`.
 
 ### Steps
 
@@ -58,34 +66,30 @@ When Gmail is selected in the Load dialog:
 
 ---
 
-## Refresh from Gmail Button
+## Combined Refresh (Drive + Gmail)
 
-The **Refresh from Gmail** button in the toolbar (`RefreshButton` with
-`mode="gmail-refresh"`) performs an incremental Gmail sync without user interaction.
+The toolbar **Refresh** button calls `POST /api/docs/refresh` with
+`sources: ["drive", "gmail"]`, running both sources in parallel via
+`executeRefresh()` in `src/lib/refresh.ts`. The hamburger menu offers
+source-specific refreshes ("Refresh from Drive", "Refresh from Gmail") using
+the same endpoint with a single source.
 
-### Flow — `POST /api/docs/gmail-refresh`
+### Flow — `executeRefresh(userId, email, sources)`
 
-1. Read `lastGmailUpdateTimestamp` from the Status table
-2. If no saved timestamp, default to 7 days ago
-3. Scan Gmail since that timestamp
-4. Extract unique doc IDs from scan results
-5. Fetch full Drive metadata via `fetchDocsByIds`
-6. Upsert each doc in the DB (create with all Drive fields + role; update metadata
-   and clear `isDeleted`)
-7. Detect deletions: doc IDs from Gmail not returned by `fetchDocsByIds` are
-   checked via `findDeletedDocIds` (reuses existing 404/403 logic)
-8. Sync comments for upserted docs via `syncComments`
-9. Unarchive: if a doc is ARCHIVED and `syncResult.shouldUnarchive` is true, set
-   it back to INBOX (MUTED comments stay muted — existing `syncComments` behavior)
-10. Handle `isDeleted` from syncComments results
-11. Update `lastGmailUpdateTimestamp` to now
-12. Return `{ added, updated, deleted, unarchived, errorCount, comments }`
-
-No labels or notes are applied (this is a refresh, not a load).
+1. `getDriveClient()` + `getStatus()` (shared setup)
+2. **Discovery phase** (parallel via `Promise.allSettled`):
+   - Drive (if active): `changes.list` with saved token, fallback to `listRecentDocs`
+   - Gmail (if active): `scanGmailForDocIds(userId, since)` → doc IDs only
+3. **Merge**: build `driveDocMap`, compute `gmailOnlyIds` (Gmail IDs not in Drive results)
+4. **Single metadata fetch**: `fetchDocsByIds` for Gmail-only IDs (no double-fetch)
+5. **Upsert loop**: Gmail-sourced new docs always INBOX; Drive-only new non-AUTHOR docs skipped
+6. **Deletions**: Drive `changes.list` deletions + `findDeletedDocIds` for missing Gmail docs
+7. **Comment sync** + **unarchive** for all upserted/updated docs
+8. **Save tokens**: Drive token if Drive succeeded (and no transient errors); Gmail timestamp if Gmail succeeded
 
 ### Timestamp Lifecycle
 
-The `lastGmailUpdateTimestamp` field in the Status table tracks the scan position.
+The `lastGmailUpdateTimestamp` field in the Status table tracks the Gmail scan position.
 
 ```
 No timestamp ──► Default (7 days ago) ──► Scan ──► Timestamp saved
@@ -95,28 +99,28 @@ No timestamp ──► Default (7 days ago) ──► Scan ──► Timestamp s
                                                   Scan from saved timestamp
 ```
 
-The timestamp is always updated after a successful scan, even if no docs were
+The timestamp is always updated after a successful Gmail scan, even if no docs were
 found. This prevents re-scanning the same window on repeated clicks.
 
 ### UI
 
-- Icon: same `RefreshCw` spinner as Refresh / Full Refresh
-- Label: "Refresh from Gmail"
-- Tooltip: "Check Gmail for doc notifications since last scan"
-- Toast: "Gmail refresh — N new, N updated, N unarchived" with error count suffix
-  if > 0 (e.g., "(3 errors)")
-- Error toast: "Failed to refresh from Gmail"
+- **Refresh button** (toolbar): scans both Drive and Gmail
+  - Toast: "Refresh complete — N new, N updated..." with error count suffix
+- **Refresh from Drive** (hamburger): Drive-only scan
+  - Toast: "Drive refresh complete — ..."
+- **Refresh from Gmail** (hamburger): Gmail-only scan
+  - Toast: "Gmail refresh complete — ..."
 
 ---
 
-## Comparison: Load vs Refresh from Gmail
+## Comparison: Load vs Refresh
 
-| | Load dialog (Gmail source) | Refresh from Gmail button |
+| | Load dialog (Gmail source) | Refresh (combined or Gmail-only) |
 |---|---|---|
-| **Trigger** | Open dialog, configure, scan, select, add | Single click |
+| **Trigger** | Open dialog, configure, scan, select, add | Single click (toolbar or hamburger) |
 | **User selection** | Yes — review and deselect docs | No — all discovered docs are upserted |
 | **Labels/notes** | Can assign | None |
 | **Time window** | User-specified `daysBack` | Saved `lastGmailUpdateTimestamp` (or 7 days) |
 | **Unarchive** | Yes (via comment sync in the load POST) | Yes |
 | **Deletion detection** | No (Load with Gmail source skips it) | Yes (`findDeletedDocIds` for missing docs) |
-| **API route** | `POST /api/docs/scan` then `POST /api/docs?mode=load` | `POST /api/docs/gmail-refresh` |
+| **API route** | `POST /api/docs/scan` then `POST /api/docs?mode=load` | `POST /api/docs/refresh` |

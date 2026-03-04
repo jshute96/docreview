@@ -19,7 +19,8 @@ One-line descriptions of every source file, grouped by layer.
 |------|-------------|
 | `auth/[...nextauth]/route.ts` | NextAuth catch-all handler (GET+POST) |
 | `docs/route.ts` | `GET` list docs (with filters); `POST` refresh/full-refresh/load sync from Drive (load accepts selectedGoogleDocIds, labelIds, notes) |
-| `docs/gmail-refresh/route.ts` | `POST` incremental Gmail refresh — scans Gmail since last timestamp, upserts docs, syncs comments, unarchives ARCHIVED docs with new activity, detects deletions |
+| `docs/gmail-refresh/route.ts` | `POST` incremental Gmail refresh — scans Gmail since last timestamp, upserts docs, syncs comments, unarchives ARCHIVED docs with new activity, detects deletions (legacy; superseded by `/api/docs/refresh`) |
+| `docs/refresh/route.ts` | `POST` combined refresh — accepts `{ sources: ["drive", "gmail"] }`, runs parallel discovery, merges results, upserts, syncs comments; defaults to both sources |
 | `docs/scan/route.ts` | `POST` scan Drive or Gmail for documents without modifying DB — branches on `source` field, returns total, existing count, and new doc list |
 | `docs/add/route.ts` | `POST` add a doc by URL — validates via Drive, creates DB record, syncs comments |
 | `docs/validate/route.ts` | `GET` validate a Google Drive URL — checks access, mime type, returns metadata |
@@ -54,7 +55,7 @@ One-line descriptions of every source file, grouped by layer.
 | `bulk-edit-dialog.tsx` | Dialog to edit role, labels, and notes for multiple documents simultaneously |
 
 | `load-dialog.tsx` | Load from Drive/Gmail dialog — two-phase scan→add flow with source toggle (Drive/Gmail), options (days back, ownership, shared drives), doc selection, labels, notes; shows error count for unresolved Gmail emails |
-| `refresh-button.tsx` | Refresh/Full Refresh/Gmail button — calls POST `/api/docs` or `/api/docs/gmail-refresh` then reloads list |
+| `refresh-button.tsx` | Combined Refresh button — calls POST `/api/docs/refresh` with both Drive+Gmail sources, then reloads list |
 | `tri-state-button.tsx` | Tri-state filter buttons (off/include/exclude) with diagonal strikethrough + slow-click-to-reset |
 | `label-badge.tsx` | Colored label pill with optional remove button |
 | `label-picker.tsx` | Label selection grid for add/edit dialogs |
@@ -97,7 +98,8 @@ Shadcn/ui components:
 |------|-------------|
 | `api-fetch.ts` | Client-side `apiFetch()` wrapper — intercepts 401 (expired Google token), shows deduplicated reauth toast, throws `ApiAuthError`; `isAuthError()` helper for catch blocks |
 | `google-drive.ts` | Google Drive/Docs API client — OAuth2 with token refresh, `invalidGrantResponse()` for API routes, changes feed (`changes.list`/`getStartPageToken`), file listing, `fetchDocsByIds` (batch metadata fetch by ID), comment fetching, `fetchAllThreads` (bulk thread fetch), `fetchDocContent` (combined document text + suggestion extraction in one Docs API call), thread detail, reply/resolve; OAuth2 client also used by Gmail scanner |
-| `gmail.ts` | Gmail notification scanner — `scanGmailNotifications(userId, since)` queries Gmail for doc sharing/comment emails after a `Date`, extracts doc IDs from body, fetches Drive metadata; filters by `internalDate` for timestamp-level precision; returns `{ docs, errorCount }` |
+| `gmail.ts` | Gmail notification scanner — `scanGmailForDocIds(userId, since)` queries Gmail for doc sharing/comment emails after a `Date`, extracts doc IDs from body (no Drive calls); `scanGmailNotifications` wraps it with Drive metadata fetch; filters by `internalDate` for timestamp-level precision |
+| `refresh.ts` | Combined refresh engine — `executeRefresh(userId, email, sources)` runs parallel Drive+Gmail discovery, merges results, upserts, detects deletions, syncs comments, unarchives, saves tokens |
 | `auth-utils.ts` | Centralized authentication helpers for Server Components and API routes |
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates/deletes DB records, computes unarchive signals |
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
@@ -133,11 +135,14 @@ Shadcn/ui components:
 
 | File | Description |
 |------|-------------|
-| `inbox-states.md` | Describes Inbox/Archived/Muted states for docs and comments, and state changes between them |
-| `refresh.md` | Full refresh flow — Drive sync modes, deletion detection, comment sync, UI update |
-| `comment-tracking.md` | Comment status logic, unarchive rules, filter behavior |
+| `auth.md` | Authentication — NextAuth v5 + Google OAuth, session handling, token refresh |
 | `bulk-edit.md` | Bulk editing logic — tri-state UI, context-aware cycling, no-op protection |
+| `comment-tracking.md` | Comment status logic, unarchive rules, filter behavior |
+| `cross-tab.md` | Cross-tab sync — BroadcastChannel events, deduplication, listener hook |
 | `dialog-sizing.md` | Shared dialog sizing pattern — flexible item list, stable height on removal |
-| `gmail.md` | Gmail integration — scanner internals, internalDate filtering, Load dialog Gmail source, Refresh from Gmail button, timestamp lifecycle, Load vs Refresh comparison |
+| `file-index.md` | This file — one-line descriptions of every source file |
+| `gmail.md` | Gmail integration — scanner internals, combined refresh engine, timestamp lifecycle, Load vs Refresh comparison |
+| `inbox-states.md` | Describes Inbox/Archived/Muted states for docs and comments, and state changes between them |
 | `load-dialog.md` | Load dialog — two-phase scan→add flow, Drive/Gmail source toggle, search options, dialog layout |
+| `refresh.md` | Full refresh flow — Drive sync modes, deletion detection, comment sync, UI update |
 | `suggestions.md` | Suggestion sync via Docs API, limitations |

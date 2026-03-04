@@ -13,7 +13,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { LoadDialog } from "@/components/load-dialog";
 import { BulkEditDialog } from "@/components/bulk-edit-dialog";
 import { signOut } from "next-auth/react";
-import { Menu, RefreshCw, LogOut } from "lucide-react";
+import { Menu, RefreshCw, LogOut, HardDriveDownload, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -176,6 +176,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
   }
 
   const [fullRefreshing, setFullRefreshing] = useState(false);
+  const [sourceRefreshing, setSourceRefreshing] = useState(false);
 
   async function handleFullRefresh() {
     setFullRefreshing(true);
@@ -203,6 +204,44 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
       if (!isAuthError(err)) toast.error("Failed to sync with Google Drive");
     } finally {
       setFullRefreshing(false);
+    }
+  }
+
+  async function handleSourceRefresh(sources: ("drive" | "gmail")[]) {
+    setSourceRefreshing(true);
+    const contextId = generateContextId();
+    try {
+      const syncRes = await apiFetch("/api/docs/refresh", {
+        method: "POST",
+        contextId,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sources }),
+      });
+      if (!syncRes.ok) throw new Error("Refresh failed");
+      const data = await syncRes.json();
+
+      const docsRes = await apiFetch("/api/docs?includeArchived=true", { contextId });
+      if (!docsRes.ok) throw new Error("Failed to reload docs");
+      const newDocs: DocWithLabels[] = await docsRes.json();
+
+      setDocs(newDocs);
+      broadcastChange({ type: "docs" }, contextId);
+
+      const label = sources.length === 1
+        ? sources[0] === "drive" ? "Drive refresh" : "Gmail refresh"
+        : "Refresh";
+      const parts = [
+        data.added > 0 ? `${data.added} new` : "",
+        data.updated > 0 ? `${data.updated} updated` : "",
+        data.deleted > 0 ? `${data.deleted} deleted` : "",
+        data.unarchived > 0 ? `${data.unarchived} unarchived` : "",
+      ].filter(Boolean).join(", ");
+      const errorSuffix = data.errorCount > 0 ? ` (${data.errorCount} errors)` : "";
+      toast.success(`${label} complete — ${parts || "no updates"}${errorSuffix}`, { duration: 8000 });
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to refresh");
+    } finally {
+      setSourceRefreshing(false);
     }
   }
 
@@ -245,6 +284,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-zinc-900">Your Docs</h1>
         <div className="flex items-center gap-2">
+          <RefreshButton onRefresh={(newDocs) => setDocs(newDocs)} />
           <AddDocDialog
             onDocAdded={handleDocAdded}
             trigger={
@@ -253,8 +293,6 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
               </Button>
             }
           />
-          <RefreshButton mode="refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
-          <RefreshButton mode="gmail-refresh" onRefresh={(newDocs) => setDocs(newDocs)} />
           <LoadDialog onRefresh={(newDocs) => setDocs(newDocs)} />
           <ManageLabelsDialog />
           <Button
@@ -262,13 +300,13 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
             size="sm"
             onClick={() => window.open("https://drive.google.com", "_blank")}
             title="Open Google Drive"
-            className="px-2"
           >
             <img
               src="https://ssl.gstatic.com/images/branding/product/1x/drive_2020q4_48dp.png"
               alt="Google Drive"
-              className="h-4 w-4"
+              className="h-4 w-4 mr-1.5"
             />
+            Drive
           </Button>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
@@ -282,6 +320,21 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={() => handleSourceRefresh(["drive"])}
+                disabled={sourceRefreshing}
+              >
+                {sourceRefreshing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <HardDriveDownload className="h-4 w-4 mr-2" />}
+                Refresh from Drive
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => handleSourceRefresh(["gmail"])}
+                disabled={sourceRefreshing}
+              >
+                {sourceRefreshing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+                Refresh from Gmail
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={handleFullRefresh}
                 disabled={fullRefreshing}
@@ -321,7 +374,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
       {filteredDocs.length === 0 ? (
         <p className="py-12 text-center text-sm text-zinc-400">
           {docs.length === 0
-            ? 'No docs yet. Use "Add doc" or "Load from Drive" to add docs.'
+            ? 'No docs yet. Use "Refresh", "Add doc", or "Load docs" to add some.'
             : "No docs match the current filters."}
         </p>
       ) : (
