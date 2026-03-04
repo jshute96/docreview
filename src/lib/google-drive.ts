@@ -383,6 +383,7 @@ export async function fetchDocContent(
 // A single reply within a comment thread (not the initial comment).
 export interface ThreadReply {
   author: string;
+  fromMe: boolean;
   content: string;
   htmlContent?: string;
   createdTime: string;
@@ -395,6 +396,7 @@ export interface ThreadReply {
 export interface CommentThread {
   id: string;
   author: string;
+  fromMe: boolean;
   content: string;
   htmlContent?: string;
   createdTime: string;
@@ -458,6 +460,7 @@ export async function fetchThreadDetail(
 
   const threadReplies: ThreadReply[] = allReplies.map((r) => ({
     author: r.author?.displayName ?? "Unknown",
+    fromMe: r.author?.me === true,
     content: r.content ?? "",
     ...(r.htmlContent ? { htmlContent: r.htmlContent } : {}),
     createdTime: r.createdTime ?? "",
@@ -473,6 +476,7 @@ export async function fetchThreadDetail(
     thread: {
       id: c.id,
       author: c.author?.displayName ?? "Unknown",
+      fromMe: c.author?.me === true,
       content: c.content,
       ...(c.htmlContent ? { htmlContent: c.htmlContent } : {}),
       createdTime: c.createdTime ?? "",
@@ -500,7 +504,7 @@ export async function fetchAllThreads(
         drive.comments.list({
           fileId: googleDocId,
           fields:
-            "nextPageToken, comments(id, resolved, content, htmlContent, quotedFileContent(mimeType, value), createdTime, modifiedTime, author(displayName), replies(content, htmlContent, createdTime, action, author(displayName)))",
+            "nextPageToken, comments(id, resolved, content, htmlContent, quotedFileContent(mimeType, value), createdTime, modifiedTime, author(me, displayName), replies(content, htmlContent, createdTime, action, author(me, displayName)))",
           pageSize: 100,
           ...(pageToken ? { pageToken } : {}),
         }),
@@ -512,6 +516,7 @@ export async function fetchAllThreads(
 
         const replies: ThreadReply[] = (c.replies ?? []).map((r) => ({
           author: r.author?.displayName ?? "Unknown",
+          fromMe: r.author?.me === true,
           content: r.content ?? "",
           ...(r.htmlContent ? { htmlContent: r.htmlContent } : {}),
           createdTime: r.createdTime ?? "",
@@ -521,6 +526,7 @@ export async function fetchAllThreads(
         threads.push({
           id: c.id,
           author: c.author?.displayName ?? "Unknown",
+          fromMe: c.author?.me === true,
           content: c.content,
           ...(c.htmlContent ? { htmlContent: c.htmlContent } : {}),
           createdTime: c.createdTime ?? "",

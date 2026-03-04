@@ -284,49 +284,51 @@ export function CommentThreadPanel({
             key={thread.id}
             className={`py-3 first:pt-0 last:pb-0 ${thread.resolved ? "opacity-60" : ""}`}
           >
-            {threadIndex === 0 && thread.quotedFileContent?.value && (
-              <div className="mb-2">
-                <div className="rounded border-l-2 border-zinc-300 bg-zinc-100 px-3 py-1.5">
-                  {/* Drive returns text/html for quotedFileContent but in practice
-                     the value appears to be plain text with no formatting markup. */}
-                  {thread.quotedFileContent.mimeType === "text/html" ? (
-                    <p className="text-xs text-zinc-500 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: thread.quotedFileContent.value }} />
-                  ) : (
-                    <p className="text-xs text-zinc-500 whitespace-pre-wrap">{thread.quotedFileContent.value}</p>
+            <div className={thread.fromMe ? "bg-green-50 -mx-4 px-4 pt-2 pb-1 mb-2" : ""}>
+              {threadIndex === 0 && thread.quotedFileContent?.value && (
+                <div className="mb-2">
+                  <div className="rounded border-l-2 border-zinc-300 bg-zinc-100 px-3 py-1.5">
+                    {/* Drive returns text/html for quotedFileContent but in practice
+                       the value appears to be plain text with no formatting markup. */}
+                    {thread.quotedFileContent.mimeType === "text/html" ? (
+                      <p className="text-xs text-zinc-500 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: thread.quotedFileContent.value }} />
+                    ) : (
+                      <p className="text-xs text-zinc-500 whitespace-pre-wrap">{thread.quotedFileContent.value}</p>
+                    )}
+                  </div>
+                  {documentText !== undefined && (() => {
+                    // Drive API may truncate long quoted text with "..." or "…" — match on the prefix
+                    const raw = thread.quotedFileContent!.value;
+                    const trimmed = raw.replace(/\.{3}$|…$/, "");
+                    return !documentText.toLowerCase().includes(trimmed.toLowerCase());
+                  })() && (
+                    <p
+                      className="mt-1 text-xs text-amber-600"
+                      title="The quoted text is a snapshot from when the comment was created. If the text has been deleted, the comment thread may not be visible when viewing the document."
+                    >
+                      This text no longer exists in the document. This comment might not be visible.
+                    </p>
                   )}
                 </div>
-                {documentText !== undefined && (() => {
-                  // Drive API may truncate long quoted text with "..." or "…" — match on the prefix
-                  const raw = thread.quotedFileContent!.value;
-                  const trimmed = raw.replace(/\.{3}$|…$/, "");
-                  return !documentText.toLowerCase().includes(trimmed.toLowerCase());
-                })() && (
-                  <p
-                    className="mt-1 text-xs text-amber-600"
-                    title="The quoted text is a snapshot from when the comment was created. If the text has been deleted, the comment thread may not be visible when viewing the document."
-                  >
-                    This text no longer exists in the document. This comment might not be visible.
-                  </p>
+              )}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-zinc-900">
+                  {thread.author}
+                </span>
+                <span className="text-xs text-zinc-400">
+                  {formatTime(thread.createdTime)}
+                </span>
+                {thread.resolved && (
+                  <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-600">
+                    Resolved
+                  </span>
                 )}
               </div>
-            )}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-zinc-900">
-                {thread.author}
-              </span>
-              <span className="text-xs text-zinc-400">
-                {formatTime(thread.createdTime)}
-              </span>
-              {thread.resolved && (
-                <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-600">
-                  Resolved
-                </span>
-              )}
+              <CommentContent htmlContent={thread.htmlContent} content={thread.content} searchFilter={searchFilter ?? ""} className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap" />
             </div>
-            <CommentContent htmlContent={thread.htmlContent} content={thread.content} searchFilter={searchFilter ?? ""} className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap" />
 
             {thread.replies.map((reply, i) => (
-              <div key={i} className="ml-8 mt-2">
+              <div key={i} className={`mt-2 ml-8 ${reply.fromMe ? "bg-green-50 -mr-4 pr-4 pt-2 pb-1" : ""}`}>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-zinc-900">
                     {reply.author}

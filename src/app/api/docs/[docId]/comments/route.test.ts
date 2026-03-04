@@ -61,7 +61,7 @@ describe("GET /api/docs/[docId]/comments", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ docId: "d1", userId: "u1", googleDocId: "g1" });
     mockFetchAllThreads.mockResolvedValue([
-      { id: "c1", author: "A", content: "C", createdTime: "T", resolved: false, replies: [] },
+      { id: "c1", author: "A", fromMe: false, content: "C", createdTime: "T", resolved: false, replies: [] },
     ]);
     const req = new NextRequest("http://localhost/api/docs/d1/comments");
     const res = await GET(req, makeParams("d1"));
