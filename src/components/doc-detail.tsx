@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { RefreshCw, Menu, Archive, ArchiveRestore } from "lucide-react";
+import { RefreshCw, Menu } from "lucide-react";
 import type { Comment, Label } from "@prisma/client";
 import type { DocWithComments, DocWithLabels } from "@/types";
 import type { CommentThread, SuggestionContent } from "@/lib/google-drive";
@@ -60,6 +60,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   const [archiving, setArchiving] = useState(false);
   const [bulkArchiving, setBulkArchiving] = useState(false);
   const [bulkUnarchiving, setBulkUnarchiving] = useState(false);
+  const [bulkMarkingRead, setBulkMarkingRead] = useState(false);
+  const [bulkMarkingUnread, setBulkMarkingUnread] = useState(false);
   const [threadMap, setThreadMap] = useState<Record<string, CommentThread>>({});
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
   const [documentText, setDocumentText] = useState<string | undefined>(undefined);
@@ -309,6 +311,59 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   function handleArchiveAll() { void handleBulkStatusChange("INBOX", "ARCHIVED"); }
   function handleUnarchiveAll() { void handleBulkStatusChange("ARCHIVED", "INBOX"); }
+
+  async function handleBulkReadChange(targetIsRead: boolean) {
+    const targets = filteredComments.filter((c) => c.isRead !== targetIsRead);
+    if (targets.length === 0) return;
+
+    const setBusy = targetIsRead ? setBulkMarkingRead : setBulkMarkingUnread;
+    const pastVerb = targetIsRead ? "read" : "unread";
+
+    setBusy(true);
+    const contextId = generateContextId();
+    try {
+      const commentIds = targets.map((c) => c.commentId);
+      const res = await apiFetch(`/api/docs/${doc.docId}/comments`, {
+        method: "PATCH",
+        body: JSON.stringify({ commentIds, isRead: targetIsRead }),
+        contextId,
+      });
+      if (!res.ok) throw new Error("Failed");
+
+      const { count } = await res.json();
+      setComments((prev) =>
+        prev.map((c) =>
+          commentIds.includes(c.commentId) ? { ...c, isRead: targetIsRead } : c
+        )
+      );
+
+      // Trigger exit animations for comments that would be filtered out
+      targets.forEach((c) => {
+        const updated = { ...c, isRead: targetIsRead };
+        if (wouldBeFilteredOut(updated)) {
+          setExitingIds((prev) => new Set(prev).add(updated.commentId));
+        }
+      });
+
+      setTimeout(() => {
+        setExitingIds((prev) => {
+          const next = new Set(prev);
+          targets.forEach((c) => next.delete(c.commentId));
+          return next;
+        });
+      }, 200);
+
+      broadcastChange({ type: "comments", docId: doc.docId }, contextId);
+      toast.success(`Marked ${count} comments ${pastVerb}`);
+    } catch {
+      toast.error(`Failed to mark comments ${pastVerb}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleMarkAllRead() { void handleBulkReadChange(true); }
+  function handleMarkAllUnread() { void handleBulkReadChange(false); }
 
   function handleCommentUpdate(updated: Comment) {
     setSortActive(false);
@@ -567,6 +622,16 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                     >
                       Collapse all
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-5 px-1.5 text-[10px] text-zinc-900"
+                      title="Mark all visible comments as read"
+                      onClick={handleMarkAllRead}
+                      disabled={bulkMarkingRead || !filteredComments.some((c) => !c.isRead)}
+                    >
+                      {bulkMarkingRead ? "Marking..." : "Mark all read"}
+                    </Button>
                     <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -583,15 +648,19 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                           onSelect={handleArchiveAll}
                           disabled={bulkArchiving || !filteredComments.some((c) => c.status === "INBOX")}
                         >
-                          <Archive className="h-4 w-4 mr-2" />
                           {bulkArchiving ? "Archiving..." : "Archive all"}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={handleUnarchiveAll}
                           disabled={bulkUnarchiving || !filteredComments.some((c) => c.status === "ARCHIVED")}
                         >
-                          <ArchiveRestore className="h-4 w-4 mr-2" />
                           {bulkUnarchiving ? "Unarchiving..." : "Unarchive all"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={handleMarkAllUnread}
+                          disabled={bulkMarkingUnread || !filteredComments.some((c) => c.isRead)}
+                        >
+                          {bulkMarkingUnread ? "Marking..." : "Mark all unread"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

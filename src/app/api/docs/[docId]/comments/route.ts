@@ -76,16 +76,29 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { commentIds, status } = body as { commentIds: string[]; status: CommentStatus };
+  const { commentIds, status, isRead } = body as { commentIds: string[]; status?: CommentStatus; isRead?: boolean };
 
   if (!Array.isArray(commentIds) || commentIds.length === 0) {
     return NextResponse.json({ error: "Invalid commentIds" }, { status: 400 });
   }
 
-  const VALID_STATUSES: string[] = Object.values(CommentStatus);
-  if (!VALID_STATUSES.includes(status)) {
-    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  // Must provide exactly one of status or isRead
+  if (status !== undefined && isRead !== undefined) {
+    return NextResponse.json({ error: "Provide status or isRead, not both" }, { status: 400 });
   }
+
+  if (status !== undefined) {
+    const VALID_STATUSES: string[] = Object.values(CommentStatus);
+    if (!VALID_STATUSES.includes(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+  } else if (typeof isRead !== "boolean") {
+    return NextResponse.json({ error: "Invalid isRead value" }, { status: 400 });
+  }
+
+  const data: { status?: CommentStatus; isRead?: boolean } = {};
+  if (status !== undefined) data.status = status;
+  if (isRead !== undefined) data.isRead = isRead;
 
   // Update only comments that belong to this document
   const result = await prisma.comment.updateMany({
@@ -93,7 +106,7 @@ export async function PATCH(
       commentId: { in: commentIds },
       docId,
     },
-    data: { status },
+    data,
   });
 
   return NextResponse.json({ count: result.count });
