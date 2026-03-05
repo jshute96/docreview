@@ -22,8 +22,8 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/gmail-refresh/route.ts` | `POST` incremental Gmail refresh — scans Gmail since last timestamp, upserts docs, syncs comments, unarchives ARCHIVED docs with new activity, detects deletions (legacy; superseded by `/api/docs/refresh`) |
 | `docs/refresh/route.ts` | `POST` combined refresh — accepts `{ sources: ["drive", "gmail"] }`, runs parallel discovery, merges results, upserts, syncs comments; defaults to both sources |
 | `docs/scan/route.ts` | `POST` scan Drive or Gmail for documents without modifying DB — branches on `source` field, returns total, existing count, and new doc list |
-| `docs/add/route.ts` | `POST` add a doc by URL — validates via Drive, creates DB record, syncs comments |
-| `docs/validate/route.ts` | `GET` validate a Google Drive URL — checks access, mime type, returns metadata |
+| `docs/add/route.ts` | `POST` add or update a doc by URL — validates via Drive; creates DB record + syncs comments for new docs, updates labels/notes/status for existing docs |
+| `docs/validate/route.ts` | `GET` validate a Google Drive URL — checks access, mime type, returns metadata; for existing docs returns `existing: true` with labels, notes, status |
 | `docs/bulk-update/route.ts` | `PATCH` bulk update multiple docs — optimized role/label/notes updates with no-op protection |
 | `docs/[docId]/route.ts` | `GET` single doc; `PATCH` update role/status/labels |
 | `docs/[docId]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata then syncs comments |
@@ -48,9 +48,9 @@ One-line descriptions of every source file, grouped by layer.
 | `comment-filter-bar.tsx` | Comment list filter bar — toggles for my threads/comments, show mode, suggestions |
 | `comment-row.tsx` | Single comment row — expandable, shows content preview, thread panel, status actions |
 | `comment-thread-panel.tsx` | Expanded thread view — shows all replies, reply textarea, resolve/reopen buttons |
-| `add-doc-content.tsx` | Shared add-doc form body — URL validation, label picker, notes; used by dialog and standalone page |
-| `add-doc-dialog.tsx` | Dialog wrapper for adding a doc — renders `AddDocContent` inside a dialog |
-| `add-doc-page-client.tsx` | Standalone add-doc page (client) — renders `AddDocContent` in a card with cross-tab sync |
+| `add-doc-content.tsx` | Shared add/update doc form body — URL validation, label picker, notes; populates form from existing doc data; used by dialog and standalone page |
+| `add-doc-dialog.tsx` | Dialog wrapper for adding/updating a doc — renders `AddDocContent` inside a dialog, dynamic title and button text |
+| `add-doc-page-client.tsx` | Standalone add/update doc page (client) — renders `AddDocContent` in a card with cross-tab sync |
 | `edit-doc-dialog.tsx` | Dialog to edit doc role and labels |
 | `bulk-edit-dialog.tsx` | Dialog to edit role, labels, and notes for multiple documents simultaneously |
 

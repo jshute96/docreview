@@ -28,8 +28,6 @@ function errorMessageForCode(code: string): string {
       return "Not a recognized Google Drive URL or doc ID";
     case "invalid_mime_type":
       return "Only Docs, Sheets, and Slides are supported";
-    case "already_exists":
-      return "This document is already in your list";
     case "trashed":
       return "This document is in the trash";
     case "no_access":
@@ -47,15 +45,18 @@ interface AddDocContentProps {
   onSuccess: (doc: DocWithLabels) => void;
   initialUrl?: string;
   onUrlChange?: () => void;
+  onExistingChange?: (isExisting: boolean) => void;
   buttons: (args: {
     handleAdd: () => Promise<DocWithLabels | null>;
     adding: boolean;
     isValid: boolean;
+    isExisting: boolean;
+    existingDocId: string | null;
   }) => ReactNode;
 }
 
 export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>(
-  function AddDocContent({ onSuccess, initialUrl, onUrlChange, buttons }, ref) {
+  function AddDocContent({ onSuccess, initialUrl, onUrlChange, onExistingChange, buttons }, ref) {
     const { allLabels } = useLabels();
     const [url, setUrl] = useState(initialUrl ?? "");
     const [validationState, setValidationState] =
@@ -64,6 +65,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
     const [validTitle, setValidTitle] = useState<string | null>(null);
     const [validMimeType, setValidMimeType] = useState<string | null>(null);
     const [existingDocId, setExistingDocId] = useState<string | null>(null);
+    const [isExisting, setIsExisting] = useState(false);
     const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
     const [notes, setNotes] = useState("");
     const [addToInbox, setAddAsActive] = useState(true);
@@ -77,6 +79,10 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
     useLabelSync(allLabels, setSelectedLabelIds);
     useAutoResize(notesRef, notes);
 
+    useEffect(() => {
+      onExistingChange?.(isExisting);
+    }, [isExisting, onExistingChange]);
+
     function resetForm() {
       setUrl("");
       setValidationState("idle");
@@ -84,6 +90,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
       setValidTitle(null);
       setValidMimeType(null);
       setExistingDocId(null);
+      setIsExisting(false);
       setSelectedLabelIds([]);
       setNotes("");
       setAddAsActive(true);
@@ -115,12 +122,19 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
           setValidTitle(data.title ?? null);
           setValidMimeType(data.mimeType ?? null);
           setValidationState("valid");
+          if (data.existing) {
+            setIsExisting(true);
+            setExistingDocId(data.docId ?? null);
+            setSelectedLabelIds(data.labels ?? []);
+            setNotes(data.notes ?? "");
+            setAddAsActive(data.status === "INBOX");
+          } else {
+            setIsExisting(false);
+            setExistingDocId(null);
+          }
         } else {
           if (data.title) setValidTitle(data.title);
           if (data.mimeType) setValidMimeType(data.mimeType);
-          if (data.error === "already_exists") {
-            setExistingDocId(data.docId ?? null);
-          }
           setValidationState("invalid");
           setValidationError(errorMessageForCode(data.error));
         }
@@ -140,6 +154,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
       setValidTitle(null);
       setValidMimeType(null);
       setExistingDocId(null);
+      setIsExisting(false);
       onUrlChange?.();
 
       if (abortRef.current) {
@@ -184,7 +199,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
         onSuccess(newDoc);
         return newDoc;
       } catch (err) {
-        if (!isAuthError(err)) toast.error("Failed to add document");
+        if (!isAuthError(err)) toast.error(isExisting ? "Failed to update document" : "Failed to add document");
         return null;
       } finally {
         setAdding(false);
@@ -228,6 +243,9 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
             </div>
             {validationError && (
               <p className="mt-1 text-xs text-red-500">{validationError}</p>
+            )}
+            {isExisting && (
+              <p className="mt-1 text-xs text-green-600">This document already exists</p>
             )}
             {validTitle && (
               <div className="mt-1.5">
@@ -299,6 +317,8 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
           handleAdd,
           adding,
           isValid: validationState === "valid",
+          isExisting,
+          existingDocId,
         })}
       </>
     );

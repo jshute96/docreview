@@ -158,7 +158,14 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
   }
 
   function handleDocAdded(newDoc: DocWithLabels) {
-    setDocs((prev) => [newDoc, ...prev]);
+    setDocs((prev) => {
+      const idx = prev.findIndex((d) => d.docId === newDoc.docId);
+      if (idx >= 0) {
+        // Update existing doc in place
+        return prev.map((d) => (d.docId === newDoc.docId ? newDoc : d));
+      }
+      return [newDoc, ...prev];
+    });
   }
 
   function handleLabelDelete(id: string) {
@@ -345,6 +352,13 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${refreshing === "full" ? "animate-spin" : ""}`} />
                 Full Refresh
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => window.open("/add", "_blank")}
+              >
+                <span className="h-4 w-4 mr-2" />
+                Add doc page
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

@@ -29,18 +29,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "invalid_url" }, { status: 400 });
   }
 
-  const existing = await prisma.doc.findUnique({
+  const existingRow = await prisma.doc.findUnique({
     where: { userId_googleDocId: { userId, googleDocId: fileId } },
-    select: { docId: true, title: true, mimeType: true },
+    select: {
+      docId: true, title: true, mimeType: true,
+      notes: true, status: true, isDeleted: true,
+      labels: { select: { labelId: true } },
+    },
   });
-  if (existing) {
-    return NextResponse.json({
-      error: "already_exists",
-      docId: existing.docId,
-      title: existing.title,
-      mimeType: existing.mimeType,
-    }, { status: 409 });
-  }
+  const existing = existingRow?.isDeleted ? null : existingRow;
 
   let f;
   try {
@@ -84,6 +81,13 @@ export async function GET(req: NextRequest) {
     owner: f.owners?.[0]?.displayName ?? null,
     lastModifiedInDrive: f.modifiedTime ?? null,
     createdTimeInDrive: f.createdTime ?? null,
+    ...(existing ? {
+      existing: true,
+      docId: existing.docId,
+      labels: existing.labels.map((l) => l.labelId),
+      notes: existing.notes,
+      status: existing.status,
+    } : {}),
   });
   });
 }

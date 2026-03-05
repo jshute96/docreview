@@ -41,12 +41,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid_url" }, { status: 400 });
   }
 
-  const existing = await prisma.doc.findUnique({
+  const existingRow = await prisma.doc.findUnique({
     where: { userId_googleDocId: { userId, googleDocId: fileId } },
+    select: { docId: true, isDeleted: true },
   });
-  if (existing) {
-    return NextResponse.json({ error: "already_exists" }, { status: 409 });
-  }
+  const existing = existingRow?.isDeleted ? null : existingRow;
 
   if (labelIds.length > 0) {
     const ownedLabels = await prisma.label.findMany({
@@ -56,6 +55,32 @@ export async function POST(req: NextRequest) {
     if (ownedLabels.length !== labelIds.length) {
       return NextResponse.json({ error: "Invalid label" }, { status: 400 });
     }
+  }
+
+  if (existing) {
+    // Update existing doc: replace labels, update notes and status
+    await prisma.$transaction([
+      prisma.docLabel.deleteMany({ where: { docId: existing.docId } }),
+      ...(labelIds.length > 0
+        ? [prisma.docLabel.createMany({
+            data: labelIds.map((labelId: string) => ({ docId: existing.docId, labelId })),
+          })]
+        : []),
+      prisma.doc.update({
+        where: { docId: existing.docId },
+        data: {
+          notes: notes || null,
+          status: status ?? "INBOX",
+        },
+      }),
+    ]);
+
+    const result = await prisma.doc.findUnique({
+      where: { docId: existing.docId },
+      include: docWithCountsInclude,
+    });
+
+    return NextResponse.json(result ? withCommentCounts(result) : result);
   }
 
   let f;
