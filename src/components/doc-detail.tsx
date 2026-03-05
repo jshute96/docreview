@@ -14,6 +14,16 @@ import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -65,6 +75,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   const [threadMap, setThreadMap] = useState<Record<string, CommentThread>>({});
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
   const [documentText, setDocumentText] = useState<string | undefined>(undefined);
+  const [showUntrackDialog, setShowUntrackDialog] = useState(false);
 
   // Derive searchable text from threadMap (author names + all reply content)
   const threadText = useMemo(() => {
@@ -441,7 +452,6 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   }
 
   async function handleUntrack() {
-    if (!window.confirm("All state for this document will be removed from the database. Continue?")) return;
     const contextId = generateContextId();
     try {
       const res = await apiFetch(`/api/docs/${doc.docId}`, { method: "DELETE", contextId });
@@ -520,7 +530,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={handleUntrack} title="Remove this document from the database">
+              <DropdownMenuItem onSelect={() => setShowUntrackDialog(true)} title="Remove this document from the database">
                 <Trash2 className="h-4 w-4 mr-2" />
                 Untrack this doc
               </DropdownMenuItem>
@@ -725,6 +735,21 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
         </div>
       )}
     </div>
+
+    <AlertDialog open={showUntrackDialog} onOpenChange={setShowUntrackDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Untrack this document?</AlertDialogTitle>
+          <AlertDialogDescription>
+            All state for this document will be removed from the database.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleUntrack}>Continue</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </LabelProvider>
   );
 }
