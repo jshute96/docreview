@@ -245,6 +245,13 @@ export async function executeRefresh(
   }
 
   // --- Save tokens ---
+  // Safety: we only advance the Drive/Gmail tokens when at least one doc was
+  // successfully read.  If *every* doc failed (transient errors, permission
+  // denied, or deleted), something systemic may be wrong and we don't want to
+  // skip past changes we haven't processed.  Permission-denied docs (usually
+  // from the Docs suggestions API) count as failures here intentionally — the
+  // next refresh will retry, and if even one doc succeeds we know the service
+  // is healthy and can safely advance.
   const transientErrors = syncResults
     .map((r, i) => r.transientError ? commentDocs[i].googleDocId : null)
     .filter((id): id is string => id !== null);

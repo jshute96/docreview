@@ -10,13 +10,16 @@ import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 
 interface RefreshButtonProps {
   onRefresh: (docs: DocWithLabels[]) => void;
+  disabled?: boolean;
+  onLoadingChange?: (loading: boolean) => void;
 }
 
-export function RefreshButton({ onRefresh }: RefreshButtonProps) {
+export function RefreshButton({ onRefresh, disabled, onLoadingChange }: RefreshButtonProps) {
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {
     setLoading(true);
+    onLoadingChange?.(true);
     const contextId = generateContextId();
     try {
       const syncRes = await apiFetch("/api/docs/refresh", {
@@ -47,13 +50,14 @@ export function RefreshButton({ onRefresh }: RefreshButtonProps) {
       if (!isAuthError(err)) toast.error("Failed to refresh");
     } finally {
       setLoading(false);
+      onLoadingChange?.(false);
     }
   }
 
   return (
     <Button
       onClick={handleClick}
-      disabled={loading}
+      disabled={loading || disabled}
       variant="outline"
       size="sm"
       title="Sync docs from Drive and Gmail"

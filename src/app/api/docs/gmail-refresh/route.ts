@@ -138,6 +138,9 @@ export async function POST(req: NextRequest) {
     }
 
     // --- Save tokens ---
+    // Safety: if *every* doc failed (transient, permission denied, or deleted),
+    // something systemic may be wrong — skip the timestamp update so the next
+    // refresh retries from the same point.  See refresh.ts for the full rationale.
     const transientErrors = syncResults
       .map((r, i) => r.transientError ? upsertedDocs[i].googleDocId : null)
       .filter((id): id is string => id !== null);

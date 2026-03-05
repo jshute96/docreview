@@ -25,7 +25,7 @@ export function formatDate(d: Date | string | null, omitSeconds = false): string
     year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit",
     ...(!omitSeconds ? { second: "2-digit" } : {}),
-    hour12: false,
+    hourCycle: "h23",
   });
 
   const parts = formatter.formatToParts(dt);

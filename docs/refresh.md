@@ -284,18 +284,25 @@ crash the entire sync.
 After all comment syncs complete, the POST handler checks whether any sync result had
 `transientError: true`. If so, it **skips saving the changes page token**. This preserves the
 old token so the next Refresh re-processes changes from the same point and re-attempts the
-docs whose comment sync failed. Documents with `permissionDenied: true` (403) do not trigger
-this skip.
+docs whose comment sync failed. A single `permissionDenied: true` (403) doc does not trigger
+this skip on its own — but it does reduce the success count for the `allFailed` safety check
+below.
 
 ### Systemic Failure Protection (`allFailed`)
 
-As a safety measure, if a sync attempt includes one or more documents but **every single document fetch fails** (due to transient errors, 404s, or 403s), the sync is treated as a systemic failure.
+As a safety measure, if a sync attempt includes one or more documents but **every single
+document fetch fails** (due to transient errors, permission denied, or deletions), the sync
+is treated as a systemic failure.
 
 In this state:
 - The Drive `driveChangesPageToken` is **not** updated.
 - The Gmail `lastGmailUpdateTimestamp` is **not** updated.
 
-This prevents the system from "skipping ahead" in the changes feed or Gmail window if a broad issue (like a network outage or expired OAuth scope) is preventing access to all documents. The sync will re-attempt the same window during the next refresh.
+This prevents the system from "skipping ahead" in the changes feed or Gmail window if a broad
+issue (like a network outage or expired OAuth scope) is preventing access to all documents.
+Permission-denied docs (typically from the Docs suggestions API returning 403) count as
+failures here intentionally — the next refresh will retry, and if even one doc succeeds we
+know the service is healthy and can safely advance the token.
 
 ---
 

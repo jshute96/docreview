@@ -285,6 +285,9 @@ export async function POST(req: NextRequest) {
 
   // Save changes page token only if no transient errors occurred.
   // For load mode, initialize the token so subsequent refreshes use changes.list.
+  // Safety: if *every* doc failed (transient, permission denied, or deleted),
+  // something systemic may be wrong — skip the token update so the next refresh
+  // retries from the same point.  See refresh.ts for the full rationale.
   const transientErrors = syncResults
     .map((r, i) => r.transientError ? commentDocs[i].googleDocId : null)
     .filter((id): id is string => id !== null);

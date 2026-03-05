@@ -45,12 +45,20 @@ describe("formatDate", () => {
   });
 
   it("formats a Date object (with seconds by default)", () => {
-    const d = new Date(2024, 0, 5, 9, 3, 45); // Jan 5, 2024 09:03:45 local
+    // 2024-01-05 09:03:45 PST = 2024-01-05T17:03:45Z
+    const d = new Date("2024-01-05T17:03:45Z");
     expect(formatDate(d)).toBe("2024-01-05 09:03:45");
   });
 
   it("omits seconds when omitSeconds is true", () => {
-    const d = new Date(2024, 2, 1, 8, 5, 9); // Mar 1, 2024 08:05:09
+    // 2024-03-01 08:05:09 PST = 2024-03-01T16:05:09Z
+    const d = new Date("2024-03-01T16:05:09Z");
     expect(formatDate(d, true)).toBe("2024-03-01 08:05");
+  });
+
+  it("formats midnight correctly (hour 00, not 24)", () => {
+    // 2024-01-01 00:00:00 PST = 2024-01-01T08:00:00Z
+    const d = new Date("2024-01-01T08:00:00Z");
+    expect(formatDate(d)).toBe("2024-01-01 00:00:00");
   });
 });

@@ -175,11 +175,11 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
     });
   }
 
-  const [fullRefreshing, setFullRefreshing] = useState(false);
-  const [sourceRefreshing, setSourceRefreshing] = useState(false);
+  // Which refresh operation is active (null = idle). Only one can run at a time.
+  const [refreshing, setRefreshing] = useState<"main" | "drive" | "gmail" | "full" | null>(null);
 
   async function handleFullRefresh() {
-    setFullRefreshing(true);
+    setRefreshing("full");
     const contextId = generateContextId();
     try {
       const syncRes = await apiFetch("/api/docs?mode=full-refresh", { method: "POST", contextId });
@@ -203,12 +203,12 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to sync with Google Drive");
     } finally {
-      setFullRefreshing(false);
+      setRefreshing(null);
     }
   }
 
   async function handleSourceRefresh(sources: ("drive" | "gmail")[]) {
-    setSourceRefreshing(true);
+    setRefreshing(sources.length === 1 ? sources[0] : "main");
     const contextId = generateContextId();
     try {
       const syncRes = await apiFetch("/api/docs/refresh", {
@@ -241,7 +241,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to refresh");
     } finally {
-      setSourceRefreshing(false);
+      setRefreshing(null);
     }
   }
 
@@ -284,7 +284,11 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-zinc-900">Your Docs</h1>
         <div className="flex items-center gap-2">
-          <RefreshButton onRefresh={(newDocs) => setDocs(newDocs)} />
+          <RefreshButton
+            onRefresh={(newDocs) => setDocs(newDocs)}
+            disabled={refreshing !== null}
+            onLoadingChange={(v) => setRefreshing(v ? "main" : null)}
+          />
           <AddDocDialog
             onDocAdded={handleDocAdded}
             trigger={
@@ -322,24 +326,24 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 onSelect={() => handleSourceRefresh(["drive"])}
-                disabled={sourceRefreshing}
+                disabled={refreshing !== null}
               >
-                {sourceRefreshing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <HardDriveDownload className="h-4 w-4 mr-2" />}
+                {refreshing === "drive" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <HardDriveDownload className="h-4 w-4 mr-2" />}
                 Refresh from Drive
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => handleSourceRefresh(["gmail"])}
-                disabled={sourceRefreshing}
+                disabled={refreshing !== null}
               >
-                {sourceRefreshing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+                {refreshing === "gmail" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
                 Refresh from Gmail
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={handleFullRefresh}
-                disabled={fullRefreshing}
+                disabled={refreshing !== null}
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${fullRefreshing ? "animate-spin" : ""}`} />
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing === "full" ? "animate-spin" : ""}`} />
                 Full Refresh
               </DropdownMenuItem>
               <DropdownMenuSeparator />
