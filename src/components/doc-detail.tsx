@@ -526,6 +526,16 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
           >{doc.title}</a>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-zinc-900"
+            title={doc.status === "INBOX" ? "Archive this document" : "Move this document to inbox"}
+            onClick={handleArchive}
+            disabled={archiving}
+          >
+            {doc.status === "INBOX" ? "Archive" : "Unarchive"}
+          </Button>
           <Button variant="outline" size="sm" title="Open the document" className="text-zinc-900" asChild>
             <a href={doc.driveUrl} target="docreview-doc">Open</a>
           </Button>
@@ -606,16 +616,6 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
               Edit
             </Button>
           </EditDocDialog>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-6 px-2 text-xs text-zinc-900"
-            title={doc.status === "INBOX" ? "Archive this document" : "Move this document to inbox"}
-            onClick={handleArchive}
-            disabled={archiving}
-          >
-            {doc.status === "INBOX" ? "Archive" : "Unarchive"}
-          </Button>
         </div>
         {doc.notes?.trim() && (
           <div className="flex gap-2 mt-2 text-sm text-zinc-600">
