@@ -563,7 +563,7 @@ export async function fetchAllThreads(
 }
 
 // Creates a reply on a Drive comment thread. Replying to a resolved thread
-// reopens it automatically. Pass resolve=true to resolve instead of reply.
+// reopens it automatically. Pass resolve=true to resolve (with optional content).
 export async function replyToComment(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string,
@@ -572,13 +572,16 @@ export async function replyToComment(
   resolve?: boolean
 ): Promise<void> {
   const drive = createDrive({ version: "v3", auth });
-  const tag = resolve ? " (resolve)" : "";
+  const body: { content?: string; action?: string } = {};
+  if (content) body.content = content;
+  if (resolve) body.action = "resolve";
+  const tag = resolve ? (content ? " (reply+resolve)" : " (resolve)") : "";
   const t0 = Date.now();
   await drive.replies.create({
     fileId: googleDocId,
     commentId,
     fields: "id",
-    requestBody: resolve ? { action: "resolve" } : { content },
+    requestBody: body,
   });
   logInfo(`[Drive] replies.create${tag} ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
 }

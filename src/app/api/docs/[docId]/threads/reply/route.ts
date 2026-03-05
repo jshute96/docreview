@@ -48,14 +48,11 @@ export async function POST(
   try {
     const driveAuth = await getDriveClient(userId);
 
-    // Reply first if content provided (replying to a resolved thread reopens it)
-    if (content && content.trim()) {
-      await replyToComment(driveAuth, doc.googleDocId, commentId, content.trim());
-    }
+    const trimmed = content?.trim() || "";
 
-    // Then resolve if requested
-    if (resolve) {
-      await replyToComment(driveAuth, doc.googleDocId, commentId, "", true);
+    // Single API call handles reply, resolve, or both
+    if (trimmed || resolve) {
+      await replyToComment(driveAuth, doc.googleDocId, commentId, trimmed, resolve);
     }
 
     // Refresh thread data from Drive
