@@ -341,7 +341,13 @@ export async function fetchDocContent(
         return { documentText: null, suggestions: {} };
       }
     } else {
-      logError(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
+      const isPermission = err.code === 403 || err.code === 404 ||
+        /permission|forbidden|not found/i.test(err.message ?? "");
+      if (isPermission) {
+        logError(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms): ${err.message ?? err}`);
+      } else {
+        logError(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
+      }
       return { documentText: null, suggestions: {} };
     }
   }

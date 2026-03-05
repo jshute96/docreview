@@ -41,7 +41,8 @@
       "WebFetch(domain:www.prisma.io)",
       "WebSearch",
       "Bash(find:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(npx next build:*)"
     ]
   }
 }
