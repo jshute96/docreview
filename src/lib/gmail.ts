@@ -2,6 +2,7 @@ import { gmail as createGmail } from "@googleapis/gmail";
 import { drive as createDrive } from "@googleapis/drive";
 import { getDriveClient, parseGoogleDocId } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
+import { formatDate } from "@/lib/utils";
 
 export interface GmailDocIdResult {
   docIds: string[];
@@ -81,7 +82,7 @@ export async function scanGmailForDocIds(
         // Filter by internalDate for timestamp-level precision (Gmail after: is day-level only)
         const internalDate = Number(res.data.internalDate);
         if (internalDate && internalDate < sinceMs) {
-          logInfo(`[Gmail] ${messageId}: skipped — internalDate ${new Date(internalDate).toISOString()} < since (${Date.now() - t0}ms)`);
+          logInfo(`[Gmail] ${messageId}: skipped — internalDate ${formatDate(new Date(internalDate))} < since ${formatDate(since)} (${Date.now() - t0}ms)`);
           return;
         }
 

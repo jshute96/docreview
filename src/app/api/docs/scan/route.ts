@@ -6,6 +6,7 @@ import { scanGmailNotifications } from "@/lib/gmail";
 import { parseLoadOptions } from "@/lib/load-options";
 import { logError, logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
+import { formatDate } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
   return runWithRequestId("POST", req, async () => {
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
 
   if (source === "gmail") {
     const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
-    logInfo(`[Scan] Starting Gmail scan: daysBack=${daysBack}, since=${since.toISOString()}`);
+    logInfo(`[Scan] Starting Gmail scan: daysBack=${daysBack}, since=${formatDate(since)}`);
 
     try {
       const { docs: gmailDocs, errorCount } = await scanGmailNotifications(userId, since);

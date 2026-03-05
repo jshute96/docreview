@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { OFFLINE_MODE, OfflineModeError } from "@/lib/offline";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { withProgressLogging } from "./promise-utils";
+import { formatDate } from "./utils";
 
 export const SUPPORTED_MIME_TYPES = new Set([
   "application/vnd.google-apps.document",
@@ -225,7 +226,7 @@ export async function fetchComments(
   } while (pageToken);
 
   logInfo(
-    `[Drive] comments.list ${googleDocId} (since ${sinceStr ?? "all"}) → ${comments.length} comments (${Date.now() - t0}ms)`
+    `[Drive] comments.list ${googleDocId} (since ${since ? formatDate(since) : "all"}) → ${comments.length} comments (${Date.now() - t0}ms)`
   );
   return comments;
 }

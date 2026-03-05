@@ -12,6 +12,7 @@ import { scanGmailForDocIds } from "@/lib/gmail";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "@/lib/status";
 import { logError, logWarning, logInfo } from "@/lib/log";
+import { formatDate } from "@/lib/utils";
 
 export type RefreshSource = "drive" | "gmail";
 
@@ -88,7 +89,7 @@ export async function executeRefresh(
     discoveryPromises.push((async () => {
       const since = status?.lastGmailUpdateTimestamp
         ?? new Date(Date.now() - DEFAULT_GMAIL_DAYS_BACK * 24 * 60 * 60 * 1000);
-      logInfo(`[Refresh] Gmail: scanning since ${since.toISOString()}`);
+      logInfo(`[Refresh] Gmail: scanning since ${formatDate(since)}`);
       const result = await scanGmailForDocIds(userId, since);
       gmailDocIds = result.docIds;
       gmailErrorCount = result.errorCount;

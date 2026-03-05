@@ -7,6 +7,7 @@ import { logError, logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateGmailTimestamp } from "@/lib/status";
+import { formatDate } from "@/lib/utils";
 
 const DEFAULT_DAYS_BACK = 7;
 
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
     const status = await getStatus(userId);
     const since = status?.lastGmailUpdateTimestamp
       ?? new Date(Date.now() - DEFAULT_DAYS_BACK * 24 * 60 * 60 * 1000);
-    logInfo(`[GmailRefresh] Scanning since ${since.toISOString()}`);
+    logInfo(`[GmailRefresh] Scanning since ${formatDate(since)}`);
 
     // Scan Gmail for doc notifications
     const { docs: gmailDocs, errorCount } = await scanGmailNotifications(userId, since);

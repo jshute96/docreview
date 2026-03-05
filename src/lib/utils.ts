@@ -19,6 +19,16 @@ export function contrastText(hex: string): string {
 export function formatDate(d: Date | string | null): string {
   if (!d) return "—";
   const dt = new Date(d);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(dt);
+  const get = (t: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === t)!.value;
+
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
 }
