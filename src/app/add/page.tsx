@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default async function AddPage({
   searchParams,
 }: {
-  searchParams: Promise<{ url?: string }>;
+  searchParams: Promise<{ doc?: string }>;
 }) {
   const session = await requireAuth();
   const userId = session.user.id;
@@ -26,7 +26,7 @@ export default async function AddPage({
   return (
     <AddDocPageClient
       initialLabels={labels}
-      initialUrl={params.url}
+      initialUrl={params.doc}
     />
   );
 }
