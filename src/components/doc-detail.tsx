@@ -526,6 +526,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
           >{doc.title}</a>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <Button variant="outline" size="sm" title="Open the document" className="text-zinc-900" asChild>
+            <a href={doc.driveUrl} target="docreview-doc">Open</a>
+          </Button>
           <Button variant="outline" size="sm" title="Back to the document list" className="text-zinc-900" asChild>
             <a href="/docs">Doc list</a>
           </Button>
