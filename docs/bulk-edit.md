@@ -13,7 +13,8 @@ The Bulk Edit feature allows users to update roles, labels, and notes for multip
 The dialog follows the shared dialog sizing pattern (see [`dialog-sizing.md`](./dialog-sizing.md)) —
 the doc list is the flexible element that shrinks on viewport resize.
 
-- **Dynamic Selection**: Displays a list of selected documents with their respective icons and titles. Users can remove documents from the bulk operation using the "X" button.
+- **Dynamic Selection**: Displays a list of selected documents with their respective icons and titles. Users can remove documents from the bulk operation using the "X" button or Delete/Backspace key.
+- **Multi-Select Highlighting**: Rows support click (select one), Ctrl/Cmd+click (toggle), and Shift+click (range select) via the shared `useMultiSelect` hook. When rows are highlighted, all actions (role/status/label cycling, consistency checks, save) scope to the highlighted subset. With no highlights, actions apply to all docs. Double-click opens the doc's comments page.
 - **Tri-State Controls**: Role, State (Inbox/Archived), and Label buttons use a three-state logic:
     - `as-is`: No change to the document. Represented by a `?` overlay if the selection is inconsistent (mixed), or no overlay if all documents share the state.
     - `set` (+): Ensures the property is applied to all selected documents (e.g., sets Role to AUTHOR, or State to INBOX).

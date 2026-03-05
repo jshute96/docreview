@@ -53,9 +53,9 @@ One-line descriptions of every source file, grouped by layer.
 | `add-doc-dialog.tsx` | Dialog wrapper for adding/updating a doc — renders `AddDocContent` inside a dialog, dynamic title and button text |
 | `add-doc-page-client.tsx` | Standalone add/update doc page (client) — renders `AddDocContent` in a card with cross-tab sync |
 | `edit-doc-dialog.tsx` | Dialog to edit doc role and labels |
-| `bulk-edit-dialog.tsx` | Dialog to edit role, labels, and notes for multiple documents simultaneously |
+| `bulk-edit-dialog.tsx` | Dialog to edit role, labels, and notes for multiple documents simultaneously; supports multi-select highlighting to scope actions to a subset |
 
-| `load-dialog.tsx` | Load from Drive/Gmail dialog — two-phase scan→add flow with source toggle (Drive/Gmail), options (days back, ownership, shared drives), doc selection, labels, notes; shows error count for unresolved Gmail emails |
+| `load-dialog.tsx` | Load from Drive/Gmail dialog — two-phase scan→add flow with source toggle (Drive/Gmail), options (days back, ownership, shared drives), doc selection with multi-select highlighting, labels, notes; shows error count for unresolved Gmail emails |
 | `refresh-button.tsx` | Combined Refresh button — calls POST `/api/docs/refresh` with both Drive+Gmail sources, then reloads list |
 | `tri-state-button.tsx` | Tri-state filter buttons (off/include/exclude) with diagonal strikethrough + slow-click-to-reset |
 | `label-badge.tsx` | Colored label pill with optional remove button |
@@ -88,6 +88,7 @@ Shadcn/ui components:
 |------|-------------|
 | `use-auto-resize.ts` | `useAutoResize()` hook — auto-grows a textarea to fit content up to a max height |
 | `use-label-sync.ts` | `useLabelSync()` hook — removes stale label IDs from selection when available labels change |
+| `use-multi-select.ts` | `useMultiSelect()` hook — generic row multi-selection with click/Ctrl+click/Shift+click, highlight state, effective item filtering, and bulk removal helpers |
 
 ## Contexts (`src/contexts/`)
 

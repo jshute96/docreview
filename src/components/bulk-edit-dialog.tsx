@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId } from "@/lib/api-fetch";
 import { useLabels } from "@/contexts/label-context";
+import { useMultiSelect } from "@/hooks/use-multi-select";
 
 interface BulkEditDialogProps {
   initialDocs: DocWithLabels[];
@@ -72,7 +73,12 @@ export function BulkEditDialog({
   const [labelStates, setLabelStates] = useState<Record<string, BulkEditState>>({});
   const [appendNotes, setAppendNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [docListRows, setDocListRows] = useState(5);
   const notesRef = useRef<HTMLTextAreaElement>(null);
+  const {
+    highlightedIds, effectiveItems: effectiveDocs, handleRowClick,
+    removeFromHighlight, clearHighlights, reset: resetHighlights, rowClassName,
+  } = useMultiSelect(selectedDocs, d => d.docId);
 
   const handleOpenChange = useCallback((isOpen: boolean) => {
     if (isOpen) {
@@ -83,23 +89,23 @@ export function BulkEditDialog({
       const initialLabelStates: Record<string, BulkEditState> = {};
       allLabels.forEach(label => { initialLabelStates[label.labelId] = "as-is"; });
       setLabelStates(initialLabelStates);
+      setDocListRows(Math.min(15, Math.max(5, initialDocs.length)));
+      resetHighlights();
     }
     setOpen(isOpen);
   }, [initialDocs, allLabels]);
 
-  function handleRemoveDoc(id: string) {
-    const next = selectedDocs.filter(d => d.docId !== id);
-    setSelectedDocs(next);
-
-    // Revert role/label states to 'as-is' if they've become redundant (no-op)
-    // for the remaining documents in the selection. This ensures we don't 
-    // perform unnecessary database updates.
-    const role = checkConsistency(next, d => d.role === "AUTHOR");
+  /**
+   * Revert role/status/label states to 'as-is' if they've become redundant
+   * (no-op) for the remaining documents. Prevents unnecessary DB updates.
+   */
+  function revertRedundantStates(remainingDocs: DocWithLabels[]) {
+    const role = checkConsistency(remainingDocs, d => d.role === "AUTHOR");
     if ((roleState === "set" && role.all) || (roleState === "clear" && role.none)) {
       setRoleState("as-is");
     }
 
-    const status = checkConsistency(next, d => d.status === "INBOX");
+    const status = checkConsistency(remainingDocs, d => d.status === "INBOX");
     if ((statusState === "set" && status.all) || (statusState === "clear" && status.none)) {
       setStatusState("as-is");
     }
@@ -107,7 +113,7 @@ export function BulkEditDialog({
     setLabelStates(current => {
       const updated = { ...current };
       allLabels.forEach(l => {
-        const label = checkConsistency(next, d => d.labels.some(dl => dl.labelId === l.labelId));
+        const label = checkConsistency(remainingDocs, d => d.labels.some(dl => dl.labelId === l.labelId));
         if ((updated[l.labelId] === "set" && label.all) || (updated[l.labelId] === "clear" && label.none)) {
           updated[l.labelId] = "as-is";
         }
@@ -116,12 +122,26 @@ export function BulkEditDialog({
     });
   }
 
+  function handleRemoveDoc(id: string) {
+    const next = selectedDocs.filter(d => d.docId !== id);
+    setSelectedDocs(next);
+    removeFromHighlight(id);
+    revertRedundantStates(next);
+  }
+
+  function handleRemoveHighlighted() {
+    const removed = clearHighlights();
+    const next = selectedDocs.filter(d => !removed.has(d.docId));
+    setSelectedDocs(next);
+    revertRedundantStates(next);
+  }
+
   function cycleRole(e: React.MouseEvent) {
     // Prevent interaction with the underlying dialog/overlay when clicking toggles
     e.preventDefault(); e.stopPropagation();
-    const { all, none } = checkConsistency(selectedDocs, d => d.role === "AUTHOR");
+    const { all, none } = checkConsistency(effectiveDocs, d => d.role === "AUTHOR");
     setRoleState(prev => {
-      // Skip redundant states: 
+      // Skip redundant states:
       // If all are authors, skip 'set' (+). If none are authors, skip 'clear' (-).
       if (all) return prev === "as-is" ? "clear" : "as-is";
       if (none) return prev === "as-is" ? "set" : "as-is";
@@ -131,7 +151,7 @@ export function BulkEditDialog({
 
   function cycleStatus(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
-    const { all, none } = checkConsistency(selectedDocs, d => d.status === "INBOX");
+    const { all, none } = checkConsistency(effectiveDocs, d => d.status === "INBOX");
     setStatusState(prev => {
       if (all) return prev === "as-is" ? "clear" : "as-is";
       if (none) return prev === "as-is" ? "set" : "as-is";
@@ -141,7 +161,7 @@ export function BulkEditDialog({
 
   function cycleLabel(labelId: string, e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
-    const { all, none } = checkConsistency(selectedDocs, d => d.labels.some(dl => dl.labelId === labelId));
+    const { all, none } = checkConsistency(effectiveDocs, d => d.labels.some(dl => dl.labelId === labelId));
     setLabelStates(prev => {
       const current = prev[labelId] ?? "as-is";
       let next: BulkEditState;
@@ -165,7 +185,7 @@ export function BulkEditDialog({
   useEffect(() => { autoResize(); }, [appendNotes, autoResize]);
 
   async function handleSave() {
-    if (selectedDocs.length === 0) {
+    if (effectiveDocs.length === 0) {
       toast.error("No documents selected");
       return;
     }
@@ -176,7 +196,7 @@ export function BulkEditDialog({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          docIds: selectedDocs.map(d => d.docId),
+          docIds: effectiveDocs.map(d => d.docId),
           role: roleState,
           status: statusState,
           labelUpdates: labelStates,
@@ -203,19 +223,19 @@ export function BulkEditDialog({
     }
   }
 
-  const role = checkConsistency(selectedDocs, d => d.role === "AUTHOR");
-  const status = checkConsistency(selectedDocs, d => d.status === "INBOX");
+  const role = checkConsistency(effectiveDocs, d => d.role === "AUTHOR");
+  const status = checkConsistency(effectiveDocs, d => d.status === "INBOX");
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Edit {selectedDocs.length} Document{selectedDocs.length === 1 ? "" : "s"}</DialogTitle>
+          <DialogTitle>Edit {effectiveDocs.length} Document{effectiveDocs.length === 1 ? "" : "s"}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto min-h-0">
-          <div className="flex flex-col gap-6 p-6 pt-4">
+        <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
+          <div className="flex flex-col gap-6 px-6 pt-4 pb-0 shrink-0">
             <div className="flex gap-8">
               <div>
                 <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-900">
@@ -277,7 +297,7 @@ export function BulkEditDialog({
                 {allLabels.map((label) => {
                   const bg = label.color ?? "#e4e4e7";
                   const state = labelStates[label.labelId] ?? "as-is";
-                  const { all: allHave, mixed: isMixed } = checkConsistency(selectedDocs, d => d.labels.some(dl => dl.labelId === label.labelId));
+                  const { all: allHave, mixed: isMixed } = checkConsistency(effectiveDocs, d => d.labels.some(dl => dl.labelId === label.labelId));
                   const active = state === "set" || state === "clear" || (state === "as-is" && allHave);
 
                   return (
@@ -311,50 +331,60 @@ export function BulkEditDialog({
                 className={`${TEXTAREA_CLASSES} max-h-[150px] w-full`}
               />
             </div>
-
-            <div 
-              className="overflow-hidden rounded-md border border-zinc-200 bg-zinc-50/50 flex flex-col"
-              style={{ 
-                maxHeight: `clamp(calc(5 * 1.5rem + 2px), 30vh, calc(15 * 1.5rem + 2px))`,
-                minHeight: selectedDocs.length > 0 ? `calc(${Math.min(selectedDocs.length, 5)} * 1.5rem + 2px)` : "auto",
-              }}
-            >
-              <div className="max-w-full overflow-auto">
-                {selectedDocs.length === 0 ? (
-                  <div className="py-4 text-center text-xs italic text-zinc-400">No documents selected</div>
-                ) : (
-                  <div className="flex flex-col">
-                    {selectedDocs.map((doc) => (
-                      <div key={doc.docId} className="flex h-6 min-w-max items-center gap-2 px-2 transition-colors hover:bg-zinc-100">
-                        <button
-                          onClick={() => handleRemoveDoc(doc.docId)}
-                          className="rounded p-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-600"
-                          title="Remove from list"
-                          aria-label={`Remove ${doc.title}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                        <a 
-                          href={`/comments/${doc.docId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Open document comments page"
-                          className={`flex items-center gap-2 transition-colors hover:text-blue-600 hover:underline ${
-                            doc.isDeleted ? "text-zinc-400 line-through" : ""
-                          }`}
-                        >
-                          <DocTypeIcon mimeType={doc.mimeType} className={`h-3 w-3 flex-shrink-0 ${doc.isDeleted ? "text-zinc-300" : ""}`} />
-                          <span className="whitespace-nowrap pr-4 text-xs font-medium">
-                            {doc.title}
-                          </span>
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
+
+          <div
+            tabIndex={-1}
+            onKeyDown={(e) => {
+              if ((e.key === "Delete" || e.key === "Backspace") && highlightedIds.size > 0) {
+                e.preventDefault();
+                handleRemoveHighlighted();
+              }
+            }}
+            className="mx-6 overflow-y-auto overflow-x-hidden rounded-md border border-zinc-200 bg-zinc-50/50 outline-none shrink"
+            style={{
+              height: `calc(${docListRows} * 1.5rem + 2px)`,
+              minHeight: `calc(5 * 1.5rem + 2px)`,
+              maxHeight: `calc(15 * 1.5rem + 2px)`,
+            }}
+          >
+            {selectedDocs.length === 0 ? (
+              <div className="py-4 text-center text-xs italic text-zinc-400">No documents selected</div>
+            ) : (
+              <div className="flex flex-col">
+                {selectedDocs.map((doc) => (
+                  <div
+                    key={doc.docId}
+                    onClick={(e) => handleRowClick(doc.docId, e)}
+                    className={rowClassName(doc.docId, "flex h-6 min-w-max items-center gap-2 px-2 transition-colors")}
+                  >
+                    <button
+                      onClick={() => handleRemoveDoc(doc.docId)}
+                      className="rounded p-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-600"
+                      title="Remove from list"
+                      aria-label={`Remove ${doc.title}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                    <span
+                      onDoubleClick={() => window.open(`/comments/${doc.docId}`, "_blank")}
+                      title="Click to select, double-click to open"
+                      className={`flex items-center gap-2 ${
+                        doc.isDeleted ? "text-zinc-400 line-through" : ""
+                      }`}
+                    >
+                      <DocTypeIcon mimeType={doc.mimeType} className={`h-3 w-3 flex-shrink-0 ${doc.isDeleted ? "text-zinc-300" : ""}`} />
+                      <span className="whitespace-nowrap pr-4 text-xs font-medium">
+                        {doc.title}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <p className="mx-6 mt-1 text-sm text-zinc-400 shrink-0">Click to select, double-click to open</p>
         </div>
 
         <div className="p-6 pt-0">
@@ -362,7 +392,7 @@ export function BulkEditDialog({
             onConfirm={handleSave}
             onCancel={() => setOpen(false)}
             confirmLabel={saving ? "Saving…" : "Save Changes"}
-            disabled={saving || selectedDocs.length === 0}
+            disabled={saving || effectiveDocs.length === 0}
           />
         </div>
       </DialogContent>

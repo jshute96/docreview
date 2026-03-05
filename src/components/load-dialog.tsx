@@ -29,6 +29,7 @@ import { useLabelSync } from "@/hooks/use-label-sync";
 import { useLabels } from "@/contexts/label-context";
 import type { DocWithLabels } from "@/types";
 import { broadcastChange } from "@/lib/cross-tab";
+import { useMultiSelect } from "@/hooks/use-multi-select";
 
 interface LoadOptions {
   daysBack: number;
@@ -86,6 +87,19 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
   useAutoResize(notesRef, notes);
   useLabelSync(allLabels, setSelectedLabelIds);
 
+  const visibleDocs = scanResult
+    ? scanResult.docs.filter(
+        (d) =>
+          !removedDocIds.has(d.googleDocId) &&
+          (viewMode === "all" || d.isNew)
+      )
+    : [];
+
+  const {
+    highlightedIds, effectiveItems: effectiveDocs, handleRowClick,
+    removeFromHighlight, clearHighlights, reset: resetHighlights, rowClassName,
+  } = useMultiSelect(visibleDocs, d => d.googleDocId);
+
   const handleOpenChange = useCallback((isOpen: boolean) => {
     if (isOpen) {
       setScanResult(null);
@@ -96,6 +110,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       setNotes("");
       setAddAsActive(true);
       setDaysBackText(String(DEFAULT_OPTIONS.daysBack));
+      resetHighlights();
     } else {
       abortRef.current?.abort();
     }
@@ -134,6 +149,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       const result: ScanResult = await res.json();
       setScanResult(result);
       setRemovedDocIds(new Set());
+      resetHighlights();
       setDocListRows(Math.min(15, Math.max(5, result.docs.filter((d) => viewMode === "all" || d.isNew).length)));
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
@@ -156,7 +172,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
         body: JSON.stringify({
           ...options,
           source,
-          selectedGoogleDocIds: visibleDocs.map((d) => d.googleDocId),
+          selectedGoogleDocIds: effectiveDocs.map((d) => d.googleDocId),
           labelIds: selectedLabelIds,
           notes,
           status: addToInbox ? "INBOX" : "ARCHIVED",
@@ -196,13 +212,23 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
     }
   }
 
-  const visibleDocs = scanResult
-    ? scanResult.docs.filter(
-        (d) =>
-          !removedDocIds.has(d.googleDocId) &&
-          (viewMode === "all" || d.isNew)
-      )
-    : [];
+  function handleRemoveDoc(googleDocId: string) {
+    setRemovedDocIds(prev => {
+      const next = new Set(prev);
+      next.add(googleDocId);
+      return next;
+    });
+    removeFromHighlight(googleDocId);
+  }
+
+  function handleRemoveHighlighted() {
+    const removed = clearHighlights();
+    setRemovedDocIds(prev => {
+      const next = new Set(prev);
+      removed.forEach(id => next.add(id));
+      return next;
+    });
+  }
 
   const hasAnyDocs = scanResult ? scanResult.docs.length > 0 : false;
 
@@ -433,7 +459,14 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
           {/* Doc list - flexible, shrinks first; height based on view's doc count (ignoring removals) so X-clicks don't resize */}
           {scanResult && hasAnyDocs && (
             <div
-              className="mx-6 overflow-y-auto overflow-x-hidden rounded-md border border-zinc-200 bg-zinc-50/50 shrink"
+              tabIndex={-1}
+              onKeyDown={(e) => {
+                if ((e.key === "Delete" || e.key === "Backspace") && highlightedIds.size > 0) {
+                  e.preventDefault();
+                  handleRemoveHighlighted();
+                }
+              }}
+              className="mx-6 overflow-y-auto overflow-x-hidden rounded-md border border-zinc-200 bg-zinc-50/50 shrink outline-none"
               style={{
                 height: `calc(${docListRows} * 1.5rem + 2px)`,
                 minHeight: `calc(5 * 1.5rem + 2px)`,
@@ -451,16 +484,11 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                   {visibleDocs.map((doc) => (
                     <div
                       key={doc.googleDocId}
-                      className="flex h-6 min-w-max items-center gap-2 px-2 transition-colors hover:bg-zinc-100"
+                      onClick={(e) => handleRowClick(doc.googleDocId, e)}
+                      className={rowClassName(doc.googleDocId, "flex h-6 min-w-max items-center gap-2 px-2 transition-colors")}
                     >
                       <button
-                        onClick={() =>
-                          setRemovedDocIds((prev) => {
-                            const next = new Set(prev);
-                            next.add(doc.googleDocId);
-                            return next;
-                          })
-                        }
+                        onClick={() => handleRemoveDoc(doc.googleDocId)}
                         className="rounded p-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-600"
                         title="Remove from list"
                         aria-label={`Remove ${doc.title}`}
@@ -476,12 +504,10 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                           {doc.isNew ? "NEW" : ""}
                         </span>
                       )}
-                      <a
-                        href={doc.driveUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 transition-colors hover:text-blue-600 hover:underline"
-                        title={doc.title}
+                      <span
+                        onDoubleClick={() => window.open(doc.driveUrl, "_blank")}
+                        title="Click to select, double-click to open"
+                        className="flex items-center gap-2"
                       >
                         <DocTypeIcon
                           mimeType={doc.mimeType}
@@ -490,7 +516,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                         <span className="whitespace-nowrap pr-4 text-xs font-medium">
                           {doc.title}
                         </span>
-                      </a>
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -501,12 +527,15 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
           {/* Below doc list - fixed */}
           {scanResult && hasAnyDocs && (
             <div className="flex flex-col gap-4 px-6 py-4 shrink-0">
-              {removedDocIds.size > 0 && (
-                <p className="text-sm text-zinc-500">
-                  {visibleDocs.length} document
-                  {visibleDocs.length === 1 ? "" : "s"} selected
-                </p>
-              )}
+              <div>
+                <p className="text-sm text-zinc-400">Click to select, double-click to open</p>
+                {(removedDocIds.size > 0 || highlightedIds.size > 0) && (
+                  <p className="text-sm text-zinc-500">
+                    {effectiveDocs.length} document
+                    {effectiveDocs.length === 1 ? "" : "s"} selected
+                  </p>
+                )}
+              </div>
 
               <LabelPicker
                 selectedLabelIds={selectedLabelIds}
@@ -555,7 +584,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={visibleDocs.length === 0 || adding}
+                disabled={effectiveDocs.length === 0 || adding}
                 onClick={handleAdd}
                 title={viewMode === "all"
                   ? "Add new documents and update labels/notes on existing ones"
