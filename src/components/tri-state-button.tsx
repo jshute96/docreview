@@ -14,7 +14,7 @@ import { contrastText } from "@/lib/utils";
 
 const SLOW_CLICK_MS = 500;
 
-function useTriStateCycle(value: TriState, onChange: (v: TriState) => void) {
+export function useTriStateCycle(value: TriState, onChange: (v: TriState) => void) {
   const lastClickRef = useRef(0);
   return useCallback(() => {
     const now = Date.now();
@@ -44,7 +44,7 @@ function slashColor(hex: string): string {
   return luminance > 0.3 ? "#18181b" : "#fafafa";
 }
 
-function DiagonalStrike({ bgColor }: { bgColor: string }) {
+export function DiagonalStrike({ bgColor }: { bgColor: string }) {
   const stroke = slashColor(bgColor);
   return (
     <span

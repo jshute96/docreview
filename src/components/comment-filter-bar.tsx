@@ -1,17 +1,22 @@
 "use client";
 
+import type { TriState } from "@/lib/tri-state";
+import { TriStateStarButton } from "@/components/star-button";
+
 type ShowMode = "inbox" | "open" | "resolved" | "all";
 interface CommentFilterBarProps {
   myThreadsFilter: boolean;
   myCommentsFilter: boolean;
   showMode: ShowMode;
   suggestionsOnly: boolean;
+  isStarred: TriState;
   unrepliedFilter: boolean;
   searchFilter: string;
   onMyThreadsChange: (v: boolean) => void;
   onMyCommentsChange: (v: boolean) => void;
   onShowModeChange: (v: ShowMode) => void;
   onSuggestionsOnlyChange: (v: boolean) => void;
+  onIsStarredChange: (v: TriState) => void;
   onUnrepliedChange: (v: boolean) => void;
   onSearchFilterChange: (v: string) => void;
 }
@@ -21,12 +26,14 @@ export function CommentFilterBar({
   myCommentsFilter,
   showMode,
   suggestionsOnly,
+  isStarred,
   unrepliedFilter,
   searchFilter,
   onMyThreadsChange,
   onMyCommentsChange,
   onShowModeChange,
   onSuggestionsOnlyChange,
+  onIsStarredChange,
   onUnrepliedChange,
   onSearchFilterChange,
 }: CommentFilterBarProps) {
@@ -58,6 +65,8 @@ export function CommentFilterBar({
         <div className="h-4 w-px bg-zinc-200" />
         {toggleBtn(myCommentsFilter, "My comments", () => onMyCommentsChange(!myCommentsFilter), "Threads I started")}
         <div className="h-4 w-px bg-zinc-200" />
+        <TriStateStarButton value={isStarred} onChange={onIsStarredChange} />
+        <div className="h-4 w-px bg-zinc-200" />
         {toggleBtn(suggestionsOnly, "Suggestions", () => onSuggestionsOnlyChange(!suggestionsOnly), "Show suggestions")}
 
         <div className="h-4 w-px bg-zinc-200" />
@@ -85,7 +94,7 @@ export function CommentFilterBar({
         </div>
 
         <div className="h-4 w-px bg-zinc-200" />
-        {toggleBtn(unrepliedFilter, "Unreplied", () => onUnrepliedChange(!unrepliedFilter), "Exclude threads where I wrote the last reply")}
+        {toggleBtn(unrepliedFilter, "Unread", () => onUnrepliedChange(!unrepliedFilter), "Show only unread comments")}
 
       </div>
 

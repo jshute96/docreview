@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     where: { userId_googleDocId: { userId, googleDocId: fileId } },
     select: {
       docId: true, title: true, mimeType: true,
-      notes: true, status: true, isDeleted: true,
+      notes: true, status: true, isStarred: true, isDeleted: true,
       labels: { select: { labelId: true } },
     },
   });
@@ -87,6 +87,7 @@ export async function GET(req: NextRequest) {
       labels: existing.labels.map((l) => l.labelId),
       notes: existing.notes,
       status: existing.status,
+      isStarred: existing.isStarred,
     } : {}),
   });
   });

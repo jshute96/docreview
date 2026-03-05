@@ -15,7 +15,7 @@ the doc list is the flexible element that shrinks on viewport resize.
 
 - **Dynamic Selection**: Displays a list of selected documents with their respective icons and titles. Users can remove documents from the bulk operation using the "X" button or Delete/Backspace key.
 - **Multi-Select Highlighting**: Rows support click (select one), Ctrl/Cmd+click (toggle), and Shift+click (range select) via the shared `useMultiSelect` hook. When rows are highlighted, all actions (role/status/label cycling, consistency checks, save) scope to the highlighted subset. With no highlights, actions apply to all docs. Double-click opens the doc's comments page.
-- **Tri-State Controls**: Role, State (Inbox/Archived), and Label buttons use a three-state logic:
+- **Tri-State Controls**: Role, State (Inbox/Archived), Star, and Label buttons use a three-state logic:
     - `as-is`: No change to the document. Represented by a `?` overlay if the selection is inconsistent (mixed), or no overlay if all documents share the state.
     - `set` (+): Ensures the property is applied to all selected documents (e.g., sets Role to AUTHOR, or State to INBOX).
     - `clear` (-): Ensures the property is removed/negated (e.g., sets Role to REVIEWER, or State to ARCHIVED).
@@ -32,7 +32,7 @@ the doc list is the flexible element that shrinks on viewport resize.
 ### Backend (`src/app/api/docs/bulk-update/route.ts`)
 - **Batch Read**: All target docs are fetched in a single `findMany` call (not N+1 queries).
 - **Transaction**: All writes are wrapped in `prisma.$transaction` for atomicity.
-- **Validation**: Runtime checks on all inputs — `docIds` must be a non-empty string array (max 500), `role` and `labelUpdates` values must be valid `BulkEditState` strings, `appendNotes` must be a string if present.
+- **Validation**: Runtime checks on all inputs — `docIds` must be a non-empty string array (max 500), `role`, `isStarred`, and `labelUpdates` values must be valid `BulkEditState` strings, `appendNotes` must be a string if present.
 - **No-Op Protection**: Before building an `update` call, the API checks whether any actual changes are required (role change, non-empty append notes, or label additions/removals). Unchanged docs are skipped but still included in the response from the initial batch read.
 - **Response Shape**: Returns `{ docs, skipped }` — `docs` is the full list (updated + unchanged), `skipped` is the count of requested IDs not found in the database (e.g., docs owned by another user).
 

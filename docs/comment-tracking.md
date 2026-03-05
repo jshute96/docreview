@@ -199,7 +199,8 @@ The doc detail page provides three ways to narrow the comment table:
 - **My threads** — keep only `iParticipated` (since `isThreadAuthor` implies `iParticipated`)
 - **My comments** — keep only `isThreadAuthor`
 - **Suggestions** — show only `type = SUGGESTION`
-- **Unreplied** — exclude threads where `isRead` (I wrote the last reply)
+- **Starred** — tri-state star filter (off/starred-only/unstarred-only)
+- **Unread** — exclude threads where `isRead` (I wrote the last reply)
 
 **Search filter**:
 The search bar at the top of the table allows filtering comments by text. The search is
@@ -214,7 +215,7 @@ Both regex and literal substring matching are always attempted:
 - The same logic is used for both filtering (`matchesFilter`) and highlighting
   (`highlightText`), ensuring consistent behavior.
 
-All five data columns (Created, Modified, Responses, Mine, Replied, Status) are sortable.
+The sortable data columns are Modified, Responses, and Status (which combines star, Mine/Replied badges, and Resolved/Open state into one column).
 Modified shows "—" when it equals Created (i.e., no replies have been added).
 
 **Sort freezing on single-comment updates:** When you reply to, resolve, refresh, or

@@ -10,6 +10,7 @@ export interface FilterOptions {
   isInbox: TriState;
   hasComments: TriState;
   isAuthor: TriState;
+  isStarred: TriState;
   mimeTypes: Record<string, TriState>;
   labels: Record<string, TriState>;
   titleFilter: string;
@@ -36,6 +37,10 @@ export function filterDocs(
     // isAuthor: include = AUTHOR only, exclude = non-AUTHOR only
     if (opts.isAuthor === "include" && doc.role !== "AUTHOR") return false;
     if (opts.isAuthor === "exclude" && doc.role === "AUTHOR") return false;
+
+    // isStarred: include = starred only, exclude = unstarred only
+    if (opts.isStarred === "include" && !doc.isStarred) return false;
+    if (opts.isStarred === "exclude" && doc.isStarred) return false;
 
     // mimeTypes: include = must match one (OR), exclude = must not match any
     const docMime = doc.mimeType ?? "";

@@ -19,6 +19,7 @@ import { useAutoResize } from "@/hooks/use-auto-resize";
 import { useLabelSync } from "@/hooks/use-label-sync";
 import { useLabels } from "@/contexts/label-context";
 import { Checkbox } from "@/components/ui/checkbox";
+import { StarButton } from "@/components/star-button";
 
 type ValidationState = "idle" | "validating" | "valid" | "invalid";
 
@@ -68,6 +69,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
     const [isExisting, setIsExisting] = useState(false);
     const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
     const [notes, setNotes] = useState("");
+    const [isStarred, setIsStarred] = useState(false);
     const [addToInbox, setAddAsActive] = useState(true);
     const [adding, setAdding] = useState(false);
 
@@ -92,6 +94,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
       setExistingDocId(null);
       setIsExisting(false);
       setSelectedLabelIds([]);
+      setIsStarred(false);
       setNotes("");
       setAddAsActive(true);
       setAdding(false);
@@ -126,6 +129,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
             setIsExisting(true);
             setExistingDocId(data.docId ?? null);
             setSelectedLabelIds(data.labels ?? []);
+            setIsStarred(data.isStarred ?? false);
             setNotes(data.notes ?? "");
             setAddAsActive(data.status === "INBOX");
           } else {
@@ -190,6 +194,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
           body: JSON.stringify({
             url,
             labelIds: selectedLabelIds,
+            isStarred,
             notes,
             status: addToInbox ? "INBOX" : "ARCHIVED",
           }),
@@ -282,6 +287,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
           <LabelPicker
             selectedLabelIds={selectedLabelIds}
             onToggle={toggleLabel}
+            prefix={<StarButton starred={isStarred} onToggle={() => setIsStarred(!isStarred)} />}
           />
 
           <div>

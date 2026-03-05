@@ -25,15 +25,19 @@ export async function POST(req: NextRequest) {
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const { url, labelIds = [], notes, status } = body as {
+  const { url, labelIds = [], isStarred, notes, status } = body as {
     url: string;
     labelIds?: string[];
+    isStarred?: boolean;
     notes?: string;
     status?: "INBOX" | "ARCHIVED";
   };
 
   if (status !== undefined && status !== "INBOX" && status !== "ARCHIVED") {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  }
+  if (isStarred !== undefined && typeof isStarred !== "boolean") {
+    return NextResponse.json({ error: "Invalid isStarred" }, { status: 400 });
   }
 
   const fileId = parseGoogleDocId(url);
@@ -71,6 +75,7 @@ export async function POST(req: NextRequest) {
         data: {
           notes: notes || null,
           status: status ?? "INBOX",
+          ...(isStarred !== undefined ? { isStarred } : {}),
         },
       }),
     ]);
@@ -122,6 +127,7 @@ export async function POST(req: NextRequest) {
       lastModifiedInDrive: f.modifiedTime ? new Date(f.modifiedTime) : null,
       createdTimeInDrive: f.createdTime ? new Date(f.createdTime) : null,
       notes: notes || null,
+      ...(isStarred !== undefined ? { isStarred } : {}),
       ...(labelIds.length > 0
         ? { labels: { create: labelIds.map((labelId: string) => ({ labelId })) } }
         : {}),

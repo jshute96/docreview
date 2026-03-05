@@ -151,6 +151,7 @@ model Doc {
   role                 DocRole    @default(REVIEWER)
   status               DocStatus  @default(INBOX)
   isDeleted            Boolean    @default(false) @map("is_deleted") // soft-delete; set when Drive reports 404/403/trashed, cleared if doc reappears
+  isStarred            Boolean    @default(false) @map("is_starred")
   lastModifiedInDrive  DateTime?  @map("last_modified_in_drive")    // Drive's modifiedTime (does NOT update when comments change)
   notes                String?    @map("notes")
   owner                String?
@@ -175,6 +176,7 @@ model Comment {
   isThreadAuthor  Boolean        @default(false) @map("is_thread_author")
   iParticipated   Boolean        @default(false) @map("i_participated")
   isRead          Boolean        @default(false) @map("is_read")
+  isStarred       Boolean        @default(false) @map("is_starred")
   status          CommentStatus  @default(INBOX)
   driveCreatedAt  DateTime?      @map("drive_created_at")
   driveModifiedAt DateTime?      @map("drive_modified_at")

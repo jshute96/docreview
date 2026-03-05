@@ -16,6 +16,7 @@ import { DialogButtons } from "@/components/dialog-buttons";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { BulkEditState, cycleBulkEditState } from "@/lib/bulk-edit";
+import { Star } from "lucide-react";
 import { contrastText } from "@/lib/utils";
 import { ManageLabelsDialog } from "@/components/manage-labels-dialog";
 import { Button } from "@/components/ui/button";
@@ -70,6 +71,7 @@ export function BulkEditDialog({
   const [selectedDocs, setSelectedDocs] = useState<DocWithLabels[]>(initialDocs);
   const [roleState, setRoleState] = useState<BulkEditState>("as-is");
   const [statusState, setStatusState] = useState<BulkEditState>("as-is");
+  const [starState, setStarState] = useState<BulkEditState>("as-is");
   const [labelStates, setLabelStates] = useState<Record<string, BulkEditState>>({});
   const [appendNotes, setAppendNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -86,6 +88,7 @@ export function BulkEditDialog({
       setAppendNotes("");
       setRoleState("as-is");
       setStatusState("as-is");
+      setStarState("as-is");
       const initialLabelStates: Record<string, BulkEditState> = {};
       allLabels.forEach(label => { initialLabelStates[label.labelId] = "as-is"; });
       setLabelStates(initialLabelStates);
@@ -108,6 +111,11 @@ export function BulkEditDialog({
     const status = checkConsistency(remainingDocs, d => d.status === "INBOX");
     if ((statusState === "set" && status.all) || (statusState === "clear" && status.none)) {
       setStatusState("as-is");
+    }
+
+    const star = checkConsistency(remainingDocs, d => d.isStarred);
+    if ((starState === "set" && star.all) || (starState === "clear" && star.none)) {
+      setStarState("as-is");
     }
 
     setLabelStates(current => {
@@ -159,6 +167,16 @@ export function BulkEditDialog({
     });
   }
 
+  function cycleStar(e: React.MouseEvent) {
+    e.preventDefault(); e.stopPropagation();
+    const { all, none } = checkConsistency(effectiveDocs, d => d.isStarred);
+    setStarState(prev => {
+      if (all) return prev === "as-is" ? "clear" : "as-is";
+      if (none) return prev === "as-is" ? "set" : "as-is";
+      return cycleBulkEditState(prev);
+    });
+  }
+
   function cycleLabel(labelId: string, e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
     const { all, none } = checkConsistency(effectiveDocs, d => d.labels.some(dl => dl.labelId === labelId));
@@ -199,6 +217,7 @@ export function BulkEditDialog({
           docIds: effectiveDocs.map(d => d.docId),
           role: roleState,
           status: statusState,
+          isStarred: starState,
           labelUpdates: labelStates,
           appendNotes: appendNotes.trim(),
         }),
@@ -225,6 +244,7 @@ export function BulkEditDialog({
 
   const role = checkConsistency(effectiveDocs, d => d.role === "AUTHOR");
   const status = checkConsistency(effectiveDocs, d => d.status === "INBOX");
+  const star = checkConsistency(effectiveDocs, d => d.isStarred);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -275,6 +295,30 @@ export function BulkEditDialog({
                   >
                     Inbox
                     <StateIndicator state={statusState} isMixed={status.mixed} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center">
+                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-900">
+                  Star
+                </label>
+                <div className="flex items-center py-1.5">
+                  <button
+                    type="button"
+                    onClick={cycleStar}
+                    title="Toggle star for all selected documents"
+                    className="relative"
+                  >
+                    <Star
+                      className={`h-6 w-6 transition-colors ${
+                        starState === "set" || (starState === "as-is" && star.all)
+                          ? "text-amber-400"
+                          : "text-zinc-300 hover:text-zinc-400"
+                      }`}
+                      fill={starState === "set" || (starState === "as-is" && star.all) ? "currentColor" : "none"}
+                    />
+                    <StateIndicator state={starState} isMixed={star.mixed} />
                   </button>
                 </div>
               </div>

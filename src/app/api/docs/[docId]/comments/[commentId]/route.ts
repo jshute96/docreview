@@ -30,9 +30,9 @@ export async function PATCH(
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const { status, isRead } = body as { status?: CommentStatus; isRead?: boolean };
+  const { status, isRead, isStarred } = body as { status?: CommentStatus; isRead?: boolean; isStarred?: boolean };
 
-  if (status === undefined && isRead === undefined) {
+  if (status === undefined && isRead === undefined && isStarred === undefined) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
@@ -47,11 +47,16 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid isRead" }, { status: 400 });
   }
 
+  if (isStarred !== undefined && typeof isStarred !== "boolean") {
+    return NextResponse.json({ error: "Invalid isStarred" }, { status: 400 });
+  }
+
   // Update comment and (if needed) doc status in a single transaction
   const updated = await prisma.$transaction(async (tx) => {
-    const data: { status?: CommentStatus; isRead?: boolean } = {};
+    const data: { status?: CommentStatus; isRead?: boolean; isStarred?: boolean } = {};
     if (status !== undefined) data.status = status;
     if (isRead !== undefined) data.isRead = isRead;
+    if (isStarred !== undefined) data.isStarred = isStarred;
 
     const result = await tx.comment.update({
       where: { commentId },

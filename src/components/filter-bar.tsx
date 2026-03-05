@@ -9,6 +9,7 @@ import {
   TriStateLabelButton,
   TRISTATE_COLORS,
 } from "@/components/tri-state-button";
+import { TriStateStarButton } from "@/components/star-button";
 
 const DOC_TYPES = [
   { mimeType: "application/vnd.google-apps.document", label: "Docs", color: "#4285F4" },
@@ -21,12 +22,14 @@ interface FilterBarProps {
   isInbox: TriState;
   hasComments: TriState;
   isAuthor: TriState;
+  isStarred: TriState;
   mimeTypes: Record<string, TriState>;
   labelsFilter: Record<string, TriState>;
   titleFilter: string;
   onIsInboxChange: (v: TriState) => void;
   onHasCommentsChange: (v: TriState) => void;
   onIsAuthorChange: (v: TriState) => void;
+  onIsStarredChange: (v: TriState) => void;
   onMimeTypeChange: (mimeType: string, v: TriState) => void;
   onLabelChange: (id: string, v: TriState) => void;
   onTitleFilterChange: (v: string) => void;
@@ -37,12 +40,14 @@ export function FilterBar({
   isInbox,
   hasComments,
   isAuthor,
+  isStarred,
   mimeTypes,
   labelsFilter,
   titleFilter,
   onIsInboxChange,
   onHasCommentsChange,
   onIsAuthorChange,
+  onIsStarredChange,
   onMimeTypeChange,
   onLabelChange,
   onTitleFilterChange,
@@ -53,7 +58,7 @@ export function FilterBar({
         Filters
       </legend>
       <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
 
         {/* Doc type icons */}
         <div className="flex items-center gap-1">
@@ -81,6 +86,11 @@ export function FilterBar({
           className="rounded-full"
           title="Docs that have the Author tag"
         />
+
+        <div className="h-4 w-px bg-zinc-200" />
+
+        {/* Starred */}
+        <TriStateStarButton value={isStarred} onChange={onIsStarredChange} />
 
         <div className="h-4 w-px bg-zinc-200" />
 

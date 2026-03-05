@@ -33,6 +33,7 @@ import { FriendlyDate } from "@/components/friendly-date";
 import { createMatcher } from "@/lib/highlight";
 import { broadcastChange, useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
+import { StarButton } from "@/components/star-button";
 import { LabelProvider } from "@/contexts/label-context";
 
 interface DocDetailProps {
@@ -177,6 +178,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   const [showMode, setShowMode] = useState<"inbox" | "open" | "resolved" | "all">("inbox");
   const [suggestionsOnly, setSuggestionsOnly] = useState(false);
   const [unrepliedFilter, setUnrepliedFilter] = useState(false);
+  const [isStarredFilter, setIsStarredFilter] = useState<"off" | "include" | "exclude">("off");
   const [searchFilter, setSearchFilter] = useState("");
   type SortCol = "driveCreatedAt" | "driveModifiedAt" | "replyCount" | "iParticipated" | "resolved";
   type SortDir = "asc" | "desc";
@@ -192,7 +194,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   // Re-enable sorting when any filter changes so the new view is properly sorted
   useEffect(() => {
     setSortActive(true);
-  }, [showMode, myThreadsFilter, myCommentsFilter, suggestionsOnly, searchFilter]);
+  }, [showMode, myThreadsFilter, myCommentsFilter, suggestionsOnly, isStarredFilter, searchFilter]);
 
   // IDs of comments animating out (slide collapse) before removal from the filtered list
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
@@ -208,6 +210,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     if (myThreadsFilter && !c.iParticipated) return true;
     if (myCommentsFilter && !c.isThreadAuthor) return true;
     if (unrepliedFilter && c.isRead) return true;
+    if (isStarredFilter === "include" && !c.isStarred) return true;
+    if (isStarredFilter === "exclude" && c.isStarred) return true;
     return false;
   }
 
@@ -243,7 +247,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   }
 
   function handleEditSave(updated: DocWithLabels) {
-    setDoc((prev) => ({ ...prev, role: updated.role, labels: updated.labels, status: updated.status, notes: updated.notes }));
+    setDoc((prev) => ({ ...prev, role: updated.role, labels: updated.labels, status: updated.status, isStarred: updated.isStarred, notes: updated.notes }));
   }
 
   async function handleArchive() {
@@ -266,6 +270,24 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       toast.error("Failed to update status");
     } finally {
       setArchiving(false);
+    }
+  }
+
+  async function handleToggleStar() {
+    const contextId = generateContextId();
+    try {
+      const res = await apiFetch(`/api/docs/${doc.docId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isStarred: !doc.isStarred }),
+        contextId,
+      });
+      if (!res.ok) throw new Error("Failed");
+      const updated: DocWithLabels = await res.json();
+      setDoc((prev) => ({ ...prev, isStarred: updated.isStarred }));
+      broadcastChange({ type: "docs", docId: doc.docId }, contextId);
+    } catch {
+      toast.error("Failed to update star");
     }
   }
 
@@ -561,6 +583,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
         </div>
         <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-zinc-600">
           <span className="font-medium text-zinc-400">Labels:</span>
+          <StarButton starred={doc.isStarred} onToggle={handleToggleStar} />
           {doc.role === "AUTHOR" && (
             <span title="You are an author of this document" className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>
               Author
@@ -610,12 +633,14 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
         myCommentsFilter={myCommentsFilter}
         showMode={showMode}
         suggestionsOnly={suggestionsOnly}
+        isStarred={isStarredFilter}
         unrepliedFilter={unrepliedFilter}
         searchFilter={searchFilter}
         onMyThreadsChange={setMyThreadsFilter}
         onMyCommentsChange={setMyCommentsFilter}
         onShowModeChange={setShowMode}
         onSuggestionsOnlyChange={setSuggestionsOnly}
+        onIsStarredChange={setIsStarredFilter}
         onUnrepliedChange={setUnrepliedFilter}
         onSearchFilterChange={setSearchFilter}
       />
@@ -643,8 +668,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                 </th>
                 <ThButton col="driveModifiedAt" title="Thread last-modified time">Modified</ThButton>
                 <ThButton col="replyCount" title="Number of replies">Responses</ThButton>
-                <ThButton col="iParticipated" title="Whether I created or replied">Created</ThButton>
-                <ThButton col="resolved" title="Whether comment is open or resolved">Status</ThButton>
+                <th className="py-2.5 pr-4 text-left">
+                  <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide" title="Comment status">Status</span>
+                </th>
                 <th className="pr-4 py-2.5 text-right">
                   <div className="flex items-center justify-end gap-2">
                     <Button

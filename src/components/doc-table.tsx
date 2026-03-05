@@ -75,6 +75,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
   const [isInbox, setIsInbox] = useState<TriState>("include");
   const [hasComments, setHasComments] = useState<TriState>("off");
   const [isAuthor, setIsAuthor] = useState<TriState>("off");
+  const [isStarred, setIsStarred] = useState<TriState>("off");
   const [mimeTypes, setMimeTypes] = useState<Record<string, TriState>>({});
   const [labelsFilter, setLabelsFilter] = useState<Record<string, TriState>>({});
   const [titleFilter, setTitleFilter] = useState("");
@@ -99,6 +100,9 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
     if (isAuthor === "include") parts.push("Author");
     else if (isAuthor === "exclude") parts.push("!Author");
 
+    if (isStarred === "include") parts.push("Starred");
+    else if (isStarred === "exclude") parts.push("!Starred");
+
     for (const label of labels) {
       const state = labelsFilter[label.labelId];
       if (state === "include") parts.push(label.name);
@@ -122,7 +126,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
     if (isInbox === "include" && parts.length === 0) parts.push("Inbox");
 
     document.title = "Docreview: " + parts.join(", ");
-  }, [isInbox, hasComments, isAuthor, mimeTypes, labelsFilter, titleFilter, labels]);
+  }, [isInbox, hasComments, isAuthor, isStarred, mimeTypes, labelsFilter, titleFilter, labels]);
 
   function handleSort(col: SortCol) {
     if (sortCol === col) {
@@ -257,6 +261,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
       isInbox,
       hasComments,
       isAuthor,
+      isStarred,
       mimeTypes,
       labels: labelsFilter,
       titleFilter,
@@ -378,12 +383,14 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
         isInbox={isInbox}
         hasComments={hasComments}
         isAuthor={isAuthor}
+        isStarred={isStarred}
         mimeTypes={mimeTypes}
         labelsFilter={labelsFilter}
         titleFilter={titleFilter}
         onIsInboxChange={setIsInbox}
         onHasCommentsChange={setHasComments}
         onIsAuthorChange={setIsAuthor}
+        onIsStarredChange={setIsStarred}
         onMimeTypeChange={(mt, v) => handleTriStateChange(setMimeTypes, mt, v)}
         onLabelChange={(id, v) => handleTriStateChange(setLabelsFilter, id, v)}
         onTitleFilterChange={setTitleFilter}
@@ -400,6 +407,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
           <table className="w-full">
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50">
+                <th className="w-0" />
                 <ThButton col="title" title="Document title">Title</ThButton>
                 <th colSpan={3} className="px-1 py-1.5">
                   <div className="text-center text-xs font-medium text-zinc-500 uppercase tracking-wide leading-none mb-1">Comments</div>

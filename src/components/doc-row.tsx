@@ -10,6 +10,7 @@ import { DocTypeIcon } from "@/components/doc-type-icon";
 import { Button } from "@/components/ui/button";
 import { FriendlyDate } from "@/components/friendly-date";
 import { highlightText } from "@/lib/highlight";
+import { StarButton } from "@/components/star-button";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId } from "@/lib/api-fetch";
 import { UNREAD_COMMENTS_TOOLTIP, INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
@@ -50,6 +51,24 @@ export function DocRow({
     }
   }
 
+  async function handleToggleStar() {
+    const contextId = generateContextId();
+    try {
+      const res = await apiFetch(`/api/docs/${doc.docId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isStarred: !doc.isStarred }),
+        contextId,
+      });
+      if (!res.ok) throw new Error("Failed");
+      const updated: DocWithLabels = await res.json();
+      onUpdate(updated);
+      broadcastChange({ type: "docs", docId: doc.docId }, contextId);
+    } catch {
+      toast.error("Failed to update star");
+    }
+  }
+
   const hasNotes = !!doc.notes?.trim();
   const notesTooltip = hasNotes
     ? doc.notes!.split("\n").slice(0, 20).join("\n") + (doc.notes!.split("\n").length > 20 ? "\n…" : "")
@@ -57,7 +76,12 @@ export function DocRow({
 
   return (
     <tr className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
-      <td className={`pl-4 pr-4 ${hasNotes ? "pt-1.5 pb-0.5" : "py-1.5"}`}>
+      <td className={`pl-4 pr-0 ${hasNotes ? "pt-1.5 pb-0.5" : "py-1.5"} w-0`}>
+        <div className="flex items-center h-5">
+          <StarButton starred={doc.isStarred} onToggle={handleToggleStar} />
+        </div>
+      </td>
+      <td className={`pl-2 pr-4 ${hasNotes ? "pt-1.5 pb-0.5" : "py-1.5"}`}>
         <div className="flex flex-wrap items-center gap-2">
           <a
             href={`/comments/${doc.docId}`}

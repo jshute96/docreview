@@ -23,14 +23,14 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/gmail-refresh/route.ts` | `POST` incremental Gmail refresh — scans Gmail since last timestamp, upserts docs, syncs comments, unarchives ARCHIVED docs with new activity, detects deletions (legacy; superseded by `/api/docs/refresh`) |
 | `docs/refresh/route.ts` | `POST` combined refresh — accepts `{ sources: ["drive", "gmail"] }`, runs parallel discovery, merges results, upserts, syncs comments; defaults to both sources |
 | `docs/scan/route.ts` | `POST` scan Drive or Gmail for documents without modifying DB — branches on `source` field, returns total, existing count, and new doc list |
-| `docs/add/route.ts` | `POST` add or update a doc by URL — validates via Drive; creates DB record + syncs comments for new docs, updates labels/notes/status for existing docs |
-| `docs/validate/route.ts` | `GET` validate a Google Drive URL — checks access, mime type, returns metadata; for existing docs returns `existing: true` with labels, notes, status |
-| `docs/bulk-update/route.ts` | `PATCH` bulk update multiple docs — optimized role/label/notes updates with no-op protection |
-| `docs/[docId]/route.ts` | `GET` single doc; `PATCH` update role/status/labels |
+| `docs/add/route.ts` | `POST` add or update a doc by URL — validates via Drive; creates DB record + syncs comments for new docs, updates labels/notes/status/star for existing docs |
+| `docs/validate/route.ts` | `GET` validate a Google Drive URL — checks access, mime type, returns metadata; for existing docs returns `existing: true` with labels, notes, status, star |
+| `docs/bulk-update/route.ts` | `PATCH` bulk update multiple docs — optimized role/star/label/notes updates with no-op protection |
+| `docs/[docId]/route.ts` | `GET` single doc; `PATCH` update role/status/star/labels |
 | `docs/[docId]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata then syncs comments |
 | `docs/[docId]/comments/route.ts` | `GET` fetch all comment threads from Drive (fast path — Drive `comments.list` only) |
 | `docs/[docId]/content/route.ts` | `GET` fetch document text and suggestion content (slow path — Docs API `documents.get` or Drive `files.export`); for Docs, uses a single `SUGGESTIONS_INLINE` call for both |
-| `docs/[docId]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (INBOX/ARCHIVED/MUTED) |
+| `docs/[docId]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (INBOX/ARCHIVED/MUTED), read state, or star |
 | `docs/[docId]/threads/route.ts` | `GET` fetch thread(s) from Drive; `POST` refresh a single thread (updates DB) |
 | `docs/[docId]/threads/reply/route.ts` | `POST` reply to / resolve / reopen a comment thread via Drive API |
 | `labels/route.ts` | `GET` list labels; `POST` create label |
@@ -43,21 +43,22 @@ One-line descriptions of every source file, grouped by layer.
 |------|-------------|
 | `doc-table.tsx` | Main doc list view (client) — filter state, sort state, renders FilterBar + DocRows |
 | `auto-signin.tsx` | Client component for seamless offline authentication |
-| `doc-row.tsx` | Single doc row in the table — title, comment counts, labels, archive/edit/open buttons |
+| `doc-row.tsx` | Single doc row in the table — star, title, comment counts, labels, archive/edit/open buttons |
 | `doc-detail.tsx` | Single doc detail view (client) — metadata panel, comment filters, comment table; pre-fetches all threads on load for instant expand |
-| `filter-bar.tsx` | Doc list filter bar — tri-state buttons for type/author/labels/active/comments + title regex |
-| `comment-filter-bar.tsx` | Comment list filter bar — toggles for my threads/comments, show mode, suggestions |
+| `filter-bar.tsx` | Doc list filter bar — tri-state buttons for type/author/starred/labels/active/comments + title regex |
+| `comment-filter-bar.tsx` | Comment list filter bar — toggles for my threads/comments, starred, show mode, suggestions, unread |
 | `comment-row.tsx` | Single comment row — expandable, shows content preview, thread panel, status actions |
 | `comment-thread-panel.tsx` | Expanded thread view — shows all replies, reply textarea, resolve/reopen buttons |
 | `add-doc-content.tsx` | Shared add/update doc form body — URL validation, label picker, notes; populates form from existing doc data; used by dialog and standalone page |
 | `add-doc-dialog.tsx` | Dialog wrapper for adding/updating a doc — renders `AddDocContent` inside a dialog, dynamic title and button text |
 | `add-doc-page-client.tsx` | Standalone add/update doc page (client) — renders `AddDocContent` in a card with cross-tab sync |
-| `edit-doc-dialog.tsx` | Dialog to edit doc role and labels |
-| `bulk-edit-dialog.tsx` | Dialog to edit role, labels, and notes for multiple documents simultaneously; supports multi-select highlighting to scope actions to a subset |
+| `edit-doc-dialog.tsx` | Dialog to edit doc role, star, and labels |
+| `bulk-edit-dialog.tsx` | Dialog to edit role, star, labels, and notes for multiple documents simultaneously; supports multi-select highlighting to scope actions to a subset |
 
 | `load-dialog.tsx` | Load from Drive/Gmail dialog — two-phase scan→add flow with source toggle (Drive/Gmail), options (days back, ownership, shared drives), doc selection with multi-select highlighting, labels, notes; shows error count for unresolved Gmail emails |
 | `refresh-button.tsx` | Combined Refresh button — calls POST `/api/docs/refresh` with both Drive+Gmail sources, then reloads list |
-| `tri-state-button.tsx` | Tri-state filter buttons (off/include/exclude) with diagonal strikethrough + slow-click-to-reset |
+| `star-button.tsx` | `StarButton` (two-state toggle) and `TriStateStarButton` (tri-state filter) for starring docs and comments |
+| `tri-state-button.tsx` | Tri-state filter buttons (off/include/exclude) with diagonal strikethrough + slow-click-to-reset; exports `useTriStateCycle` and `DiagonalStrike` |
 | `label-badge.tsx` | Colored label pill with optional remove button |
 | `label-picker.tsx` | Label selection grid for add/edit dialogs |
 | `manage-labels-dialog.tsx` | Dialog to create/delete/reorder/recolor labels with pointer-based drag reorder |
@@ -107,7 +108,7 @@ Shadcn/ui components:
 | `auth-utils.ts` | Centralized authentication helpers for Server Components and API routes |
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates/deletes DB records, computes unarchive signals |
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
-| `doc-filters.ts` | Client-side doc filtering (tri-state logic for inbox/comments/author/mimeType/labels/title regex) and sorting |
+| `doc-filters.ts` | Client-side doc filtering (tri-state logic for inbox/comments/author/starred/mimeType/labels/title regex) and sorting |
 | `doc-queries.ts` | Shared Prisma include constants (`labelInclude`, `docWithCountsInclude`, `docWithCommentsInclude`) + `withCommentCounts` transform |
 | `highlight.tsx` | `highlightText()` — regex/substring highlighter for plain text; `highlightHtml()` — same for HTML strings (highlights text outside tags, returns null if no match); `matchesFilter()` — centralized dual regex/substring search; `createMatcher()` — compiled reusable matcher |
 | `prisma.ts` | Singleton PrismaClient with dev-mode write-op logging |

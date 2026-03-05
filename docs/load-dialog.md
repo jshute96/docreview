@@ -55,7 +55,7 @@ hidden (not applicable). Switching sources clears any existing scan results.
 │  │ ✕ 📄 API Spec        │    │
 │  │ ...                   │    │
 │  └──────────────────────┘    │
-│  Labels: [picker]            │
+│  Labels: [★ picker]           │
 │  Notes:  [textarea]          │
 │                              │
 │      [Add] [Rescan] [Cancel] │
@@ -82,7 +82,7 @@ Doc titles are clickable links that open in Google Drive.
 
 If any docs were removed, a "N documents selected" line appears below the list.
 
-The user can optionally assign labels, notes, and document status:
+The user can optionally assign star, labels, notes, and document status:
 - **New docs:** labels and notes are set on creation. If **Add to Inbox** is checked (default),
   status is set to `INBOX`; otherwise `ARCHIVED`.
 - **Existing docs:** labels are added (duplicates skipped), notes are appended with a

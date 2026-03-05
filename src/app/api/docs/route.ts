@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
   const loadLabelIds: string[] = Array.isArray(loadBody.labelIds) ? loadBody.labelIds as string[] : [];
   const loadNotes: string = typeof loadBody.notes === "string" ? (loadBody.notes as string).trim() : "";
   const loadStatus: "INBOX" | "ARCHIVED" | undefined = typeof loadBody.status === "string" && (loadBody.status === "INBOX" || loadBody.status === "ARCHIVED") ? (loadBody.status as "INBOX" | "ARCHIVED") : undefined;
+  const loadIsStarred: boolean | undefined = typeof loadBody.isStarred === "boolean" ? loadBody.isStarred : undefined;
 
   // Validate label ownership before proceeding
   if (loadLabelIds.length > 0) {
@@ -182,6 +183,7 @@ export async function POST(req: NextRequest) {
         owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
         status: loadStatus ?? (doc.role === "AUTHOR" ? "INBOX" : "ARCHIVED"),
+        ...(loadIsStarred !== undefined ? { isStarred: loadIsStarred } : {}),
         ...(loadNotes ? { notes: loadNotes } : {}),
         ...(loadLabelIds.length > 0
           ? { labels: { create: loadLabelIds.map((id) => ({ labelId: id })) } }
@@ -196,6 +198,7 @@ export async function POST(req: NextRequest) {
         createdTimeInDrive: doc.createdTimeInDrive,
         isDeleted: false,
         ...(loadStatus === "INBOX" ? { status: "INBOX" as const } : {}),
+        ...(loadIsStarred !== undefined ? { isStarred: loadIsStarred } : {}),
       },
       select: { docId: true, notes: true },
     });

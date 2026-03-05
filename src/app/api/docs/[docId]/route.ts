@@ -54,13 +54,17 @@ export async function PATCH(
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const { role, status, labelIds, notes } = body as {
+  const { role, status, labelIds, notes, isStarred } = body as {
     role?: DocRole;
     status?: DocStatus;
     labelIds?: string[];
     notes?: string | null;
+    isStarred?: boolean;
   };
 
+  if (isStarred !== undefined && typeof isStarred !== "boolean") {
+    return NextResponse.json({ error: "Invalid isStarred" }, { status: 400 });
+  }
   if (role !== undefined && !VALID_ROLES.includes(role)) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   }
@@ -88,6 +92,7 @@ export async function PATCH(
     data: {
       ...(role !== undefined ? { role } : {}),
       ...(status !== undefined ? { status } : {}),
+      ...(isStarred !== undefined ? { isStarred } : {}),
       ...(notes !== undefined ? { notes: notes || null } : {}),
       ...(labelIds !== undefined
         ? {

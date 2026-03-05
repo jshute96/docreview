@@ -30,6 +30,7 @@ import { useLabels } from "@/contexts/label-context";
 import type { DocWithLabels } from "@/types";
 import { broadcastChange } from "@/lib/cross-tab";
 import { useMultiSelect } from "@/hooks/use-multi-select";
+import { StarButton } from "@/components/star-button";
 
 interface LoadOptions {
   daysBack: number;
@@ -74,6 +75,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
   const [viewMode, setViewMode] = useState<"new" | "all">("new");
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+  const [isStarred, setIsStarred] = useState(false);
   const [addToInbox, setAddAsActive] = useState(true);
   const [adding, setAdding] = useState(false);
   const [source, setSource] = useState<"drive" | "gmail">("drive");
@@ -108,6 +110,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       setSource("drive");
       setSelectedLabelIds([]);
       setNotes("");
+      setIsStarred(false);
       setAddAsActive(true);
       setDaysBackText(String(DEFAULT_OPTIONS.daysBack));
       resetHighlights();
@@ -175,6 +178,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
           selectedGoogleDocIds: effectiveDocs.map((d) => d.googleDocId),
           labelIds: selectedLabelIds,
           notes,
+          ...(isStarred ? { isStarred } : {}),
           status: addToInbox ? "INBOX" : "ARCHIVED",
         }),
         signal: controller.signal,
@@ -540,6 +544,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
               <LabelPicker
                 selectedLabelIds={selectedLabelIds}
                 onToggle={toggleLabel}
+                prefix={<StarButton starred={isStarred} onToggle={() => setIsStarred(!isStarred)} />}
               />
 
               <div>

@@ -8,11 +8,13 @@ import { useLabels } from "@/contexts/label-context";
 interface LabelPickerProps {
   selectedLabelIds: string[];
   onToggle: (id: string) => void;
+  prefix?: React.ReactNode;
 }
 
 export function LabelPicker({
   selectedLabelIds,
   onToggle,
+  prefix,
 }: LabelPickerProps) {
   const { allLabels } = useLabels();
 
@@ -36,8 +38,9 @@ export function LabelPicker({
           }
         />
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        {allLabels.length === 0 && (
+      <div className="flex flex-wrap items-center gap-1.5">
+        {prefix}
+        {allLabels.length === 0 && !prefix && (
           <p className="text-xs text-zinc-400 italic">No labels created yet.</p>
         )}
         {allLabels.map((label) => {

@@ -19,6 +19,7 @@ import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId } from "@/lib/api-fetch";
 import { useAutoResize } from "@/hooks/use-auto-resize";
 import { useLabelSync } from "@/hooks/use-label-sync";
+import { StarButton } from "@/components/star-button";
 import { useLabels } from "@/contexts/label-context";
 
 interface EditDocDialogProps {
@@ -39,6 +40,7 @@ export function EditDocDialog({
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>(
     doc.labels.map((dl) => dl.labelId)
   );
+  const [isStarred, setIsStarred] = useState(doc.isStarred);
   const [notes, setNotes] = useState(doc.notes ?? "");
   const [saving, setSaving] = useState(false);
   const notesRef = useRef<HTMLTextAreaElement>(null);
@@ -60,7 +62,7 @@ export function EditDocDialog({
       const res = await apiFetch(`/api/docs/${doc.docId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, status, labelIds: selectedLabelIds, notes }),
+        body: JSON.stringify({ role, status, isStarred, labelIds: selectedLabelIds, notes }),
         contextId,
       });
       if (!res.ok) throw new Error("Save failed");
@@ -82,6 +84,7 @@ export function EditDocDialog({
         // Reset on open
         setRole(doc.role);
         setStatus(doc.status);
+        setIsStarred(doc.isStarred);
         setSelectedLabelIds(doc.labels.map((dl) => dl.labelId));
         setNotes(doc.notes ?? "");
       }
@@ -145,6 +148,15 @@ export function EditDocDialog({
                   >
                     Inbox
                   </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center">
+                <label className="mb-1.5 block text-xs font-medium text-zinc-900 uppercase tracking-wide">
+                  Star
+                </label>
+                <div className="flex items-center py-1.5">
+                  <StarButton starred={isStarred} onToggle={() => setIsStarred(!isStarred)} className="scale-150" />
                 </div>
               </div>
             </div>

@@ -23,10 +23,11 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { docIds, role, status, labelUpdates, appendNotes } = body as {
+  const { docIds, role, status, isStarred, labelUpdates, appendNotes } = body as {
     docIds: unknown;
     role: unknown;
     status: unknown;
+    isStarred: unknown;
     labelUpdates: unknown;
     appendNotes?: unknown;
   };
@@ -47,6 +48,9 @@ export async function PATCH(req: NextRequest) {
   if (typeof status !== "string" || !VALID_BULK_STATES.has(status)) {
     return NextResponse.json({ error: "Invalid status state" }, { status: 400 });
   }
+  if (isStarred !== undefined && (typeof isStarred !== "string" || !VALID_BULK_STATES.has(isStarred))) {
+    return NextResponse.json({ error: "Invalid isStarred state" }, { status: 400 });
+  }
   if (
     typeof labelUpdates !== "object" ||
     labelUpdates === null ||
@@ -63,6 +67,7 @@ export async function PATCH(req: NextRequest) {
 
   const typedRole = role as BulkEditState;
   const typedStatus = status as BulkEditState;
+  const typedIsStarred = (isStarred ?? "as-is") as BulkEditState;
   const typedLabelUpdates = labelUpdates as Record<string, BulkEditState>;
   const typedAppendNotes = appendNotes as string | undefined;
 
@@ -84,6 +89,9 @@ export async function PATCH(req: NextRequest) {
 
     if (typedStatus === "set") data.status = DocStatus.INBOX;
     else if (typedStatus === "clear") data.status = DocStatus.ARCHIVED;
+
+    if (typedIsStarred === "set") data.isStarred = true;
+    else if (typedIsStarred === "clear") data.isStarred = false;
 
     if (typedAppendNotes && typedAppendNotes.trim().length > 0) {
       const currentNotes = doc.notes ?? "";

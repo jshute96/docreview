@@ -27,6 +27,7 @@ const defaultOpts: FilterOptions = {
   isInbox: "include",
   hasComments: "off",
   isAuthor: "off",
+  isStarred: "off",
   mimeTypes: {},
   labels: {},
   titleFilter: "",

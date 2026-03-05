@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CommentThreadPanel } from "@/components/comment-thread-panel";
 import { highlightText } from "@/lib/highlight";
 import { FriendlyDate } from "@/components/friendly-date";
+import { StarButton } from "@/components/star-button";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 
@@ -294,6 +295,24 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     }
   }
 
+  async function toggleStar() {
+    const contextId = generateContextId();
+    try {
+      const res = await apiFetch(`/api/docs/${docId}/comments/${comment.commentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isStarred: !comment.isStarred }),
+        contextId,
+      });
+      if (!res.ok) throw new Error("Failed");
+      const updated: Comment = await res.json();
+      onUpdate(updated);
+      broadcastChange({ type: "comments", docId }, contextId);
+    } catch {
+      toast.error("Failed to update star");
+    }
+  }
+
   const isArchived = comment.status === "ARCHIVED";
   const isMuted = comment.status === "MUTED";
 
@@ -346,26 +365,24 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         comment.replyCount > 0 ? comment.replyCount : ""
       )}
       {cell(`${cellPy} pr-4`,
-        !isSuggestion && comment.isThreadAuthor ? (
-          <span title="You started this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
-            Mine
-          </span>
-        ) : !isSuggestion && comment.iParticipated ? (
-          <span title="You replied in this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700">
-            Replied
-          </span>
-        ) : null
-      )}
-      {cell(`${cellPy} pr-4`,
-        comment.resolved ? (
-          <span title="This comment has been resolved" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-zinc-100 text-zinc-500">
-            Resolved
-          </span>
-        ) : (
-          <span title="This comment is unresolved" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700">
-            Open
-          </span>
-        )
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <StarButton starred={comment.isStarred} onToggle={toggleStar} />
+          {!isSuggestion && comment.isThreadAuthor && (
+            <span title="You started this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
+              Mine
+            </span>
+          )}
+          {!isSuggestion && comment.iParticipated && !comment.isThreadAuthor && (
+            <span title="You replied in this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700">
+              Replied
+            </span>
+          )}
+          {comment.resolved && (
+            <span title="This comment has been resolved" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-zinc-100 text-zinc-500">
+              Resolved
+            </span>
+          )}
+        </div>
       )}
       {cell(`${cellPy} pr-4`,
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -419,7 +436,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         onClick={handleRowClick}
         {...hoverHandlers}
       >
-        <td colSpan={6} className="max-w-0 overflow-hidden">
+        <td colSpan={5} className="max-w-0 overflow-hidden">
           <div className={cellWrap} style={cellWrapStyle}>
             <div className="overflow-hidden min-h-0 pt-0.5 pb-2 pl-4 pr-4">
           {isSuggestion && !suggestionContent && comment.resolved ? (
@@ -452,7 +469,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     )}
     {hasBeenExpanded && (
       <tr className={`${expanded && !isExiting ? "border-b border-zinc-100" : ""}${isExiting ? " pointer-events-none" : ""}`}>
-        <td colSpan={6} className="p-0">
+        <td colSpan={5} className="p-0">
           <div
             className="grid transition-[grid-template-rows] duration-200 ease-out"
             style={{ gridTemplateRows: expanded && !isExiting ? "1fr" : "0fr" }}
