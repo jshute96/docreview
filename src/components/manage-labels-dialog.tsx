@@ -253,21 +253,6 @@ export function ManageLabelsDialog({
           <DialogTitle>Manage Labels</DialogTitle>
         </DialogHeader>
 
-        <div className="px-6 pt-4 pb-2">
-          <form onSubmit={handleAdd} className="flex gap-2">
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Label name…"
-              className="flex-1 rounded-md border border-zinc-200 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-zinc-300"
-            />
-            <Button type="submit" variant="outline" size="sm" disabled={!name.trim()}>
-              Add
-            </Button>
-          </form>
-        </div>
-
         <div className="flex-1 overflow-y-auto min-h-0 px-6 py-2">
           <div
             ref={listRef}
@@ -317,6 +302,21 @@ export function ManageLabelsDialog({
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="px-6 pt-2 pb-2">
+          <form onSubmit={handleAdd} className="flex gap-2">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Label name…"
+              className="flex-1 rounded-md border border-zinc-200 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-zinc-300"
+            />
+            <Button type="submit" variant="outline" size="sm" disabled={!name.trim()}>
+              Add
+            </Button>
+          </form>
         </div>
 
         <div className="p-6 pt-2">
