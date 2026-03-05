@@ -259,17 +259,17 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
   );
 
   function SortIcon({ col }: { col: SortCol }) {
-    if (sortCol !== col) return <span className="ml-1 text-zinc-300">↕</span>;
-    return <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
+    if (sortCol !== col) return <span className="text-zinc-300">↕</span>;
+    return <span>{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
-  function ThButton({ col, rowSpan, title, children }: { col: SortCol; rowSpan?: number; title?: string; children: React.ReactNode }) {
+  function ThButton({ col, rowSpan, title, className, children }: { col: SortCol; rowSpan?: number; title?: string; className?: string; children: React.ReactNode }) {
     return (
-      <th className="px-4 py-2.5 text-left" rowSpan={rowSpan}>
+      <th className={className || "px-2 py-2.5 text-left"} rowSpan={rowSpan}>
         <button
           onClick={() => handleSort(col)}
           title={title}
-          className="flex items-center text-xs font-medium text-zinc-500 uppercase tracking-wide hover:text-zinc-800"
+          className="inline-flex items-center text-xs font-medium text-zinc-500 uppercase tracking-wide hover:text-zinc-800"
         >
           {children}
           <SortIcon col={col} />
@@ -385,15 +385,19 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
         <div className="overflow-x-auto rounded-lg border border-zinc-200">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-zinc-100 bg-zinc-50">
-                <ThButton col="title" rowSpan={2} title="Document title">Title</ThButton>
-                <th colSpan={3} className="px-4 pt-2 pb-0 text-center text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                  Comments
+              <tr className="border-b border-zinc-200 bg-zinc-50">
+                <ThButton col="title" title="Document title">Title</ThButton>
+                <th colSpan={3} className="px-1 py-1.5">
+                  <div className="text-center text-xs font-medium text-zinc-500 uppercase tracking-wide leading-none mb-1">Comments</div>
+                  <div className="flex gap-2">
+                    <div className="flex-1 flex justify-center"><button onClick={() => handleSort("unread")} title={UNREAD_COMMENTS_TOOLTIP} className="inline-flex items-center text-xs font-medium text-zinc-500 uppercase tracking-wide hover:text-zinc-800">Unread<SortIcon col="unread" /></button></div>
+                    <div className="flex-1 flex justify-center"><button onClick={() => handleSort("inbox")} title={INBOX_COMMENTS_TOOLTIP} className="inline-flex items-center text-xs font-medium text-zinc-500 uppercase tracking-wide hover:text-zinc-800">Inbox<SortIcon col="inbox" /></button></div>
+                    <div className="flex-1 flex justify-center"><button onClick={() => handleSort("open")} title={OPEN_COMMENTS_TOOLTIP} className="inline-flex items-center text-xs font-medium text-zinc-500 uppercase tracking-wide hover:text-zinc-800">Open<SortIcon col="open" /></button></div>
+                  </div>
                 </th>
-                <ThButton col="lastModifiedInDrive" rowSpan={2} title="Last change time">Last Modified</ThButton>
-                <th rowSpan={2} className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide text-left">
+                <ThButton col="lastModifiedInDrive" title="Last change time">Last Modified</ThButton>
+                <th className="px-4 py-2 text-left">
                   <div className="flex items-center gap-2">
-                    Actions
                     <BulkEditDialog
                       initialDocs={filteredDocs}
                       onSave={handleBulkUpdate}
@@ -404,11 +408,6 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
                     </BulkEditDialog>
                   </div>
                 </th>
-              </tr>
-              <tr className="border-b border-zinc-200 bg-zinc-50">
-                <ThButton col="unread" title={UNREAD_COMMENTS_TOOLTIP}>Unread</ThButton>
-                <ThButton col="inbox" title={INBOX_COMMENTS_TOOLTIP}>Inbox</ThButton>
-                <ThButton col="open" title={OPEN_COMMENTS_TOOLTIP}>Open</ThButton>
               </tr>
             </thead>
             <tbody className="bg-white">

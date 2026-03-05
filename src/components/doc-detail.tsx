@@ -547,9 +547,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                 <ThButton col="replyCount" title="Number of replies">Responses</ThButton>
                 <ThButton col="iParticipated" title="Whether I created or replied">Created</ThButton>
                 <ThButton col="resolved" title="Whether comment is open or resolved">Status</ThButton>
-                <th className="pr-4 py-2.5 text-left">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Actions</span>
+                <th className="pr-4 py-2.5 text-right">
+                  <div className="flex items-center justify-end gap-2">
                     <Button
                       variant="outline"
                       size="sm"
