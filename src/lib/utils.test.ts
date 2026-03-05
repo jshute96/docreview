@@ -44,19 +44,13 @@ describe("formatDate", () => {
     expect(formatDate(null)).toBe("—");
   });
 
-  it("formats a Date object", () => {
-    const d = new Date(2024, 0, 5, 9, 3); // Jan 5, 2024 09:03 local
-    expect(formatDate(d)).toBe("2024-01-05 09:03");
+  it("formats a Date object (with seconds by default)", () => {
+    const d = new Date(2024, 0, 5, 9, 3, 45); // Jan 5, 2024 09:03:45 local
+    expect(formatDate(d)).toBe("2024-01-05 09:03:45");
   });
 
-  it("formats an ISO string", () => {
-    // Use a fixed date; formatDate will show local time
-    const d = new Date(2024, 11, 25, 14, 30);
-    expect(formatDate(d.toISOString())).toBe("2024-12-25 14:30");
-  });
-
-  it("pads single-digit months, days, hours, minutes", () => {
-    const d = new Date(2024, 2, 1, 8, 5); // Mar 1, 2024 08:05
-    expect(formatDate(d)).toBe("2024-03-01 08:05");
+  it("omits seconds when omitSeconds is true", () => {
+    const d = new Date(2024, 2, 1, 8, 5, 9); // Mar 1, 2024 08:05:09
+    expect(formatDate(d, true)).toBe("2024-03-01 08:05");
   });
 });

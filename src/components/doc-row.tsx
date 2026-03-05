@@ -50,7 +50,7 @@ export function DocRow({
     }
   }
 
-  const lastModified = formatDate(doc.lastModifiedInDrive);
+  const lastModified = formatDate(doc.lastModifiedInDrive, true);
   const hasNotes = !!doc.notes?.trim();
   const notesTooltip = hasNotes
     ? doc.notes!.split("\n").slice(0, 20).join("\n") + (doc.notes!.split("\n").length > 20 ? "\n…" : "")

@@ -307,10 +307,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       {...hoverHandlers}
     >
       {cell(`${cellPy} pl-4 pr-4 text-sm text-zinc-500 whitespace-nowrap`,
-        formatDate(comment.driveCreatedAt)
+        formatDate(comment.driveCreatedAt, true)
       )}
       {cell(`${cellPy} pr-4 text-sm text-zinc-500 whitespace-nowrap`,
-        sameAsCreated ? "—" : formatDate(comment.driveModifiedAt)
+        sameAsCreated ? "—" : formatDate(comment.driveModifiedAt, true)
       )}
       {cell(`${cellPy} pr-4 text-sm text-zinc-500 tabular-nums`,
         comment.replyCount > 0 ? comment.replyCount : ""

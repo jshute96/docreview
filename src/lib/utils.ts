@@ -16,7 +16,7 @@ export function contrastText(hex: string): string {
   return luminance > 0.5 ? "#18181b" : "#fafafa";
 }
 
-export function formatDate(d: Date | string | null): string {
+export function formatDate(d: Date | string | null, omitSeconds = false): string {
   if (!d) return "—";
   const dt = new Date(d);
 
@@ -24,11 +24,13 @@ export function formatDate(d: Date | string | null): string {
     timeZone: "America/Los_Angeles",
     year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit",
+    ...(!omitSeconds ? { second: "2-digit" } : {}),
     hour12: false,
   });
 
   const parts = formatter.formatToParts(dt);
   const get = (t: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === t)!.value;
 
-  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
+  const base = `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
+  return !omitSeconds ? `${base}:${get("second")}` : base;
 }

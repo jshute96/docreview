@@ -6,6 +6,7 @@ import type { CommentThread } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
 import { highlightText, highlightHtml } from "@/lib/highlight";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
+import { formatDate } from "@/lib/utils";
 
 /** Render comment/reply text with search highlighting, preferring htmlContent. */
 function CommentContent({ htmlContent, content, searchFilter, className }: {
@@ -26,18 +27,6 @@ function CommentContent({ htmlContent, content, searchFilter, className }: {
     return <p className={`${className} [&_a]:text-blue-600 [&_a]:underline`} dangerouslySetInnerHTML={{ __html: htmlContent }} />;
   }
   return content ? <p className={className}>{highlightText(content, searchFilter)}</p> : null;
-}
-
-function formatTime(iso: string): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }
 
 interface CommentThreadPanelProps {
@@ -316,9 +305,8 @@ export function CommentThreadPanel({
                   {thread.author}
                 </span>
                 <span className="text-xs text-zinc-400">
-                  {formatTime(thread.createdTime)}
-                </span>
-                {thread.resolved && (
+                  {formatDate(thread.createdTime, true)}
+                </span>                {thread.resolved && (
                   <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-600">
                     Resolved
                   </span>
@@ -334,7 +322,7 @@ export function CommentThreadPanel({
                     {reply.author}
                   </span>
                   <span className="text-xs text-zinc-400">
-                    {formatTime(reply.createdTime)}
+                    {formatDate(reply.createdTime, true)}
                   </span>
                   {reply.action === "resolve" && (
                     <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-600">

@@ -450,11 +450,11 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
           </span>
           <span>
             <span className="font-medium text-zinc-400">Created:</span>{" "}
-            {formatDate(doc.createdTimeInDrive)}
+            {formatDate(doc.createdTimeInDrive, true)}
           </span>
           <span>
             <span className="font-medium text-zinc-400">Modified:</span>{" "}
-            {formatDate(doc.lastModifiedInDrive)}
+            {formatDate(doc.lastModifiedInDrive, true)}
           </span>
           <span>
             <span className="font-medium text-zinc-400">DocId:</span>{" "}
