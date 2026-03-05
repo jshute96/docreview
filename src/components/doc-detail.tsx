@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { RefreshCw, Menu } from "lucide-react";
+import { RefreshCw, Menu, Trash2 } from "lucide-react";
 import type { Comment, Label } from "@prisma/client";
 import type { DocWithComments, DocWithLabels } from "@/types";
 import type { CommentThread, SuggestionContent } from "@/lib/google-drive";
@@ -440,6 +440,21 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     );
   }
 
+  async function handleUntrack() {
+    if (!window.confirm("All state for this document will be removed from the database. Continue?")) return;
+    const contextId = generateContextId();
+    try {
+      const res = await apiFetch(`/api/docs/${doc.docId}`, { method: "DELETE", contextId });
+      if (!res.ok) throw new Error("Failed to delete");
+      broadcastChange({ type: "docs", docId: doc.docId }, contextId);
+      window.close();
+      // Some browsers block window.close() — fall back to navigation
+      window.location.href = "/docs";
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to untrack document");
+    }
+  }
+
   useEffect(() => {
     document.title = `Docreview: ${doc.title}`;
   }, [doc.title]);
@@ -493,6 +508,24 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </Button>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                title="More options"
+                className="px-2 text-zinc-900"
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={handleUntrack} title="Remove this document from the database">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Untrack this doc
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
