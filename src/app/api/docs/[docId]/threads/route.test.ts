@@ -111,7 +111,7 @@ describe("GET /api/docs/[docId]/threads", () => {
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
     const thread = { id: "c1", author: "Alice", fromMe: false, content: "Hi", createdTime: "", resolved: false, replies: [] };
     mockFetchThreadDetail.mockResolvedValue({
-      resolved: false, isThreadAuthor: true, iParticipated: false, iResolvedIt: false, iCommentedLast: false,
+      resolved: false, isThreadAuthor: true, iParticipated: false, iResolvedIt: false, isRead: false,
       driveCreatedAt: null, driveModifiedAt: null, replyCount: 0,
       thread,
     });
@@ -216,7 +216,7 @@ describe("POST /api/docs/[docId]/threads", () => {
 
     const thread = { id: "c1", author: "Alice", fromMe: false, content: "Hi", createdTime: "", resolved: false, replies: [] };
     mockFetchThreadDetail.mockResolvedValue({
-      resolved: false, isThreadAuthor: true, iParticipated: false, iResolvedIt: false, iCommentedLast: false,
+      resolved: false, isThreadAuthor: true, iParticipated: false, iResolvedIt: false, isRead: false,
       driveCreatedAt: new Date("2024-06-01"), driveModifiedAt: new Date("2024-06-10"),
       replyCount: 2, thread,
     });
@@ -246,7 +246,7 @@ describe("POST /api/docs/[docId]/threads", () => {
 
     const thread = { id: "c1", author: "Me", fromMe: true, content: "Done", createdTime: "", resolved: true, replies: [] };
     mockFetchThreadDetail.mockResolvedValue({
-      resolved: true, isThreadAuthor: true, iParticipated: false, iResolvedIt: true, iCommentedLast: true,
+      resolved: true, isThreadAuthor: true, iParticipated: false, iResolvedIt: true, isRead: true,
       driveCreatedAt: null, driveModifiedAt: null, replyCount: 0, thread,
     });
     mockComment.update.mockResolvedValue({ ...commentRecord, resolved: true, status: "ARCHIVED" });
@@ -272,7 +272,7 @@ describe("POST /api/docs/[docId]/threads", () => {
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
 
     mockFetchThreadDetail.mockResolvedValue({
-      resolved: true, isThreadAuthor: false, iParticipated: true, iResolvedIt: true, iCommentedLast: true,
+      resolved: true, isThreadAuthor: false, iParticipated: true, iResolvedIt: true, isRead: true,
       driveCreatedAt: null, driveModifiedAt: null, replyCount: 1,
       thread: { id: "c1", author: "X", fromMe: false, content: "y", createdTime: "", resolved: true, replies: [] },
     });

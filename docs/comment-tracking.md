@@ -26,7 +26,7 @@ filter and sort controls.
 | `driveCreatedAt` | Drive | When the comment was originally created |
 | `driveModifiedAt` | Drive | When the comment (or any reply) was last modified |
 | `replyCount` | Drive | Number of replies to the comment (not counting the original) |
-| `iCommentedLast` | Drive | I was the last person to comment or resolve this thread |
+| `isRead` | Drive | I was the last person to comment or resolve this thread |
 | `status` | User | `INBOX`, `ARCHIVED`, or `MUTED` — see below |
 
 ---
@@ -99,7 +99,7 @@ are still updated when they differ, so the detail page reflects current state.
 **For all other statuses (INBOX, ARCHIVED, or MUTED with @-mention)**, apply this logic
 (first matching rule wins):
 
-1. Compare `resolved`, `iParticipated`, `iCommentedLast`, `status`, `driveCreatedAt`,
+1. Compare `resolved`, `iParticipated`, `isRead`, `status`, `driveCreatedAt`,
    `driveModifiedAt`, and `replyCount` against the existing record. Skip the update if all match.
 2. If a **new reply @-mentions me** → `INBOX` (overrides all other rules, including MUTED).
 3. If `resolved = true` AND I was the one who resolved it → set status to `ARCHIVED`.
@@ -197,7 +197,7 @@ The doc detail page provides three ways to narrow the comment table:
 - **My threads** — keep only `iParticipated` (since `isThreadAuthor` implies `iParticipated`)
 - **My comments** — keep only `isThreadAuthor`
 - **Suggestions** — show only `type = SUGGESTION`
-- **Unreplied** — exclude threads where `iCommentedLast` (I wrote the last reply)
+- **Unreplied** — exclude threads where `isRead` (I wrote the last reply)
 
 **Search filter**:
 The search bar at the top of the table allows filtering comments by text. The search is
@@ -264,7 +264,7 @@ once and used for three derived fields:
   and resolve actions.
 - **`iResolvedIt`** — find the last reply where `action === "resolve"`; true if
   `author.me === true`.
-- **`iCommentedLast`** — if `replies.length > 0`, `replies[last].author.me === true`;
+- **`isRead`** — if `replies.length > 0`, `replies[last].author.me === true`;
   otherwise `comment.author.me === true`. True when the most recent action on the thread
   (reply, resolve, or the initial comment if no replies) was by me. Used for the
   **Unreplied** filter and green row highlighting on the detail page.

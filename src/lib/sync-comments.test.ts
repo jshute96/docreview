@@ -79,7 +79,7 @@ function driveComment(overrides: Record<string, unknown> = {}) {
     isThreadAuthor: false,
     iParticipated: false,
     iResolvedIt: false,
-    iCommentedLast: false,
+    isRead: false,
     mentionedMe: false,
     driveCreatedAt: new Date("2024-06-01"),
     driveModifiedAt: new Date("2024-06-10"),

@@ -194,7 +194,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     if (showMode === "resolved" && !c.resolved) return true;
     if (myThreadsFilter && !c.iParticipated) return true;
     if (myCommentsFilter && !c.isThreadAuthor) return true;
-    if (unrepliedFilter && c.iCommentedLast) return true;
+    if (unrepliedFilter && c.isRead) return true;
     return false;
   }
 
