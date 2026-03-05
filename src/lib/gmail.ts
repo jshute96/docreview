@@ -21,6 +21,7 @@ export interface GmailScanDoc {
 export interface GmailScanResult {
   docs: GmailScanDoc[];
   errorCount: number;
+  skipCount: number;
 }
 
 /** Scan Gmail for Google Doc notification emails and return just doc IDs (no Drive API calls). */
@@ -118,12 +119,13 @@ export async function scanGmailNotifications(
   since: Date
 ): Promise<GmailScanResult> {
   const { docIds, errorCount: scanErrors } = await scanGmailForDocIds(userId, since);
-  if (docIds.length === 0) return { docs: [], errorCount: scanErrors };
+  if (docIds.length === 0) return { docs: [], errorCount: scanErrors, skipCount: 0 };
 
   const auth = await getDriveClient(userId);
   const driveClient = createDrive({ version: "v3", auth });
 
   let errorCount = scanErrors;
+  let skipCount = 0;
   const results: GmailScanDoc[] = [];
 
   await Promise.all(
@@ -149,20 +151,24 @@ export async function scanGmailNotifications(
         });
 
         logInfo(`[Gmail] Drive metadata for ${docId}: "${file.name}" (${Date.now() - t0}ms)`);
-      } catch (err: unknown) {
-        const code = (err as { code?: number })?.code;
+      } catch (err: any) {
+        const code = err.code;
         if (code === 404) {
           logWarning(`[Gmail] Drive file not found: ${docId} (${Date.now() - t0}ms)`);
+          skipCount++;
+        } else if (code === 403) {
+          logWarning(`[Gmail] Drive permission denied for ${docId} (${Date.now() - t0}ms)`);
+          skipCount++;
         } else {
           logError(`[Gmail] Drive metadata failed for ${docId} (${Date.now() - t0}ms):`, err);
+          errorCount++;
         }
-        errorCount++;
       }
     })
   );
 
-  logInfo(`[Gmail] Scan complete: ${results.length} docs, ${errorCount} errors`);
-  return { docs: results, errorCount };
+  logInfo(`[Gmail] Scan complete: ${results.length} docs, ${errorCount} errors, ${skipCount} skipped`);
+  return { docs: results, errorCount, skipCount };
 }
 
 /** Extract plaintext body from a Gmail message payload. */

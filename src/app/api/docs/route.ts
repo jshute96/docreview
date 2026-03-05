@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
           driveDocs = result.docs;
           deletedDocIds = result.deletedDocIds;
           newPageToken = result.newPageToken;
-          logInfo(`[Sync] changes.list → ${driveDocs.length} changed docs, ${deletedDocIds.size} deletions`);
+          logInfo(`[Sync] changes.list → ${driveDocs.length} changed docs, ${deletedDocIds.size} deletions, newPageToken ${newPageToken}`);
         } catch (err: unknown) {
           // Expired/invalid token → fall back to bootstrap
           const code = (err as { code?: number | string })?.code;
@@ -285,8 +285,22 @@ export async function POST(req: NextRequest) {
 
   // Save changes page token only if no transient errors occurred.
   // For load mode, initialize the token so subsequent refreshes use changes.list.
-  const anyTransientError = syncResults.some(r => r.transientError);
-  if (!anyTransientError) {
+  const transientErrors = syncResults
+    .map((r, i) => r.transientError ? commentDocs[i].googleDocId : null)
+    .filter((id): id is string => id !== null);
+
+  const permissionErrors = syncResults
+    .map((r, i) => r.permissionDenied ? commentDocs[i].googleDocId : null)
+    .filter((id): id is string => id !== null);
+
+  const successCount = syncResults.filter(r => !r.transientError && !r.permissionDenied && !r.isDeleted).length;
+  const allFailed = commentDocs.length > 0 && successCount === 0;
+
+  if (permissionErrors.length > 0) {
+    logInfo(`[Sync] Comment access denied for ${permissionErrors.length} docs (skipped): ${permissionErrors.join(", ")}`);
+  }
+
+  if (transientErrors.length === 0 && !allFailed) {
     if (newPageToken) {
       logInfo(`[Sync] Saving changes token for future refreshes`);
       await updateDriveChangesToken(userId, newPageToken);
@@ -295,8 +309,10 @@ export async function POST(req: NextRequest) {
       const token = await getChangesStartPageToken(userId);
       await updateDriveChangesToken(userId, token);
     }
+  } else if (allFailed) {
+    logWarning(`[Sync] All ${commentDocs.length} document fetches failed, skipping token update for safety`);
   } else {
-    logWarning("[Sync] Transient errors during comment sync, skipping token update");
+    logWarning(`[Sync] Transient errors during comment sync for ${transientErrors.length} docs, skipping token update: ${transientErrors.join(", ")}`);
   }
 
   const elapsed = Date.now() - t0;

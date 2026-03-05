@@ -19,15 +19,26 @@ export async function syncComments(
   doc: Doc,
   driveAuth: Awaited<ReturnType<typeof getDriveClient>>,
   userEmail?: string
-): Promise<{ created: number; shouldUnarchive: boolean; hasNonResolveActivity: boolean; isDeleted?: boolean; transientError?: boolean }> {
+): Promise<{
+  created: number;
+  shouldUnarchive: boolean;
+  hasNonResolveActivity: boolean;
+  isDeleted?: boolean;
+  permissionDenied?: boolean;
+  transientError?: boolean;
+}> {
   let comments;
   try {
     comments = await fetchComments(driveAuth, doc.googleDocId, undefined, userEmail);
-  } catch (err: unknown) {
-    const code = (err as { code?: number })?.code;
-    if (code === 404 || code === 403) {
-      logWarning(`[Comments] doc ${doc.googleDocId} is deleted or inaccessible (code ${code})`);
+  } catch (err: any) {
+    const code = err.code;
+    if (code === 404) {
+      logWarning(`[Comments] doc ${doc.googleDocId} not found (code 404)`);
       return { created: 0, shouldUnarchive: false, hasNonResolveActivity: false, isDeleted: true };
+    }
+    if (code === 403) {
+      logWarning(`[Comments] permission denied for ${doc.googleDocId} (code 403)`);
+      return { created: 0, shouldUnarchive: false, hasNonResolveActivity: false, permissionDenied: true };
     }
     logError(`[Comments] failed for ${doc.googleDocId}:`, err);
     return { created: 0, shouldUnarchive: false, hasNonResolveActivity: false, transientError: true };
@@ -36,6 +47,7 @@ export async function syncComments(
   // All Drive API results are regular comments. Suggestions come exclusively from Docs API.
   let docsSuggestionsForSync: Awaited<ReturnType<typeof fetchSuggestions>> = [];
   let suggestionFetchFailed = false;
+  let suggestionPermissionDenied = false;
   if (doc.mimeType === DOCS_MIME_TYPE) {
     try {
       docsSuggestionsForSync = await fetchSuggestions(driveAuth, doc.googleDocId);
@@ -45,10 +57,11 @@ export async function syncComments(
         err.message?.includes("permission to access the document suggestions")
       ) {
         logWarning(`[Suggestions] permission denied for ${doc.googleDocId}`);
+        suggestionPermissionDenied = true;
       } else {
         logError(`[Suggestions] fetch failed for ${doc.googleDocId}:`, err);
+        suggestionFetchFailed = true;
       }
-      suggestionFetchFailed = true;
     }
   }
 
@@ -261,6 +274,11 @@ export async function syncComments(
   if (suggestionFetchFailed) {
     logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated (suggestions skipped: fetch failed)`);
     return { created, shouldUnarchive, hasNonResolveActivity, transientError: true };
+  }
+
+  if (suggestionPermissionDenied) {
+    logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated (suggestions skipped: permission denied)`);
+    return { created, shouldUnarchive, hasNonResolveActivity, permissionDenied: true };
   }
 
   // Docs API sync: ensures ALL pending suggestions are tracked.

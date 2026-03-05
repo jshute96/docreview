@@ -3,7 +3,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { fetchDocsByIds, findDeletedDocIds, getDriveClient, invalidGrantResponse } from "@/lib/google-drive";
 import { scanGmailNotifications } from "@/lib/gmail";
-import { logError, logInfo } from "@/lib/log";
+import { logError, logWarning, logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateGmailTimestamp } from "@/lib/status";
@@ -31,10 +31,13 @@ export async function POST(req: NextRequest) {
     logInfo(`[GmailRefresh] Scanning since ${formatDate(since)}`);
 
     // Scan Gmail for doc notifications
-    const { docs: gmailDocs, errorCount } = await scanGmailNotifications(userId, since);
+    const { docs: gmailDocs, errorCount, skipCount } = await scanGmailNotifications(userId, since);
     if (gmailDocs.length === 0) {
-      logInfo(`[GmailRefresh] No docs found in Gmail (${errorCount} errors)`);
-      await updateGmailTimestamp(userId, new Date());
+      logInfo(`[GmailRefresh] No docs found in Gmail (${errorCount} errors, ${skipCount} skipped)`);
+      // Only update timestamp if there were no actual errors
+      if (errorCount === 0) {
+        await updateGmailTimestamp(userId, new Date());
+      }
       return NextResponse.json({ added: 0, updated: 0, deleted: 0, unarchived: 0, errorCount, comments: 0 });
     }
 
@@ -134,12 +137,37 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Update timestamp for next incremental scan
-    await updateGmailTimestamp(userId, new Date());
+    // --- Save tokens ---
+    const transientErrors = syncResults
+      .map((r, i) => r.transientError ? upsertedDocs[i].googleDocId : null)
+      .filter((id): id is string => id !== null);
+
+    const permissionErrors = syncResults
+      .map((r, i) => r.permissionDenied ? upsertedDocs[i].googleDocId : null)
+      .filter((id): id is string => id !== null);
+
+    const successCount = syncResults.filter(r => !r.transientError && !r.permissionDenied && !r.isDeleted).length;
+    const allFailed = upsertedDocs.length > 0 && successCount === 0;
+
+    if (permissionErrors.length > 0) {
+      logInfo(`[GmailRefresh] Comment access denied for ${permissionErrors.length} docs (skipped): ${permissionErrors.join(", ")}`);
+    }
+
+    // Update timestamp for next incremental scan only if not all failed and no transient errors
+    if (!allFailed && transientErrors.length === 0 && errorCount === 0) {
+      await updateGmailTimestamp(userId, new Date());
+    } else {
+      if (allFailed) {
+        logWarning(`[GmailRefresh] All ${upsertedDocs.length} document fetches failed, skipping timestamp update for safety`);
+      } else {
+        logWarning(`[GmailRefresh] Sync issues (transient: ${transientErrors.length}, scanner: ${errorCount}), skipping timestamp update`);
+      }
+    }
 
     const elapsed = Date.now() - t0;
-    logInfo(`[GmailRefresh] Complete in ${elapsed}ms: ${added} added, ${updated} updated, ${deleted} deleted, ${unarchived} unarchived, ${comments} comments`);
-    return NextResponse.json({ added, updated, deleted, unarchived, errorCount, comments });
+    const totalErrors = errorCount + transientErrors.length;
+    logInfo(`[GmailRefresh] Complete in ${elapsed}ms: ${added} added, ${updated} updated, ${deleted} deleted, ${unarchived} unarchived, ${comments} comments (${totalErrors} errors)`);
+    return NextResponse.json({ added, updated, deleted, unarchived, errorCount: totalErrors, comments });
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;

@@ -270,15 +270,32 @@ the toast reads "no updates".
 ## Transient Error Handling
 
 `syncComments` catches Drive/Docs API errors per-doc so that a single doc's failure doesn't
-crash the entire sync. Permanent errors (404, 403) are treated as deletions. Transient errors
-(429 rate limit, 500 server error, network timeouts) return `transientError: true` instead —
-this also applies when `fetchSuggestions` fails, which skips the suggestion resolution logic
-to avoid incorrectly marking live suggestions as resolved.
+crash the entire sync.
+
+- **Permanent errors (404)** are treated as deletions. The doc is marked `isDeleted: true`.
+- **Expected permission errors (403)** are treated as successful skips. If the user lacks
+  comment permission for a doc (common for view-only shared docs), comment sync is skipped
+  for that doc. This is **not** considered a transient error and does **not** block the
+  token update.
+- **Transient errors** (429 rate limit, 500 server error, network timeouts) return
+  `transientError: true`. This also applies when `fetchSuggestions` fails for unexpected
+  reasons.
 
 After all comment syncs complete, the POST handler checks whether any sync result had
 `transientError: true`. If so, it **skips saving the changes page token**. This preserves the
 old token so the next Refresh re-processes changes from the same point and re-attempts the
-docs whose comment sync failed.
+docs whose comment sync failed. Documents with `permissionDenied: true` (403) do not trigger
+this skip.
+
+### Systemic Failure Protection (`allFailed`)
+
+As a safety measure, if a sync attempt includes one or more documents but **every single document fetch fails** (due to transient errors, 404s, or 403s), the sync is treated as a systemic failure.
+
+In this state:
+- The Drive `driveChangesPageToken` is **not** updated.
+- The Gmail `lastGmailUpdateTimestamp` is **not** updated.
+
+This prevents the system from "skipping ahead" in the changes feed or Gmail window if a broad issue (like a network outage or expired OAuth scope) is preventing access to all documents. The sync will re-attempt the same window during the next refresh.
 
 ---
 

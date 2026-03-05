@@ -68,7 +68,9 @@ in the DB whose `googleCommentId` was not returned by Drive are deleted outright
 of status (INBOX, ARCHIVED, or MUTED).
 
 This only runs when `fetchComments` succeeds — if the API call throws, we return early before
-reaching the deletion code, so a transient error can never wipe out all comments.
+reaching the deletion code, so a transient error can never wipe out all comments. Permanent
+permission errors (403) also return early without triggering deletion, as the document
+still exists even if its comments are inaccessible.
 
 ---
 

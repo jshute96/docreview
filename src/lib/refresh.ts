@@ -245,21 +245,36 @@ export async function executeRefresh(
   }
 
   // --- Save tokens ---
-  const anyTransientError = syncResults.some((r) => r.transientError);
+  const transientErrors = syncResults
+    .map((r, i) => r.transientError ? commentDocs[i].googleDocId : null)
+    .filter((id): id is string => id !== null);
 
-  if (driveSucceeded && newPageToken && !anyTransientError) {
-    logInfo("[Refresh] Saving Drive changes token");
-    await updateDriveChangesToken(userId, newPageToken);
-  } else if (driveSucceeded && newPageToken && anyTransientError) {
-    logWarning("[Refresh] Transient errors during comment sync, skipping Drive token update");
+  const permissionErrors = syncResults
+    .map((r, i) => r.permissionDenied ? commentDocs[i].googleDocId : null)
+    .filter((id): id is string => id !== null);
+
+  const successCount = syncResults.filter(r => !r.transientError && !r.permissionDenied && !r.isDeleted).length;
+  const allFailed = commentDocs.length > 0 && successCount === 0;
+
+  if (permissionErrors.length > 0) {
+    logInfo(`[Refresh] Comment access denied for ${permissionErrors.length} docs (skipped): ${permissionErrors.join(", ")}`);
   }
 
-  if (gmailSucceeded) {
+  if (driveSucceeded && newPageToken && transientErrors.length === 0 && !allFailed) {
+    logInfo("[Refresh] Saving Drive changes token");
+    await updateDriveChangesToken(userId, newPageToken);
+  } else if (driveSucceeded && newPageToken && allFailed) {
+    logWarning(`[Refresh] All ${commentDocs.length} document fetches failed, skipping token update for safety`);
+  } else if (driveSucceeded && newPageToken && transientErrors.length > 0) {
+    logWarning(`[Refresh] Transient errors during comment sync for ${transientErrors.length} docs, skipping Drive token update: ${transientErrors.join(", ")}`);
+  }
+
+  if (gmailSucceeded && transientErrors.length === 0 && !allFailed && gmailErrorCount === 0) {
     await updateGmailTimestamp(userId, new Date());
   }
 
   const elapsed = Date.now() - t0;
-  const errorCount = gmailErrorCount;
+  const errorCount = gmailErrorCount + transientErrors.length;
   logInfo(`[Refresh] Complete in ${elapsed}ms: ${added} added, ${updated} updated, ${deleted} deleted, ${unarchived} unarchived, ${comments} comments (${errorCount} errors)`);
   return { added, updated, deleted, unarchived, comments, errorCount };
 }

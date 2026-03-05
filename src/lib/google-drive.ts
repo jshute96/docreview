@@ -617,17 +617,18 @@ export interface DriveChangesResult {
 }
 
 export async function listChanges(userId: string, pageToken: string): Promise<DriveChangesResult> {
+  logInfo(`[Drive] listChanges: starting with token ${pageToken}`);
   const auth = await getDriveClient(userId);
   const drive = createDrive({ version: "v3", auth });
 
   // Collect all changes, deduplicating by fileId (keep last entry per file)
   const changesByFileId = new Map<string, { removed: boolean; file?: { id?: string | null; name?: string | null; mimeType?: string | null; webViewLink?: string | null; modifiedTime?: string | null; createdTime?: string | null; owners?: { me?: boolean | null; displayName?: string | null }[] | null; trashed?: boolean | null } | null }>();
-  let currentToken = pageToken;
-  let newPageToken = pageToken;
+  let currentToken: string | undefined = pageToken;
+  let newStartToken: string | undefined;
 
   do {
     const t0 = Date.now();
-    const res = await withProgressLogging(
+    const res: any = await withProgressLogging(
       drive.changes.list({
         pageToken: currentToken,
         fields: "nextPageToken, newStartPageToken, changes(removed, fileId, file(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed))",
@@ -636,7 +637,7 @@ export async function listChanges(userId: string, pageToken: string): Promise<Dr
       }),
       `[Drive] changes.list${currentToken ? " (page)" : ""}`
     );
-    logInfo(`[Drive] changes.list (page ${currentToken.slice(0, 8)}…) → ${res.data.changes?.length ?? 0} changes (${Date.now() - t0}ms)`);
+    logInfo(`[Drive] changes.list (page ${currentToken ?? "null"}) → ${res.data.changes?.length ?? 0} changes (${Date.now() - t0}ms)`);
 
     for (const change of res.data.changes ?? []) {
       if (!change.fileId) continue;
@@ -647,11 +648,13 @@ export async function listChanges(userId: string, pageToken: string): Promise<Dr
     }
 
     if (res.data.newStartPageToken) {
-      newPageToken = res.data.newStartPageToken;
-      break;
+      newStartToken = res.data.newStartPageToken;
     }
-    currentToken = res.data.nextPageToken!;
+    currentToken = res.data.nextPageToken ?? undefined;
   } while (currentToken);
+
+  // Use the new start token from the last page, or fall back to the input token if none returned.
+  const newPageToken = newStartToken ?? pageToken;
 
   const docs: DriveDoc[] = [];
   const deletedDocIds = new Set<string>();
@@ -679,7 +682,7 @@ export async function listChanges(userId: string, pageToken: string): Promise<Dr
     });
   }
 
-  logInfo(`[Drive] changes summary: ${docs.length} changed docs, ${deletedDocIds.size} deleted (${changesByFileId.size} total changes)`);
+  logInfo(`[Drive] changes summary: ${docs.length} changed docs, ${deletedDocIds.size} deleted (${changesByFileId.size} total changes), next token: ${newPageToken}`);
   return { docs, deletedDocIds, newPageToken };
 }
 
@@ -766,7 +769,7 @@ export async function listRecentDocs(userId: string, since?: Date, options?: Lis
       }),
       `[Drive] files.list (recent docs${pageToken ? " page" : ""})`
     );
-    logInfo(`[Drive] files.list (recent docs${pageToken ? ", page " + pageToken.slice(0, 8) + "…" : ""}) → ${res.data.files?.length ?? 0} files (${Date.now() - t0}ms)`);
+    logInfo(`[Drive] files.list (recent docs${pageToken ? ", page " + pageToken : ""}) → ${res.data.files?.length ?? 0} files (${Date.now() - t0}ms)`);
 
     for (const file of res.data.files ?? []) {
       if (!file.id || !file.name) continue;
