@@ -104,3 +104,26 @@ export async function PATCH(
   return NextResponse.json(withCommentCounts(updated));
   });
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ docId: string }> }
+) {
+  return runWithRequestId("DELETE", req, async () => {
+  const session = await getValidSession();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.id;
+  const { docId } = await params;
+
+  const doc = await prisma.doc.findUnique({ where: { docId } });
+  if (!doc || doc.userId !== userId) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  await prisma.doc.delete({ where: { docId } });
+
+  return new NextResponse(null, { status: 204 });
+  });
+}
