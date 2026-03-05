@@ -306,11 +306,7 @@ export function CommentThreadPanel({
                 </span>
                 <span className="text-xs text-zinc-400">
                   {formatDate(thread.createdTime, true)}
-                </span>                {thread.resolved && (
-                  <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-600">
-                    Resolved
-                  </span>
-                )}
+                </span>
               </div>
               <CommentContent htmlContent={thread.htmlContent} content={thread.content} searchFilter={searchFilter ?? ""} className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap" />
             </div>

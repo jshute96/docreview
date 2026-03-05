@@ -30,18 +30,32 @@ export async function PATCH(
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const { status } = body as { status: CommentStatus };
+  const { status, isRead } = body as { status?: CommentStatus; isRead?: boolean };
 
-  const VALID_STATUSES: string[] = Object.values(CommentStatus);
-  if (!VALID_STATUSES.includes(status)) {
-    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  if (status === undefined && isRead === undefined) {
+    return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+  }
+
+  if (status !== undefined) {
+    const VALID_STATUSES: string[] = Object.values(CommentStatus);
+    if (!VALID_STATUSES.includes(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+  }
+
+  if (isRead !== undefined && typeof isRead !== "boolean") {
+    return NextResponse.json({ error: "Invalid isRead" }, { status: 400 });
   }
 
   // Update comment and (if needed) doc status in a single transaction
   const updated = await prisma.$transaction(async (tx) => {
+    const data: { status?: CommentStatus; isRead?: boolean } = {};
+    if (status !== undefined) data.status = status;
+    if (isRead !== undefined) data.isRead = isRead;
+
     const result = await tx.comment.update({
       where: { commentId },
-      data: { status },
+      data,
     });
 
     // Moving a comment to INBOX should also move the doc to INBOX if it's ARCHIVED

@@ -26,7 +26,7 @@ filter and sort controls.
 | `driveCreatedAt` | Drive | When the comment was originally created |
 | `driveModifiedAt` | Drive | When the comment (or any reply) was last modified |
 | `replyCount` | Drive | Number of replies to the comment (not counting the original) |
-| `isRead` | Drive | I was the last person to comment or resolve this thread |
+| `isRead` | Drive / User | Whether I've read this thread (see below) |
 | `status` | User | `INBOX`, `ARCHIVED`, or `MUTED` — see below |
 
 ---
@@ -99,8 +99,10 @@ are still updated when they differ, so the detail page reflects current state.
 **For all other statuses (INBOX, ARCHIVED, or MUTED with @-mention)**, apply this logic
 (first matching rule wins):
 
-1. Compare `resolved`, `iParticipated`, `isRead`, `status`, `driveCreatedAt`,
-   `driveModifiedAt`, and `replyCount` against the existing record. Skip the update if all match.
+1. Compare `resolved`, `iParticipated`, `status`, `driveCreatedAt`,
+   `driveModifiedAt`, and `replyCount` against the existing record. `isRead` is only
+   compared when `driveModifiedAt` has changed (preserving manual toggles). Skip the
+   update if all match.
 2. If a **new reply @-mentions me** → `INBOX` (overrides all other rules, including MUTED).
 3. If `resolved = true` AND I was the one who resolved it → set status to `ARCHIVED`.
 4. Otherwise, if there is **new activity** (new replies, thread re-opened, or modification
@@ -264,10 +266,12 @@ once and used for three derived fields:
   and resolve actions.
 - **`iResolvedIt`** — find the last reply where `action === "resolve"`; true if
   `author.me === true`.
-- **`isRead`** — if `replies.length > 0`, `replies[last].author.me === true`;
-  otherwise `comment.author.me === true`. True when the most recent action on the thread
-  (reply, resolve, or the initial comment if no replies) was by me. Used for the
-  **Unreplied** filter and green row highlighting on the detail page.
+- **`isRead`** — Initial value from Drive: if `replies.length > 0`,
+  `replies[last].author.me === true`; otherwise `comment.author.me === true`. Can also be
+  toggled manually via the "Mark read/unread" button on the comments page. Manual changes
+  are sticky: sync only overwrites `isRead` when `driveModifiedAt` changes (i.e., new
+  activity on the thread). Used for the **Unreplied** filter, green row highlighting, and
+  the unread comment count on the docs page.
 - **`replyCount`** — `replies.length`: total number of replies to the original comment,
   including resolve actions. No extra API call; derived from the already-fetched replies.
 - **`mentionedMe`** — whether the initial comment's `mentionedEmailAddresses` includes

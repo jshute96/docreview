@@ -126,12 +126,15 @@ export async function syncComments(
         (c.replyMentionedMeFlags ?? []).slice(existing.replyCount).some(Boolean);
 
       if (existing.status === "MUTED" && !newReplyMentionsMe) {
+        // Only update isRead from Drive when driveModifiedAt changed (new activity)
+        const modifiedChanged = !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
+        const effectiveIsRead = modifiedChanged ? c.isRead : existing.isRead;
         const changed =
           existing.resolved !== c.resolved ||
           existing.iParticipated !== c.iParticipated ||
-          existing.isRead !== c.isRead ||
+          existing.isRead !== effectiveIsRead ||
           !datesEqual(existing.driveCreatedAt, c.driveCreatedAt) ||
-          !datesEqual(existing.driveModifiedAt, c.driveModifiedAt) ||
+          modifiedChanged ||
           existing.replyCount !== c.replyCount;
         if (changed) {
           await prisma.comment.update({
@@ -139,7 +142,7 @@ export async function syncComments(
             data: {
               resolved: c.resolved,
               iParticipated: c.iParticipated,
-              isRead: c.isRead,
+              isRead: effectiveIsRead,
               driveCreatedAt: c.driveCreatedAt,
               driveModifiedAt: c.driveModifiedAt,
               replyCount: c.replyCount,
@@ -214,13 +217,16 @@ export async function syncComments(
         shouldUnarchive = true;
       }
 
+      // Only update isRead from Drive when driveModifiedAt changed (new activity)
+      const modifiedChanged = !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
+      const effectiveIsRead = modifiedChanged ? c.isRead : existing.isRead;
       const changed =
         existing.resolved !== c.resolved ||
         existing.iParticipated !== c.iParticipated ||
-        existing.isRead !== c.isRead ||
+        existing.isRead !== effectiveIsRead ||
         existing.status !== status ||
         !datesEqual(existing.driveCreatedAt, c.driveCreatedAt) ||
-        !datesEqual(existing.driveModifiedAt, c.driveModifiedAt) ||
+        modifiedChanged ||
         existing.replyCount !== c.replyCount;
       if (changed) {
         await prisma.comment.update({
@@ -228,7 +234,7 @@ export async function syncComments(
           data: {
             resolved: c.resolved,
             iParticipated: c.iParticipated,
-            isRead: c.isRead,
+            isRead: effectiveIsRead,
             status,
             driveCreatedAt: c.driveCreatedAt,
             driveModifiedAt: c.driveModifiedAt,

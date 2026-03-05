@@ -264,6 +264,27 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     }
   }
 
+  async function toggleRead() {
+    setLoading(true);
+    const contextId = generateContextId();
+    try {
+      const res = await apiFetch(`/api/docs/${docId}/comments/${comment.commentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isRead: !comment.isRead }),
+        contextId,
+      });
+      if (!res.ok) throw new Error("Failed");
+      const updated: Comment = await res.json();
+      onUpdate(updated);
+      broadcastChange({ type: "comments", docId }, contextId);
+    } catch {
+      toast.error("Failed to update comment");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const isArchived = comment.status === "ARCHIVED";
   const isMuted = comment.status === "MUTED";
 
@@ -359,6 +380,16 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             disabled={loading}
           >
             {isArchived ? "Unarchive" : "Archive"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            title={comment.isRead ? "Mark as unread" : "Mark as read"}
+            onClick={toggleRead}
+            disabled={loading}
+          >
+            {comment.isRead ? "Mark unread" : "Mark read"}
           </Button>
           <Button
             variant="outline"

@@ -125,13 +125,18 @@ export async function POST(
         ? "ARCHIVED"
         : "INBOX";
 
+    // Only update isRead from Drive when driveModifiedAt changed (new activity)
+    const modifiedChanged =
+      commentRecord.driveModifiedAt?.getTime() !== data.driveModifiedAt?.getTime();
+    const effectiveIsRead = modifiedChanged ? data.isRead : commentRecord.isRead;
+
     const updated = await prisma.comment.update({
       where: { commentId: commentRecord.commentId },
       data: {
         resolved: data.resolved,
         isThreadAuthor: data.isThreadAuthor,
         iParticipated: data.iParticipated,
-        isRead: data.isRead,
+        isRead: effectiveIsRead,
         ...(isMuted ? {} : { status }),
         driveCreatedAt: data.driveCreatedAt,
         driveModifiedAt: data.driveModifiedAt,
