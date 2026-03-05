@@ -27,7 +27,7 @@ import { filterDocs, sortDocs } from "@/lib/doc-filters";
 import type { SortCol, SortDir } from "@/lib/doc-filters";
 import { LabelProvider } from "@/contexts/label-context";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
-import { INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
+import { UNREAD_COMMENTS_TOOLTIP, INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 
 interface DocTableProps {
   initialDocs: DocWithLabels[];
@@ -129,7 +129,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortCol(col);
-      setSortDir(col === "lastModifiedInDrive" || col === "inbox" || col === "open" ? "desc" : "asc");
+      setSortDir(col === "lastModifiedInDrive" || col === "unread" || col === "inbox" || col === "open" ? "desc" : "asc");
     }
   }
 
@@ -282,7 +282,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
     <LabelProvider allLabels={labels} onLabelsChange={setLabels} onLabelDelete={handleLabelDelete}>
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-zinc-900">Your Docs</h1>
+        <h1 className="text-xl font-semibold text-zinc-900">Docreview: Inbox view</h1>
         <div className="flex items-center gap-2">
           <RefreshButton
             onRefresh={(newDocs) => setDocs(newDocs)}
@@ -387,7 +387,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50">
                 <ThButton col="title" rowSpan={2} title="Document title">Title</ThButton>
-                <th colSpan={2} className="px-4 pt-2 pb-0 text-center text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                <th colSpan={3} className="px-4 pt-2 pb-0 text-center text-xs font-medium text-zinc-500 uppercase tracking-wide">
                   Comments
                 </th>
                 <ThButton col="lastModifiedInDrive" rowSpan={2} title="Last change time">Last Modified</ThButton>
@@ -406,6 +406,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
                 </th>
               </tr>
               <tr className="border-b border-zinc-200 bg-zinc-50">
+                <ThButton col="unread" title={UNREAD_COMMENTS_TOOLTIP}>Unread</ThButton>
                 <ThButton col="inbox" title={INBOX_COMMENTS_TOOLTIP}>Inbox</ThButton>
                 <ThButton col="open" title={OPEN_COMMENTS_TOOLTIP}>Open</ThButton>
               </tr>

@@ -12,7 +12,7 @@ import { formatDate } from "@/lib/utils";
 import { highlightText } from "@/lib/highlight";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId } from "@/lib/api-fetch";
-import { INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
+import { UNREAD_COMMENTS_TOOLTIP, INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 
 interface DocRowProps {
   doc: DocWithLabels;
@@ -89,8 +89,16 @@ export function DocRow({
         )}
       </td>
       <td className="py-1.5 px-4 text-sm text-zinc-500">
-        <div 
-          className="mx-auto w-8 text-right -translate-x-2" 
+        <div
+          className="mx-auto w-8 text-right -translate-x-2"
+          title={doc._count.unreadComments > 0 ? UNREAD_COMMENTS_TOOLTIP : undefined}
+        >
+          {doc._count.unreadComments > 0 ? doc._count.unreadComments : ""}
+        </div>
+      </td>
+      <td className="py-1.5 px-4 text-sm text-zinc-500">
+        <div
+          className="mx-auto w-8 text-right -translate-x-2"
           title={doc._count.inboxComments > 0 ? INBOX_COMMENTS_TOOLTIP : undefined}
         >
           {doc._count.inboxComments > 0 ? doc._count.inboxComments : ""}

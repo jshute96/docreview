@@ -3,7 +3,7 @@ import type { TriState } from "./tri-state";
 import { partitionTriState } from "./tri-state";
 import { matchesFilter } from "./highlight";
 
-export type SortCol = "title" | "lastModifiedInDrive" | "inbox" | "open";
+export type SortCol = "title" | "lastModifiedInDrive" | "unread" | "inbox" | "open";
 export type SortDir = "asc" | "desc";
 
 export interface FilterOptions {
@@ -73,6 +73,8 @@ export function sortDocs(
     let cmp = 0;
     if (col === "title") {
       cmp = a.title.localeCompare(b.title);
+    } else if (col === "unread") {
+      cmp = a._count.unreadComments - b._count.unreadComments;
     } else if (col === "inbox") {
       cmp = a._count.inboxComments - b._count.inboxComments;
     } else if (col === "open") {

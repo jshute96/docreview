@@ -18,11 +18,13 @@ export const docWithCountsInclude = {
         { resolved: false as const }
       ]
     },
-    select: { 
-      isThreadAuthor: true, 
-      iParticipated: true, 
-      resolved: true, 
-      status: true 
+    select: {
+      type: true,
+      isThreadAuthor: true,
+      iParticipated: true,
+      resolved: true,
+      status: true,
+      isRead: true,
     },
   },
 };
@@ -35,20 +37,20 @@ export const docWithCommentsInclude = {
 
 /** Strip raw comments array and replace with computed _count */
 export function withCommentCounts<
-  T extends { 
+  T extends {
     role: string;
-    comments: { isThreadAuthor: boolean; iParticipated: boolean; resolved: boolean; status: string }[] 
+    comments: { type: string; isThreadAuthor: boolean; iParticipated: boolean; resolved: boolean; status: string; isRead: boolean }[]
   },
 >(doc: T) {
   const { comments, ...rest } = doc;
+  const inboxFilter = (c: (typeof comments)[number]) =>
+    c.status === "INBOX" &&
+    (doc.role === "AUTHOR" || c.type === "SUGGESTION" || c.isThreadAuthor || c.iParticipated);
   return {
     ...rest,
     _count: {
-      inboxComments: comments.filter(
-        (c) =>
-          c.status === "INBOX" &&
-          (doc.role === "AUTHOR" || c.isThreadAuthor || c.iParticipated),
-      ).length,
+      unreadComments: comments.filter((c) => inboxFilter(c) && !c.isRead).length,
+      inboxComments: comments.filter(inboxFilter).length,
       openComments: comments.filter((c) => !c.resolved).length,
     },
   };
