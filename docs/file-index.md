@@ -10,7 +10,8 @@ One-line descriptions of every source file, grouped by layer.
 | `layout.tsx` | Root layout — Geist fonts, global CSS, Sonner toaster |
 | `login/page.tsx` | Login page — Google OAuth button, or offline-mode button |
 | `docs/page.tsx` | Doc list page (server) — fetches docs+labels, renders `DocTable` |
-| `add/page.tsx` | Add document page (server) — standalone add-doc form, accepts optional `?url=` query param |
+| `add/page.tsx` | Add document page (server) — standalone add-doc form, accepts optional `?doc=` query param |
+| `open/page.tsx` | Open page (server) — redirects to `/comments/<docId>` if doc exists, otherwise to `/add?doc=...` |
 | `comments/[docId]/page.tsx` | Doc detail page (server) — fetches single doc with comments, renders `DocDetail`; `generateMetadata` sets page title |
 
 ## API Routes (`src/app/api/`)
@@ -71,6 +72,7 @@ Shadcn/ui components:
 
 | File | Description |
 |------|-------------|
+| `alert-dialog.tsx` | Alert dialog for confirmations (Radix) |
 | `badge.tsx` | Badge component |
 | `button.tsx` | Button component with variant/size props |
 | `checkbox.tsx` | Checkbox input |
