@@ -242,6 +242,15 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     );
   }
 
+  async function handleReplyAndArchive(content: string) {
+    await postReply(
+      { commentId: comment.googleCommentId, content },
+      "Failed to post reply",
+      "Reply posted",
+    );
+    await updateStatus("ARCHIVED");
+  }
+
   async function updateStatus(status: "INBOX" | "ARCHIVED" | "MUTED") {
     setLoading(true);
     const contextId = generateContextId();
@@ -498,6 +507,13 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   onReply={handleReply}
                   onResolve={handleResolve}
                   onReopen={handleReopen}
+                  onReplyAndArchive={handleReplyAndArchive}
+                  onArchive={() => updateStatus(isArchived ? "INBOX" : "ARCHIVED")}
+                  isArchived={isArchived}
+                  onToggleRead={toggleRead}
+                  isRead={comment.isRead}
+                  onMute={() => updateStatus(isMuted ? "INBOX" : "MUTED")}
+                  isMuted={isMuted}
                   onDirtyChange={setHasDirtyReply}
                   searchFilter={searchFilter}
                   documentText={documentText}

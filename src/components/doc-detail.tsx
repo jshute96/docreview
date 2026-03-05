@@ -531,7 +531,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
         </p>
       ) : (
         <div className="rounded-lg border border-zinc-200">
-          <table className="w-full">
+          <table className="w-full min-w-fit">
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50">
                 <th className="pl-4 py-2.5 pr-4 text-left">

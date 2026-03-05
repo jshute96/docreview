@@ -39,6 +39,13 @@ interface CommentThreadPanelProps {
   onReply?: (content: string) => Promise<void>;
   onResolve?: (content: string) => Promise<void>;
   onReopen?: (content: string) => Promise<void>;
+  onReplyAndArchive?: (content: string) => Promise<void>;
+  onArchive?: () => void;
+  isArchived?: boolean;
+  onToggleRead?: () => void;
+  isRead?: boolean;
+  onMute?: () => void;
+  isMuted?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
   searchFilter?: string;
   documentText?: string;
@@ -54,6 +61,13 @@ export function CommentThreadPanel({
   onReply,
   onResolve,
   onReopen,
+  onReplyAndArchive,
+  onArchive,
+  isArchived,
+  onToggleRead,
+  isRead,
+  onMute,
+  isMuted,
   onDirtyChange,
   searchFilter,
   documentText,
@@ -147,6 +161,19 @@ export function CommentThreadPanel({
     }
   }
 
+  async function handleReplyAndArchive() {
+    if (!onReplyAndArchive || replyText.trim().length === 0) return;
+    setSubmitting(true);
+    try {
+      await onReplyAndArchive(replyText.trim());
+      setReplyText("");
+    } catch {
+      // Keep text on failure
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleReopen() {
     if (!onReopen) return;
     setSubmitting(true);
@@ -159,33 +186,6 @@ export function CommentThreadPanel({
       setSubmitting(false);
     }
   }
-
-  const hasButtons = commentUrl || onRefresh;
-
-  const buttons = hasButtons ? (
-    <div className="float-right relative z-10 flex gap-1 ml-2 mb-1">
-      {commentUrl && (
-        <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Open the document at this comment" asChild>
-          <a href={commentUrl} target="docreview-doc">
-            Open
-          </a>
-        </Button>
-      )}
-      {onRefresh && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-6 px-2 text-xs"
-          title="Refresh this thread"
-          onClick={onRefresh}
-          disabled={refreshing}
-        >
-          <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
-      )}
-    </div>
-  ) : null;
 
   const replyBox = (
     <div ref={replyContainerRef} className="mt-3 pt-3 border-t border-zinc-200">
@@ -205,7 +205,7 @@ export function CommentThreadPanel({
         className={TEXTAREA_CLASSES}
         style={{ width: "25%", overflow: "hidden" }}
       />
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex items-center gap-2 whitespace-nowrap">
         {resolved ? (
           <Button
             variant="outline"
@@ -239,7 +239,72 @@ export function CommentThreadPanel({
             >
               Resolve
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-3 text-xs"
+              title="Reply and archive this comment"
+              disabled={replyText.trim().length === 0 || submitting}
+              onClick={handleReplyAndArchive}
+            >
+              Reply &amp; Archive
+            </Button>
           </>
+        )}
+        <span className="text-zinc-300 mx-1">|</span>
+        {onArchive && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-3 text-xs"
+            title={isArchived ? "Unhide this comment" : "Hide this comment"}
+            onClick={onArchive}
+          >
+            {isArchived ? "Unarchive" : "Archive"}
+          </Button>
+        )}
+        {onToggleRead && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-3 text-xs"
+            title={isRead ? "Mark as unread" : "Mark as read"}
+            onClick={onToggleRead}
+          >
+            {isRead ? "Mark unread" : "Mark read"}
+          </Button>
+        )}
+        {onMute && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-3 text-xs"
+            title={isMuted ? "Permanently hidden — click to unhide" : "Permanently hide this comment"}
+            onClick={onMute}
+          >
+            {isMuted ? "Unmute" : "Mute"}
+          </Button>
+        )}
+        <span className="text-zinc-300 mx-1">|</span>
+        {commentUrl && (
+          <Button variant="outline" size="sm" className="h-7 px-3 text-xs" title="Open the document at this comment" asChild>
+            <a href={commentUrl} target="docreview-doc">
+              Open
+            </a>
+          </Button>
+        )}
+        {onRefresh && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-3 text-xs"
+            title="Refresh this thread"
+            onClick={onRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
         )}
       </div>
     </div>
@@ -247,8 +312,7 @@ export function CommentThreadPanel({
 
   if (loading) {
     return (
-      <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
-        {buttons}
+      <div className="mx-auto w-[90%] min-w-fit my-3 rounded-lg border bg-zinc-50 p-4">
         <p className="text-sm text-zinc-400">Loading comments...</p>
       </div>
     );
@@ -256,8 +320,7 @@ export function CommentThreadPanel({
 
   if (threads.length === 0) {
     return (
-      <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
-        {buttons}
+      <div className="mx-auto w-[90%] min-w-fit my-3 rounded-lg border bg-zinc-50 p-4">
         <p className="text-sm text-zinc-400">No comments on this document.</p>
         {replyBox}
       </div>
@@ -265,8 +328,7 @@ export function CommentThreadPanel({
   }
 
   return (
-    <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
-      {buttons}
+    <div className="mx-auto w-[90%] min-w-fit my-3 rounded-lg border bg-zinc-50 p-4">
       <div className="divide-y divide-zinc-200">
         {threads.map((thread, threadIndex) => (
           <div
