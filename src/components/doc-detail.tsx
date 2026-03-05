@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { formatDate } from "@/lib/utils";
+import { FriendlyDate } from "@/components/friendly-date";
 import { createMatcher } from "@/lib/highlight";
 import { broadcastChange, useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
@@ -450,11 +450,11 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
           </span>
           <span>
             <span className="font-medium text-zinc-400">Created:</span>{" "}
-            {formatDate(doc.createdTimeInDrive, true)}
+            <FriendlyDate date={doc.createdTimeInDrive} />
           </span>
           <span>
             <span className="font-medium text-zinc-400">Modified:</span>{" "}
-            {formatDate(doc.lastModifiedInDrive, true)}
+            <FriendlyDate date={doc.lastModifiedInDrive} />
           </span>
           <span>
             <span className="font-medium text-zinc-400">DocId:</span>{" "}

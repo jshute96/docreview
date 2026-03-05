@@ -34,3 +34,42 @@ export function formatDate(d: Date | string | null, omitSeconds = false): string
   const base = `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
   return !omitSeconds ? `${base}:${get("second")}` : base;
 }
+
+/** Friendly relative date: HH:MM (today), Wed, HH:MM (<6d), YYYY-MM-DD (older). */
+export function formatDateFriendly(d: Date | string | null, now?: number): { text: string; tooltip: string } {
+  if (!d) return { text: "—", tooltip: "" };
+  const dt = new Date(d);
+  const tooltip = formatDate(dt);
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+    weekday: "short",
+    hourCycle: "h23",
+  });
+  const parts = formatter.formatToParts(dt);
+  const get = (t: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === t)!.value;
+
+  const nowMs = now ?? Date.now();
+  const nowParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date(nowMs));
+  const nowGet = (t: Intl.DateTimeFormatPartTypes) => nowParts.find(p => p.type === t)!.value;
+  const isToday = get("year") === nowGet("year") && get("month") === nowGet("month") && get("day") === nowGet("day");
+
+  const diffMs = nowMs - dt.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  let text: string;
+  if (isToday) {
+    text = `${get("hour")}:${get("minute")}`;
+  } else if (diffHours >= 0 && diffHours < 6 * 24) {
+    text = `${get("weekday")}, ${get("hour")}:${get("minute")}`;
+  } else {
+    text = `${get("year")}-${get("month")}-${get("day")}`;
+  }
+
+  return { text, tooltip };
+}

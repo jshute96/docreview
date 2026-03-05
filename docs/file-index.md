@@ -62,6 +62,7 @@ One-line descriptions of every source file, grouped by layer.
 | `manage-labels-dialog.tsx` | Dialog to create/delete/reorder/recolor labels with pointer-based drag reorder |
 | `color-picker.tsx` | Popover color grid for label color selection |
 | `dialog-buttons.tsx` | Reusable Save/Cancel button pair for dialogs |
+| `friendly-date.tsx` | `<FriendlyDate>` — renders relative timestamps: time-only (today), weekday + time (<6d), date (older); full timestamp on hover |
 | `doc-type-icon.tsx` | SVG icons for Google Docs/Sheets/Slides by mime type |
 
 ### UI primitives (`src/components/ui/`)
@@ -115,7 +116,7 @@ Shadcn/ui components:
 | `request-context.ts` | `runWithRequestId(method, req, fn)` and `getRequestId()` — AsyncLocalStorage-based request ID context for correlating log lines across a single API request; extracts URL and client context ID from request; logs `[API] METHOD /path` silently on entry |
 | `status.ts` | Read/write `Status` table — tracks `driveChangesPageToken` and `lastGmailUpdateTimestamp` per user for incremental sync |
 | `tri-state.ts` | `TriState` type (`off`/`include`/`exclude`), cycle function, partition helper |
-| `utils.ts` | `cn()` (clsx+twMerge), `contrastText()` for label colors, `formatDate()` |
+| `utils.ts` | `cn()` (clsx+twMerge), `contrastText()` for label colors, `formatDate()` (full timestamp for logging), `formatDateFriendly()` (relative display format) |
 | `__mocks__/prisma.ts` | Vitest mock of PrismaClient for unit tests |
 
 ## Types & Test Utilities

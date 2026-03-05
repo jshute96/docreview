@@ -8,7 +8,7 @@ import type { CommentThread, SuggestionContent } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
 import { CommentThreadPanel } from "@/components/comment-thread-panel";
 import { highlightText } from "@/lib/highlight";
-import { formatDate } from "@/lib/utils";
+import { FriendlyDate } from "@/components/friendly-date";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 
@@ -328,10 +328,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       {...hoverHandlers}
     >
       {cell(`${cellPy} pl-4 pr-4 text-sm text-zinc-500 whitespace-nowrap`,
-        formatDate(comment.driveCreatedAt, true)
+        <FriendlyDate date={comment.driveCreatedAt} />
       )}
       {cell(`${cellPy} pr-4 text-sm text-zinc-500 whitespace-nowrap`,
-        sameAsCreated ? "—" : formatDate(comment.driveModifiedAt, true)
+        sameAsCreated ? "—" : <FriendlyDate date={comment.driveModifiedAt} />
       )}
       {cell(`${cellPy} pr-4 text-sm text-zinc-500 tabular-nums`,
         comment.replyCount > 0 ? comment.replyCount : ""

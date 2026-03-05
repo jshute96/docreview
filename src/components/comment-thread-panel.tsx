@@ -6,7 +6,7 @@ import type { CommentThread } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
 import { highlightText, highlightHtml } from "@/lib/highlight";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
-import { formatDate } from "@/lib/utils";
+import { FriendlyDate } from "@/components/friendly-date";
 
 /** Render comment/reply text with search highlighting, preferring htmlContent. */
 function CommentContent({ htmlContent, content, searchFilter, className }: {
@@ -304,9 +304,7 @@ export function CommentThreadPanel({
                 <span className="text-sm font-semibold text-zinc-900">
                   {thread.author}
                 </span>
-                <span className="text-xs text-zinc-400">
-                  {formatDate(thread.createdTime, true)}
-                </span>
+                <FriendlyDate date={thread.createdTime} className="text-xs text-zinc-400" />
               </div>
               <CommentContent htmlContent={thread.htmlContent} content={thread.content} searchFilter={searchFilter ?? ""} className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap" />
             </div>
@@ -317,9 +315,7 @@ export function CommentThreadPanel({
                   <span className="text-sm font-semibold text-zinc-900">
                     {reply.author}
                   </span>
-                  <span className="text-xs text-zinc-400">
-                    {formatDate(reply.createdTime, true)}
-                  </span>
+                  <FriendlyDate date={reply.createdTime} className="text-xs text-zinc-400" />
                   {reply.action === "resolve" && (
                     <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-600">
                       Resolved

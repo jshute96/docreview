@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { contrastText, formatDate } from "./utils";
+import { contrastText, formatDate, formatDateFriendly } from "./utils";
 
 describe("contrastText", () => {
   it("returns dark text for white background", () => {
@@ -60,5 +60,61 @@ describe("formatDate", () => {
     // 2024-01-01 00:00:00 PST = 2024-01-01T08:00:00Z
     const d = new Date("2024-01-01T08:00:00Z");
     expect(formatDate(d)).toBe("2024-01-01 00:00:00");
+  });
+});
+
+describe("formatDateFriendly", () => {
+  // Use a fixed "now" of 2024-06-15 12:00:00 PST = 2024-06-15T19:00:00Z
+  const now = new Date("2024-06-15T19:00:00Z").getTime();
+
+  it("returns em dash for null", () => {
+    expect(formatDateFriendly(null).text).toBe("—");
+    expect(formatDateFriendly(null).tooltip).toBe("");
+  });
+
+  it("shows HH:MM for timestamps today", () => {
+    // Same day: 2024-06-15 10:00:00 PDT = 2024-06-15T17:00:00Z
+    const d = new Date("2024-06-15T17:00:00Z");
+    const { text, tooltip } = formatDateFriendly(d, now);
+    expect(text).toBe("10:00");
+    expect(tooltip).toBe("2024-06-15 10:00:00");
+  });
+
+  it("shows weekday HH:MM for yesterday (within 7 days)", () => {
+    // Yesterday early: 2024-06-14 09:00:00 PDT (Fri) = 2024-06-14T16:00:00Z
+    const d = new Date("2024-06-14T16:00:00Z");
+    const { text, tooltip } = formatDateFriendly(d, now);
+    expect(text).toBe("Fri, 09:00");
+    expect(tooltip).toBe("2024-06-14 09:00:00");
+  });
+
+  it("shows weekday HH:MM for timestamps within 7 days", () => {
+    // 3 days ago: 2024-06-12 12:00:00 PDT (Wed) = 2024-06-12T19:00:00Z
+    const d = new Date("2024-06-12T19:00:00Z");
+    const { text, tooltip } = formatDateFriendly(d, now);
+    expect(text).toBe("Wed, 12:00");
+    expect(tooltip).toBe("2024-06-12 12:00:00");
+  });
+
+  it("shows YYYY-MM-DD for timestamps older than 7 days", () => {
+    // 30 days ago: 2024-05-16 12:00:00 PDT = 2024-05-16T19:00:00Z
+    const d = new Date("2024-05-16T19:00:00Z");
+    const { text, tooltip } = formatDateFriendly(d, now);
+    expect(text).toBe("2024-05-16");
+    expect(tooltip).toBe("2024-05-16 12:00:00");
+  });
+
+  it("shows YYYY-MM-DD for future timestamps", () => {
+    // 2 days in future
+    const d = new Date("2024-06-17T19:00:00Z");
+    const { text } = formatDateFriendly(d, now);
+    expect(text).toBe("2024-06-17");
+  });
+
+  it("earlier today still shows just HH:MM, not weekday", () => {
+    // Early morning same day: 2024-06-15 00:30:00 PDT = 2024-06-15T07:30:00Z
+    const d = new Date("2024-06-15T07:30:00Z");
+    const { text } = formatDateFriendly(d, now);
+    expect(text).toBe("00:30");
   });
 });

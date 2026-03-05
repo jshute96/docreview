@@ -8,7 +8,7 @@ import { ROLE_COLORS } from "@/lib/role-colors";
 import { EditDocDialog } from "@/components/edit-doc-dialog";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { Button } from "@/components/ui/button";
-import { formatDate } from "@/lib/utils";
+import { FriendlyDate } from "@/components/friendly-date";
 import { highlightText } from "@/lib/highlight";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId } from "@/lib/api-fetch";
@@ -50,7 +50,6 @@ export function DocRow({
     }
   }
 
-  const lastModified = formatDate(doc.lastModifiedInDrive, true);
   const hasNotes = !!doc.notes?.trim();
   const notesTooltip = hasNotes
     ? doc.notes!.split("\n").slice(0, 20).join("\n") + (doc.notes!.split("\n").length > 20 ? "\n…" : "")
@@ -112,7 +111,7 @@ export function DocRow({
           {doc._count.openComments > 0 ? doc._count.openComments : ""}
         </div>
       </td>
-      <td className="py-1.5 pr-4 text-sm text-zinc-500">{lastModified}</td>
+      <td className="py-1.5 pr-4 text-sm text-zinc-500"><FriendlyDate date={doc.lastModifiedInDrive} /></td>
       <td className="py-1.5 pr-4">
         <div className="flex items-center gap-1">
           <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Open this document" asChild>
