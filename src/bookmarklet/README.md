@@ -36,21 +36,21 @@ To ensure the bookmarklet is maintainable and robust against complex SPAs like G
 
 ### Google Drive Implementation
 Google Drive is a single-page application that dynamically renders and clears its DOM.
-- **Persistence:** The bookmarklet uses a `MutationObserver` and a 2-second background poll to re-scan the page and re-inject icons when Drive clears them.
-- **Targeting:**
-  - **List/Search View:** Scans by row (`[role="row"]`) and targets only the **first** icon container (`.rxUYqf` or `.qHF2df`) in that row. This ensures the icon only appears in the "Name" column.
-  - **Grid View:** Targets `.qHF2df` containers and retrieves IDs from the parent `.RlzxUb`.
+- **Persistence:** The bookmarklet uses a `MutationObserver` and a 1-second background poll to re-scan the page and re-inject icons when Drive clears them.
+- **Robust Targeting:**
+  - **Selectors:** Uses ARIA roles (`[role="row"]`, `[role="gridcell"]`) and stable data attributes (`[data-column-id="16"]` for the Name column) rather than obfuscated CSS classes.
+  - **Heuristic:** Inside a file row or grid item, it searches for the first `svg` or `img` to use as an anchor point for injection.
 - **Identification:** Validates document IDs (length > 20) to filter out folders and navigation items.
 
 ### Event Interception
 Google Drive uses aggressive event listeners to handle row selection. To ensure our links work, the bookmarklet:
-1. Installs **capturing-phase event listeners** (`click`, `mousedown`, `mouseup`) directly on the injected Docreview icon.
+1. Installs **capturing-phase event listeners** (`click`, `mousedown`, `mouseup`) directly on the injected Docreview icon elements.
 2. Calls `stopImmediatePropagation()` to kill the event before Drive's listeners can see it.
 3. Manually triggers `window.open()`.
 
 ### Idempotency
 - Uses a global `window._dr` object to track state.
-- Re-running the bookmarklet disconnects old observers, clears old intervals, and wipes internal `data-dr-in` markers to allow a fresh scan.
+- Re-running the bookmarklet disconnects old observers, clears old intervals, and allows a fresh scan by checking for the absence of `.dr-link` elements.
 
 ### Building
 Building is **not automatic**. After editing `bookmarklet-source.js`, run:
@@ -63,4 +63,4 @@ npm run build:bookmarklet
 - **Manual Activation:** You must click the bookmarklet once per session/refresh.
 - **Browser Security:** Uses a React `ref` bypass to allow `javascript:` URLs in the install UI.
 - **Icons:** Browsers do not support custom favicons for bookmarklet links in the bookmarks bar.
-- **Brittle Selectors:** Injection relies on Google's internal CSS class names, which may change.
+- **Implementation Stability:** While improved with ARIA roles, injection still relies on Google's internal DOM structure (like column IDs), which may change.
