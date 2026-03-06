@@ -148,17 +148,19 @@ owns the file, not something we infer.
 For each file Drive returns:
 
 - **New AUTHOR doc (not in DB, user owns it):** created with `role: "AUTHOR"` and
-  `createdTimeInDrive` / `owner`. Default status is `INBOX`. This happens in all modes
-  (load, refresh, full-refresh) so authored docs are auto-tracked.
+  `createdTimeInDrive` / `owner`. Default status is **ARCHIVED** to avoid "noise"
+  from the Drive changes feed resurfacing old documents. A doc only moves to
+  **INBOX** if it was also discovered via a Gmail notification (`fromGmail`)
+  or if the subsequent comment sync (Phase 3) detects relevant activity
+  that triggers a "Smart Unarchive".
 - **New REVIEWER doc (not in DB, someone else owns it):** only added during **load** mode.
   Refresh and full-refresh skip these — reviewer docs must already be tracked in the DB or
-  added manually via `/api/docs/add`.
+  added manually via `/api/docs/add`. Default status is **ARCHIVED**.
 - **Existing doc:** `title`, `driveUrl`, `mimeType`, `lastModifiedInDrive`, `owner`,
   `createdTimeInDrive`, and `isDeleted` are updated. `role` and `labels` are
-  never touched; they belong to the user. `status` is only updated during **load**
-  mode if the user specifies a status (via "Add to Inbox" or "Move to Inbox");
-  otherwise it is preserved. Setting `isDeleted: false` on upsert means a doc
-  that re-appears in Drive (e.g., shared again) is automatically restored.
+  never touched; they belong to the user. `status` is preserved (only updated
+  via Gmail or Smart Unarchive triggers). Setting `isDeleted: false` on upsert
+  means a doc that re-appears in Drive (e.g., shared again) is automatically restored.
 
 **What's preserved across refreshes:**
 - `role` — user may override Drive's detection after first sync

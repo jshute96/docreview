@@ -22,9 +22,10 @@ I am not longer interested in acting like the author.
 ## Rules for state changes
 
 * For newly added documents (including those that were **Deleted & re-added**):
-  1. If I created it or it has Author state, it goes in Inbox
-  2. If it was explicitly shared with me, it goes in Inbox
-  3. Otherwise, it starts as Archived
+  1. If discovered via Gmail (which implies a "shared with me" or comment notification), it goes in Inbox.
+  2. Otherwise, it starts as **Archived** (even if I am the Author).
+     * This avoids noise from the Drive changes feed resurfacing old documents with no new activity.
+     * The subsequent comment sync in the same refresh may move it to Inbox if it has relevant unresolved activity (see "Smart Unarchive" below).
 
 * For new comments, and new replies on a comment (First matching rule wins):
   1. If I resolved a comment that was in Inbox, it goes to Archived.
@@ -36,7 +37,9 @@ I am not longer interested in acting like the author.
      * If I reply on a comment thread I started, that doesn't go to Inbox.
   5. If I replied, on a thread I did not start, it goes to Inbox.
 
-* These comment changes trigger moving the document to Inbox:
+## Smart Unarchive
+
+These comment changes trigger moving the document to Inbox:
   1. When a comment gets created in Inbox or moves to Inbox (for any reason, including if I unarchive it)
   2. When a comment in Inbox has any new replies added
   3. When a comment in Inbox gets resolved, but not by me

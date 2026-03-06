@@ -94,11 +94,10 @@ export async function upsertDocsAndSyncComments(
         owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
         // Mode-based status defaults:
-        // - load: ARCHIVED unless I authored it
-        // - refresh/full-refresh/Gmail: INBOX if from Gmail or I authored it; else ARCHIVED
-        status: (mode === "load")
-          ? (doc.role === "AUTHOR" ? "INBOX" : "ARCHIVED")
-          : (fromGmail || doc.role === "AUTHOR" ? "INBOX" : "ARCHIVED"),
+        // All new docs discovered via Drive activity start as ARCHIVED to avoid noise
+        // from old docs resurfacing. We rely on Gmail notifications or the 
+        // subsequent comment sync (Phase 3) to move them to INBOX if relevant.
+        status: fromGmail ? "INBOX" : "ARCHIVED",
       },
       update: {
         title: doc.title,
