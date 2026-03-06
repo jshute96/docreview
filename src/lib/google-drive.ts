@@ -37,8 +37,23 @@ const BARE_DOC_ID_RE = /^[a-zA-Z0-9_-]{20,}$/;
 export function parseGoogleDocId(url: string): string | null {
   const trimmed = url.trim();
   if (BARE_DOC_ID_RE.test(trimmed)) return trimmed;
-  const match = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  return match?.[1] ?? null;
+
+  // Try /d/ID pattern
+  const dMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (dMatch?.[1]) return dMatch[1];
+
+  // Try ?id=ID pattern (for drive.google.com/open?id=ID)
+  try {
+    const parsedUrl = new URL(trimmed);
+    const idParam = parsedUrl.searchParams.get("id");
+    if (idParam && BARE_DOC_ID_RE.test(idParam)) {
+      return idParam;
+    }
+  } catch (err) {
+    // Not a valid full URL, skip searchParam check
+  }
+
+  return null;
 }
 
 export async function getDriveClient(userId: string) {

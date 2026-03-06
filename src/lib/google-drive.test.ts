@@ -50,6 +50,20 @@ describe("parseGoogleDocId", () => {
       )
     ).toBe("longId123");
   });
+
+  it("extracts ID from drive.google.com/open?id=ID URL", () => {
+    expect(
+      parseGoogleDocId(
+        "https://drive.google.com/a/google.com/open?id=1TGgHwuXMrUvTWsbvBUZn3jjOGUHJ7i0rrocWSdwyvgs"
+      )
+    ).toBe("1TGgHwuXMrUvTWsbvBUZn3jjOGUHJ7i0rrocWSdwyvgs");
+  });
+
+  it("extracts ID from a direct doc ID (>= 20 chars)", () => {
+    expect(parseGoogleDocId("1TGgHwuXMrUvTWsbvBUZn3jjOGUHJ7i0rrocWSdwyvgs")).toBe(
+      "1TGgHwuXMrUvTWsbvBUZn3jjOGUHJ7i0rrocWSdwyvgs"
+    );
+  });
 });
 
 describe("deriveCommentFlags", () => {
