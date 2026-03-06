@@ -43,8 +43,8 @@ describe("broadcastChange", () => {
 
   it("includes docId when provided", async () => {
     const { broadcastChange } = await import("./cross-tab");
-    broadcastChange({ type: "docs", docId: "abc123" });
-    expect(mockPostMessage).toHaveBeenCalledWith({ type: "docs", docId: "abc123" });
+    broadcastChange({ type: "docs", docIds: ["abc123"] });
+    expect(mockPostMessage).toHaveBeenCalledWith({ type: "docs", docIds: ["abc123"] });
   });
 
   it("reuses the same BroadcastChannel instance across calls", async () => {

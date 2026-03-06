@@ -21,7 +21,7 @@ I am not longer interested in acting like the author.
 
 ## Rules for state changes
 
-* For newly added documents:
+* For newly added documents (including those that were **Deleted & re-added**):
   1. If I created it or it has Author state, it goes in Inbox
   2. If it was explicitly shared with me, it goes in Inbox
   3. Otherwise, it starts as Archived

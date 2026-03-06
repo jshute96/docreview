@@ -28,6 +28,7 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/validate/route.ts` | `GET` validate a Google Drive URL — checks access, mime type, returns metadata; for existing docs returns `existing: true` with labels, notes, status, star |
 | `docs/bulk-update/route.ts` | `PATCH` bulk update multiple docs — optimized role/star/label/notes updates with no-op protection |
 | `docs/[docId]/route.ts` | `GET` single doc; `PATCH` update role/status/star/labels |
+| `docs/[docId]/re-add/route.ts` | `POST` transactional delete and re-add document |
 | `docs/[docId]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata then syncs comments |
 | `docs/[docId]/comments/route.ts` | `GET` fetch all comment threads from Drive (fast path — Drive `comments.list` only) |
 | `docs/[docId]/content/route.ts` | `GET` fetch document text and suggestion content (slow path — Docs API `documents.get` or Drive `files.export`); for Docs, uses a single `SUGGESTIONS_INLINE` call for both |
@@ -50,10 +51,11 @@ One-line descriptions of every source file, grouped by layer.
 | `comment-filter-bar.tsx` | Comment list filter bar — toggles for my threads/comments, starred, show mode, suggestions, unread |
 | `comment-row.tsx` | Single comment row — expandable, shows content preview, thread panel, status actions |
 | `comment-thread-panel.tsx` | Expanded thread view — shows all replies, reply textarea, resolve/reopen buttons |
-| `add-doc-content.tsx` | Shared add/update doc form body — URL validation, label picker, notes; populates form from existing doc data; used by dialog and standalone page |
-| `add-doc-dialog.tsx` | Dialog wrapper for adding/updating a doc — renders `AddDocContent` inside a dialog, dynamic title and button text |
-| `add-doc-page-client.tsx` | Standalone add/update doc page (client) — renders `AddDocContent` in a card with cross-tab sync |
+| `add-doc-form.tsx` | Shared add/update/re-add doc form body — URL validation (Add mode) or fixed doc (Re-add mode), label picker, notes; used by dialogs and standalone page |
+| `add-doc-dialog.tsx` | Dialog wrapper for adding/updating a doc — renders `add-doc-form` inside a dialog, dynamic title and button text |
+| `add-doc-page-client.tsx` | Standalone add/update doc page (client) — renders `add-doc-form` in a card with cross-tab sync |
 | `edit-doc-dialog.tsx` | Dialog to edit doc role, star, and labels |
+| `delete-readd-dialog.tsx` | Dialog to delete a document and re-add it as fresh |
 | `bulk-edit-dialog.tsx` | Dialog to edit role, star, labels, and notes for multiple documents simultaneously; supports multi-select highlighting to scope actions to a subset |
 
 | `load-dialog.tsx` | Load from Drive/Gmail dialog — two-phase scan→add flow with source toggle (Drive/Gmail), options (days back, ownership, shared drives), doc selection with multi-select highlighting, labels, notes; shows error count for unresolved Gmail emails |

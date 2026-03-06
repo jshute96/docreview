@@ -38,40 +38,58 @@ function errorMessageForCode(code: string): string {
   }
 }
 
-export interface AddDocContentHandle {
+export interface DocFormHandle {
   reset: () => void;
 }
 
-interface AddDocContentProps {
+interface DocFormProps {
   onSuccess: (doc: DocWithLabels) => void;
+  // If fixedDocId is provided, we skip URL validation and show the fixed doc title
+  fixedDocId?: string;
+  fixedTitle?: string;
+  fixedMimeType?: string | null;
+  // For URL mode
   initialUrl?: string;
   onUrlChange?: () => void;
   onExistingChange?: (isExisting: boolean) => void;
+  // Custom API endpoint (defaults to /api/docs/add)
+  apiEndpoint?: string;
+  // Render prop for buttons
   buttons: (args: {
-    handleAdd: () => Promise<DocWithLabels | null>;
-    adding: boolean;
+    handleAction: () => Promise<DocWithLabels | null>;
+    processing: boolean;
     isValid: boolean;
     isExisting: boolean;
     existingDocId: string | null;
   }) => ReactNode;
 }
 
-export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>(
-  function AddDocContent({ onSuccess, initialUrl, onUrlChange, onExistingChange, buttons }, ref) {
+export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
+  function DocForm({
+    onSuccess,
+    fixedDocId,
+    fixedTitle,
+    fixedMimeType,
+    initialUrl,
+    onUrlChange,
+    onExistingChange,
+    apiEndpoint = "/api/docs/add",
+    buttons
+  }, ref) {
     const { allLabels } = useLabels();
     const [url, setUrl] = useState(initialUrl ?? "");
     const [validationState, setValidationState] =
-      useState<ValidationState>("idle");
+      useState<ValidationState>(fixedDocId ? "valid" : "idle");
     const [validationError, setValidationError] = useState<string | null>(null);
-    const [validTitle, setValidTitle] = useState<string | null>(null);
-    const [validMimeType, setValidMimeType] = useState<string | null>(null);
-    const [existingDocId, setExistingDocId] = useState<string | null>(null);
+    const [validTitle, setValidTitle] = useState<string | null>(fixedTitle ?? null);
+    const [validMimeType, setValidMimeType] = useState<string | null>(fixedMimeType ?? null);
+    const [existingDocId, setExistingDocId] = useState<string | null>(fixedDocId ?? null);
     const [isExisting, setIsExisting] = useState(false);
     const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
     const [notes, setNotes] = useState("");
     const [isStarred, setIsStarred] = useState(false);
     const [addToInbox, setAddAsActive] = useState(true);
-    const [adding, setAdding] = useState(false);
+    const [processing, setProcessing] = useState(false);
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const abortRef = useRef<AbortController | null>(null);
@@ -87,17 +105,17 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
 
     function resetForm() {
       setUrl("");
-      setValidationState("idle");
+      setValidationState(fixedDocId ? "valid" : "idle");
       setValidationError(null);
-      setValidTitle(null);
-      setValidMimeType(null);
-      setExistingDocId(null);
+      setValidTitle(fixedTitle ?? null);
+      setValidMimeType(fixedMimeType ?? null);
+      setExistingDocId(fixedDocId ?? null);
       setIsExisting(false);
       setSelectedLabelIds([]);
       setIsStarred(false);
       setNotes("");
       setAddAsActive(true);
-      setAdding(false);
+      setProcessing(false);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (abortRef.current) abortRef.current.abort();
     }
@@ -185,29 +203,29 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
       }
     }, [initialUrl]);
 
-    async function handleAdd(): Promise<DocWithLabels | null> {
-      setAdding(true);
+    async function handleAction(): Promise<DocWithLabels | null> {
+      setProcessing(true);
       try {
-        const res = await apiFetch("/api/docs/add", {
+        const res = await apiFetch(apiEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            url,
+            url: fixedDocId ? undefined : url,
             labelIds: selectedLabelIds,
             isStarred,
             notes,
             status: addToInbox ? "INBOX" : "ARCHIVED",
           }),
         });
-        if (!res.ok) throw new Error("Add failed");
+        if (!res.ok) throw new Error("Action failed");
         const newDoc: DocWithLabels = await res.json();
         onSuccess(newDoc);
         return newDoc;
       } catch (err) {
-        if (!isAuthError(err)) toast.error(isExisting ? "Failed to update document" : "Failed to add document");
+        if (!isAuthError(err)) toast.error("Operation failed");
         return null;
       } finally {
-        setAdding(false);
+        setProcessing(false);
       }
     }
 
@@ -233,8 +251,13 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
     }
 
     return (
-      <>
-        <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
+        {fixedDocId ? (
+          <div className="flex items-center gap-1.5 text-sm font-medium text-zinc-900 line-clamp-1">
+            <DocTypeIcon mimeType={validMimeType} className="h-4 w-4 flex-shrink-0" />
+            {validTitle}
+          </div>
+        ) : (
           <div>
             <div className="flex items-center gap-2">
               <input
@@ -283,50 +306,50 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
               </div>
             )}
           </div>
+        )}
 
-          <LabelPicker
-            selectedLabelIds={selectedLabelIds}
-            onToggle={toggleLabel}
-            prefix={<StarButton starred={isStarred} onToggle={() => setIsStarred(!isStarred)} />}
+        <LabelPicker
+          selectedLabelIds={selectedLabelIds}
+          onToggle={toggleLabel}
+          prefix={<StarButton starred={isStarred} onToggle={() => setIsStarred(!isStarred)} />}
+        />
+
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-zinc-900 uppercase tracking-wide">
+            Notes
+          </label>
+          <textarea
+            ref={notesRef}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Add notes..."
+            rows={1}
+            className={`${TEXTAREA_CLASSES} w-full max-h-[200px]`}
           />
+        </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-900 uppercase tracking-wide">
-              Notes
-            </label>
-            <textarea
-              ref={notesRef}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add notes..."
-              rows={1}
-              className={`${TEXTAREA_CLASSES} w-full max-h-[200px]`}
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="add-to-inbox"
-              checked={addToInbox}
-              onCheckedChange={(checked) => setAddAsActive(checked === true)}
-            />
-            <label
-              htmlFor="add-to-inbox"
-              className="text-sm text-zinc-700 "
-            >
-              Add to Inbox
-            </label>
-          </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="doc-form-inbox"
+            checked={addToInbox}
+            onCheckedChange={(checked) => setAddAsActive(checked === true)}
+          />
+          <label
+            htmlFor="doc-form-inbox"
+            className="text-sm text-zinc-700 "
+          >
+            Add to Inbox
+          </label>
         </div>
 
         {buttons({
-          handleAdd,
-          adding,
+          handleAction,
+          processing,
           isValid: validationState === "valid",
           isExisting,
           existingDocId,
         })}
-      </>
+      </div>
     );
   }
 );

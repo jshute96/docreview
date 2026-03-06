@@ -50,11 +50,11 @@ Three event types, defined as `CrossTabEvent`:
 
 | Type | Payload | Meaning |
 |------|---------|---------|
-| `docs` | `docId?` | A document was added, updated, archived, or deleted. Optional `docId` identifies the specific doc. |
+| `docs` | `docIds?` | A document was added, updated, archived, or deleted. Optional `docIds` identifies the specific doc(s). |
 | `labels` | _(none)_ | Labels were created, deleted, reordered, or recolored. |
 | `comments` | `docId` (required) | Comments on a specific document changed (synced, replied, resolved, archived). |
 
-The `docId` field on `docs` events is optional because some operations affect multiple documents (bulk edit, load from Drive, full refresh) and don't target a single doc.
+The `docIds` field on `docs` events is optional because some operations affect multiple documents (bulk edit, load from Drive, full refresh) and don't target specific docs.
 
 ## Wire Format
 
@@ -80,15 +80,17 @@ broadcastChange({ type: "docs", docId: doc.docId }, contextId);
 ### Broadcast Call Sites
 
 **`docs` events:**
-| Source | docId? | Trigger |
-|--------|--------|---------|
+| Source | docIds? | Trigger |
+|--------|---------|---------|
 | `refresh-button.tsx` | no | Refresh / Full Refresh / Refresh from Gmail |
 | `load-dialog.tsx` | no | Add docs from Drive scan |
 | `bulk-edit-dialog.tsx` | no | Bulk edit labels/role/status/notes |
 | `doc-row.tsx` | yes | Archive / unarchive from doc list |
 | `doc-detail.tsx` | yes | Archive / unarchive from detail page |
+| `doc-detail.tsx` | yes | Delete & re-add document |
 | `add-doc-dialog.tsx` | yes | Add doc via dialog in doc list |
 | `add-doc-page-client.tsx` | yes | Add doc via standalone page |
+
 
 **`labels` events:**
 | Source | Trigger |
@@ -115,7 +117,7 @@ Three components listen via `useCrossTabListener`:
 ### doc-detail.tsx (comment detail page)
 - **Handler:** `handleCrossTab`
 - **Responds to:** selectively by event type
-- **`docs` event:** If `docId` is present and doesn't match this page's doc, the event is **ignored**. Otherwise, refetches the doc and labels in parallel.
+- **`docs` event:** If `docIds` is present and doesn't match this page's doc, the event is **ignored**. Otherwise, refetches the doc and labels in parallel.
 - **`labels` event:** Always refetches the doc and labels in parallel.
 - **`comments` event:** Only acts if `docId` matches this page's doc. Refetches the doc, threads, and content. Events for other docs are **ignored**.
 

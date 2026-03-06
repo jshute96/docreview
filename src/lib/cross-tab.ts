@@ -5,7 +5,7 @@ import { useEffect, useRef, useLayoutEffect } from "react";
 const CHANNEL_NAME = "docreview-sync";
 
 export type CrossTabEvent =
-  | { type: "docs"; docId?: string }
+  | { type: "docs"; docIds?: string[] }
   | { type: "labels" }
   | { type: "comments"; docId: string };
 
@@ -44,7 +44,11 @@ export type CrossTabReceivedEvent = CrossTabEvent & { fromContextId?: string };
 /** Build a reason string for server logging from a received cross-tab event. */
 export function crossTabReason(event: CrossTabReceivedEvent, receiver: string): string {
   let payload = event.type as string;
-  if ("docId" in event && event.docId) payload += ` docId=${event.docId}`;
+  if ("docId" in event && event.docId) {
+    payload += ` docId=${event.docId}`;
+  } else if ("docIds" in event && event.docIds) {
+    payload += ` docIds=[${event.docIds.join(", ")}]`;
+  }
   const from = event.fromContextId ? ` from ${event.fromContextId}` : "";
   return `${receiver} got notification${from}: ${payload}`;
 }

@@ -13,9 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { broadcastChange } from "@/lib/cross-tab";
 import {
-  AddDocContent,
-  type AddDocContentHandle,
-} from "@/components/add-doc-content";
+  DocForm,
+  type DocFormHandle,
+} from "@/components/add-doc-form";
 
 interface AddDocDialogProps {
   onDocAdded: (doc: DocWithLabels) => void;
@@ -28,7 +28,7 @@ export function AddDocDialog({
 }: AddDocDialogProps) {
   const [open, setOpen] = useState(false);
   const [dialogExisting, setDialogExisting] = useState(false);
-  const contentRef = useRef<AddDocContentHandle>(null);
+  const contentRef = useRef<DocFormHandle>(null);
   const handleExistingChange = useCallback((v: boolean) => setDialogExisting(v), []);
 
   return (
@@ -56,17 +56,17 @@ export function AddDocDialog({
 
         <div className="flex-1 overflow-y-auto min-h-0">
           <div className="p-6 pt-4">
-            <AddDocContent
+            <DocForm
               ref={contentRef}
               onExistingChange={handleExistingChange}
               onSuccess={(newDoc) => {
                 const wasExisting = dialogExisting;
                 onDocAdded(newDoc);
                 setOpen(false);
-                broadcastChange({ type: "docs", docId: newDoc.docId });
+                broadcastChange({ type: "docs", docIds: [newDoc.docId] });
                 toast.success(`${wasExisting ? "Updated" : "Added"} "${newDoc.title}"`);
               }}
-              buttons={({ handleAdd, adding, isValid, isExisting, existingDocId }) => (
+              buttons={({ handleAction, processing, isValid, isExisting, existingDocId }) => (
                 <div className="mt-4 flex gap-2 justify-end">
                   {isExisting && existingDocId && (
                     <Button
@@ -82,20 +82,20 @@ export function AddDocDialog({
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={!isValid || adding}
-                    onClick={handleAdd}
+                    disabled={!isValid || processing}
+                    onClick={handleAction}
                     title={isExisting ? "Update the document in your list" : "Add the document to your list"}
                   >
-                    {adding
+                    {processing
                       ? (isExisting ? "Updating\u2026" : "Adding\u2026")
                       : (isExisting ? "Update" : "Add")}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={!isValid || adding}
+                    disabled={!isValid || processing}
                     onClick={async () => {
-                      const doc = await handleAdd();
+                      const doc = await handleAction();
                       if (doc) window.open(`/comments/${doc.docId}`, "_blank");
                     }}
                     title={isExisting ? "Update the document and open its comments page" : "Add the document and open its comments page"}

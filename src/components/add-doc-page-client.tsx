@@ -10,9 +10,9 @@ import { LabelProvider } from "@/contexts/label-context";
 import { broadcastChange, useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
 import { apiFetch } from "@/lib/api-fetch";
 import {
-  AddDocContent,
-  type AddDocContentHandle,
-} from "@/components/add-doc-content";
+  DocForm,
+  type DocFormHandle,
+} from "@/components/add-doc-form";
 
 interface AddDocPageClientProps {
   initialLabels: Label[];
@@ -31,7 +31,7 @@ export function AddDocPageClient({
   initialUrl,
 }: AddDocPageClientProps) {
   const [labels, setLabels] = useState<Label[]>(initialLabels);
-  const contentRef = useRef<AddDocContentHandle>(null);
+  const contentRef = useRef<DocFormHandle>(null);
   const [lastAdded, setLastAdded] = useState<LastAdded | null>(null);
   const pageExistingRef = useRef(false);
   const handleExistingChange = useCallback((v: boolean) => { pageExistingRef.current = v; }, []);
@@ -54,7 +54,7 @@ export function AddDocPageClient({
     const wasExisting = pageExistingRef.current;
     contentRef.current?.reset();
     setLastAdded({ docId: doc.docId, title: doc.title, mimeType: doc.mimeType, wasExisting });
-    broadcastChange({ type: "docs", docId: doc.docId });
+    broadcastChange({ type: "docs", docIds: [doc.docId] });
     toast.success(`${wasExisting ? "Updated" : "Added"} "${doc.title}"`);
   }, []);
 
@@ -71,14 +71,14 @@ export function AddDocPageClient({
             onLabelsChange={setLabels}
             onLabelDelete={handleLabelDelete}
           >
-            <AddDocContent
+            <DocForm
               ref={contentRef}
               initialUrl={initialUrl}
               onSuccess={handleSuccess}
               onUrlChange={() => setLastAdded(null)}
               onExistingChange={handleExistingChange}
-              buttons={({ handleAdd, adding, isValid, isExisting, existingDocId }) => (
-                  <div className="mt-6 flex gap-2">
+              buttons={({ handleAction, processing, isValid, isExisting, existingDocId }) => (
+                  <div className="mt-2 flex gap-2 border-t border-zinc-100 pt-6">
                     {isExisting && existingDocId && (
                       <Button
                         variant="outline"
@@ -92,20 +92,20 @@ export function AddDocPageClient({
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={!isValid || adding}
-                      onClick={handleAdd}
+                      disabled={!isValid || processing}
+                      onClick={handleAction}
                       title={isExisting ? "Update the document in your list" : "Add the document to your list"}
                     >
-                      {adding
+                      {processing
                         ? (isExisting ? "Updating\u2026" : "Adding\u2026")
                         : (isExisting ? "Update" : "Add")}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={!isValid || adding}
+                      disabled={!isValid || processing}
                       onClick={async () => {
-                        const doc = await handleAdd();
+                        const doc = await handleAction();
                         if (doc) window.open(`/comments/${doc.docId}`, "_blank");
                       }}
                       title={isExisting ? "Update the document and open its comments page" : "Add the document and open its comments page"}

@@ -9,6 +9,7 @@ import type { CommentThread, SuggestionContent } from "@/lib/google-drive";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { LabelBadge } from "@/components/label-badge";
 import { EditDocDialog } from "@/components/edit-doc-dialog";
+import { DeleteReAddDialog } from "@/components/delete-readd-dialog";
 import { ROLE_COLORS } from "@/lib/role-colors";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
@@ -77,6 +78,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
   const [documentText, setDocumentText] = useState<string | undefined>(undefined);
   const [showUntrackDialog, setShowUntrackDialog] = useState(false);
+  const [showReAddDialog, setShowReAddDialog] = useState(false);
 
   // Derive searchable text from threadMap (author names + all reply content)
   const threadText = useMemo(() => {
@@ -152,7 +154,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
       if (event.type === "docs") {
         // Skip if the event is for a different doc
-        if (event.docId && event.docId !== initialDoc.docId) return;
+        const isTarget = event.docIds?.includes(initialDoc.docId);
+        if (event.docIds && !isTarget) return;
+
         const [labelsRes] = await Promise.all([
           apiFetch("/api/labels", { contextId }),
           refetchDoc(),
@@ -264,7 +268,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithLabels = await res.json();
       setDoc((prev) => ({ ...prev, status: updated.status }));
-      broadcastChange({ type: "docs", docId: doc.docId }, contextId);
+      broadcastChange({ type: "docs", docIds: [doc.docId] }, contextId);
       toast.success(newStatus === "ARCHIVED" ? "Archived" : "Unarchived");
     } catch {
       toast.error("Failed to update status");
@@ -285,7 +289,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithLabels = await res.json();
       setDoc((prev) => ({ ...prev, isStarred: updated.isStarred }));
-      broadcastChange({ type: "docs", docId: doc.docId }, contextId);
+      broadcastChange({ type: "docs", docIds: [doc.docId] }, contextId);
     } catch {
       toast.error("Failed to update star");
     }
@@ -478,13 +482,19 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     try {
       const res = await apiFetch(`/api/docs/${doc.docId}`, { method: "DELETE", contextId });
       if (!res.ok) throw new Error("Failed to delete");
-      broadcastChange({ type: "docs", docId: doc.docId }, contextId);
+      broadcastChange({ type: "docs", docIds: [doc.docId] }, contextId);
       window.close();
       // Some browsers block window.close() — fall back to navigation
       window.location.href = "/docs";
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to untrack document");
     }
+  }
+
+  function handleReAddSuccess(newDoc: DocWithLabels) {
+    const contextId = generateContextId();
+    broadcastChange({ type: "docs", docIds: [doc.docId, newDoc.docId] }, contextId);
+    window.location.href = `/comments/${newDoc.docId}`;
   }
 
   useEffect(() => {
@@ -566,8 +576,13 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => setShowUntrackDialog(true)} title="Remove this document from the database">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Untrack this doc
+                <span className="absolute left-2 flex h-4 w-4 items-center justify-center">
+                  <Trash2 className="h-4 w-4" />
+                </span>
+                <span className="pl-6">Untrack this doc</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem inset onSelect={() => setShowReAddDialog(true)} title="Remove this document from the database, then re-add it">
+                Delete & re-add
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -767,6 +782,15 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
         </div>
       )}
     </div>
+
+    <DeleteReAddDialog
+      open={showReAddDialog}
+      onOpenChange={setShowReAddDialog}
+      docId={doc.docId}
+      docTitle={doc.title}
+      mimeType={doc.mimeType}
+      onSuccess={handleReAddSuccess}
+    />
 
     <AlertDialog open={showUntrackDialog} onOpenChange={setShowUntrackDialog}>
       <AlertDialogContent>

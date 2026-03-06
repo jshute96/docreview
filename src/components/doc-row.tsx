@@ -42,7 +42,7 @@ export function DocRow({
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithLabels = await res.json();
       onUpdate(updated);
-      broadcastChange({ type: "docs", docId: doc.docId }, contextId);
+      broadcastChange({ type: "docs", docIds: [doc.docId] }, contextId);
       toast.success(newStatus === "ARCHIVED" ? "Archived" : "Unarchived");
     } catch {
       toast.error("Failed to update status");
@@ -63,7 +63,7 @@ export function DocRow({
       if (!res.ok) throw new Error("Failed");
       const updated: DocWithLabels = await res.json();
       onUpdate(updated);
-      broadcastChange({ type: "docs", docId: doc.docId }, contextId);
+      broadcastChange({ type: "docs", docIds: [doc.docId] }, contextId);
     } catch {
       toast.error("Failed to update star");
     }
