@@ -3,6 +3,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { listRecentDocs, fetchDocsByIds, getDriveClient, getChangesStartPageToken, listChanges, invalidGrantResponse } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
+import { executeFullRefresh } from "@/lib/refresh";
 import { getStatus, updateDriveChangesToken } from "@/lib/status";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 import { parseLoadOptions } from "@/lib/load-options";
@@ -79,6 +80,23 @@ export async function POST(req: NextRequest) {
   }
 
   logInfo(`[Sync] Starting ${mode} sync`);
+  if (mode === "full-refresh") {
+    try {
+      const result = await executeFullRefresh(userId, userEmail);
+      const response = {
+        ...result,
+        mode: "full-refresh" as const,
+        total: result.updated + result.added
+      };
+      return NextResponse.json(response);
+    } catch (err) {
+      const reauth = invalidGrantResponse(err);
+      if (reauth) return reauth;
+      logError("[Sync] Full refresh error:", err);
+      return NextResponse.json({ error: "Full refresh failed" }, { status: 502 });
+    }
+  }
+
   if (mode === "load") {
     logInfo(`[Sync] Load options: source=${source}, daysBack=${daysBack}, ownership=${ownership}, includeSharedDrives=${includeSharedDrives}${selectedSet ? `, ${selectedSet.size} docs selected` : ""}`);
   }
@@ -156,9 +174,9 @@ export async function POST(req: NextRequest) {
   for (const doc of driveDocs) {
     const isExisting = existingDocIds.has(doc.googleDocId);
 
-    // Refresh/full-refresh: auto-add new docs I authored; skip others.
+    // Refresh: auto-add new docs I authored; skip others.
     // Shared-with-me docs arrive via gmail-refresh notifications instead.
-    if ((mode === "refresh" || mode === "full-refresh") && !isExisting && doc.role !== "AUTHOR") {
+    if (mode === "refresh" && !isExisting && doc.role !== "AUTHOR") {
       logInfo(`[Sync]   SKIP "${doc.title}" — new ${doc.role} doc (${mode} only auto-adds AUTHOR docs)`);
       continue;
     }
@@ -233,7 +251,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Handle deletions detected by changes.list (refresh/full-refresh)
+  // Handle deletions detected by changes.list (refresh)
   if (deletedDocIds.size > 0) {
     logInfo(`[Sync] Processing ${deletedDocIds.size} deletions from changes.list`);
     const docsToDelete = await prisma.doc.findMany({
@@ -250,21 +268,15 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Note: deletion detection for existing docs is handled by refresh/full-refresh
-  // modes (via changes.list). Load mode only processes the specific docs the user
+  // Note: deletion detection for existing docs is handled by refresh
+  // mode (via changes.list). Load mode only processes the specific docs the user
   // selected, so there's no meaningful "missing from results" set to check.
 
-  // Sync comments: full-refresh syncs ALL docs (including previously deleted
-  // ones, so they can recover if a 403 was temporary); refresh syncs only
-  // changed docs; load syncs docs returned by Drive
-  const commentDocs = mode === "full-refresh"
-    ? await prisma.doc.findMany({
-        where: { userId },
-      })
-    : await prisma.doc.findMany({
-        where: { userId, isDeleted: false, googleDocId: { in: [...driveDocIds] } },
-      });
-  logInfo(`[Sync] Syncing comments for ${commentDocs.length} docs (${mode === "full-refresh" ? "all docs" : "changed docs only"})`);
+  // Sync comments: refresh syncs only changed docs; load syncs docs returned by Drive
+  const commentDocs = await prisma.doc.findMany({
+    where: { userId, isDeleted: false, googleDocId: { in: [...driveDocIds] } },
+  });
+  logInfo(`[Sync] Syncing comments for ${commentDocs.length} docs (${mode === "refresh" ? "changed docs only" : "selected docs"})`);
   const syncResults = await Promise.all(
     commentDocs.map((doc) => syncComments(doc, driveAuth, userEmail))
   );

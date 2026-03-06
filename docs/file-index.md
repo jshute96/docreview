@@ -19,7 +19,7 @@ One-line descriptions of every source file, grouped by layer.
 | File | Description |
 |------|-------------|
 | `auth/[...nextauth]/route.ts` | NextAuth catch-all handler (GET+POST) |
-| `docs/route.ts` | `GET` list docs (with filters); `POST` refresh/full-refresh/load sync from Drive (load accepts selectedGoogleDocIds, labelIds, notes) |
+| `docs/route.ts` | `GET` list docs (with filters); `POST` refresh/full-refresh/load sync from Drive (full-refresh is exhaustive; load accepts selectedGoogleDocIds, labelIds, notes) |
 | `docs/gmail-refresh/route.ts` | `POST` incremental Gmail refresh — scans Gmail since last timestamp, upserts docs, syncs comments, unarchives ARCHIVED docs with new activity, detects deletions (legacy; superseded by `/api/docs/refresh`) |
 | `docs/refresh-selected/route.ts` | `POST` refresh metadata and comments for a specific set of documents (no Drive/Gmail scan) |
 | `docs/refresh/route.ts` | `POST` combined refresh — accepts `{ sources: ["drive", "gmail"] }`, runs parallel discovery, merges results, upserts, syncs comments; defaults to both sources |
@@ -105,7 +105,7 @@ Shadcn/ui components:
 | `api-fetch.ts` | Client-side `apiFetch()` wrapper — intercepts 401 (expired Google token), shows deduplicated reauth toast, throws `ApiAuthError`; `isAuthError()` helper for catch blocks |
 | `google-drive.ts` | Google Drive/Docs API client — OAuth2 with token refresh, `invalidGrantResponse()` for API routes, changes feed (`changes.list`/`getStartPageToken`), file listing, `fetchDocsByIds` (batch metadata fetch by ID), comment fetching, `fetchAllThreads` (bulk thread fetch), `fetchDocContent` (combined document text + suggestion extraction in one Docs API call), thread detail, reply/resolve; OAuth2 client also used by Gmail scanner |
 | `gmail.ts` | Gmail notification scanner — `scanGmailForDocIds(userId, since)` queries Gmail for doc sharing/comment emails after a `Date`, extracts doc IDs from body (no Drive calls); `scanGmailNotifications` wraps it with Drive metadata fetch; filters by `internalDate` for timestamp-level precision |
-| `refresh.ts` | Combined refresh engine — `executeRefresh(userId, email, sources)` runs parallel Drive+Gmail discovery, merges results; `refreshSelectedDocs(userId, email, docIds)` handles targeted refreshes; both use shared `upsertDocsAndSyncComments` helper |
+| `refresh.ts` | Combined refresh engine — `executeRefresh(userId, email, sources)` runs parallel Drive+Gmail discovery; `executeFullRefresh(userId, email)` and `refreshSelectedDocs(userId, email, docIds)` run exhaustive syncs via shared `refreshGoogleDocIds` helper |
 | `auth-utils.ts` | Centralized authentication helpers for Server Components and API routes |
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates/deletes DB records, computes unarchive signals |
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |

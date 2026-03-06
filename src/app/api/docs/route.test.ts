@@ -178,7 +178,7 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds query
       .mockResolvedValueOnce([]); // activeDocs for comment sync (scoped to fetched docs)
-    mockDoc.upsert.mockResolvedValue({});
+    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
@@ -217,7 +217,7 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([]); // activeDocs for comment sync
-    mockDoc.upsert.mockResolvedValue({});
+    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
@@ -252,8 +252,8 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    // Drive returns one doc (g1), but DB has two non-deleted docs (g1, g2)
-    mockListRecentDocs.mockResolvedValue([
+    // Drive returns metadata for both docs
+    mockFetchDocsByIds.mockResolvedValue([
       {
         googleDocId: "g1",
         title: "Doc One",
@@ -263,59 +263,50 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
         owner: "Owner",
-
+      },
+      {
+        googleDocId: "g2",
+        title: "Doc Two",
+        driveUrl: "https://docs.google.com/document/d/g2/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "AUTHOR" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: new Date("2024-05-01"),
+        owner: "Owner",
       },
     ]);
 
     const dbDoc1 = { docId: "d1", googleDocId: "g1" };
     const dbDoc2 = { docId: "d2", googleDocId: "g2" };
     mockDoc.findMany
-      .mockResolvedValueOnce([{ googleDocId: "g1" }, { googleDocId: "g2" }]) // existingDocIds
-      .mockResolvedValueOnce([dbDoc1, dbDoc2]); // activeDocs for comment sync (all non-deleted)
-    mockDoc.upsert.mockResolvedValue({});
+      .mockResolvedValueOnce([dbDoc1, dbDoc2]) // executeFullRefresh: fetch all non-deleted docs
+      .mockResolvedValueOnce([dbDoc1, dbDoc2]) // refreshGoogleDocIds: fetch all docs to check existingDocIds
+    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequest("full-refresh"));
     const data = await res.json();
     expect(data.mode).toBe("full-refresh");
-    expect(data.updated).toBe(1); // g1 updated, g2 not in Drive results so not upserted
-    expect(data.added).toBe(0); // g1 already existed in DB
-    // Full-refresh uses incremental timestamp
-    expect(mockGetStatus).toHaveBeenCalledWith("u1");
-    // Comment sync called for both docs (full-refresh syncs all)
+    expect(data.updated).toBe(2); // Both docs updated
+    expect(data.added).toBe(0);
     expect(mockSyncComments).toHaveBeenCalledTimes(2);
   });
 
-  it("full-refresh mode auto-adds new AUTHOR docs", async () => {
+  it("full-refresh mode does NOT auto-add new docs (scan removed)", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
-      {
-        googleDocId: "g1",
-        title: "My New Doc",
-        driveUrl: "https://docs.google.com/document/d/g1/edit",
-        mimeType: "application/vnd.google-apps.document",
-        role: "AUTHOR" as const,
-        lastModifiedInDrive: new Date("2024-06-01"),
-        createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
-
-      },
-    ]);
 
     mockDoc.findMany
-      .mockResolvedValueOnce([]) // existingDocIds — g1 not in DB
-      .mockResolvedValueOnce([]); // activeDocs for comment sync (all non-deleted)
-    mockDoc.upsert.mockResolvedValue({});
-    mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
+      .mockResolvedValueOnce([]) // executeFullRefresh: dbDocs (empty)
 
     const res = await POST(postRequest("full-refresh"));
     const data = await res.json();
     expect(data.mode).toBe("full-refresh");
-    expect(data.added).toBe(1);
-    expect(mockDoc.upsert).toHaveBeenCalledTimes(1);
+    expect(data.added).toBe(0);
+    expect(mockFetchDocsByIds).not.toHaveBeenCalled();
   });
+
 
   it("refresh mode auto-adds new AUTHOR docs", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
@@ -338,7 +329,7 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds — g1 not in DB
       .mockResolvedValueOnce([]); // activeDocs for comment sync
-    mockDoc.upsert.mockResolvedValue({});
+    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequest("refresh"));
@@ -401,7 +392,7 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([archivedDoc]); // activeDocs for comment sync
-    mockDoc.upsert.mockResolvedValue({});
+    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
     mockDoc.update.mockResolvedValue({});
     mockSyncComments.mockResolvedValue({ created: 1, shouldUnarchive: true, hasNonResolveActivity: true });
 
@@ -439,7 +430,7 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([archivedDoc]); // activeDocs for comment sync
-    mockDoc.upsert.mockResolvedValue({});
+    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
@@ -476,7 +467,7 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([dbDoc]); // activeDocs for comment sync
-    mockDoc.upsert.mockResolvedValue({});
+    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
     // syncComments reports a transient error (e.g. 429 rate limit)
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false, transientError: true });
 
@@ -507,7 +498,7 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([dbDoc]); // activeDocs for comment sync
-    mockDoc.upsert.mockResolvedValue({});
+    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequest("refresh"));
@@ -537,7 +528,7 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
       .mockResolvedValueOnce([]); // commentDocs
-    mockDoc.upsert.mockResolvedValue({});
+    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
@@ -584,7 +575,7 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
       .mockResolvedValueOnce([]); // commentDocs
-    mockDoc.upsert.mockResolvedValue({});
+    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
@@ -623,7 +614,7 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
       .mockResolvedValueOnce([]); // commentDocs
-    mockDoc.upsert.mockResolvedValue({});
+    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
@@ -801,7 +792,7 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
       .mockResolvedValueOnce([]); // commentDocs
-    mockDoc.upsert.mockResolvedValue({});
+    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false });
 
     const res = await POST(postRequestWithBody("load", {
@@ -836,7 +827,7 @@ describe("POST /api/docs", () => {
     mockDoc.findMany
       .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
       .mockResolvedValueOnce([archivedDoc]); // activeDocs for comment sync
-    mockDoc.upsert.mockResolvedValue({});
+    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
     // shouldUnarchive is true but hasNonResolveActivity is false (resolve-only)
     mockSyncComments.mockResolvedValue({ created: 0, shouldUnarchive: true, hasNonResolveActivity: false });
 

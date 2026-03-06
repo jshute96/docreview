@@ -400,7 +400,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
               <DropdownMenuItem
                 onSelect={handleFullRefresh}
                 disabled={refreshing !== null}
-                title="Perform a deep scan of all tracked documents"
+                title="Refresh metadata and comments for all documents in the database"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${refreshing === "full" ? "animate-spin" : ""}`} />
                 Full refresh

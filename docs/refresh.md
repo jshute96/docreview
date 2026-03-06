@@ -8,7 +8,7 @@ There are four sync modes, triggered from different UI paths:
 |------|---------|---------------|--------------------|--------------------|
 | **Load** | Load dialog ([`load-dialog.md`](./load-dialog.md)) | `files.get` per selected doc | None (handled by Refresh) | Selected docs |
 | **Refresh** | "Refresh" button | Drive `changes.list` + Gmail scan (parallel) | Drive changes feed + `findDeletedDocIds` for Gmail-only | Changed/discovered docs |
-| **Full Refresh** | "Full Refresh" hamburger item | `changes.list` — incremental | Built into changes feed | All docs (including deleted) |
+| **Full Refresh** | "Full Refresh" hamburger item | `fetchDocsByIds` for all docs | `findDeletedDocIds` for all docs | All docs in DB |
 | **Source Refresh** | "Refresh from Drive/Gmail" hamburger items | Drive or Gmail only | Same as Refresh, for active source | Changed/discovered docs |
 | **Refresh Selected** | "Refresh selected" hamburger item | `fetchDocsByIds` for filtered set | `findDeletedDocIds` for filtered set | Filtered docs |
 
@@ -16,10 +16,13 @@ There are four sync modes, triggered from different UI paths:
 engine in `src/lib/refresh.ts`. It scans both Drive and Gmail in parallel by default.
 The hamburger menu offers source-specific refreshes (Drive-only or Gmail-only) via the
 same endpoint with `{ sources: ["drive"] }` or `{ sources: ["gmail"] }`.
-**Refresh Selected** uses `POST /api/docs/refresh-selected` which refreshes only the
-documents currently selected by the UI filters.
 
-**Load** and **Full Refresh** still use `POST /api/docs?mode=...`.
+**Full Refresh** and **Refresh Selected** use a unified exhaustive path that bypasses the
+incremental changes feed and establishes no tokens. They perform direct metadata fetches
+(`fetchDocsByIds`) for a specific set of documents (all non-deleted docs or the UI-filtered
+set) and use `findDeletedDocIds` to prune documents that are no longer accessible in Drive.
+
+**Load** still uses `POST /api/docs?mode=load`.
  Per-doc refresh
 (detail page) is separate — see below.
 
@@ -121,13 +124,19 @@ partially handled.
 **Drive call:** `files.get` for each doc ID the user selected in the Load dialog.
 Only the selected docs are fetched — no broad listing.
 
-### Refresh / Full Refresh: `changes.list` (incremental)
+### Refresh / Full Refresh: from the changes feed
 
-**Drive call:** `changes.list` with the saved page token. Returns changed, deleted, and
+Standard **Refresh** uses `changes.list` with the saved page token. Returns changed, deleted, and
 trashed files since the token was issued.
 
 If no saved token exists, or the token has expired, falls back to bootstrap behavior
 (see Token Lifecycle above).
+
+**Full Refresh** (since March 2026) skips the changes feed and instead performs an
+exhaustive metadata fetch for all tracked document IDs in the database via `fetchDocsByIds`.
+This ensures that any docs missed by the incremental changes feed (e.g., due to Drive API
+edge cases) are eventually synchronized.
+
 
 ### Role detection (both paths)
 
@@ -160,11 +169,18 @@ For each file Drive returns:
 
 ## Phase 2 — Deletion Detection
 
-### Refresh / Full Refresh: from the changes feed
+### Refresh / Source Refresh: from the changes feed
 
 `changes.list` naturally reports deletions. A change with `removed: true` or
 `file.trashed: true` is a deletion. The handler looks up matching non-deleted docs in the DB
 and marks them `isDeleted: true`. No extra API calls needed.
+
+### Full Refresh / Refresh Selected: manual detection
+
+These modes perform exhaustive `fetchDocsByIds` calls. If a document ID known to the
+database is *not* returned in the metadata results, the system performs a final verification
+via `findDeletedDocIds` (which checks for 404/403 responses on direct file gets). This
+ensures the database stays in sync even when the changes feed is bypassed.
 
 ### Load mode: no deletion detection
 
@@ -193,7 +209,8 @@ the per-doc Refresh runs it for a single doc.
 |------|----------------------------|
 | Load | Non-deleted selected docs |
 | Refresh | Non-deleted docs returned by `changes.list` (changed docs only) |
-| Full Refresh | All docs in the DB (including deleted ones, so they can recover from temporary 403 errors) |
+| Full Refresh | All non-deleted docs in the DB |
+| Refresh Selected | All non-deleted docs in the UI-filtered set |
 
 **Why not gate on file `modifiedTime`:** Drive does not update a file's `modifiedTime` when
 comments change, so we cannot use it as a signal.
