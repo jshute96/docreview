@@ -11,8 +11,10 @@ import {
 import { scanGmailForDocIds } from "@/lib/gmail";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "@/lib/status";
-import { logError, logWarning, logInfo } from "@/lib/log";
+import { logError, logWarning, logInfo, logToFile } from "@/lib/log";
 import { formatDate } from "@/lib/utils";
+
+const DEBUG_FILE = "drive-changes-debug.log";
 
 export type RefreshSource = "drive" | "gmail";
 
@@ -58,6 +60,8 @@ export async function executeRefresh(
       const savedToken = status?.driveChangesPageToken;
       if (savedToken) {
         logInfo("[Refresh] Drive: using changes.list with saved token");
+        logToFile(DEBUG_FILE, "-------------------------------------");
+        logToFile(DEBUG_FILE, "Starting changes.list sync");
         try {
           const result = await listChanges(userId, savedToken);
           driveDocs = result.docs;
@@ -65,22 +69,29 @@ export async function executeRefresh(
           newPageToken = result.newPageToken;
           logInfo(`[Refresh] Drive: ${driveDocs.length} changed docs, ${deletedDocIds.size} deletions`);
           driveSucceeded = true;
+          logToFile(DEBUG_FILE, `Ended changes.list sync: ${driveDocs.length} docs, ${deletedDocIds.size} deleted`);
         } catch (err: unknown) {
           const code = (err as { code?: number | string })?.code;
           if (code === 404 || code === "404") {
             logWarning("[Refresh] Drive: changes.list token expired, falling back to 7-day files.list");
+            logToFile(DEBUG_FILE, "Token expired, falling back to files.list");
             newPageToken = await getChangesStartPageToken(userId);
             driveDocs = await listRecentDocs(userId);
             driveSucceeded = true;
+            logToFile(DEBUG_FILE, `Ended files.list sync (fallback): ${driveDocs.length} docs`);
           } else {
+            logToFile(DEBUG_FILE, "Ended changes.list sync with error", { error: err });
             throw err;
           }
         }
       } else {
         logInfo("[Refresh] Drive: no saved token, bootstrapping (7-day files.list)");
+        logToFile(DEBUG_FILE, "-------------------------------------");
+        logToFile(DEBUG_FILE, "Starting files.list sync (bootstrap)");
         newPageToken = await getChangesStartPageToken(userId);
         driveDocs = await listRecentDocs(userId);
         driveSucceeded = true;
+        logToFile(DEBUG_FILE, `Ended files.list sync (bootstrap): ${driveDocs.length} docs`);
       }
     })());
   }
@@ -145,6 +156,7 @@ export async function executeRefresh(
     // Drive-only new non-AUTHOR docs: skip (shared docs arrive via Gmail)
     if (!fromGmail && !isExisting && doc.role !== "AUTHOR") {
       logInfo(`[Refresh]   SKIP "${doc.title}" — new ${doc.role} doc (Drive-only, not AUTHOR)`);
+      logToFile(DEBUG_FILE, `OUTCOME: SKIP: "${doc.title}" (ID: ${doc.googleDocId}) — new REVIEWER doc (not in Gmail)`);
       continue;
     }
 
@@ -176,9 +188,11 @@ export async function executeRefresh(
 
     if (isExisting) {
       logInfo(`[Refresh]   UPDATE "${doc.title}"`);
+      logToFile(DEBUG_FILE, `OUTCOME: UPDATE: "${doc.title}" (ID: ${doc.googleDocId})`);
       updated++;
     } else {
       logInfo(`[Refresh]   ADD "${doc.title}" — ${doc.role} (owner: ${doc.owner ?? "unknown"})${fromGmail ? " [Gmail]" : ""}`);
+      logToFile(DEBUG_FILE, `OUTCOME: ADD: "${doc.title}" (ID: ${doc.googleDocId}) — ${doc.role}${fromGmail ? " [Gmail]" : ""}`);
       added++;
     }
   }
@@ -193,9 +207,10 @@ export async function executeRefresh(
         isDeleted: false,
         googleDocId: { in: [...deletedDocIds] },
       },
-      select: { docId: true },
+      select: { docId: true, googleDocId: true, title: true },
     });
     for (const doc of docsToDelete) {
+      logToFile(DEBUG_FILE, `OUTCOME: DELETE: "${doc.title}" (ID: ${doc.googleDocId})`);
       await prisma.doc.update({ where: { docId: doc.docId }, data: { isDeleted: true } });
       deleted++;
     }
