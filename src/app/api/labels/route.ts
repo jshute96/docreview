@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
 
   const labels = await prisma.label.findMany({
     where: { userId },
+    include: { _count: { select: { docs: true } } },
     orderBy: { position: "asc" },
   });
 
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
   try {
     const label = await prisma.label.create({
       data: { userId, name: name.trim(), color: color ?? null },
+      include: { _count: { select: { docs: true } } },
     });
     return NextResponse.json(label, { status: 201 });
   } catch (err) {

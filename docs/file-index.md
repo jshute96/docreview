@@ -33,8 +33,8 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/[docId]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (INBOX/ARCHIVED/MUTED), read state, or star |
 | `docs/[docId]/threads/route.ts` | `GET` fetch thread(s) from Drive; `POST` refresh a single thread (updates DB) |
 | `docs/[docId]/threads/reply/route.ts` | `POST` reply to / resolve / reopen a comment thread via Drive API |
-| `labels/route.ts` | `GET` list labels; `POST` create label |
-| `labels/[labelId]/route.ts` | `PATCH` update label color; `DELETE` delete label |
+| `labels/route.ts` | `GET` list labels with document counts; `POST` create label |
+| `labels/[labelId]/route.ts` | `GET` single label with document count; `PATCH` update label color; `DELETE` delete label |
 | `labels/reorder/route.ts` | `PATCH` reorder labels by position |
 
 ## Components (`src/components/`)
@@ -61,7 +61,7 @@ One-line descriptions of every source file, grouped by layer.
 | `tri-state-button.tsx` | Tri-state filter buttons (off/include/exclude) with diagonal strikethrough + slow-click-to-reset; exports `useTriStateCycle` and `DiagonalStrike` |
 | `label-badge.tsx` | Colored label pill with optional remove button |
 | `label-picker.tsx` | Label selection grid for add/edit dialogs |
-| `manage-labels-dialog.tsx` | Dialog to create/delete/reorder/recolor labels with pointer-based drag reorder |
+| `manage-labels-dialog.tsx` | Dialog to create/delete/reorder/recolor labels with pointer-based drag reorder; includes delete confirmation with usage count and hover tooltips |
 | `color-picker.tsx` | Popover color grid for label color selection |
 | `dialog-buttons.tsx` | Reusable Save/Cancel button pair for dialogs |
 | `friendly-date.tsx` | `<FriendlyDate>` — renders relative timestamps: time-only (today), weekday + time (<6d), date (older); full timestamp on hover |
@@ -127,7 +127,7 @@ Shadcn/ui components:
 
 | File | Description |
 |------|-------------|
-| `types/index.ts` | `DocWithLabels`, `DocWithComments` types + NextAuth session augmentation |
+| `types/index.ts` | `DocWithLabels`, `DocWithComments`, `LabelWithCount` types + NextAuth session augmentation |
 | `test-utils.ts` | `suppressingErrors()` — wraps test blocks to suppress expected console.error output |
 
 ## Schema & Config

@@ -3,6 +3,31 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { runWithRequestId } from "@/lib/request-context";
 
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ labelId: string }> }
+) {
+  return runWithRequestId("GET", _req, async () => {
+  const session = await getValidSession();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.id;
+  const { labelId } = await params;
+
+  const label = await prisma.label.findUnique({
+    where: { labelId },
+    include: { _count: { select: { docs: true } } },
+  });
+
+  if (!label || label.userId !== userId) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(label);
+  });
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ labelId: string }> }

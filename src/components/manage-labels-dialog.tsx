@@ -11,12 +11,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { ColorPicker, PRIMARY_COLORS } from "@/components/color-picker";
 import { DialogButtons } from "@/components/dialog-buttons";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId } from "@/lib/api-fetch";
 import { useLabels } from "@/contexts/label-context";
+import type { LabelWithCount } from "@/types";
 
 function randomPrimaryColor(): string {
   return PRIMARY_COLORS[Math.floor(Math.random() * PRIMARY_COLORS.length)];
@@ -35,11 +46,14 @@ export function ManageLabelsDialog({
   const [saving, setSaving] = useState(false);
 
   // Buffered local state — only committed on Save
-  const [draft, setDraft] = useState<Label[]>([]);
+  const [draft, setDraft] = useState<LabelWithCount[]>([]);
   const nextTempId = useRef(0);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [colorChanges, setColorChanges] = useState<Map<string, string>>(new Map());
+
+  // Delete confirmation
+  const [labelToDelete, setLabelToDelete] = useState<LabelWithCount | null>(null);
 
   // Pointer-based drag reorder (no ghost image)
   const dragIndexRef = useRef<number | null>(null);
@@ -109,14 +123,25 @@ export function ManageLabelsDialog({
     setDragActiveIndex(null);
   }, []);
 
-  function handleOpen(isOpen: boolean) {
+  async function handleOpen(isOpen: boolean) {
     if (isOpen) {
-      // Reset draft to current labels
+      // Reset draft to current labels initially
       setDraft([...labels]);
       setAddedIds(new Set());
       setDeletedIds(new Set());
       setColorChanges(new Map());
       setName("");
+
+      // Refresh labels with counts from the server
+      try {
+        const res = await apiFetch("/api/labels");
+        if (res.ok) {
+          const latest: LabelWithCount[] = await res.json();
+          setDraft(latest);
+        }
+      } catch {
+        // Fallback to initial labels if fetch fails
+      }
     }
     setOpen(isOpen);
   }
@@ -130,19 +155,20 @@ export function ManageLabelsDialog({
       return;
     }
     const tempId = `__temp_${nextTempId.current++}`;
-    const newLabel: Label = {
+    const newLabel: LabelWithCount = {
       labelId: tempId,
       userId: "",
       name: trimmed,
       color: randomPrimaryColor(),
       position: draft.length,
+      _count: { docs: 0 },
     };
     setDraft((prev) => [...prev, newLabel]);
     setAddedIds((prev) => new Set(prev).add(tempId));
     setName("");
   }
 
-  function handleColorChange(label: Label, color: string) {
+  function handleColorChange(label: LabelWithCount, color: string) {
     setDraft((prev) =>
       prev.map((l) => (l.labelId === label.labelId ? { ...l, color } : l))
     );
@@ -152,6 +178,14 @@ export function ManageLabelsDialog({
   }
 
   function handleDelete(id: string) {
+    const label = draft.find((l) => l.labelId === id);
+    if (!label) return;
+    setLabelToDelete(label);
+  }
+
+  function confirmDelete() {
+    if (!labelToDelete) return;
+    const id = labelToDelete.labelId;
     setDraft((prev) => prev.filter((l) => l.labelId !== id));
     if (addedIds.has(id)) {
       // Was never persisted — just remove from added set
@@ -169,6 +203,7 @@ export function ManageLabelsDialog({
         return next;
       });
     }
+    setLabelToDelete(null);
   }
 
   function handleCancel() {
@@ -187,7 +222,7 @@ export function ManageLabelsDialog({
       }
 
       // 2. Create new labels
-      const tempToReal = new Map<string, Label>();
+      const tempToReal = new Map<string, LabelWithCount>();
       for (const tempId of addedIds) {
         const tempLabel = draft.find((l) => l.labelId === tempId);
         if (!tempLabel) continue;
@@ -201,7 +236,7 @@ export function ManageLabelsDialog({
           const err = await res.json();
           throw new Error(err.error ?? "Failed to create label");
         }
-        const created: Label = await res.json();
+        const created: LabelWithCount = await res.json();
         tempToReal.set(tempId, created);
       }
 
@@ -282,6 +317,7 @@ export function ManageLabelsDialog({
               <div
                 key={label.labelId}
                 data-label-row
+                title={`Label ${label.name} is attached to ${label._count?.docs ?? 0} documents`}
                 className={`flex items-center justify-between rounded-md px-2 py-1.5 select-none touch-none ${
                   dragActiveIndex === index
                     ? "bg-zinc-100 ring-1 ring-zinc-300 cursor-grabbing"
@@ -328,6 +364,20 @@ export function ManageLabelsDialog({
           />
         </div>
       </DialogContent>
+
+      <AlertDialog open={!!labelToDelete} onOpenChange={(o) => !o && setLabelToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Label {labelToDelete?.name} is attached to {labelToDelete?._count?.docs ?? 0} documents. Delete it?
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Continue</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

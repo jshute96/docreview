@@ -1,5 +1,11 @@
 import type { Doc, Label, DocLabel, Comment } from "@prisma/client";
 
+export type LabelWithCount = Label & {
+  _count?: {
+    docs: number;
+  };
+};
+
 export type DocWithLabels = Doc & {
   labels: (DocLabel & { label: Label })[];
   _count: { unreadComments: number; inboxComments: number; openComments: number };

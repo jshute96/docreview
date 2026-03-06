@@ -6,30 +6,18 @@ P1:
   * I shared with you emails
 * refine gmail flows
 * Remember state/tag for @mentioned on comment, with mine/replied and resolved
-* Status column in comments view: Mine, Replied, Open, Inbox, Muted
-* Main app title in the top level.
 * More decoration - favicon.
-* ergonomics of control placement in comments view
-  - archive at the bottom, etc.
 * Refresh selected docs
 * Cancel API requests and other work on tab close?
 
 Easy:
 * scroll bars for lots of docs
-* Button to open Drive
 * Button for search in Drive (from docs search box)
-* Put filter labels in window title, so I can distinguish multiple windows
-* Confirm screen on deleting label, with a label count (also show in hover)
-* Filter for all resolved.
 * Comments page Doc List button gets a finger icon, other buttons don't.
 
 * Dialog boxes
   * dialog box moves on new vs add
-  * Edit All and Load dialog boxes don't follow my dialog-sizing.md rules and aren't consistent.
-      * Refactor SelectBox widget to use in both
   * Load dialog upper bound of 365 days? and UI weirdness from that.
-  * Multi-select in SelectBox, with remove or "just these".
-  * Deleting multiple labels, the window resizes and moves
 
 * Better handling of docs I don't have permission to (vs deleted)
   * rename `is_deleted` to `in_trash`
@@ -37,12 +25,9 @@ Easy:
   * support adding these from gmail notifications, with fill-in title and notes
   * try flow of adding a doc I am requesting permission to, with notes about what it was
 
-* Star a comment or doc?
 * "No comments on this doc" still shows if we try to load and fail.
 * Make refresh on a doc faster, and probably cheaper, by doing fewer API calls.
-* If someone else resolves my thread, that comment should stay in inbox?
 * Mute state on docs
-* Track what comments I've seen, and show the new ones in a different color
 * keyboard shortcuts
 * consider saving loaded comments
 * consider preloading comments earlier (maybe from docs page too)
@@ -79,7 +64,6 @@ Easy:
   * tooltip display for longer notes
   * editable notes box inline on the comments page?
   * rendering glitch when toggling filters makes scroll bar appear
-  * wrapped dates, tall rows in the main box again
 
 ## gaps
 * no way to get suggestions cheaply or incrementally

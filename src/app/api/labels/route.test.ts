@@ -50,6 +50,7 @@ describe("GET /api/labels", () => {
     expect(data).toEqual(labels);
     expect(mockLabel.findMany).toHaveBeenCalledWith({
       where: { userId: "u1" },
+      include: { _count: { select: { docs: true } } },
       orderBy: { position: "asc" },
     });
   });
@@ -116,6 +117,7 @@ describe("POST /api/labels", () => {
     await POST(makeReq({ name: "  Bug  " }));
     expect(mockLabel.create).toHaveBeenCalledWith({
       data: { userId: "u1", name: "Bug", color: null },
+      include: { _count: { select: { docs: true } } },
     });
   });
 
@@ -126,6 +128,7 @@ describe("POST /api/labels", () => {
     await POST(makeReq({ name: "Bug", color: "#ff0000" }));
     expect(mockLabel.create).toHaveBeenCalledWith({
       data: { userId: "u1", name: "Bug", color: "#ff0000" },
+      include: { _count: { select: { docs: true } } },
     });
   });
 });
