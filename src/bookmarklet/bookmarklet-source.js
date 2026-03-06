@@ -23,14 +23,14 @@
 
   function createIconButton(docId, size, originalUrl) {
     var btn = document.createElement('div');
-    var openUrl = 'http://localhost:3000/open?doc=' + encodeURIComponent(originalUrl || ('https://docs.google.com/open?id=' + docId));
+    var openUrl = '__BASE_URL__/open?doc=' + encodeURIComponent(originalUrl || ('https://docs.google.com/open?id=' + docId));
     
     btn.className = 'dr-link';
     btn.title = 'Open in Docreview';
     btn.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;vertical-align:middle;width:' + (size+4) + 'px;height:' + (size+4) + 'px;margin-right:4px;';
 
     var img = document.createElement('img');
-    img.src = 'http://localhost:3000/docreview.svg';
+    img.src = '__BASE_URL__/docreview.svg';
     img.style.cssText = 'width:' + size + 'px;height:' + size + 'px;border-radius:2px;pointer-events:none;';
     btn.appendChild(img);
 

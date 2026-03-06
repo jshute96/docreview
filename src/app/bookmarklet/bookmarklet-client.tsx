@@ -1,17 +1,23 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { bookmarkletCode } from "@/bookmarklet/bookmarklet-code";
 
 export function BookmarkletClient() {
-  const minified = `javascript:${bookmarkletCode}`;
+  const [minified, setMinified] = useState("");
   const linkRef = useRef<HTMLAnchorElement>(null);
 
   useEffect(() => {
+    // Generate the final JS on the client so we can use window.location.origin
+    const origin = window.location.origin;
+    const finalCode = bookmarkletCode.replace(/__BASE_URL__/g, origin);
+    const jsUrl = `javascript:${finalCode}`;
+    setMinified(jsUrl);
+    
     if (linkRef.current) {
-      linkRef.current.setAttribute("href", minified);
+      linkRef.current.setAttribute("href", jsUrl);
     }
-  }, [minified]);
+  }, []);
 
   return (
     <div className="mx-auto max-w-xl p-8">
@@ -25,12 +31,12 @@ export function BookmarkletClient() {
       <div className="mb-8 flex items-center gap-4 rounded-lg border bg-muted/50 p-6">
         <a
           ref={linkRef}
-          title="Docreview links"
+          title="Add Docreview links"
           className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
           onClick={(e) => e.preventDefault()}
         >
           <img src="/docreview.svg" alt="" className="h-4 w-4 rounded-[2px]" />
-          Docreview links
+          Add Docreview links
         </a>
         <span className="text-sm text-muted-foreground">
           ← Drag this to your bookmarks bar

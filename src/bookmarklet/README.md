@@ -59,6 +59,9 @@ npm run build:bookmarklet
 ```
 (This is also included in the main `npm run build` script).
 
+### Changing the host
+When installed via the `/bookmarklet` page, the bookmarklet **automatically points to the server it was installed from** (using `window.location.origin` at runtime). No manual configuration is required for standard use.
+
 ### Limitations
 - **Manual Activation:** You must click the bookmarklet once per session/refresh.
 - **Browser Security:** Uses a React `ref` bypass to allow `javascript:` URLs in the install UI.
