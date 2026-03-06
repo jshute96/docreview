@@ -719,18 +719,21 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                         <DropdownMenuItem
                           onSelect={handleArchiveAll}
                           disabled={bulkArchiving || !filteredComments.some((c) => c.status === "INBOX")}
+                          title="Archive all visible inbox comments"
                         >
                           {bulkArchiving ? "Archiving..." : "Archive all"}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={handleUnarchiveAll}
                           disabled={bulkUnarchiving || !filteredComments.some((c) => c.status === "ARCHIVED")}
+                          title="Move all visible archived comments back to inbox"
                         >
                           {bulkUnarchiving ? "Unarchiving..." : "Unarchive all"}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={handleMarkAllUnread}
                           disabled={bulkMarkingUnread || !filteredComments.some((c) => c.isRead)}
+                          title="Mark all visible read comments as unread"
                         >
                           {bulkMarkingUnread ? "Marking..." : "Mark all unread"}
                         </DropdownMenuItem>

@@ -10,13 +10,17 @@ There are four sync modes, triggered from different UI paths:
 | **Refresh** | "Refresh" button | Drive `changes.list` + Gmail scan (parallel) | Drive changes feed + `findDeletedDocIds` for Gmail-only | Changed/discovered docs |
 | **Full Refresh** | "Full Refresh" hamburger item | `changes.list` — incremental | Built into changes feed | All docs (including deleted) |
 | **Source Refresh** | "Refresh from Drive/Gmail" hamburger items | Drive or Gmail only | Same as Refresh, for active source | Changed/discovered docs |
+| **Refresh Selected** | "Refresh selected" hamburger item | `fetchDocsByIds` for filtered set | `findDeletedDocIds` for filtered set | Filtered docs |
 
 **Refresh** (the toolbar button) calls `POST /api/docs/refresh` which runs the combined
 engine in `src/lib/refresh.ts`. It scans both Drive and Gmail in parallel by default.
 The hamburger menu offers source-specific refreshes (Drive-only or Gmail-only) via the
 same endpoint with `{ sources: ["drive"] }` or `{ sources: ["gmail"] }`.
+**Refresh Selected** uses `POST /api/docs/refresh-selected` which refreshes only the
+documents currently selected by the UI filters.
 
-**Load** and **Full Refresh** still use `POST /api/docs?mode=...`. Per-doc refresh
+**Load** and **Full Refresh** still use `POST /api/docs?mode=...`.
+ Per-doc refresh
 (detail page) is separate — see below.
 
 ## Per-doc Refresh (detail page)

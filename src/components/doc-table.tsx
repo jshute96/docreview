@@ -187,7 +187,43 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
   }
 
   // Which refresh operation is active (null = idle). Only one can run at a time.
-  const [refreshing, setRefreshing] = useState<"main" | "drive" | "gmail" | "full" | null>(null);
+  const [refreshing, setRefreshing] = useState<"main" | "drive" | "gmail" | "full" | "selected" | null>(null);
+
+  async function handleRefreshSelected() {
+    if (filteredDocs.length === 0) return;
+    setRefreshing("selected");
+    const contextId = generateContextId();
+    try {
+      const docIds = filteredDocs.map((d) => d.docId);
+      const syncRes = await apiFetch("/api/docs/refresh-selected", {
+        method: "POST",
+        contextId,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ docIds }),
+      });
+      if (!syncRes.ok) throw new Error("Refresh failed");
+      const data = await syncRes.json();
+
+      const docsRes = await apiFetch("/api/docs?includeArchived=true", { contextId });
+      if (!docsRes.ok) throw new Error("Failed to reload docs");
+      const newDocs: DocWithLabels[] = await docsRes.json();
+
+      setDocs(newDocs);
+      broadcastChange({ type: "docs" }, contextId);
+
+      const parts = [
+        data.updated > 0 ? `${data.updated} updated` : "",
+        data.deleted > 0 ? `${data.deleted} deleted` : "",
+        data.unarchived > 0 ? `${data.unarchived} unarchived` : "",
+      ].filter(Boolean).join(", ");
+      const errorSuffix = data.errorCount > 0 ? ` (${data.errorCount} errors)` : "";
+      toast.success(`Refresh complete — ${parts || "no updates"}${errorSuffix}`, { duration: 8000 });
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to refresh selected docs");
+    } finally {
+      setRefreshing(null);
+    }
+  }
 
   async function handleFullRefresh() {
     setRefreshing("full");
@@ -339,6 +375,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
               <DropdownMenuItem
                 onSelect={() => handleSourceRefresh(["drive"])}
                 disabled={refreshing !== null}
+                title="Scan Google Drive for recent document changes"
               >
                 {refreshing === "drive" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <HardDriveDownload className="h-4 w-4 mr-2" />}
                 Refresh from Drive
@@ -346,21 +383,32 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
               <DropdownMenuItem
                 onSelect={() => handleSourceRefresh(["gmail"])}
                 disabled={refreshing !== null}
+                title="Scan Gmail for new document notifications"
               >
                 {refreshing === "gmail" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
                 Refresh from Gmail
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
+                onSelect={handleRefreshSelected}
+                disabled={refreshing !== null || filteredDocs.length === 0}
+                title="Refresh metadata and comments for currently displayed documents"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing === "selected" ? "animate-spin" : ""}`} />
+                Refresh selected
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 onSelect={handleFullRefresh}
                 disabled={refreshing !== null}
+                title="Perform a deep scan of all tracked documents"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${refreshing === "full" ? "animate-spin" : ""}`} />
-                Full Refresh
+                Full refresh
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={() => window.open("/add", "_blank")}
+                title="Open the standalone document import page"
               >
                 <span className="h-4 w-4 mr-2" />
                 Add doc page
@@ -369,6 +417,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
               <DropdownMenuItem
                 onSelect={() => signOut({ callbackUrl: "/login" })}
                 disabled={isOffline}
+                title="Sign out of your account"
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign out

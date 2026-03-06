@@ -7,7 +7,6 @@ P1:
 * refine gmail flows
 * Remember state/tag for @mentioned on comment, with mine/replied and resolved
 * More decoration - favicon.
-* Refresh selected docs
 * Cancel API requests and other work on tab close?
 
 Easy:
