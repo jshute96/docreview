@@ -9,6 +9,7 @@ import { DocTypeIcon } from "@/components/doc-type-icon";
 import { LabelProvider } from "@/contexts/label-context";
 import { broadcastChange, useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
 import { apiFetch } from "@/lib/api-fetch";
+import { useRouter } from "next/navigation";
 import {
   DocForm,
   type DocFormHandle,
@@ -30,6 +31,7 @@ export function AddDocPageClient({
   initialLabels,
   initialUrl,
 }: AddDocPageClientProps) {
+  const router = useRouter();
   const [labels, setLabels] = useState<Label[]>(initialLabels);
   const contentRef = useRef<DocFormHandle>(null);
   const [lastAdded, setLastAdded] = useState<LastAdded | null>(null);
@@ -83,7 +85,7 @@ export function AddDocPageClient({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => window.open(`/comments/${existingDocId}`, "_blank")}
+                        onClick={() => router.push(`/comments/${existingDocId}`)}
                         title="Open the document's comments page"
                       >
                         Open
@@ -106,7 +108,7 @@ export function AddDocPageClient({
                       disabled={!isValid || processing}
                       onClick={async () => {
                         const doc = await handleAction();
-                        if (doc) window.open(`/comments/${doc.docId}`, "_blank");
+                        if (doc) router.push(`/comments/${doc.docId}`);
                       }}
                       title={isExisting ? "Update the document and open its comments page" : "Add the document and open its comments page"}
                     >
