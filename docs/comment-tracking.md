@@ -84,8 +84,8 @@ individually (with no-op detection to skip unchanged records).
 
 **No-op detection:** Before writing an update, each comment's Drive-side fields are compared
 against the existing record. If nothing changed, the update is skipped entirely. This avoids
-unnecessary writes and makes the "N updated" log count accurate. Date fields are compared
-via `.getTime()` with null-handling.
+unnecessary writes and makes the granular log counts (e.g., "3 updated comment threads") accurate.
+Date fields are compared via `.getTime()` with null-handling.
 
 **@-mention in new reply**: If any new reply mentions the current user (via
 `mentionedEmailAddresses`), the comment moves to `INBOX` — even if it was `MUTED`. This

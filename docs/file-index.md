@@ -37,16 +37,18 @@ One-line descriptions of every source file, grouped by layer.
 |------|-------------|
 | `auth/[...nextauth]/route.ts` | NextAuth catch-all handler (GET+POST) |
 | `docs/route.ts` | `GET` list docs (with filters); `POST` refresh/full-refresh/load sync from Drive (full-refresh is exhaustive; load accepts selectedGoogleDocIds, labelIds, notes) |
-| `docs/gmail-refresh/route.ts` | `POST` incremental Gmail refresh — scans Gmail since last timestamp, upserts docs, syncs comments, unarchives ARCHIVED docs with new activity, detects deletions (legacy; superseded by `/api/docs/refresh`) |
+| `docs/gmail-refresh/route.ts` | `POST` incremental Gmail refresh — scans Gmail since last timestamp, performs upsert and sync via shared logic in `refresh.ts` |
+| `docs/gmail-refresh/route.test.ts` | Tests for incremental Gmail refresh flow, deletion detection, and timestamp updates |
 | `docs/refresh-selected/route.ts` | `POST` refresh metadata and comments for a specific set of documents (no Drive/Gmail scan) |
-| `docs/refresh/route.ts` | `POST` combined refresh — accepts `{ sources: ["drive", "gmail"] }`, runs parallel discovery, merges results, upserts, syncs comments; defaults to both sources |
+| `docs/refresh/route.ts` | `POST` combined refresh — accepts `{ sources: ["drive", "gmail"] }`, runs parallel discovery, merges results, upserts, syncs comments via shared logic in `refresh.ts` |
 | `docs/scan/route.ts` | `POST` scan Drive or Gmail for documents without modifying DB — branches on `source` field, returns total, existing count, and new doc list |
 | `docs/add/route.ts` | `POST` add or update a doc by URL — validates via Drive; creates DB record + syncs comments for new docs, updates labels/notes/status/star for existing docs |
 | `docs/validate/route.ts` | `GET` validate a Google Drive URL — checks access, mime type, returns metadata; for existing docs returns `existing: true` with labels, notes, status, star |
 | `docs/bulk-update/route.ts` | `PATCH` bulk update multiple docs — optimized role/star/label/notes updates with no-op protection |
 | `docs/[docId]/route.ts` | `GET` single doc; `PATCH` update role/status/star/labels |
 | `docs/[docId]/re-add/route.ts` | `POST` transactional delete and re-add document |
-| `docs/[docId]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata then syncs comments |
+| `docs/[docId]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata and syncs comments via shared logic in `refresh.ts` |
+| `docs/[docId]/refresh/route.test.ts` | Tests for single-doc metadata refresh and comment sync |
 | `docs/[docId]/comments/route.ts` | `GET` fetch all comment threads from Drive (fast path — Drive `comments.list` only) |
 | `docs/[docId]/content/route.ts` | `GET` fetch document text and suggestion content (slow path — Docs API `documents.get` or Drive `files.export`); for Docs, uses a single `SUGGESTIONS_INLINE` call for both |
 | `docs/[docId]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (INBOX/ARCHIVED/MUTED), read state, or star |

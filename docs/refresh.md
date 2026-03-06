@@ -282,9 +282,9 @@ with its comments array. `DocDetail` calls `setDoc(updated)` and `setComments(up
 directly, so the title, owner, and modified date in the header also reflect the latest Drive
 data without a page reload.
 
-The main POST response includes summary counts (`added`, `updated`, `deleted`, `comments`)
-which are shown in a toast: e.g., "Sync complete — 2 new, 1 updated". If nothing changed,
-the toast reads "no updates".
+The main POST response includes summary counts (`added`, `updated`, `deleted`, `unarchived`,
+`commentsCreated`, `commentsUpdated`, `suggestionsCreated`, `suggestionsUpdated`,
+`skipNotAuthor`) which are used for logging and debugging.
 
 ---
 
@@ -330,29 +330,28 @@ know the service is healthy and can safely advance the token.
 ## Server Logging
 
 The sync handler and comment sync engine log structured messages at each stage. All log lines
-use a `[Sync]` or `[Comments]` prefix for easy filtering. Sample output for a typical
-Refresh:
+use a `[Refresh]` or `[Comments]` prefix for easy filtering (previously `[Sync]`). Log messages
+handle singular/plural forms correctly (e.g., "1 doc" vs "0 docs").
+
+Sample output for a typical Refresh:
 
 ```
-[Sync] Starting refresh sync
-[Sync] refresh: using changes.list with saved token
+[Refresh] Starting refresh (sources: drive, gmail)
+[Refresh] Drive: using changes.list with saved token
 [Drive] changes.list (page abc123…) → 5 changes (142ms)
-[Sync] changes.list → 3 changed docs, 1 deletions
-[Sync] Doc found: Project Spec (abc123)
-[Sync] Doc found: Meeting Notes (def456)
-[Sync] Doc found: Design Doc (ghi789)
-[Sync] Processing 1 deletions from changes.list
-[Sync] Syncing comments for 3 docs (changed docs only)
+[Refresh] Ended changes.list sync: 3 changed docs, 1 total deletions reported by Drive
+[Refresh] Syncing comments for 3 docs
 [Drive] comments.list abc123 (since all) → 12 comments (87ms)
 [Docs] documents.get abc123 → 2 suggestions (134ms)
-[Comments] abc123: 12 comments from Drive, 1 new, 3 updated, 0 deleted; 2 suggestions (0 new, 0 updated, 0 resolved)
+[Comments] abc123: 12 comments from Drive (1 new, 3 updated, 0 deleted); 2 suggestions (0 new, 1 updated, 0 resolved)
 [Drive] comments.list def456 (since all) → 3 comments (45ms)
-[Comments] def456: 3 from Drive, 0 new, 0 updated, 0 deleted
+[Comments] def456: 3 from Drive (0 new, 0 updated, 0 deleted)
 [Drive] comments.list ghi789 (since all) → 8 comments (62ms)
 [Docs] documents.get ghi789 → 0 suggestions (98ms)
-[Comments] ghi789: 8 comments from Drive, 2 new, 1 updated, 1 deleted; 0 suggestions (0 new, 0 updated, 1 resolved) → unarchive
-[Sync] Saving changes token for future refreshes
-[Sync] refresh complete in 892ms: 0 added, 3 updated, 1 deleted, 1 unarchived, 3 comments synced
+[Comments] ghi789: 8 comments from Drive (2 new, 1 updated, 1 deleted); 0 suggestions (0 new, 1 updated, 1 resolved) → unarchive
+[Refresh] Drive: 1 of 1 deletions were tracked docs
+[Refresh] Saving changes token for future refreshes
+[Refresh] Complete in 892ms: 0 docs added, 3 docs updated, 1 doc deleted, 1 doc unarchived, 3 new comment threads, 4 updated comment threads, 2 new suggestions, 1 updated suggestion, 45 docs skipped (not author) (0 errors)
 ```
 
 Key state transitions are logged:
@@ -363,11 +362,13 @@ Key state transitions are logged:
 | `using changes.list with saved token` | Normal incremental refresh via changes feed |
 | `changes.list token expired, falling back to bootstrap` | Saved token was too old; re-bootstrapping |
 | `Load (drive): fetching metadata for N docs by ID` | Load mode fetching selected docs |
-| `Processing N deletions from changes.list` | Deletions detected in the changes feed |
+| `Ended changes.list sync: N changed docs, M total deletions` | Results from Drive changes feed |
+| `Drive: X of Y deletions were tracked docs` | How many Drive-reported deletions affected our DB |
 | `Saving changes token for future refreshes` | Token update after successful sync |
 | `Load complete, initializing changes token` | Load mode establishing baseline for future Refresh |
-| `Transient errors during comment sync, skipping token update` | Token preserved due to partial failure |
+| `Sync issues (errors: N), skipping timestamp update` | Gmail/Sync error prevented advancing the scan window |
 | `→ unarchive` suffix on comment sync line | Doc will be moved from ARCHIVED back to INBOX |
+| `N docs skipped (not author)` | Count of new discovered docs that were skipped because the user isn't the owner |
 
 ---
 

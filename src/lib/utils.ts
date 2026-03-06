@@ -73,3 +73,9 @@ export function formatDateFriendly(d: Date | string | null, now?: number): { tex
 
   return { text, tooltip };
 }
+
+/** Simple pluralization: pluralize(count, "apple") -> "1 apple", "2 apples", "0 apples". */
+export function pluralize(count: number, singular: string, plural?: string): string {
+  const p = plural ?? `${singular}s`;
+  return `${count} ${count === 1 ? singular : p}`;
+}

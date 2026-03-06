@@ -5,9 +5,9 @@ import { fetchDocsByIds, findDeletedDocIds, getDriveClient, invalidGrantResponse
 import { scanGmailNotifications } from "@/lib/gmail";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
-import { syncComments } from "@/lib/sync-comments";
+import { handleMissingGmailDocs, upsertDocsAndSyncComments } from "@/lib/refresh";
 import { getStatus, updateGmailTimestamp } from "@/lib/status";
-import { formatDate } from "@/lib/utils";
+import { formatDate, pluralize } from "@/lib/utils";
 
 const DEFAULT_DAYS_BACK = 7;
 
@@ -31,21 +31,21 @@ export async function POST(req: NextRequest) {
     logInfo(`[GmailRefresh] Scanning since ${formatDate(since)}`);
 
     // Scan Gmail for doc notifications
-    const { docs: gmailDocs, errorCount, skipCount } = await scanGmailNotifications(userId, since);
+    const { docs: gmailDocs, errorCount: scannerErrorCount, skipCount } = await scanGmailNotifications(userId, since);
     if (gmailDocs.length === 0) {
-      logInfo(`[GmailRefresh] No docs found in Gmail (${errorCount} errors, ${skipCount} skipped)`);
+      logInfo(`[GmailRefresh] No docs found in Gmail (${scannerErrorCount} errors, ${skipCount} skipped)`);
       // Only update timestamp if there were no actual errors
-      if (errorCount === 0) {
+      if (scannerErrorCount === 0) {
         await updateGmailTimestamp(userId, new Date());
       }
-      return NextResponse.json({ added: 0, updated: 0, deleted: 0, unarchived: 0, errorCount, comments: 0 });
+      return NextResponse.json({ added: 0, updated: 0, deleted: 0, unarchived: 0, errorCount: scannerErrorCount, comments: 0 });
     }
 
     // Fetch full Drive metadata for discovered docs
     const docIds = [...new Set(gmailDocs.map((d) => d.googleDocId))];
-    logInfo(`[GmailRefresh] Fetching Drive metadata for ${docIds.length} docs`);
+    logInfo(`[GmailRefresh] Fetching Drive metadata for ${docIds.length} docs from Gmail`);
     const driveDocs = await fetchDocsByIds(userId, docIds);
-    const driveAuth = await getDriveClient(userId);
+    const gmailDocIdSet = new Set(gmailDocs.map(d => d.googleDocId));
 
     // Pre-fetch existing doc IDs to distinguish adds from updates
     const existingDocIds = new Set(
@@ -55,122 +55,48 @@ export async function POST(req: NextRequest) {
       })).map((d) => d.googleDocId)
     );
 
-    let added = 0;
-    let updated = 0;
-    let deleted = 0;
-
-    // Upsert each doc returned by Drive
-    for (const doc of driveDocs) {
-      const isExisting = existingDocIds.has(doc.googleDocId);
-
-      await prisma.doc.upsert({
-        where: { userId_googleDocId: { userId, googleDocId: doc.googleDocId } },
-        create: {
-          userId,
-          googleDocId: doc.googleDocId,
-          title: doc.title,
-          driveUrl: doc.driveUrl,
-          mimeType: doc.mimeType,
-          role: doc.role,
-          lastModifiedInDrive: doc.lastModifiedInDrive,
-          owner: doc.owner,
-          createdTimeInDrive: doc.createdTimeInDrive,
-          status: "INBOX",
-        },
-        update: {
-          title: doc.title,
-          driveUrl: doc.driveUrl,
-          mimeType: doc.mimeType,
-          lastModifiedInDrive: doc.lastModifiedInDrive,
-          owner: doc.owner,
-          createdTimeInDrive: doc.createdTimeInDrive,
-          isDeleted: false,
-        },
-      });
-
-      if (isExisting) {
-        logInfo(`[GmailRefresh]   UPDATE "${doc.title}"`);
-        updated++;
-      } else {
-        logInfo(`[GmailRefresh]   ADD "${doc.title}" — ${doc.role} (owner: ${doc.owner ?? "unknown"})`);
-        added++;
-      }
-    }
+    // Use shared logic for upsert and comment sync
+    const syncRes = await upsertDocsAndSyncComments(userId, userEmail, driveDocs, {
+      existingDocIds,
+      fromGmailDocIdSet: gmailDocIdSet,
+      mode: "refresh"
+    });
 
     // Detect deletions: scan doc IDs found in Gmail but not returned by fetchDocsByIds
     const returnedIds = new Set(driveDocs.map((d) => d.googleDocId));
-    const missingIds = docIds.filter((id) => !returnedIds.has(id) && existingDocIds.has(id));
-    if (missingIds.length > 0) {
-      logInfo(`[GmailRefresh] Checking ${missingIds.length} missing docs for deletion`);
-      const deletedIds = await findDeletedDocIds(userId, missingIds);
-      for (const id of deletedIds) {
-        await prisma.doc.updateMany({
-          where: { userId, googleDocId: id },
-          data: { isDeleted: true },
-        });
-        deleted++;
-      }
-    }
+    const extraDeleted = await handleMissingGmailDocs(userId, docIds, returnedIds, existingDocIds);
 
-    // Sync comments for upserted docs
-    const upsertedDocs = await prisma.doc.findMany({
-      where: { userId, isDeleted: false, googleDocId: { in: [...returnedIds] } },
-    });
-    logInfo(`[GmailRefresh] Syncing comments for ${upsertedDocs.length} docs`);
-    const syncResults = await Promise.all(
-      upsertedDocs.map((doc) => syncComments(doc, driveAuth, userEmail))
-    );
-    const comments = syncResults.reduce((sum, r) => sum + r.created, 0);
+    const totalDeleted = syncRes.deleted + extraDeleted;
+    const totalErrorCount = scannerErrorCount + syncRes.errorCount;
 
-    // Unarchive ARCHIVED docs with new activity, handle deletions from syncComments
-    let unarchived = 0;
-    for (let i = 0; i < upsertedDocs.length; i++) {
-      const res = syncResults[i];
-      if (res.isDeleted) {
-        await prisma.doc.update({ where: { docId: upsertedDocs[i].docId }, data: { isDeleted: true } });
-        deleted++;
-        continue;
-      }
-      if (upsertedDocs[i].status === "ARCHIVED" && res.shouldUnarchive && res.hasNonResolveActivity) {
-        await prisma.doc.update({ where: { docId: upsertedDocs[i].docId }, data: { status: "INBOX" } });
-        unarchived++;
-      }
-    }
-
-    // --- Save tokens ---
-    // Safety: if *every* doc failed (transient, permission denied, or deleted),
-    // something systemic may be wrong — skip the timestamp update so the next
-    // refresh retries from the same point.  See refresh.ts for the full rationale.
-    const transientErrors = syncResults
-      .map((r, i) => r.transientError ? upsertedDocs[i].googleDocId : null)
-      .filter((id): id is string => id !== null);
-
-    const permissionErrors = syncResults
-      .map((r, i) => r.permissionDenied ? upsertedDocs[i].googleDocId : null)
-      .filter((id): id is string => id !== null);
-
-    const successCount = syncResults.filter(r => !r.transientError && !r.permissionDenied && !r.isDeleted).length;
-    const allFailed = upsertedDocs.length > 0 && successCount === 0;
-
-    if (permissionErrors.length > 0) {
-      logInfo(`[GmailRefresh] Comment access denied for ${permissionErrors.length} docs (skipped): ${permissionErrors.join(", ")}`);
-    }
-
-    // Update timestamp for next incremental scan only if not all failed and no transient errors
-    if (!allFailed && transientErrors.length === 0 && errorCount === 0) {
+    // Update timestamp for next incremental scan only if no errors occurred
+    // We check both scanner errors and sync/fetch errors (transient errors in syncRes)
+    if (totalErrorCount === 0 && syncRes.successCount === syncRes.totalAttempted) {
       await updateGmailTimestamp(userId, new Date());
     } else {
-      if (allFailed) {
-        logWarning(`[GmailRefresh] All ${upsertedDocs.length} document fetches failed, skipping timestamp update for safety`);
-      } else {
-        logWarning(`[GmailRefresh] Sync issues (transient: ${transientErrors.length}, scanner: ${errorCount}), skipping timestamp update`);
-      }
+      logWarning(`[GmailRefresh] Sync issues (errors: ${totalErrorCount}), skipping timestamp update`);
     }
 
     const elapsed = Date.now() - t0;
-    const totalErrors = errorCount + transientErrors.length;
-    logInfo(`[GmailRefresh] Complete in ${elapsed}ms: ${added} added, ${updated} updated, ${deleted} deleted, ${unarchived} unarchived, ${comments} comments (${totalErrors} errors)`);
-    return NextResponse.json({ added, updated, deleted, unarchived, errorCount: totalErrors, comments });
+    const counts = [
+      pluralize(syncRes.added, "doc") + " added",
+      pluralize(syncRes.updated, "doc") + " updated",
+      pluralize(totalDeleted, "doc") + " deleted",
+      pluralize(syncRes.unarchived, "doc") + " unarchived",
+    ];
+    const commentStr = `${pluralize(syncRes.commentsCreated, "new comment thread")}, ${pluralize(syncRes.commentsUpdated, "updated comment thread")}`;
+    const suggestionStr = syncRes.suggestionsCreated > 0 || syncRes.suggestionsUpdated > 0
+      ? `, ${pluralize(syncRes.suggestionsCreated, "new suggestion")}, ${pluralize(syncRes.suggestionsUpdated, "updated suggestion")}`
+      : "";
+    logInfo(`[GmailRefresh] Complete in ${elapsed}ms: ${counts.join(", ")}, ${commentStr}${suggestionStr} (${pluralize(totalErrorCount, "error")})`);
+    
+    return NextResponse.json({
+      ...syncRes,
+      deleted: totalDeleted,
+      errorCount: totalErrorCount,
+      // Backward compatibility
+      comments: syncRes.commentsCreated + syncRes.suggestionsCreated
+    });
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;

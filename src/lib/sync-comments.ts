@@ -20,7 +20,11 @@ export async function syncComments(
   driveAuth: Awaited<ReturnType<typeof getDriveClient>>,
   userEmail?: string
 ): Promise<{
-  created: number;
+  commentsCreated: number;
+  commentsUpdated: number;
+  suggestionsCreated: number;
+  suggestionsUpdated: number;
+  suggestionsResolved: number;
   shouldUnarchive: boolean;
   hasNonResolveActivity: boolean;
   isDeleted?: boolean;
@@ -34,14 +38,26 @@ export async function syncComments(
     const code = err.code;
     if (code === 404) {
       logWarning(`[Comments] doc ${doc.googleDocId} not found (code 404)`);
-      return { created: 0, shouldUnarchive: false, hasNonResolveActivity: false, isDeleted: true };
+      return {
+        commentsCreated: 0, commentsUpdated: 0,
+        suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
+        shouldUnarchive: false, hasNonResolveActivity: false, isDeleted: true
+      };
     }
     if (code === 403) {
       logWarning(`[Comments] permission denied for ${doc.googleDocId} (code 403)`);
-      return { created: 0, shouldUnarchive: false, hasNonResolveActivity: false, permissionDenied: true };
+      return {
+        commentsCreated: 0, commentsUpdated: 0,
+        suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
+        shouldUnarchive: false, hasNonResolveActivity: false, permissionDenied: true
+      };
     }
     logError(`[Comments] failed for ${doc.googleDocId}:`, err);
-    return { created: 0, shouldUnarchive: false, hasNonResolveActivity: false, transientError: true };
+    return {
+      commentsCreated: 0, commentsUpdated: 0,
+      suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
+      shouldUnarchive: false, hasNonResolveActivity: false, transientError: true
+    };
   }
 
   // All Drive API results are regular comments. Suggestions come exclusively from Docs API.
@@ -271,20 +287,46 @@ export async function syncComments(
   });
 
   if (doc.mimeType !== DOCS_MIME_TYPE) {
-    logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated, ${deleted} deleted${shouldUnarchive ? " → unarchive" : ""}`);
-    return { created, shouldUnarchive, hasNonResolveActivity };
+    logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive (${created} new, ${updatedCount} updated, ${deleted} deleted)${shouldUnarchive ? " → unarchive" : ""}`);
+    return {
+      commentsCreated: created,
+      commentsUpdated: updatedCount,
+      suggestionsCreated: 0,
+      suggestionsUpdated: 0,
+      suggestionsResolved: 0,
+      shouldUnarchive,
+      hasNonResolveActivity
+    };
   }
 
   // If the Docs API fetch failed, skip suggestion sync entirely — we can't
   // tell which suggestions are still live, so resolving absent ones would be wrong.
   if (suggestionFetchFailed) {
-    logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated (suggestions skipped: fetch failed)`);
-    return { created, shouldUnarchive, hasNonResolveActivity, transientError: true };
+    logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive (${created} new, ${updatedCount} updated) (suggestions skipped: fetch failed)`);
+    return {
+      commentsCreated: created,
+      commentsUpdated: updatedCount,
+      suggestionsCreated: 0,
+      suggestionsUpdated: 0,
+      suggestionsResolved: 0,
+      shouldUnarchive,
+      hasNonResolveActivity,
+      transientError: true
+    };
   }
 
   if (suggestionPermissionDenied) {
-    logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive, ${created} new, ${updatedCount} updated (suggestions skipped: permission denied)`);
-    return { created, shouldUnarchive, hasNonResolveActivity, permissionDenied: true };
+    logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive (${created} new, ${updatedCount} updated) (suggestions skipped: permission denied)`);
+    return {
+      commentsCreated: created,
+      commentsUpdated: updatedCount,
+      suggestionsCreated: 0,
+      suggestionsUpdated: 0,
+      suggestionsResolved: 0,
+      shouldUnarchive,
+      hasNonResolveActivity,
+      permissionDenied: true
+    };
   }
 
   // Docs API sync: ensures ALL pending suggestions are tracked.
@@ -345,7 +387,15 @@ export async function syncComments(
     }
   }
 
-  const totalCreated = created + suggestionsToCreate.length;
-  logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} comments from Drive, ${totalCreated} new, ${updatedCount} updated, ${deleted} deleted; ${docsSuggestionsForSync.length} suggestions (${suggestionsToCreate.length} new, ${suggestionsUpdated} updated, ${suggestionsResolved} resolved)${shouldUnarchive ? " → unarchive" : ""}`);
-  return { created: totalCreated, shouldUnarchive, hasNonResolveActivity };
+  const suggestionsCreated = suggestionsToCreate.length;
+  logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} comments from Drive (${created} new, ${updatedCount} updated, ${deleted} deleted); ${docsSuggestionsForSync.length} suggestions (${suggestionsCreated} new, ${suggestionsUpdated} updated, ${suggestionsResolved} resolved)${shouldUnarchive ? " → unarchive" : ""}`);
+  return {
+    commentsCreated: created,
+    commentsUpdated: updatedCount,
+    suggestionsCreated,
+    suggestionsUpdated,
+    suggestionsResolved,
+    shouldUnarchive,
+    hasNonResolveActivity
+  };
 }

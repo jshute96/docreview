@@ -3,6 +3,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { listRecentDocs, fetchDocsByIds, getDriveClient, getChangesStartPageToken, listChanges, invalidGrantResponse } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
+import { pluralize } from "@/lib/utils";
 import { executeFullRefresh } from "@/lib/refresh";
 import { getStatus, updateDriveChangesToken } from "@/lib/status";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
@@ -280,7 +281,10 @@ export async function POST(req: NextRequest) {
   const syncResults = await Promise.all(
     commentDocs.map((doc) => syncComments(doc, driveAuth, userEmail))
   );
-  const comments = syncResults.reduce((sum, r) => sum + r.created, 0);
+  const commentsCreated = syncResults.reduce((sum, r) => sum + r.commentsCreated, 0);
+  const commentsUpdated = syncResults.reduce((sum, r) => sum + r.commentsUpdated, 0);
+  const suggestionsCreated = syncResults.reduce((sum, r) => sum + r.suggestionsCreated, 0);
+  const suggestionsUpdated = syncResults.reduce((sum, r) => sum + r.suggestionsUpdated, 0);
 
   // Unarchive ARCHIVED docs only when syncComments detected meaningful new activity.
   // Also handle newly detected deletions from syncComments results.
@@ -334,7 +338,30 @@ export async function POST(req: NextRequest) {
   }
 
   const elapsed = Date.now() - t0;
-  logInfo(`[Sync] ${mode} complete in ${elapsed}ms: ${added} added, ${updated} updated, ${deleted} deleted, ${unarchived} unarchived, ${comments} comments synced`);
-  return NextResponse.json({ mode, added, updated, deleted, unarchived, total: driveDocs.length, comments });
+  const counts = [
+    pluralize(added, "doc") + " added",
+    pluralize(updated, "doc") + " updated",
+    pluralize(deleted, "doc") + " deleted",
+    pluralize(unarchived, "doc") + " unarchived",
+  ];
+  const commentStr = `${pluralize(commentsCreated, "new comment thread")}, ${pluralize(commentsUpdated, "updated comment thread")}`;
+  const suggestionStr = suggestionsCreated > 0 || suggestionsUpdated > 0
+    ? `, ${pluralize(suggestionsCreated, "new suggestion")}, ${pluralize(suggestionsUpdated, "updated suggestion")}`
+    : "";
+  logInfo(`[Sync] ${mode} complete in ${elapsed}ms: ${counts.join(", ")}, ${commentStr}${suggestionStr}`);
+  return NextResponse.json({
+    mode,
+    added,
+    updated,
+    deleted,
+    unarchived,
+    total: driveDocs.length,
+    commentsCreated,
+    commentsUpdated,
+    suggestionsCreated,
+    suggestionsUpdated,
+    // Backward compatibility
+    comments: commentsCreated + suggestionsCreated
+  });
   });
 }

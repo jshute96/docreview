@@ -98,7 +98,11 @@ describe("syncComments error handling", () => {
     const doc = makeDoc();
 
     const result = await suppressingErrors(() => syncComments(doc, driveAuth));
-    expect(result).toEqual({ created: 0, shouldUnarchive: false, hasNonResolveActivity: false, transientError: true });
+        expect(result).toEqual({
+      commentsCreated: 0, commentsUpdated: 0,
+      suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
+      shouldUnarchive: false, hasNonResolveActivity: false, transientError: true
+    });
   });
 });
 
@@ -111,7 +115,7 @@ describe("syncComments isInteresting logic", () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockFetchComments.mockResolvedValue([driveComment()]);
 
-    const { shouldUnarchive, created } = await syncComments(doc, driveAuth);
+    const { shouldUnarchive, commentsCreated: created } = await syncComments(doc, driveAuth);
     expect(created).toBe(1);
     expect(shouldUnarchive).toBe(true);
   });
@@ -178,7 +182,7 @@ describe("syncComments isInteresting logic", () => {
       driveComment({ replyCount: 3, replyAuthorMeFlags: [false, false, false] }),
     ]);
 
-    const { shouldUnarchive, created } = await syncComments(doc, driveAuth);
+    const { shouldUnarchive, commentsCreated: created } = await syncComments(doc, driveAuth);
     expect(created).toBe(0);
     expect(shouldUnarchive).toBe(true);
   });
@@ -233,8 +237,8 @@ describe("syncComments isInteresting logic", () => {
       { id: "suggest.abc", suggestionType: "EDIT" },
     ]);
 
-    const { shouldUnarchive, created } = await syncComments(doc, driveAuth);
-    expect(created).toBe(1);
+    const { shouldUnarchive, suggestionsCreated } = await syncComments(doc, driveAuth);
+    expect(suggestionsCreated).toBe(1);
     expect(shouldUnarchive).toBe(true);
   });
 
@@ -259,8 +263,8 @@ describe("syncComments isInteresting logic", () => {
       .mockResolvedValueOnce([])  // batch fetch comments
       .mockResolvedValueOnce([{ commentId: "cr1", googleCommentId: "suggest.abc", suggestionType: "DELETE" }]);
 
-    const { shouldUnarchive, created } = await syncComments(doc, driveAuth);
-    expect(created).toBe(0);
+    const { shouldUnarchive, suggestionsCreated } = await syncComments(doc, driveAuth);
+    expect(suggestionsCreated).toBe(0);
     expect(shouldUnarchive).toBe(false);
   });
 });

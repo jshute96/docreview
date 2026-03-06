@@ -12,7 +12,7 @@ import { scanGmailForDocIds } from "@/lib/gmail";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "@/lib/status";
 import { logError, logWarning, logInfo, logToFile } from "@/lib/log";
-import { formatDate } from "@/lib/utils";
+import { formatDate, pluralize } from "@/lib/utils";
 import type { Doc } from "@prisma/client";
 
 const DEBUG_FILE = "drive-changes-debug.log";
@@ -24,8 +24,12 @@ export interface RefreshResult {
   updated: number;
   deleted: number;
   unarchived: number;
-  comments: number;
+  commentsCreated: number;
+  commentsUpdated: number;
+  suggestionsCreated: number;
+  suggestionsUpdated: number;
   errorCount: number;
+  skipNotAuthor?: number;
   // Extra stats for safety checks
   successCount?: number;
   totalAttempted?: number;
@@ -35,7 +39,11 @@ const DEFAULT_GMAIL_DAYS_BACK = 7;
 
 /**
  * Shared logic to update a set of documents from Drive metadata and sync their comments.
- * Returns counts of added, updated, deleted, unarchived, and comments synced.
+ * Supports multiple modes:
+ * - refresh/full-refresh: auto-adds AUTHOR docs, sets INBOX status for relevant activity
+ * - load: manual selection, sets ARCHIVED status for non-AUTHOR docs
+ * - selected: targeted refresh of specific existing docs
+ * Returns counts of added, updated, deleted, unarchived, and comment threads synced.
  */
 export async function upsertDocsAndSyncComments(
   userId: string,
@@ -44,15 +52,17 @@ export async function upsertDocsAndSyncComments(
   options: {
     existingDocIds: Set<string>;
     fromGmailDocIdSet?: Set<string>;
-    mode?: "refresh" | "full-refresh" | "selected";
+    mode?: "refresh" | "full-refresh" | "selected" | "load";
+    docId?: string; // Optional: restrict upsert to a specific docId (for single-doc refresh)
   }
 ): Promise<RefreshResult> {
-  const { existingDocIds, fromGmailDocIdSet = new Set(), mode = "refresh" } = options;
+  const { existingDocIds, fromGmailDocIdSet = new Set(), mode = "refresh", docId } = options;
   const driveAuth = await getDriveClient(userId);
 
   let added = 0;
   let updated = 0;
   let deleted = 0;
+  let skipNotAuthor = 0;
 
   const processedDocs: Doc[] = [];
 
@@ -64,13 +74,15 @@ export async function upsertDocsAndSyncComments(
     // Refresh/full-refresh: auto-add new docs I authored; skip others.
     // Shared docs arrive via Gmail notifications instead.
     if ((mode === "refresh" || mode === "full-refresh") && !isExisting && !fromGmail && doc.role !== "AUTHOR") {
-      logInfo(`[Refresh]   SKIP "${doc.title}" — new ${doc.role} doc (auto-adds only AUTHOR or Gmail docs)`);
       logToFile(DEBUG_FILE, `OUTCOME: SKIP: "${doc.title}" (ID: ${doc.googleDocId}) — new REVIEWER doc (not in Gmail)`);
+      skipNotAuthor++;
       continue;
     }
 
     const result = await prisma.doc.upsert({
-      where: { userId_googleDocId: { userId, googleDocId: doc.googleDocId } },
+      where: docId
+        ? { docId }
+        : { userId_googleDocId: { userId, googleDocId: doc.googleDocId } },
       create: {
         userId,
         googleDocId: doc.googleDocId,
@@ -81,8 +93,12 @@ export async function upsertDocsAndSyncComments(
         lastModifiedInDrive: doc.lastModifiedInDrive,
         owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
-        // Gmail docs always start as INBOX; others use role-based default
-        status: fromGmail ? "INBOX" : (doc.role === "AUTHOR" ? "INBOX" : "ARCHIVED"),
+        // Mode-based status defaults:
+        // - load: ARCHIVED unless I authored it
+        // - refresh/full-refresh/Gmail: INBOX if from Gmail or I authored it; else ARCHIVED
+        status: (mode === "load")
+          ? (doc.role === "AUTHOR" ? "INBOX" : "ARCHIVED")
+          : (fromGmail || doc.role === "AUTHOR" ? "INBOX" : "ARCHIVED"),
       },
       update: {
         title: doc.title,
@@ -98,7 +114,9 @@ export async function upsertDocsAndSyncComments(
     processedDocs.push(result);
 
     if (isExisting) {
-      logInfo(`[Refresh]   UPDATE "${doc.title}"`);
+      if (mode !== "selected") {
+        logInfo(`[Refresh]   UPDATE "${doc.title}"`);
+      }
       logToFile(DEBUG_FILE, `OUTCOME: UPDATE: "${doc.title}" (ID: ${doc.googleDocId})`);
       updated++;
     } else {
@@ -113,7 +131,10 @@ export async function upsertDocsAndSyncComments(
   const syncResults = await Promise.all(
     processedDocs.map((doc) => syncComments(doc, driveAuth, userEmail))
   );
-  const comments = syncResults.reduce((sum, r) => sum + r.created, 0);
+  const commentsCreated = syncResults.reduce((sum, r) => sum + r.commentsCreated, 0);
+  const commentsUpdated = syncResults.reduce((sum, r) => sum + r.commentsUpdated, 0);
+  const suggestionsCreated = syncResults.reduce((sum, r) => sum + r.suggestionsCreated, 0);
+  const suggestionsUpdated = syncResults.reduce((sum, r) => sum + r.suggestionsUpdated, 0);
 
   let unarchived = 0;
   for (let i = 0; i < processedDocs.length; i++) {
@@ -139,10 +160,14 @@ export async function upsertDocsAndSyncComments(
     updated,
     deleted,
     unarchived,
-    comments,
+    commentsCreated,
+    commentsUpdated,
+    suggestionsCreated,
+    suggestionsUpdated,
     errorCount,
     successCount,
-    totalAttempted: processedDocs.length
+    totalAttempted: processedDocs.length,
+    skipNotAuthor
   };
 }
 
@@ -159,7 +184,11 @@ async function refreshGoogleDocIds(
   const t0 = Date.now();
   if (googleDocIds.length === 0) {
     logInfo(`[Refresh] No docs to refresh (${mode})`);
-    return { added: 0, updated: 0, deleted: 0, unarchived: 0, comments: 0, errorCount: 0 };
+    return {
+      added: 0, updated: 0, deleted: 0, unarchived: 0,
+      commentsCreated: 0, commentsUpdated: 0, suggestionsCreated: 0, suggestionsUpdated: 0,
+      errorCount: 0
+    };
   }
 
   logInfo(`[Refresh] Refreshing ${googleDocIds.length} docs (${mode})`);
@@ -206,9 +235,50 @@ async function refreshGoogleDocIds(
 
   const elapsed = Date.now() - t0;
   const result = { ...syncRes, deleted: syncRes.deleted + additionalDeleted };
-  logInfo(`[Refresh] ${mode} complete in ${elapsed}ms: ${result.updated} updated, ${result.deleted} deleted, ${result.unarchived} unarchived, ${result.comments} comments (${result.errorCount} errors)`);
+  const counts = [
+    pluralize(result.updated, "doc") + " updated",
+    pluralize(result.deleted, "doc") + " deleted",
+    pluralize(result.unarchived, "doc") + " unarchived",
+  ];
+  const commentStr = `${pluralize(result.commentsCreated, "new comment thread")}, ${pluralize(result.commentsUpdated, "updated comment thread")}`;
+  const suggestionStr = result.suggestionsCreated > 0 || result.suggestionsUpdated > 0
+    ? `, ${pluralize(result.suggestionsCreated, "new suggestion")}, ${pluralize(result.suggestionsUpdated, "updated suggestion")}`
+    : "";
+  const skipStr = result.skipNotAuthor && result.skipNotAuthor > 0
+    ? `, ${pluralize(result.skipNotAuthor, "doc")} skipped (not author)`
+    : "";
+  logInfo(`[Refresh] ${mode} complete in ${elapsed}ms: ${counts.join(", ")}, ${commentStr}${suggestionStr}${skipStr} (${pluralize(result.errorCount, "error")})`);
   logToFile(DEBUG_FILE, `Ended exhaustive refresh (${mode}): ${result.updated} updated, ${result.deleted} deleted`);
   return result;
+}
+
+/**
+ * Handles Gmail docs that were not returned by fetchDocsByIds.
+ * Checks if they were deleted/access revoked in Drive.
+ */
+export async function handleMissingGmailDocs(
+  userId: string,
+  gmailDocIds: string[],
+  returnedDocIds: Set<string>,
+  existingDocIds: Set<string>
+): Promise<number> {
+  const missingIds = gmailDocIds.filter((id) => !returnedDocIds.has(id) && existingDocIds.has(id));
+  let extraDeleted = 0;
+  if (missingIds.length > 0) {
+    logInfo(`[Refresh] Checking ${missingIds.length} missing Gmail docs for deletion`);
+    const deletedIds = await findDeletedDocIds(userId, missingIds);
+    for (const id of missingIds) {
+      if (deletedIds.has(id)) {
+        logToFile(DEBUG_FILE, `OUTCOME: DELETE (GMAIL MISSING): ID: ${id}`);
+        await prisma.doc.updateMany({
+          where: { userId, googleDocId: id },
+          data: { isDeleted: true },
+        });
+        extraDeleted++;
+      }
+    }
+  }
+  return extraDeleted;
 }
 
 export async function executeRefresh(
@@ -249,7 +319,7 @@ export async function executeRefresh(
           deletedDocIdsFromDrive = result.deletedDocIds;
           newPageToken = result.newPageToken;
           driveSucceeded = true;
-          logToFile(DEBUG_FILE, `Ended changes.list sync: ${driveDocs.length} docs, ${deletedDocIdsFromDrive.size} deleted`);
+          logToFile(DEBUG_FILE, `Ended changes.list sync: ${driveDocs.length} changed docs, ${deletedDocIdsFromDrive.size} total deletions reported by Drive`);
         } catch (err: unknown) {
           const code = (err as { code?: number | string })?.code;
           if (code === 404 || code === "404") {
@@ -329,6 +399,7 @@ export async function executeRefresh(
       },
       select: { docId: true, googleDocId: true, title: true },
     });
+    logInfo(`[Refresh] Drive: ${docsToDelete.length} of ${deletedDocIdsFromDrive.size} deletions were tracked docs`);
     for (const doc of docsToDelete) {
       logToFile(DEBUG_FILE, `OUTCOME: DELETE: "${doc.title}" (ID: ${doc.googleDocId})`);
       await prisma.doc.update({ where: { docId: doc.docId }, data: { isDeleted: true } });
@@ -339,22 +410,7 @@ export async function executeRefresh(
   // Gmail docs that failed fetchDocsByIds — check if tracked and deleted
   if (gmailOnlyIds.length > 0) {
     const returnedGmailIds = new Set(gmailOnlyDocs.map((d) => d.googleDocId));
-    const missingIds = gmailOnlyIds.filter((id) => !returnedGmailIds.has(id) && existingDocIds.has(id));
-    if (missingIds.length > 0) {
-      const deletedIds = await findDeletedDocIds(userId, missingIds);
-      if (deletedIds) {
-        for (const id of missingIds) {
-          if (deletedIds.has(id)) {
-            logToFile(DEBUG_FILE, `OUTCOME: DELETE (GMAIL MISSING): ID: ${id}`);
-            await prisma.doc.updateMany({
-              where: { userId, googleDocId: id },
-              data: { isDeleted: true },
-            });
-            extraDeleted++;
-          }
-        }
-      }
-    }
+    extraDeleted += await handleMissingGmailDocs(userId, gmailOnlyIds, returnedGmailIds, existingDocIds);
   }
 
   // Save tokens - only if not all failed (safety check)
@@ -373,7 +429,20 @@ export async function executeRefresh(
   const elapsed = Date.now() - t0;
   const totalErrorCount = gmailErrorCount + syncRes.errorCount;
   const totalDeleted = syncRes.deleted + extraDeleted;
-  logInfo(`[Refresh] Complete in ${elapsed}ms: ${syncRes.added} added, ${syncRes.updated} updated, ${totalDeleted} deleted, ${syncRes.unarchived} unarchived, ${syncRes.comments} comments (${totalErrorCount} errors)`);
+  const counts = [
+    pluralize(syncRes.added, "doc") + " added",
+    pluralize(syncRes.updated, "doc") + " updated",
+    pluralize(totalDeleted, "doc") + " deleted",
+    pluralize(syncRes.unarchived, "doc") + " unarchived",
+  ];
+  const commentStr = `${pluralize(syncRes.commentsCreated, "new comment thread")}, ${pluralize(syncRes.commentsUpdated, "updated comment thread")}`;
+  const suggestionStr = syncRes.suggestionsCreated > 0 || syncRes.suggestionsUpdated > 0
+    ? `, ${pluralize(syncRes.suggestionsCreated, "new suggestion")}, ${pluralize(syncRes.suggestionsUpdated, "updated suggestion")}`
+    : "";
+  const skipStr = syncRes.skipNotAuthor && syncRes.skipNotAuthor > 0
+    ? `, ${pluralize(syncRes.skipNotAuthor, "doc")} skipped (not author)`
+    : "";
+  logInfo(`[Refresh] Complete in ${elapsed}ms: ${counts.join(", ")}, ${commentStr}${suggestionStr}${skipStr} (${pluralize(totalErrorCount, "error")})`);
   return { ...syncRes, deleted: totalDeleted, errorCount: totalErrorCount };
 }
 
