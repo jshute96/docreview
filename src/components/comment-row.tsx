@@ -351,7 +351,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   return (
     <>
     <tr
-      className={`${rowBg} ${rowCls} cursor-pointer${hasContentRow || expanded || isExiting ? "" : " border-b border-zinc-100"}`}
+      className={`${rowBg} ${rowCls}${hasContentRow || expanded || isExiting ? "" : " border-b border-zinc-100"}`}
       onClick={handleRowClick}
       {...hoverHandlers}
     >
@@ -432,7 +432,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     </tr>
     {hasContentRow && (
       <tr
-        className={`${rowBg}${expanded || isExiting ? "" : " border-b border-zinc-100"} ${rowCls} cursor-pointer`}
+        className={`${rowBg}${expanded || isExiting ? "" : " border-b border-zinc-100"} ${rowCls}`}
         onClick={handleRowClick}
         {...hoverHandlers}
       >

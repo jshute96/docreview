@@ -393,7 +393,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                 />
                 <label
                   htmlFor="load-shared-drives"
-                  className="text-sm text-zinc-700 cursor-pointer"
+                  className="text-sm text-zinc-700 "
                 >
                   Include shared drives
                 </label>
@@ -574,7 +574,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                 />
                 <label
                   htmlFor="load-to-inbox"
-                  className="text-sm text-zinc-700 cursor-pointer"
+                  className="text-sm text-zinc-700 "
                 >
                   {viewMode === "all" ? "Move to Inbox" : "Add to Inbox"}
                 </label>

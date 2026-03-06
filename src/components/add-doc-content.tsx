@@ -312,7 +312,7 @@ export const AddDocContent = forwardRef<AddDocContentHandle, AddDocContentProps>
             />
             <label
               htmlFor="add-to-inbox"
-              className="text-sm text-zinc-700 cursor-pointer"
+              className="text-sm text-zinc-700 "
             >
               Add to Inbox
             </label>

@@ -343,7 +343,7 @@ export function ManageLabelsDialog({
                     <button
                       type="button"
                       onPointerDown={(e) => e.stopPropagation()}
-                      className="h-4 w-4 rounded-full cursor-pointer ring-1 ring-zinc-200 hover:ring-zinc-400"
+                      className="h-4 w-4 rounded-full  ring-1 ring-zinc-200 hover:ring-zinc-400"
                       style={{ backgroundColor: label.color ?? "#e4e4e7" }}
                       aria-label={`Change color for ${label.name}`}
                     />

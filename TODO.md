@@ -13,7 +13,6 @@ P1:
 Easy:
 * scroll bars for lots of docs
 * Button for search in Drive (from docs search box)
-* Comments page Doc List button gets a finger icon, other buttons don't.
 
 * Dialog boxes
   * dialog box moves on new vs add
