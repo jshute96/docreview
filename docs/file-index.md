@@ -12,6 +12,7 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/page.tsx` | Doc list page (server) — fetches docs+labels, renders `DocTable` |
 | `add/page.tsx` | Add document page (server) — standalone add-doc form, accepts optional `?doc=` query param |
 | `open/page.tsx` | Open page (server) — redirects to `/comments/<docId>` if doc exists, otherwise to `/add?doc=...` |
+| `bookmarklet/page.tsx` | Bookmarklet install page — drag-to-bookmarks-bar link that injects a Docreview icon into Google Docs titlebar |
 | `comments/[docId]/page.tsx` | Doc detail page (server) — fetches single doc with comments, renders `DocDetail`; `generateMetadata` sets page title |
 
 ## API Routes (`src/app/api/`)
