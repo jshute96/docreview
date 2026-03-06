@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Docreview",
   description: "Track your Google Docs workflow",
+  icons: {
+    icon: "/docreview.svg",
+  },
 };
 
 export default function RootLayout({

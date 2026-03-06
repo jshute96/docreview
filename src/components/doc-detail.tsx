@@ -523,7 +523,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       )}
       {/* Header row: title left, buttons right */}
       <div className="flex items-start justify-between">
-        <div className="flex items-baseline text-xl font-semibold pt-1">
+        <div className="flex items-center text-xl font-semibold pt-1">
+          <img src="/docreview.svg" alt="Docreview Logo" className="h-6 w-6 rounded-md shadow-sm mr-2 flex-shrink-0" />
           <span className="flex-shrink-0 text-zinc-500 mr-2">Docreview:</span>
           <DocTypeIcon mimeType={doc.mimeType} className="h-5 w-5 flex-shrink-0 translate-y-[3px] mr-1" />
           <a

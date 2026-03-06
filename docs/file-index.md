@@ -12,7 +12,24 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/page.tsx` | Doc list page (server) — fetches docs+labels, renders `DocTable` |
 | `add/page.tsx` | Add document page (server) — standalone add-doc form, accepts optional `?doc=` query param |
 | `open/page.tsx` | Open page (server) — redirects to `/comments/<docId>` if doc exists, otherwise to `/add?doc=...` |
+| `bookmarklet/page.tsx` | Bookmarklet install page (server) — metadata and wrapper for `BookmarkletClient` |
+| `bookmarklet/bookmarklet-client.tsx` | Bookmarklet install page (client) — "Drag to Install" UI and interactive logic |
 | `comments/[docId]/page.tsx` | Doc detail page (server) — fetches single doc with comments, renders `DocDetail`; `generateMetadata` sets page title |
+
+## Bookmarklet (`src/bookmarklet/`)
+
+| File | Description |
+|------|-------------|
+| `bookmarklet-source.js` | Source of truth for the bookmarklet code (clean, documented) |
+| `bookmarklet-code.ts` | Automatically generated minified bookmarklet code for use in `page.tsx` |
+| `bookmarklet.txt` | Automatically generated minified bookmarklet code for manual install/distribution |
+| `README.md` | Documentation for bookmarklet internals, build process, and manual install instructions |
+
+## Assets (`public/`)
+
+| File | Description |
+|------|-------------|
+| `docreview.svg` | The official Docreview brand icon (violet square with document lines) |
 
 ## API Routes (`src/app/api/`)
 
@@ -93,6 +110,14 @@ Shadcn/ui components:
 | `use-auto-resize.ts` | `useAutoResize()` hook — auto-grows a textarea to fit content up to a max height |
 | `use-label-sync.ts` | `useLabelSync()` hook — removes stale label IDs from selection when available labels change |
 | `use-multi-select.ts` | `useMultiSelect()` hook — generic row multi-selection with click/Ctrl+click/Shift+click, highlight state, effective item filtering, and bulk removal helpers |
+
+## Scripts (`scripts/`)
+
+| File | Description |
+|------|-------------|
+| `build-bookmarklet.mjs` | Builds the bookmarklet by minifying `bookmarklet-source.js` and updating `.txt` and `.ts` outputs |
+| `check-deps.mjs` | Checks that required Node.js version and dependencies are installed |
+| `check-db.mjs` | Checks that the database is reachable and migrations are up-to-date |
 
 ## Contexts (`src/contexts/`)
 

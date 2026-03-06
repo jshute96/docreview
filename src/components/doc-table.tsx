@@ -13,7 +13,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { LoadDialog } from "@/components/load-dialog";
 import { BulkEditDialog } from "@/components/bulk-edit-dialog";
 import { signOut } from "next-auth/react";
-import { Menu, RefreshCw, LogOut, HardDriveDownload, Mail } from "lucide-react";
+import { Menu, RefreshCw, LogOut, HardDriveDownload, Mail, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -330,7 +330,10 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
     <LabelProvider allLabels={labels} onLabelsChange={setLabels} onLabelDelete={handleLabelDelete}>
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-zinc-900">Docreview: Inbox view</h1>
+        <div className="flex items-center gap-3">
+          <img src="/docreview.svg" alt="Docreview Logo" className="h-8 w-8 rounded-lg shadow-sm" />
+          <h1 className="text-xl font-semibold text-zinc-900 tracking-tight">Docreview: Inbox view</h1>
+        </div>
         <div className="flex items-center gap-2">
           <RefreshButton
             onRefresh={(newDocs) => setDocs(newDocs)}
@@ -410,8 +413,15 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
                 onSelect={() => window.open("/add", "_blank")}
                 title="Open the standalone document import page"
               >
-                <span className="h-4 w-4 mr-2" />
+                <FileText className="h-4 w-4 mr-2" />
                 Add doc page
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => window.open("/bookmarklet", "_blank")}
+                title="Install the Docreview bookmarklet"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Bookmarklet page
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

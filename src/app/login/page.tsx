@@ -23,7 +23,11 @@ export default async function LoginPage({
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50">
       <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-2 text-2xl font-semibold text-zinc-900 text-center">Docreview</h1>
+      <div className="mb-8 flex flex-col items-center">
+        <img src="/docreview.svg" alt="Docreview Logo" className="mb-4 h-16 w-16 shadow-lg rounded-xl" />
+        <h1 className="mb-2 text-3xl font-bold tracking-tight text-zinc-900">Docreview</h1>
+        <p className="text-zinc-500">Document review, streamlined.</p>
+      </div>
         
         {error && (
           <div className="mb-4 rounded-md bg-red-50 p-3 text-xs text-red-600">
