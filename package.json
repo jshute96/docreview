@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node scripts/check-deps.mjs && node scripts/check-db.mjs && next dev",
     "dev:offline": "node scripts/check-deps.mjs && node scripts/check-db.mjs && OFFLINE_MODE=true next dev",
-    "build": "next build",
+    "build": "npm run build:bookmarklet && next build",
+    "build:bookmarklet": "node scripts/build-bookmarklet.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
