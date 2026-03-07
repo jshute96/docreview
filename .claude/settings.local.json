@@ -43,6 +43,7 @@
       "Bash(find:*)",
       "Bash(npx eslint:*)",
       "Bash(npx next build:*)",
+      "Bash(node scripts/build-bookmarklet.mjs)",
       "Bash(gh issue:*)"
     ]
   }

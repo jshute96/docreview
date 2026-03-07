@@ -16,7 +16,6 @@
   
   // Cleanup previous instance
   if (window._dr.observer) window._dr.observer.disconnect();
-  if (window._dr.interval) clearInterval(window._dr.interval);
   if (window._dr.cleanup) {
     try { window._dr.cleanup(); } catch(e) {}
   }
@@ -125,7 +124,6 @@
     injectDocs();
   } else if (isDrive) {
     injectDrive();
-    window._dr.interval = setInterval(injectDrive, 1000);
     window._dr.observer = new MutationObserver(injectDrive);
     window._dr.observer.observe(document.body, { childList: true, subtree: true });
   }
