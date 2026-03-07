@@ -46,14 +46,29 @@
       "Bash(node scripts/build-bookmarklet.mjs)",
       "Bash(npm run build:bookmarklet)",
       "Bash(gh issue:*)",
+      "mcp__playwright2__browser_click",
+      "mcp__playwright2__browser_close",
+      "mcp__playwright2__browser_evaluate",
+      "mcp__playwright2__browser_fill_form",
+      "mcp__playwright2__browser_navigate",
+      "mcp__playwright2__browser_press_key",
+      "mcp__playwright2__browser_run_code",
+      "mcp__playwright2__browser_snapshot",
+      "mcp__playwright2__browser_tabs",
+      "mcp__playwright2__browser_take_screenshot",
       "mcp__playwright__browser_click",
+      "mcp__playwright__browser_evaluate",
       "mcp__playwright__browser_fill_form",
-      "mcp__playwright__browser_tabs",
-      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_navigate",
       "mcp__playwright__browser_press_key",
       "mcp__playwright__browser_run_code",
-      "mcp__playwright__browser_take_screenshot",
-      "mcp__playwright__browser_navigate"
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_tabs",
+      "mcp__playwright__browser_take_screenshot"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "playwright2"
+  ]
 }

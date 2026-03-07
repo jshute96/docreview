@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "playwright2": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest", "--user-data-dir", "/tmp/playwright-user2"]
+    }
+  }
+}
