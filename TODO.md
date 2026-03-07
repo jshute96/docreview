@@ -99,6 +99,7 @@ Easy:
 
 ## low priority
 * rename a label
+* help for URLs: where to reference /add?doc=ID, etc.
 
 ## tools
 * Figure out how to get playwrite MCP to work so it can look at a browser
