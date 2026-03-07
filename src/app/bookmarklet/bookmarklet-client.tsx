@@ -28,17 +28,18 @@ export function BookmarkletClient() {
 
       <p className="mb-6 text-muted-foreground">
         Drag the links below to your bookmarks bar to quickly access
-        Docreview from Google Docs, Sheets, Slides and Drive.
+        Docreview from Google Docs, Sheets, Slides, Drive and Gmail.
       </p>
 
       <div className="space-y-4">
         <div className="rounded-lg border bg-muted/50 p-6">
-          <h2 className="mb-1 text-lg font-semibold">Add Docreview links (in Drive, Docs, Sheets and Slides)</h2>
+          <h2 className="mb-1 text-lg font-semibold">Add Docreview links</h2>
           <div className="mb-4 text-sm text-muted-foreground">
-            Adds a Docreview icon:
+            Adds a Docreview icon or link:
             <ul className="my-1 ml-5 list-disc">
               <li>Next to each document in Google Drive.</li>
               <li>Next to the title in Docs, Sheets and Slides.</li>
+              <li>Next to document attachments in Gmail, with an &ldquo;Open in Docreview&rdquo; link in notification emails.</li>
             </ul>
             Click the icon to open that doc in Docreview, adding it if necessary.
           </div>
@@ -59,9 +60,10 @@ export function BookmarkletClient() {
         </div>
 
         <div className="rounded-lg border bg-muted/50 p-6">
-          <h2 className="mb-1 text-lg font-semibold">Open in Docreview (the current doc, from Docs, Sheets and Slides)</h2>
+          <h2 className="mb-1 text-lg font-semibold">Open in Docreview</h2>
           <p className="mb-4 text-sm text-muted-foreground">
-            Click while viewing a doc in Google Docs, Sheets, or Slides.
+            Click while viewing a doc in Google Docs, Sheets, or Slides, or a
+            document notification email in Gmail.
             <br />
             Opens the doc in Docreview, adding it if necessary.
           </p>

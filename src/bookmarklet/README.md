@@ -8,15 +8,16 @@ Injects a violet Docreview icon into the following locations:
 
 1.  **Google Docs/Sheets/Slides:** In the titlebar, directly to the left of the document name.
 2.  **Google Drive:** In the file list (List/Search view) and grid view (Boxes), next to the file type icon.
+3.  **Gmail:** Next to the document attachment chip in the inbox list. In message view, an "Open in Docreview" link appears above the email body.
 
-- **Clicking the icon:** Opens the document in a new Docreview tab.
+- **Clicking the icon/link:** Opens the document in a new Docreview tab.
   - If the doc is already tracked, it goes to the **Comments view**.
   - If it's a new doc, it goes to the **Add Document** page.
-- **Dynamic Views:** On Google Drive, the bookmarklet automatically adds icons to new files as you scroll or navigate.
+- **Dynamic Views:** On Google Drive and Gmail, the bookmarklet automatically adds icons to new content as you navigate (via `MutationObserver`).
 
 ## Open in Docreview
 
-A simpler bookmarklet — click it while viewing a Google Doc, Sheet, or Slides to open the document directly in Docreview. Shows an error if the current page is not a supported document.
+A simpler bookmarklet — click it while viewing a Google Doc, Sheet, or Slides to open the document directly in Docreview. On Gmail, opens the document linked in the current notification email. Shows an error if the current page is not a supported document or has no document link.
 
 ## Installation
 1. Start Docreview: `npm run dev`.
@@ -45,6 +46,12 @@ Google Drive is a single-page application that dynamically renders and clears it
   - **Heuristic:** Inside a file row or grid item, it searches for the first `svg` or `img` to use as an anchor point for injection.
 - **Identification:** Validates document IDs (length > 20) to filter out folders and navigation items.
 
+### Gmail Implementation
+Gmail notification emails (sharing invitations, comment notifications) include a `data-docurl` attribute on attachment chip elements in the top-level DOM.
+- **Inbox list:** The bookmarklet injects a Docreview icon before the document type icon in each `[data-docurl]` chip.
+- **Message view:** The email body content is rendered inside a cross-origin `data:` iframe that bookmarklet code cannot access. Instead, the bookmarklet inserts an "Open in Docreview" link above the iframe, using the doc URL from the `[data-docurl]` chip. This only works when navigating from the inbox (SPA navigation), since the chips are part of the inbox list DOM and are not rendered on a direct message page load.
+- **Persistence:** Like Drive, uses a `MutationObserver` to handle Gmail's SPA navigation.
+
 ### Event Interception
 Google Drive uses aggressive event listeners to handle row selection. To ensure our links work, the bookmarklet:
 1. Installs **capturing-phase event listeners** (`click`, `mousedown`, `mouseup`) directly on the injected Docreview icon elements.
@@ -61,6 +68,9 @@ Building is **not automatic**. After editing either source file, run:
 npm run build:bookmarklet
 ```
 (This is also included in the main `npm run build` script).
+
+### Install Page
+The `/bookmarklet` page (`src/app/bookmarklet/bookmarklet-client.tsx`) describes what each bookmarklet does. Update that page whenever bookmarklet behavior changes.
 
 ### Changing the host
 When installed via the `/bookmarklet` page, the bookmarklet **automatically points to the server it was installed from** (using `window.location.origin` at runtime). No manual configuration is required for standard use.

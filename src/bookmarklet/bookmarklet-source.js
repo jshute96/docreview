@@ -8,8 +8,9 @@
   var hostname = location.hostname;
   var isDocs = hostname.endsWith('docs.google.com');
   var isDrive = hostname.endsWith('drive.google.com');
+  var isGmail = hostname.endsWith('mail.google.com');
 
-  if (!isDocs && !isDrive) return;
+  if (!isDocs && !isDrive && !isGmail) return;
 
   // Global state management
   window._dr = window._dr || {};
@@ -120,11 +121,67 @@
     });
   }
 
+  function injectGmail() {
+    // Inject into attachment chips with data-docurl (visible in inbox list view).
+    // The chip contains: [Attachment: label] [doc-type icon] [doc title].
+    // We insert the Docreview icon before the doc-type icon.
+    var chips = document.querySelectorAll('[data-docurl]');
+    chips.forEach(function(chip) {
+      if (chip.querySelector('.dr-link')) return;
+      var docUrl = chip.getAttribute('data-docurl');
+      if (!docUrl) return;
+      var anchor = chip.querySelector('img');
+      if (!anchor) return;
+      var btn = createIconButton(null, 16, docUrl);
+      btn.style.marginRight = '0';
+      btn.style.marginLeft = '2px';
+      chip.style.display = 'inline-flex';
+      chip.style.alignItems = 'center';
+      anchor.parentElement.insertBefore(btn, anchor);
+    });
+
+    // In message view, insert an "Open in Docreview" bar above the email body iframe.
+    // The visible doc-title chip is inside a cross-origin data: iframe and cannot be accessed,
+    // so we inject into the top-level DOM just above it.
+    var msgDiv = document.querySelector('[data-message-id]');
+    if (msgDiv) {
+      var iframe = msgDiv.querySelector('iframe');
+      if (iframe && iframe.parentElement && !iframe.parentElement.querySelector('.dr-gmail-bar')) {
+        var chip = document.querySelector('[data-docurl]');
+        if (chip) {
+          var docUrl = chip.getAttribute('data-docurl');
+          if (docUrl) {
+            var openUrl = '__BASE_URL__/open?doc=' + encodeURIComponent(docUrl);
+            var bar = document.createElement('div');
+            bar.className = 'dr-gmail-bar';
+            bar.style.cssText = 'padding:8px 20% 0 0;margin-bottom:-14px;font-family:Google Sans,Roboto,sans-serif;font-size:16px;color:#5f6368;text-align:center;position:relative;z-index:1;';
+            bar.appendChild(document.createTextNode('Open in '));
+            var link = document.createElement('a');
+            link.href = openUrl;
+            link.target = '_blank';
+            link.style.cssText = 'color:#7c3aed;text-decoration:none;font-weight:500;vertical-align:middle;';
+            var img = document.createElement('img');
+            img.src = '__BASE_URL__/docreview.svg';
+            img.style.cssText = 'width:16px;height:16px;border-radius:2px;vertical-align:middle;margin-right:3px;';
+            link.appendChild(img);
+            link.appendChild(document.createTextNode('Docreview'));
+            bar.appendChild(link);
+            iframe.parentElement.insertBefore(bar, iframe);
+          }
+        }
+      }
+    }
+  }
+
   if (isDocs) {
     injectDocs();
   } else if (isDrive) {
     injectDrive();
     window._dr.observer = new MutationObserver(injectDrive);
+    window._dr.observer.observe(document.body, { childList: true, subtree: true });
+  } else if (isGmail) {
+    injectGmail();
+    window._dr.observer = new MutationObserver(injectGmail);
     window._dr.observer.observe(document.body, { childList: true, subtree: true });
   }
 

@@ -76,11 +76,51 @@ Source: `bookmarklet-source.js`
 2. Run the bookmarklet.
 3. **Expect**: Same as Sheets — Slides also has `.docs-titlebar-badges`, so the badge is injected successfully. The `injectDocs()` code path works across all three Workspace editors.
 
+### Gmail — inbox list chips
+
+1. Open Gmail at `https://mail.google.com` with notification emails visible (sharing invitations, comment notifications).
+2. Run the bookmarklet.
+3. **Expect**: A `.dr-link` icon appears inside each `[data-docurl]` chip, before the document type `img`. The chip gets `display: inline-flex` and `align-items: center`.
+4. **Verify**: Count `.dr-link` elements matches `[data-docurl]` chip count. Images loaded. Take a screenshot.
+
+### Gmail — inbox list idempotency
+
+1. Run the bookmarklet again without reloading.
+2. **Expect**: Same number of `.dr-link` elements — no duplicates. The `.querySelector('.dr-link')` guard on each chip prevents re-injection.
+
+### Gmail — inbox list click
+
+1. Click an injected `.dr-link` icon in an inbox chip.
+2. **Expect**: A new tab opens at `http://localhost:3000/open?doc={encoded-docurl}`.
+
+### Gmail — message view bar (SPA navigation)
+
+1. With the bookmarklet already active (MutationObserver running), click a notification email in the inbox to open it.
+2. **Expect**: An "Open in Docreview" bar (`.dr-gmail-bar`) appears above the email body iframe inside `[data-message-id]`. The bar contains "Open in " text followed by a link with the Docreview icon and "Docreview" text. The bar is centered in the first 80% of the row (`padding-right: 20%`).
+3. **Verify**: `document.querySelector('.dr-gmail-bar')` exists. The link `href` contains `http://localhost:3000/open?doc=`. Take a screenshot.
+
+### Gmail — message view bar idempotency
+
+1. Navigate back to inbox, then click the same email again.
+2. **Expect**: Still only one `.dr-gmail-bar`. The `!iframe.parentElement.querySelector('.dr-gmail-bar')` guard prevents duplicates.
+
+### Gmail — message view bar (direct page load)
+
+1. Reload the browser while viewing a notification email (direct page load, not SPA navigation).
+2. Run the bookmarklet.
+3. **Expect**: The `.dr-gmail-bar` does **not** appear, because `[data-docurl]` chips are part of the inbox list DOM and are not rendered on direct page loads. No error is thrown.
+
+### Gmail — MutationObserver persistence
+
+1. Run the bookmarklet on the inbox.
+2. Navigate within Gmail (e.g., open an email, go back to inbox, switch labels).
+3. **Expect**: Icons re-appear on newly rendered chips without re-running the bookmarklet, because the MutationObserver calls `injectGmail()` on DOM changes.
+
 ### Non-Google page
 
 1. Navigate to a non-Google page (e.g., `http://localhost:3000/docs`).
 2. Run the bookmarklet.
-3. **Expect**: Nothing happens (the `if (!isDocs && !isDrive) return` guard exits silently). No errors, no injected elements.
+3. **Expect**: Nothing happens (the `if (!isDocs && !isDrive && !isGmail) return` guard exits silently). No errors, no injected elements.
 
 ## "Open in Docreview" bookmarklet
 
@@ -115,6 +155,18 @@ Source: `open-in-docreview-source.js`
 1. Navigate to `http://localhost:3000/docs`.
 2. Run the bookmarklet.
 3. **Expect**: Same alert: "Not a supported document".
+
+### Gmail — with doc chip (supported)
+
+1. Open a notification email in Gmail (via SPA navigation from inbox, so `[data-docurl]` chips exist).
+2. Run the bookmarklet.
+3. **Expect**: A new tab opens at `http://localhost:3000/open?doc={encoded-docurl}`, using the URL from the first `[data-docurl]` chip.
+
+### Gmail — without doc chip
+
+1. Open a non-notification email in Gmail (one without `[data-docurl]` chips), or reload a notification email directly (chips won't be in DOM).
+2. Run the bookmarklet.
+3. **Expect**: An alert dialog appears with the message "No document link found in this email". Use `page.once('dialog')` pattern to capture and dismiss.
 
 ### Google Docs homepage (unsupported)
 
