@@ -186,6 +186,33 @@ export async function upsertDocsAndSyncComments(
 }
 
 /**
+ * Given a list of Google Doc IDs that were expected but not returned by a
+ * Drive metadata fetch, check whether they are actually deleted/trashed and
+ * mark them accordingly in the database.  Returns the number of docs marked.
+ */
+async function markMissingAsDeleted(
+  userId: string,
+  missingIds: string[],
+  logLabel: string,
+): Promise<number> {
+  if (missingIds.length === 0) return 0;
+  logInfo(`[Refresh] Checking ${missingIds.length} missing ${logLabel} docs for deletion`);
+  const deletedIds = await findDeletedDocIds(userId, missingIds);
+  let count = 0;
+  for (const id of missingIds) {
+    if (deletedIds.has(id)) {
+      logToFile(DEBUG_FILE, `OUTCOME: DELETE (${logLabel.toUpperCase()} MISSING): ID: ${id}`);
+      await prisma.doc.updateMany({
+        where: { userId, googleDocId: id },
+        data: { isDeleted: true },
+      });
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
  * Common logic to refresh a specific set of Google Doc IDs.
  * Used by Refresh Selected and Full Refresh.
  */
@@ -231,24 +258,7 @@ async function refreshGoogleDocIds(
   // Deletion detection: if fetchDocsByIds missed some docs, check if they are actually deleted
   const foundIds = new Set(driveDocs.map(d => d.googleDocId));
   const missingIds = googleDocIds.filter(id => !foundIds.has(id));
-
-  let additionalDeleted = 0;
-  if (missingIds.length > 0) {
-    logToFile(DEBUG_FILE, `Checking ${missingIds.length} docs missing from Drive metadata fetch`);
-    const deletedIds = await findDeletedDocIds(userId, missingIds);
-    if (deletedIds) {
-      for (const id of missingIds) {
-        if (deletedIds.has(id)) {
-          logToFile(DEBUG_FILE, `OUTCOME: DELETE (MISSING): ID: ${id}`);
-          await prisma.doc.updateMany({
-            where: { userId, googleDocId: id },
-            data: { isDeleted: true },
-          });
-          additionalDeleted++;
-        }
-      }
-    }
-  }
+  const additionalDeleted = await markMissingAsDeleted(userId, missingIds, mode);
 
   const elapsed = Date.now() - t0;
   const result = { ...syncRes, deleted: syncRes.deleted + additionalDeleted };
@@ -280,22 +290,7 @@ export async function handleMissingGmailDocs(
   existingDocIds: Set<string>
 ): Promise<number> {
   const missingIds = gmailDocIds.filter((id) => !returnedDocIds.has(id) && existingDocIds.has(id));
-  let extraDeleted = 0;
-  if (missingIds.length > 0) {
-    logInfo(`[Refresh] Checking ${missingIds.length} missing Gmail docs for deletion`);
-    const deletedIds = await findDeletedDocIds(userId, missingIds);
-    for (const id of missingIds) {
-      if (deletedIds.has(id)) {
-        logToFile(DEBUG_FILE, `OUTCOME: DELETE (GMAIL MISSING): ID: ${id}`);
-        await prisma.doc.updateMany({
-          where: { userId, googleDocId: id },
-          data: { isDeleted: true },
-        });
-        extraDeleted++;
-      }
-    }
-  }
-  return extraDeleted;
+  return markMissingAsDeleted(userId, missingIds, "Gmail");
 }
 
 export async function executeRefresh(

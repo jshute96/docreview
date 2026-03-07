@@ -195,17 +195,20 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
   // Which refresh operation is active (null = idle). Only one can run at a time.
   const [refreshing, setRefreshing] = useState<"main" | "drive" | "gmail" | "full" | "selected" | null>(null);
 
-  async function handleRefreshSelected() {
-    if (filteredDocs.length === 0) return;
-    setRefreshing("selected");
+  async function runRefresh(
+    spinnerKey: "main" | "drive" | "gmail" | "full" | "selected",
+    url: string,
+    fetchOpts: Record<string, unknown>,
+    successLabel: string,
+    errorLabel: string,
+  ) {
+    setRefreshing(spinnerKey);
     const contextId = generateContextId();
     try {
-      const docIds = filteredDocs.map((d) => d.docId);
-      const data = await fetchWithProgress<Record<string, number>>("/api/docs/refresh-selected", {
+      const data = await fetchWithProgress<Record<string, number>>(url, {
         method: "POST",
         contextId,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ docIds }),
+        ...fetchOpts,
       }, handleRefreshProgress);
 
       const docsRes = await apiFetch("/api/docs?includeArchived=true", { contextId });
@@ -217,72 +220,39 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
 
       dismissProgressToasts();
       const { summary, errorSuffix } = formatResultParts(data);
-      toast.success(`Refresh complete — ${summary}${errorSuffix}`, { duration: 8000 });
+      toast.success(`${successLabel} — ${summary}${errorSuffix}`, { duration: 8000 });
     } catch (err) {
       dismissProgressToasts();
-      if (!isAuthError(err)) toast.error("Failed to refresh selected docs");
+      if (!isAuthError(err)) toast.error(errorLabel);
     } finally {
       setRefreshing(null);
     }
+  }
+
+  async function handleRefreshSelected() {
+    if (filteredDocs.length === 0) return;
+    const docIds = filteredDocs.map((d) => d.docId);
+    await runRefresh("selected", "/api/docs/refresh-selected", {
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ docIds }),
+    }, "Refresh complete", "Failed to refresh selected docs");
   }
 
   async function handleFullRefresh() {
-    setRefreshing("full");
-    const contextId = generateContextId();
-    try {
-      const data = await fetchWithProgress<Record<string, number>>("/api/docs?mode=full-refresh", {
-        method: "POST",
-        contextId,
-      }, handleRefreshProgress);
-
-      const docsRes = await apiFetch("/api/docs?includeArchived=true", { contextId });
-      if (!docsRes.ok) throw new Error("Failed to reload docs");
-      const newDocs: DocWithLabels[] = await docsRes.json();
-
-      setDocs(newDocs);
-      broadcastChange({ type: "docs" }, contextId);
-
-      dismissProgressToasts();
-      const { summary, errorSuffix } = formatResultParts(data);
-      toast.success(`Full refresh complete — ${summary}${errorSuffix}`, { duration: 8000 });
-    } catch (err) {
-      dismissProgressToasts();
-      if (!isAuthError(err)) toast.error("Failed to sync with Google Drive");
-    } finally {
-      setRefreshing(null);
-    }
+    await runRefresh("full", "/api/docs?mode=full-refresh", {},
+      "Full refresh complete", "Failed to sync with Google Drive");
   }
 
   async function handleSourceRefresh(sources: ("drive" | "gmail")[]) {
-    setRefreshing(sources.length === 1 ? sources[0] : "main");
-    const contextId = generateContextId();
-    try {
-      const data = await fetchWithProgress<Record<string, number>>("/api/docs/refresh", {
-        method: "POST",
-        contextId,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sources }),
-      }, handleRefreshProgress);
-
-      const docsRes = await apiFetch("/api/docs?includeArchived=true", { contextId });
-      if (!docsRes.ok) throw new Error("Failed to reload docs");
-      const newDocs: DocWithLabels[] = await docsRes.json();
-
-      setDocs(newDocs);
-      broadcastChange({ type: "docs" }, contextId);
-
-      dismissProgressToasts();
-      const label = sources.length === 1
-        ? sources[0] === "drive" ? "Drive refresh" : "Gmail refresh"
-        : "Refresh";
-      const { summary, errorSuffix } = formatResultParts(data);
-      toast.success(`${label} complete — ${summary}${errorSuffix}`, { duration: 8000 });
-    } catch (err) {
-      dismissProgressToasts();
-      if (!isAuthError(err)) toast.error("Failed to refresh");
-    } finally {
-      setRefreshing(null);
-    }
+    const label = sources.length === 1
+      ? sources[0] === "drive" ? "Drive refresh" : "Gmail refresh"
+      : "Refresh";
+    await runRefresh(
+      sources.length === 1 ? sources[0] : "main",
+      "/api/docs/refresh",
+      { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sources }) },
+      `${label} complete`, "Failed to refresh",
+    );
   }
 
   const filteredDocs = sortDocs(
