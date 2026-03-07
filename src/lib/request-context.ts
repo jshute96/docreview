@@ -24,12 +24,17 @@ import { logSilent } from "./log";
 const CONTEXT_ID_HEADER = "x-context-id";
 const CONTEXT_REASON_HEADER = "x-context-reason";
 
+interface RequestContext {
+  requestId: string;
+  userId?: string;
+}
+
 const globalForStore = globalThis as unknown as {
-  _requestIdStore: AsyncLocalStorage<string> | undefined;
+  _requestIdStore: AsyncLocalStorage<RequestContext> | undefined;
 };
 
 const requestIdStore =
-  globalForStore._requestIdStore ?? new AsyncLocalStorage<string>();
+  globalForStore._requestIdStore ?? new AsyncLocalStorage<RequestContext>();
 
 if (process.env.NODE_ENV !== "production")
   globalForStore._requestIdStore = requestIdStore;
@@ -45,7 +50,7 @@ interface RequestLike {
 export function runWithRequestId<T>(method: string, req: RequestLike, fn: () => T): T {
   const id = req.headers.get(CONTEXT_ID_HEADER) || randomUUID().replace(/-/g, "").slice(0, 8);
   const reason = req.headers.get(CONTEXT_REASON_HEADER);
-  return requestIdStore.run(id, () => {
+  return requestIdStore.run({ requestId: id }, () => {
     if (reason) logSilent(`[CrossTab] ${reason}`);
     logSilent(`[API] ${method} ${req.nextUrl.pathname}`);
     return fn();
@@ -55,5 +60,16 @@ export function runWithRequestId<T>(method: string, req: RequestLike, fn: () => 
 /** Return the current request's context ID, or "--------" if called
  *  outside a request (e.g. during server startup). */
 export function getRequestId(): string {
-  return requestIdStore.getStore() ?? "--------";
+  return requestIdStore.getStore()?.requestId ?? "--------";
+}
+
+/** Set the user ID for the current request context (call after session is resolved). */
+export function setRequestUserId(userId: string): void {
+  const ctx = requestIdStore.getStore();
+  if (ctx) ctx.userId = userId;
+}
+
+/** Return the current request's user ID, or undefined if not set. */
+export function getRequestUserId(): string | undefined {
+  return requestIdStore.getStore()?.userId;
 }

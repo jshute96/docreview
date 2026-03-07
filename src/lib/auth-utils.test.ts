@@ -12,6 +12,10 @@ vi.mock("./offline", () => ({
   getExpectedOfflineId: vi.fn(),
 }));
 
+vi.mock("./request-context", () => ({
+  setRequestUserId: vi.fn(),
+}));
+
 const mockAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
 const mockGetExpectedId = vi.mocked(getExpectedOfflineId);
 

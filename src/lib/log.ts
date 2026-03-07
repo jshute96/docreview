@@ -2,7 +2,7 @@ import { createWriteStream, mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { inspect } from "node:util";
 import type { WriteStream } from "node:fs";
-import { getRequestId } from "./request-context";
+import { getRequestId, getRequestUserId } from "./request-context";
 
 const RED = "\x1b[31m";
 const YELLOW = "\x1b[33m";
@@ -120,10 +120,11 @@ function writeToFile(level: string, message: string, args: unknown[], requestId?
   if (!stream) return;
 
   const ts = pstTimestamp();
+  const userId = (getRequestUserId() ?? "-").padEnd(25);
   const reqId = requestId ?? getRequestId();
   const cleanMsg = stripAnsi(message);
   const argsStr = formatArgs(args);
-  stream.write(`${ts} ${reqId} ${level} ${cleanMsg}${argsStr}\n`);
+  stream.write(`${ts} ${userId} ${reqId} ${level} ${cleanMsg}${argsStr}\n`);
 }
 
 // --- Public API ---
@@ -132,10 +133,11 @@ export function logToFile(filename: string, message: string, ...args: unknown[])
   if (typeof window !== "undefined" || process.env.NODE_ENV === "test") return;
   mkdirSync(LOG_DIR, { recursive: true });
   const ts = pstTimestamp();
+  const userId = (getRequestUserId() ?? "-").padEnd(25);
   const reqId = getRequestId();
   const argsStr = formatArgs(args);
   const stream = createWriteStream(join(LOG_DIR, filename), { flags: "a" });
-  stream.write(`${ts} ${reqId} ${message}${argsStr}\n`);
+  stream.write(`${ts} ${userId} ${reqId} ${message}${argsStr}\n`);
   stream.end();
 }
 

@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { OFFLINE_MODE, getExpectedOfflineId } from "@/lib/offline";
+import { setRequestUserId } from "@/lib/request-context";
 
 /**
  * Returns the current session only if it is valid for the current mode.
@@ -18,6 +19,7 @@ export async function getValidSession() {
     }
   }
 
+  setRequestUserId(session.user.id);
   return session;
 }
 
