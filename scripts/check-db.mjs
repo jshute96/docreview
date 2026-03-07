@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * This script checks if the Prisma schema, the generated client, and the 
+ * This script checks if the Prisma schema, the generated client, and the
  * database migrations are all in sync.
  */
 
@@ -9,6 +9,27 @@ import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+const USAGE =
+  "Check that the Prisma schema, generated client, and database migrations are in sync.\n\n" +
+  "Usage:\n" +
+  "  node scripts/check-db.mjs\n\n" +
+  "Flags:\n" +
+  "  --help  Show this help message\n";
+
+const KNOWN_FLAGS = new Set(["--help"]);
+const args = process.argv.slice(2);
+
+if (args.includes("--help")) {
+  process.stdout.write(USAGE);
+  process.exit(0);
+}
+
+const unknownFlags = args.filter(a => a.startsWith("-") && !KNOWN_FLAGS.has(a));
+if (unknownFlags.length) {
+  process.stderr.write(`Unknown flag(s): ${unknownFlags.join(", ")}\n\n${USAGE}`);
+  process.exit(1);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');

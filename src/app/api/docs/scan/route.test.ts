@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { suppressingErrors } from "@/test-utils";
 
+interface ScanResult {
+  total: number;
+  existingCount: number;
+  errorCount?: number;
+  docs: Array<{ googleDocId: string; title: string; role: string; isNew: boolean }>;
+}
+
 vi.mock("@/auth", () => ({
   auth: vi.fn(),
 }));
@@ -105,7 +112,7 @@ describe("POST /api/docs/scan", () => {
 
     const res = await POST(scanRequest({ daysBack: 14 }));
     expect(res.status).toBe(200);
-    const data = await readSSEResult(res);
+    const data = await readSSEResult<ScanResult>(res);
     expect(data.total).toBe(2);
     expect(data.existingCount).toBe(1);
     expect(data.docs).toHaveLength(2);
@@ -153,7 +160,7 @@ describe("POST /api/docs/scan", () => {
 
     const res = await POST(scanRequest());
     expect(res.status).toBe(200);
-    const data = await readSSEResult(res);
+    const data = await readSSEResult<ScanResult>(res);
     expect(data.total).toBe(0);
     expect(data.docs).toEqual([]);
   });
@@ -188,7 +195,7 @@ describe("POST /api/docs/scan", () => {
 
     const res = await POST(scanRequest({ source: "gmail", daysBack: 7 }));
     expect(res.status).toBe(200);
-    const data = await readSSEResult(res);
+    const data = await readSSEResult<ScanResult>(res);
     expect(data.total).toBe(2);
     expect(data.existingCount).toBe(1);
     expect(data.errorCount).toBe(1);
@@ -209,7 +216,7 @@ describe("POST /api/docs/scan", () => {
     mockDoc.findMany.mockResolvedValue([]);
 
     const res = await POST(scanRequest({ source: "gmail", daysBack: 30 }));
-    const data = await readSSEResult(res);
+    const data = await readSSEResult<ScanResult>(res);
     expect(data.total).toBe(0);
     expect(data.docs).toEqual([]);
     expect(data.errorCount).toBe(0);

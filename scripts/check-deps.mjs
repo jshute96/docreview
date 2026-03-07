@@ -10,6 +10,27 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+const USAGE =
+  "Check that all dependencies from package.json are installed in node_modules.\n\n" +
+  "Usage:\n" +
+  "  node scripts/check-deps.mjs\n\n" +
+  "Flags:\n" +
+  "  --help  Show this help message\n";
+
+const KNOWN_FLAGS = new Set(["--help"]);
+const args = process.argv.slice(2);
+
+if (args.includes("--help")) {
+  process.stdout.write(USAGE);
+  process.exit(0);
+}
+
+const unknownFlags = args.filter(a => a.startsWith("-") && !KNOWN_FLAGS.has(a));
+if (unknownFlags.length) {
+  process.stderr.write(`Unknown flag(s): ${unknownFlags.join(", ")}\n\n${USAGE}`);
+  process.exit(1);
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 

@@ -1,5 +1,27 @@
+#!/usr/bin/env node
 import fs from 'node:fs';
 import { minify } from 'terser';
+
+const USAGE =
+  "Build bookmarklet source files into minified bookmarklet code.\n\n" +
+  "Usage:\n" +
+  "  node scripts/build-bookmarklet.mjs\n\n" +
+  "Flags:\n" +
+  "  --help  Show this help message\n";
+
+const KNOWN_FLAGS = new Set(["--help"]);
+const args = process.argv.slice(2);
+
+if (args.includes("--help")) {
+  process.stdout.write(USAGE);
+  process.exit(0);
+}
+
+const unknownFlags = args.filter(a => a.startsWith("-") && !KNOWN_FLAGS.has(a));
+if (unknownFlags.length) {
+  process.stderr.write(`Unknown flag(s): ${unknownFlags.join(", ")}\n\n${USAGE}`);
+  process.exit(1);
+}
 
 const bookmarklets = [
   {
