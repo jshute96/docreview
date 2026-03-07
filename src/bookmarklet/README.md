@@ -39,7 +39,7 @@ To ensure the bookmarklet is maintainable and robust against complex SPAs like G
 
 ### Google Drive Implementation
 Google Drive is a single-page application that dynamically renders and clears its DOM.
-- **Persistence:** The bookmarklet uses a `MutationObserver` and a 1-second background poll to re-scan the page and re-inject icons when Drive clears them.
+- **Persistence:** The bookmarklet uses a `MutationObserver` to re-scan the page and re-inject icons when Drive updates the DOM.
 - **Robust Targeting:**
   - **Selectors:** Uses ARIA roles (`[role="row"]`, `[role="gridcell"]`) and stable data attributes (`[data-column-id="16"]` for the Name column) rather than obfuscated CSS classes.
   - **Heuristic:** Inside a file row or grid item, it searches for the first `svg` or `img` to use as an anchor point for injection.
@@ -69,4 +69,5 @@ When installed via the `/bookmarklet` page, the bookmarklet **automatically poin
 - **Manual Activation:** You must click the bookmarklet once per session/refresh.
 - **Browser Security:** Uses a React `ref` bypass to allow `javascript:` URLs in the install UI.
 - **Icons:** Browsers do not support custom favicons for bookmarklet links in the bookmarks bar.
+- **Mixed Content:** When running Docreview on `http://localhost`, the icon image may be blocked by the browser on HTTPS Google pages. Users can allow mixed content via browser settings, or the bookmarklet could be updated to use an inline SVG data URI.
 - **Implementation Stability:** While improved with ARIA roles, injection still relies on Google's internal DOM structure (like column IDs), which may change.

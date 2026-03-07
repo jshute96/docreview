@@ -46,7 +46,6 @@ Easy:
   * cloud run
   * deployment scripts
 * offline mode - run with a database but no API login
-    * can the agent use this autonomously in a browser to test?
 
 * add a doc I'm requesting permission to
   * record notes about where it came from, when I asked permission
@@ -58,7 +57,9 @@ Easy:
   * capture linked-from notes when requesting permission
   * scroll to comments in the doc window without reloading
 
-* testing strategies
+* testing
+  * test scripts for playwright testing of all interactions
+
 * sandbox test environment
 * snapshot database and simulated or recorded google APIs
 * demo version with some fake docs or a starting snapshot

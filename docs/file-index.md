@@ -27,6 +27,7 @@ One-line descriptions of every source file, grouped by layer.
 | `open-in-docreview-code.ts` | Auto-generated minified "Open in Docreview" bookmarklet |
 | `open-in-docreview.txt` | Auto-generated minified "Open in Docreview" bookmarklet for manual install |
 | `README.md` | Documentation for bookmarklet internals, build process, and manual install instructions |
+| `testing.md` | Test cases for interactive Playwright-based bookmarklet testing |
 
 ## Assets (`public/`)
 
