@@ -13,16 +13,19 @@ One-line descriptions of every source file, grouped by layer.
 | `add/page.tsx` | Add document page (server) — standalone add-doc form, accepts optional `?doc=` query param |
 | `open/page.tsx` | Open page (server) — redirects to `/comments/<docId>` if doc exists, otherwise to `/add?doc=...` |
 | `bookmarklet/page.tsx` | Bookmarklet install page (server) — metadata and wrapper for `BookmarkletClient` |
-| `bookmarklet/bookmarklet-client.tsx` | Bookmarklet install page (client) — "Drag to Install" UI and interactive logic |
+| `bookmarklet/bookmarklet-client.tsx` | Bookmarklet install page (client) — "Drag to Install" UI for both bookmarklets |
 | `comments/[docId]/page.tsx` | Doc detail page (server) — fetches single doc with comments, renders `DocDetail`; `generateMetadata` sets page title |
 
 ## Bookmarklet (`src/bookmarklet/`)
 
 | File | Description |
 |------|-------------|
-| `bookmarklet-source.js` | Source of truth for the bookmarklet code (clean, documented) |
-| `bookmarklet-code.ts` | Automatically generated minified bookmarklet code for use in `page.tsx` |
-| `bookmarklet.txt` | Automatically generated minified bookmarklet code for manual install/distribution |
+| `bookmarklet-source.js` | Source for "Add Docreview links" bookmarklet (injects icons into Drive/Docs/Sheets/Slides) |
+| `bookmarklet-code.ts` | Auto-generated minified "Add Docreview links" bookmarklet |
+| `bookmarklet.txt` | Auto-generated minified "Add Docreview links" bookmarklet for manual install |
+| `open-in-docreview-source.js` | Source for "Open in Docreview" bookmarklet (redirects current doc to Docreview) |
+| `open-in-docreview-code.ts` | Auto-generated minified "Open in Docreview" bookmarklet |
+| `open-in-docreview.txt` | Auto-generated minified "Open in Docreview" bookmarklet for manual install |
 | `README.md` | Documentation for bookmarklet internals, build process, and manual install instructions |
 
 ## Assets (`public/`)
@@ -117,7 +120,7 @@ Shadcn/ui components:
 
 | File | Description |
 |------|-------------|
-| `build-bookmarklet.mjs` | Builds the bookmarklet by minifying `bookmarklet-source.js` and updating `.txt` and `.ts` outputs |
+| `build-bookmarklet.mjs` | Builds both bookmarklets by minifying source files and updating `.txt` and `.ts` outputs |
 | `check-deps.mjs` | Checks that required Node.js version and dependencies are installed |
 | `check-db.mjs` | Checks that the database is reachable and migrations are up-to-date |
 

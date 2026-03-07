@@ -1,25 +1,28 @@
-# Docreview Bookmarklet
+# Docreview Bookmarklets
 
-A bookmarklet that adds a Docreview icon to Google Workspace apps for quick access.
+Two bookmarklets for quick access to Docreview from Google Workspace.
 
-## User Experience
+## Add Docreview links
 
-The bookmarklet injects a violet Docreview icon into the following locations:
+Injects a violet Docreview icon into the following locations:
 
 1.  **Google Docs/Sheets/Slides:** In the titlebar, directly to the left of the document name.
 2.  **Google Drive:** In the file list (List/Search view) and grid view (Boxes), next to the file type icon.
 
-### Interaction
 - **Clicking the icon:** Opens the document in a new Docreview tab.
   - If the doc is already tracked, it goes to the **Comments view**.
   - If it's a new doc, it goes to the **Add Document** page.
 - **Dynamic Views:** On Google Drive, the bookmarklet automatically adds icons to new files as you scroll or navigate.
 
-### Installation
+## Open in Docreview
+
+A simpler bookmarklet — click it while viewing a Google Doc, Sheet, or Slides to open the document directly in Docreview. Shows an error if the current page is not a supported document.
+
+## Installation
 1. Start Docreview: `npm run dev`.
 2. In the Docreview inbox view, click the **Menu** icon (three horizontal lines) in the top-right.
 3. Select **Bookmarklet page** (this opens `http://localhost:3000/bookmarklet`).
-4. Drag the **Docreview links** button to your bookmarks bar.
+4. Drag either bookmarklet button to your bookmarks bar.
 
 ---
 
@@ -28,11 +31,11 @@ The bookmarklet injects a violet Docreview icon into the following locations:
 To ensure the bookmarklet is maintainable and robust against complex SPAs like Google Drive, it follows a structured build pipeline and aggressive event handling pattern.
 
 ### Build Pipeline
-1.  **Source:** `src/bookmarklet/bookmarklet-source.js` is the **source of truth**. It contains clean, documented JavaScript.
-2.  **Minification:** `scripts/build-bookmarklet.mjs` minifies the source and handles double-escaping for regex and backslashes.
-3.  **App Integration:** 
-    *   `src/bookmarklet/bookmarklet-code.ts` (generated) exports the minified string as a constant.
-    *   `src/app/bookmarklet/` contains the Next.js UI which imports this code.
+1.  **Source files:** `bookmarklet-source.js` (Add Docreview links) and `open-in-docreview-source.js` (Open in Docreview) are the **sources of truth**. They contain clean, documented JavaScript.
+2.  **Minification:** `scripts/build-bookmarklet.mjs` minifies each source and handles double-escaping for regex and backslashes.
+3.  **App Integration:**
+    *   `bookmarklet-code.ts` and `open-in-docreview-code.ts` (generated) export the minified strings as constants.
+    *   `src/app/bookmarklet/` contains the Next.js UI which imports both.
 
 ### Google Drive Implementation
 Google Drive is a single-page application that dynamically renders and clears its DOM.
@@ -53,7 +56,7 @@ Google Drive uses aggressive event listeners to handle row selection. To ensure 
 - Re-running the bookmarklet disconnects old observers, clears old intervals, and allows a fresh scan by checking for the absence of `.dr-link` elements.
 
 ### Building
-Building is **not automatic**. After editing `bookmarklet-source.js`, run:
+Building is **not automatic**. After editing either source file, run:
 ```bash
 npm run build:bookmarklet
 ```
