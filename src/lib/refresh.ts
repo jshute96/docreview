@@ -303,7 +303,31 @@ export async function executeRefresh(
   let gmailErrorCount = 0;
   let gmailSucceeded = false;
 
+  let staleGoogleDocIds: string[] = [];
+
   const discoveryPromises: Promise<void>[] = [];
+
+  // Catch-up: find docs with stale comments (never synced, or synced before
+  // last Drive modification). Runs in parallel with Drive/Gmail discovery.
+  discoveryPromises.push((async () => {
+    const rows = await prisma.$queryRaw<{ google_doc_id: string; title: string; comments_last_synced_at: Date | null }[]>`
+      SELECT google_doc_id, title, comments_last_synced_at FROM docs
+      WHERE user_id = ${userId}
+        AND is_deleted = false
+        AND (
+          comments_last_synced_at IS NULL
+          OR (last_modified_in_drive IS NOT NULL AND comments_last_synced_at < last_modified_in_drive)
+        )
+    `;
+    staleGoogleDocIds = rows.map(r => r.google_doc_id);
+    if (rows.length > 0) {
+      logInfo(`[Refresh] Found ${rows.length} docs with stale comments to catch up`);
+      for (const r of rows) {
+        const reason = r.comments_last_synced_at === null ? "never synced" : "synced before last modification";
+        logInfo(`[Refresh]   STALE "${r.title}" (${r.google_doc_id}) — ${reason}`);
+      }
+    }
+  })());
 
   if (includeDrive) {
     discoveryPromises.push((async () => {
@@ -364,13 +388,20 @@ export async function executeRefresh(
   const driveDocMap = new Map(driveDocs.map((d) => [d.googleDocId, d]));
   const gmailOnlyIds = gmailDocIds.filter((id) => !driveDocMap.has(id));
 
-  let gmailOnlyDocs: DriveDoc[] = [];
-  if (gmailOnlyIds.length > 0) {
-    logInfo(`[Refresh] Fetching Drive metadata for ${gmailOnlyIds.length} Gmail-only docs`);
-    gmailOnlyDocs = await fetchDocsByIds(userId, gmailOnlyIds);
+  // Stale docs not already covered by Drive or Gmail discovery
+  const coveredIds = new Set([...driveDocMap.keys(), ...gmailDocIds]);
+  const staleOnlyIds = staleGoogleDocIds.filter((id) => !coveredIds.has(id));
+
+  // Fetch metadata for Gmail-only and stale-only docs in one batch
+  const extraIds = [...gmailOnlyIds, ...staleOnlyIds];
+  let extraDocs: DriveDoc[] = [];
+  if (extraIds.length > 0) {
+    const staleSuffix = staleOnlyIds.length > 0 ? `, ${staleOnlyIds.length} stale catch-up` : "";
+    logInfo(`[Refresh] Fetching Drive metadata for ${extraIds.length} extra docs (${gmailOnlyIds.length} Gmail-only${staleSuffix})`);
+    extraDocs = await fetchDocsByIds(userId, extraIds);
   }
 
-  const allDiscoveryDocs = [...driveDocs, ...gmailOnlyDocs];
+  const allDiscoveryDocs = [...driveDocs, ...extraDocs];
   const gmailDocIdSet = new Set(gmailDocIds);
 
   const existingDocIds = new Set(
@@ -408,8 +439,8 @@ export async function executeRefresh(
 
   // Gmail docs that failed fetchDocsByIds — check if tracked and deleted
   if (gmailOnlyIds.length > 0) {
-    const returnedGmailIds = new Set(gmailOnlyDocs.map((d) => d.googleDocId));
-    extraDeleted += await handleMissingGmailDocs(userId, gmailOnlyIds, returnedGmailIds, existingDocIds);
+    const returnedExtraIds = new Set(extraDocs.map((d) => d.googleDocId));
+    extraDeleted += await handleMissingGmailDocs(userId, gmailOnlyIds, returnedExtraIds, existingDocIds);
   }
 
   // Save tokens - only if not all failed (safety check)

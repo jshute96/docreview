@@ -157,7 +157,7 @@ model Doc {
   owner                String?
   createdTimeInDrive   DateTime?  @map("created_time_in_drive")
   addedAt              DateTime   @default(now()) @map("added_at")  // when this doc was first added to docreview
-  commentsLastSyncedAt DateTime?  @map("comments_last_synced_at")   // stamped each sync; currently write-only (incremental comment sync was dropped because Drive's startModifiedTime silently excludes suggestions)
+  commentsLastSyncedAt DateTime?  @map("comments_last_synced_at")   // stamped with sync start time on full success (comments + suggestions); used by refresh to catch up stale docs
   user                 User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   labels               DocLabel[]
   comments             Comment[]

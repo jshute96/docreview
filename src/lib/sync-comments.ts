@@ -31,6 +31,10 @@ export async function syncComments(
   permissionDenied?: boolean;
   transientError?: boolean;
 }> {
+  // Record sync start time BEFORE fetching — any changes that arrive during
+  // the sync will have timestamps after this, ensuring the next sync covers them.
+  const syncStartedAt = new Date();
+
   let comments;
   try {
     comments = await fetchComments(driveAuth, doc.googleDocId, undefined, userEmail);
@@ -46,6 +50,12 @@ export async function syncComments(
     }
     if (code === 403) {
       logWarning(`[Comments] permission denied for ${doc.googleDocId} (code 403)`);
+      // Stamp so we don't retry every refresh — permissions rarely change,
+      // and if they do, lastModifiedInDrive will update to trigger a re-sync.
+      await prisma.doc.update({
+        where: { docId: doc.docId },
+        data: { commentsLastSyncedAt: syncStartedAt },
+      });
       return {
         commentsCreated: 0, commentsUpdated: 0,
         suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
@@ -281,12 +291,12 @@ export async function syncComments(
     deleted = result.count;
   }
 
-  await prisma.doc.update({
-    where: { docId: doc.docId },
-    data: { commentsLastSyncedAt: new Date() },
-  });
-
   if (doc.mimeType !== DOCS_MIME_TYPE) {
+    // No suggestions to sync — stamp and return
+    await prisma.doc.update({
+      where: { docId: doc.docId },
+      data: { commentsLastSyncedAt: syncStartedAt },
+    });
     logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive (${created} new, ${updatedCount} updated, ${deleted} deleted)${shouldUnarchive ? " → unarchive" : ""}`);
     return {
       commentsCreated: created,
@@ -316,6 +326,12 @@ export async function syncComments(
   }
 
   if (suggestionPermissionDenied) {
+    // Comments synced successfully; suggestions denied (common for view-only docs).
+    // Stamp so we don't retry every refresh.
+    await prisma.doc.update({
+      where: { docId: doc.docId },
+      data: { commentsLastSyncedAt: syncStartedAt },
+    });
     logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive (${created} new, ${updatedCount} updated) (suggestions skipped: permission denied)`);
     return {
       commentsCreated: created,
@@ -388,6 +404,14 @@ export async function syncComments(
   }
 
   const suggestionsCreated = suggestionsToCreate.length;
+
+  // Both comments and suggestions synced successfully — stamp with the time
+  // we started the sync so any changes arriving during the sync are covered next time.
+  await prisma.doc.update({
+    where: { docId: doc.docId },
+    data: { commentsLastSyncedAt: syncStartedAt },
+  });
+
   logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} comments from Drive (${created} new, ${updatedCount} updated, ${deleted} deleted); ${docsSuggestionsForSync.length} suggestions (${suggestionsCreated} new, ${suggestionsUpdated} updated, ${suggestionsResolved} resolved)${shouldUnarchive ? " → unarchive" : ""}`);
   return {
     commentsCreated: created,

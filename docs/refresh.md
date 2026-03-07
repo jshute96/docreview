@@ -329,6 +329,63 @@ know the service is healthy and can safely advance the token.
 
 ---
 
+## Comment Sync Recovery (Stale Comment Catch-up)
+
+Doc metadata and comment sync are not atomic — a doc can be successfully upserted but its
+comment sync may fail (transient API error, suggestion permission denied, network timeout).
+When this happens, the doc exists in the database but its comments may be stale or missing.
+
+### How staleness is tracked
+
+`commentsLastSyncedAt` on the `Doc` record is stamped with the **sync start time** (not
+completion time) when comment sync fully succeeds. This ensures that any changes arriving
+during the sync window are covered by the next sync. The timestamp is only written when
+**both** comments and suggestions complete successfully:
+
+| Scenario | Stamp? | Rationale |
+|----------|--------|-----------|
+| Full success (comments + suggestions) | Yes | Everything synced |
+| Non-Docs file (no suggestions to sync) | Yes | Comments are the only sync target |
+| Comment fetch 404 (deleted) | No | Doc marked `isDeleted`, excluded from stale query |
+| Comment fetch 403 (permission denied) | Yes | Permissions rarely change; `lastModifiedInDrive` will trigger re-sync if they do |
+| Comment fetch transient error | No | Worth retrying next refresh |
+| Suggestion fetch 403 (permission denied) | Yes | Common for view-only docs; comments synced successfully |
+| Suggestion fetch transient error | No | Worth retrying next refresh |
+
+### How stale docs are caught up
+
+During `executeRefresh`, a catch-up query runs **in parallel** with Drive and Gmail
+discovery (no added latency). It finds all non-deleted docs where:
+
+- `commentsLastSyncedAt IS NULL` — comments were never successfully synced (e.g., Add or
+  Load followed by a transient API failure), or
+- `commentsLastSyncedAt < lastModifiedInDrive` — the doc was modified in Drive after
+  the last successful comment sync.
+
+These doc IDs are deduplicated against the docs already discovered by Drive changes and
+Gmail, then merged into the same metadata fetch and `upsertDocsAndSyncComments` pipeline.
+There is no separate catch-up phase — stale docs flow through the same processing as
+everything else.
+
+### Paths that can produce stale docs
+
+| Path | How it can fail | Recovery |
+|------|----------------|----------|
+| **Add** (`/api/docs/add`) | Doc created, `syncComments` hits transient error | `commentsLastSyncedAt` stays null; caught by next Refresh |
+| **Re-add** (`/api/docs/[docId]/re-add`) | Transaction deletes old + creates new, `syncComments` fails outside transaction | Same as Add, but old comments are lost |
+| **Load** (`POST /api/docs?mode=load`) | Docs upserted, comment sync fails for some | Same as Add |
+| **Refresh** (Drive token held back) | `syncComments` transient error → Drive token not advanced | Doc reappears in next `changes.list` AND caught by stale query |
+
+### Token holdback interaction
+
+The stale catch-up is complementary to the existing Drive token holdback (see Transient
+Error Handling above). Token holdback ensures that docs with transient errors during
+Refresh reappear in the next `changes.list`. The stale catch-up additionally covers docs
+that were added outside the changes feed (Add, Re-add, Load) where there is no token to
+hold back.
+
+---
+
 ## Server Logging
 
 The sync handler and comment sync engine log structured messages at each stage. All log lines
