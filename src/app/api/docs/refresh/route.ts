@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
-import { invalidGrantResponse } from "@/lib/google-drive";
 import { executeRefresh, type RefreshSource } from "@/lib/refresh";
-import { logError, logInfo } from "@/lib/log";
+import { logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
+import { createProgressStream } from "@/lib/sse";
 
 const VALID_SOURCES = new Set<RefreshSource>(["drive", "gmail"]);
 
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     const userEmail = session.user.email ?? undefined;
 
     let body: Record<string, unknown> = {};
-    try { body = await req.json(); } catch { /* no body → defaults */ }
+    try { body = await req.json(); } catch { /* no body -> defaults */ }
 
     // Parse and validate sources (default to both)
     const rawSources = Array.isArray(body.sources) ? body.sources : ["drive", "gmail"];
@@ -28,14 +28,8 @@ export async function POST(req: NextRequest) {
 
     logInfo(`[API] Refresh request: sources=${sources.join(",")}`);
 
-    try {
-      const result = await executeRefresh(userId, userEmail, sources);
-      return NextResponse.json(result);
-    } catch (err) {
-      const reauth = invalidGrantResponse(err);
-      if (reauth) return reauth;
-      logError("[Refresh] Error:", err);
-      return NextResponse.json({ error: "Refresh failed" }, { status: 502 });
-    }
+    return createProgressStream(async (send) => {
+      return await executeRefresh(userId, userEmail, sources, send);
+    });
   });
 }

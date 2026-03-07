@@ -27,6 +27,12 @@ import { filterDocs, sortDocs } from "@/lib/doc-filters";
 import type { SortCol, SortDir } from "@/lib/doc-filters";
 import { LabelProvider } from "@/contexts/label-context";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
+import {
+  fetchWithProgress,
+  handleRefreshProgress,
+  formatResultParts,
+  dismissProgressToasts,
+} from "@/lib/stream-progress";
 import { UNREAD_COMMENTS_TOOLTIP, INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 
 interface DocTableProps {
@@ -195,14 +201,12 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
     const contextId = generateContextId();
     try {
       const docIds = filteredDocs.map((d) => d.docId);
-      const syncRes = await apiFetch("/api/docs/refresh-selected", {
+      const data = await fetchWithProgress<Record<string, number>>("/api/docs/refresh-selected", {
         method: "POST",
         contextId,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ docIds }),
-      });
-      if (!syncRes.ok) throw new Error("Refresh failed");
-      const data = await syncRes.json();
+      }, handleRefreshProgress);
 
       const docsRes = await apiFetch("/api/docs?includeArchived=true", { contextId });
       if (!docsRes.ok) throw new Error("Failed to reload docs");
@@ -211,14 +215,11 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
       setDocs(newDocs);
       broadcastChange({ type: "docs" }, contextId);
 
-      const parts = [
-        data.updated > 0 ? `${data.updated} updated` : "",
-        data.deleted > 0 ? `${data.deleted} deleted` : "",
-        data.unarchived > 0 ? `${data.unarchived} unarchived` : "",
-      ].filter(Boolean).join(", ");
-      const errorSuffix = data.errorCount > 0 ? ` (${data.errorCount} errors)` : "";
-      toast.success(`Refresh complete — ${parts || "no updates"}${errorSuffix}`, { duration: 8000 });
+      dismissProgressToasts();
+      const { summary, errorSuffix } = formatResultParts(data);
+      toast.success(`Refresh complete — ${summary}${errorSuffix}`, { duration: 8000 });
     } catch (err) {
+      dismissProgressToasts();
       if (!isAuthError(err)) toast.error("Failed to refresh selected docs");
     } finally {
       setRefreshing(null);
@@ -229,9 +230,10 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
     setRefreshing("full");
     const contextId = generateContextId();
     try {
-      const syncRes = await apiFetch("/api/docs?mode=full-refresh", { method: "POST", contextId });
-      if (!syncRes.ok) throw new Error("Sync failed");
-      const data = await syncRes.json();
+      const data = await fetchWithProgress<Record<string, number>>("/api/docs?mode=full-refresh", {
+        method: "POST",
+        contextId,
+      }, handleRefreshProgress);
 
       const docsRes = await apiFetch("/api/docs?includeArchived=true", { contextId });
       if (!docsRes.ok) throw new Error("Failed to reload docs");
@@ -240,14 +242,11 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
       setDocs(newDocs);
       broadcastChange({ type: "docs" }, contextId);
 
-      const parts = [
-        data.added > 0 ? `${data.added} new` : "",
-        data.updated > 0 ? `${data.updated} updated` : "",
-        data.deleted > 0 ? `${data.deleted} deleted` : "",
-        data.unarchived > 0 ? `${data.unarchived} unarchived` : "",
-      ].filter(Boolean).join(", ");
-      toast.success(`Full refresh complete — ${parts || "no updates"}`, { duration: 8000 });
+      dismissProgressToasts();
+      const { summary, errorSuffix } = formatResultParts(data);
+      toast.success(`Full refresh complete — ${summary}${errorSuffix}`, { duration: 8000 });
     } catch (err) {
+      dismissProgressToasts();
       if (!isAuthError(err)) toast.error("Failed to sync with Google Drive");
     } finally {
       setRefreshing(null);
@@ -258,14 +257,12 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
     setRefreshing(sources.length === 1 ? sources[0] : "main");
     const contextId = generateContextId();
     try {
-      const syncRes = await apiFetch("/api/docs/refresh", {
+      const data = await fetchWithProgress<Record<string, number>>("/api/docs/refresh", {
         method: "POST",
         contextId,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sources }),
-      });
-      if (!syncRes.ok) throw new Error("Refresh failed");
-      const data = await syncRes.json();
+      }, handleRefreshProgress);
 
       const docsRes = await apiFetch("/api/docs?includeArchived=true", { contextId });
       if (!docsRes.ok) throw new Error("Failed to reload docs");
@@ -274,18 +271,14 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
       setDocs(newDocs);
       broadcastChange({ type: "docs" }, contextId);
 
+      dismissProgressToasts();
       const label = sources.length === 1
         ? sources[0] === "drive" ? "Drive refresh" : "Gmail refresh"
         : "Refresh";
-      const parts = [
-        data.added > 0 ? `${data.added} new` : "",
-        data.updated > 0 ? `${data.updated} updated` : "",
-        data.deleted > 0 ? `${data.deleted} deleted` : "",
-        data.unarchived > 0 ? `${data.unarchived} unarchived` : "",
-      ].filter(Boolean).join(", ");
-      const errorSuffix = data.errorCount > 0 ? ` (${data.errorCount} errors)` : "";
-      toast.success(`${label} complete — ${parts || "no updates"}${errorSuffix}`, { duration: 8000 });
+      const { summary, errorSuffix } = formatResultParts(data);
+      toast.success(`${label} complete — ${summary}${errorSuffix}`, { duration: 8000 });
     } catch (err) {
+      dismissProgressToasts();
       if (!isAuthError(err)) toast.error("Failed to refresh");
     } finally {
       setRefreshing(null);

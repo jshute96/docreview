@@ -147,8 +147,11 @@ Shadcn/ui components:
 | `role-colors.ts` | Tailwind class maps for Author (blue) and Reviewer (violet) role badges/filters |
 | `load-options.ts` | `parseLoadOptions()` — shared validation for scan/load request body (daysBack, ownership, includeSharedDrives, source) |
 | `log.ts` | `logError()`, `logWarning()`, and `logInfo()` — centralized logging helpers; console output (colored) + daily file output to `logs/` with timestamps and request IDs |
+| `progress-events.ts` | Shared progress event types (`ProgressEvent`, `OnProgress`) used by SSE server (sse.ts) and client (stream-progress.ts) |
 | `request-context.ts` | `runWithRequestId(method, req, fn)` and `getRequestId()` — AsyncLocalStorage-based request ID context for correlating log lines across a single API request; extracts URL and client context ID from request; logs `[API] METHOD /path` silently on entry |
+| `sse.ts` | Server-side SSE (Server-Sent Events) streaming — `createProgressStream()` wraps long-running API operations, sends progress/result/error events over a ReadableStream |
 | `status.ts` | Read/write `Status` table — tracks `driveChangesPageToken` and `lastGmailUpdateTimestamp` per user for incremental sync |
+| `stream-progress.ts` | Client-side SSE reader + toast handlers — `fetchWithProgress()` reads SSE streams, `handleRefreshProgress()` maps events to Sonner toasts, `formatResultParts()` formats result summaries |
 | `tri-state.ts` | `TriState` type (`off`/`include`/`exclude`), cycle function, partition helper |
 | `utils.ts` | `cn()` (clsx+twMerge), `contrastText()` for label colors, `formatDate()` (full timestamp for logging), `formatDateFriendly()` (relative display format) |
 | `__mocks__/prisma.ts` | Vitest mock of PrismaClient for unit tests |

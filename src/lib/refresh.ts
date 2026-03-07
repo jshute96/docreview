@@ -13,6 +13,7 @@ import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "@/lib/status";
 import { logError, logWarning, logInfo, logToFile } from "@/lib/log";
 import { formatDate, pluralize } from "@/lib/utils";
+import type { OnProgress } from "@/lib/progress-events";
 import type { Doc } from "@prisma/client";
 
 const DEBUG_FILE = "drive-changes-debug.log";
@@ -54,7 +55,8 @@ export async function upsertDocsAndSyncComments(
     fromGmailDocIdSet?: Set<string>;
     mode?: "refresh" | "full-refresh" | "selected" | "load";
     docId?: string; // Optional: restrict upsert to a specific docId (for single-doc refresh)
-  }
+  },
+  onProgress?: OnProgress,
 ): Promise<RefreshResult> {
   const { existingDocIds, fromGmailDocIdSet = new Set(), mode = "refresh", docId } = options;
   const driveAuth = await getDriveClient(userId);
@@ -127,8 +129,21 @@ export async function upsertDocsAndSyncComments(
 
   // Sync comments for all docs we just upserted
   logInfo(`[Refresh] Syncing comments for ${processedDocs.length} docs`);
+  let syncCompleted = 0;
+  let lastProgressTime = 0;
+  const syncTotal = processedDocs.length;
+  onProgress?.({ phase: "sync", completed: 0, total: syncTotal });
   const syncResults = await Promise.all(
-    processedDocs.map((doc) => syncComments(doc, driveAuth, userEmail))
+    processedDocs.map(async (doc) => {
+      const result = await syncComments(doc, driveAuth, userEmail);
+      syncCompleted++;
+      const now = Date.now();
+      if (syncCompleted === syncTotal || now - lastProgressTime >= 500) {
+        lastProgressTime = now;
+        onProgress?.({ phase: "sync", completed: syncCompleted, total: syncTotal });
+      }
+      return result;
+    })
   );
   const commentsCreated = syncResults.reduce((sum, r) => sum + r.commentsCreated, 0);
   const commentsUpdated = syncResults.reduce((sum, r) => sum + r.commentsUpdated, 0);
@@ -178,7 +193,8 @@ async function refreshGoogleDocIds(
   userId: string,
   userEmail: string | undefined,
   googleDocIds: string[],
-  mode: "selected" | "full-refresh"
+  mode: "selected" | "full-refresh",
+  onProgress?: OnProgress,
 ): Promise<RefreshResult> {
   const t0 = Date.now();
   if (googleDocIds.length === 0) {
@@ -195,6 +211,7 @@ async function refreshGoogleDocIds(
   logToFile(DEBUG_FILE, `Starting exhaustive refresh (${mode}) for ${googleDocIds.length} IDs`);
 
   // Exhaustive metadata fetch for these specific IDs
+  onProgress?.({ phase: "metadata", count: googleDocIds.length });
   const driveDocs = (await fetchDocsByIds(userId, googleDocIds)) || [];
 
   const dbDocs = await prisma.doc.findMany({
@@ -207,7 +224,8 @@ async function refreshGoogleDocIds(
     userId,
     userEmail,
     driveDocs,
-    { existingDocIds, mode }
+    { existingDocIds, mode },
+    onProgress,
   );
 
   // Deletion detection: if fetchDocsByIds missed some docs, check if they are actually deleted
@@ -283,7 +301,8 @@ export async function handleMissingGmailDocs(
 export async function executeRefresh(
   userId: string,
   userEmail: string | undefined,
-  sources: RefreshSource[]
+  sources: RefreshSource[],
+  onProgress?: OnProgress,
 ): Promise<RefreshResult> {
   const t0 = Date.now();
   const includeDrive = sources.includes("drive");
@@ -331,6 +350,7 @@ export async function executeRefresh(
 
   if (includeDrive) {
     discoveryPromises.push((async () => {
+      onProgress?.({ phase: "drive", status: "reading" });
       const savedToken = status?.driveChangesPageToken;
       if (savedToken) {
         logInfo("[Refresh] Drive: using changes.list with saved token");
@@ -343,6 +363,7 @@ export async function executeRefresh(
           newPageToken = result.newPageToken;
           driveSucceeded = true;
           logToFile(DEBUG_FILE, `Ended changes.list sync: ${driveDocs.length} changed docs, ${deletedDocIdsFromDrive.size} total deletions reported by Drive`);
+          onProgress?.({ phase: "drive", status: "done", count: driveDocs.length });
         } catch (err: unknown) {
           const code = (err as { code?: number | string })?.code;
           if (code === 404 || code === "404") {
@@ -352,6 +373,7 @@ export async function executeRefresh(
             driveDocs = await listRecentDocs(userId);
             driveSucceeded = true;
             logToFile(DEBUG_FILE, `Ended files.list sync (fallback): ${driveDocs.length} docs`);
+            onProgress?.({ phase: "drive", status: "done", count: driveDocs.length });
           } else {
             logToFile(DEBUG_FILE, "Ended changes.list sync with error", { error: err });
             throw err;
@@ -365,12 +387,14 @@ export async function executeRefresh(
         driveDocs = await listRecentDocs(userId);
         driveSucceeded = true;
         logToFile(DEBUG_FILE, `Ended files.list sync (bootstrap): ${driveDocs.length} docs`);
+        onProgress?.({ phase: "drive", status: "done", count: driveDocs.length });
       }
     })());
   }
 
   if (includeGmail) {
     discoveryPromises.push((async () => {
+      onProgress?.({ phase: "gmail", status: "reading" });
       const since = status?.lastGmailUpdateTimestamp
         ?? new Date(Date.now() - DEFAULT_GMAIL_DAYS_BACK * 24 * 60 * 60 * 1000);
       logInfo(`[Refresh] Gmail: scanning since ${formatDate(since)}`);
@@ -379,6 +403,7 @@ export async function executeRefresh(
       gmailErrorCount = result.errorCount;
       gmailSucceeded = true;
       logInfo(`[Refresh] Gmail: ${gmailDocIds.length} doc IDs (${gmailErrorCount} errors)`);
+      onProgress?.({ phase: "gmail", status: "done", count: gmailDocIds.length, errorCount: gmailErrorCount });
     })());
   }
 
@@ -415,7 +440,8 @@ export async function executeRefresh(
     userId,
     userEmail,
     allDiscoveryDocs,
-    { existingDocIds, fromGmailDocIdSet: gmailDocIdSet, mode: "refresh" }
+    { existingDocIds, fromGmailDocIdSet: gmailDocIdSet, mode: "refresh" },
+    onProgress,
   );
 
   let extraDeleted = 0;
@@ -479,24 +505,26 @@ export async function executeRefresh(
 export async function refreshSelectedDocs(
   userId: string,
   userEmail: string | undefined,
-  docIds: string[]
+  docIds: string[],
+  onProgress?: OnProgress,
 ): Promise<RefreshResult> {
   const docs = await prisma.doc.findMany({
     where: { userId, docId: { in: docIds } },
     select: { googleDocId: true }
   });
   const googleDocIds = docs.map(d => d.googleDocId);
-  return refreshGoogleDocIds(userId, userEmail, googleDocIds, "selected");
+  return refreshGoogleDocIds(userId, userEmail, googleDocIds, "selected", onProgress);
 }
 
 export async function executeFullRefresh(
   userId: string,
-  userEmail: string | undefined
+  userEmail: string | undefined,
+  onProgress?: OnProgress,
 ): Promise<RefreshResult> {
   const docs = await prisma.doc.findMany({
     where: { userId, isDeleted: false },
     select: { googleDocId: true }
   });
   const googleDocIds = docs.map(d => d.googleDocId);
-  return refreshGoogleDocIds(userId, userEmail, googleDocIds, "full-refresh");
+  return refreshGoogleDocIds(userId, userEmail, googleDocIds, "full-refresh", onProgress);
 }

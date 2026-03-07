@@ -7,6 +7,12 @@ import { Button } from "@/components/ui/button";
 import type { DocWithLabels } from "@/types";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
+import {
+  fetchWithProgress,
+  handleRefreshProgress,
+  formatResultParts,
+  dismissProgressToasts,
+} from "@/lib/stream-progress";
 
 interface RefreshButtonProps {
   onRefresh: (docs: DocWithLabels[]) => void;
@@ -22,14 +28,12 @@ export function RefreshButton({ onRefresh, disabled, onLoadingChange }: RefreshB
     onLoadingChange?.(true);
     const contextId = generateContextId();
     try {
-      const syncRes = await apiFetch("/api/docs/refresh", {
+      const data = await fetchWithProgress<Record<string, number>>("/api/docs/refresh", {
         method: "POST",
         contextId,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sources: ["drive", "gmail"] }),
-      });
-      if (!syncRes.ok) throw new Error("Refresh failed");
-      const data = await syncRes.json();
+      }, handleRefreshProgress);
 
       const docsRes = await apiFetch("/api/docs?includeArchived=true", { contextId });
       if (!docsRes.ok) throw new Error("Failed to reload docs");
@@ -38,15 +42,11 @@ export function RefreshButton({ onRefresh, disabled, onLoadingChange }: RefreshB
       onRefresh(docs);
       broadcastChange({ type: "docs" }, contextId);
 
-      const parts = [
-        data.added > 0 ? `${data.added} new` : "",
-        data.updated > 0 ? `${data.updated} updated` : "",
-        data.deleted > 0 ? `${data.deleted} deleted` : "",
-        data.unarchived > 0 ? `${data.unarchived} unarchived` : "",
-      ].filter(Boolean).join(", ");
-      const errorSuffix = data.errorCount > 0 ? ` (${data.errorCount} errors)` : "";
-      toast.success(`Refresh complete — ${parts || "no updates"}${errorSuffix}`, { duration: 8000 });
+      dismissProgressToasts();
+      const { summary, errorSuffix } = formatResultParts(data);
+      toast.success(`Refresh complete — ${summary}${errorSuffix}`, { duration: 8000 });
     } catch (err) {
+      dismissProgressToasts();
       if (!isAuthError(err)) toast.error("Failed to refresh");
     } finally {
       setLoading(false);

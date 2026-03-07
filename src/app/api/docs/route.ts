@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { listRecentDocs, fetchDocsByIds, getDriveClient, getChangesStartPageToken, listChanges, invalidGrantResponse } from "@/lib/google-drive";
+import { listRecentDocs, fetchDocsByIds, getDriveClient, getChangesStartPageToken, listChanges } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { pluralize } from "@/lib/utils";
 import { executeFullRefresh } from "@/lib/refresh";
 import { getStatus, updateDriveChangesToken } from "@/lib/status";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 import { parseLoadOptions } from "@/lib/load-options";
-import { logError, logWarning, logInfo } from "@/lib/log";
+import { logWarning, logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
+import { createProgressStream } from "@/lib/sse";
+import type { OnProgress } from "@/lib/progress-events";
 
 export async function GET(req: NextRequest) {
   return runWithRequestId("GET", req, async () => {
@@ -82,25 +84,45 @@ export async function POST(req: NextRequest) {
 
   logInfo(`[Sync] Starting ${mode} sync`);
   if (mode === "full-refresh") {
-    try {
-      const result = await executeFullRefresh(userId, userEmail);
-      const response = {
+    return createProgressStream(async (send) => {
+      const result = await executeFullRefresh(userId, userEmail, send);
+      return {
         ...result,
         mode: "full-refresh" as const,
-        total: result.updated + result.added
+        total: result.updated + result.added,
       };
-      return NextResponse.json(response);
-    } catch (err) {
-      const reauth = invalidGrantResponse(err);
-      if (reauth) return reauth;
-      logError("[Sync] Full refresh error:", err);
-      return NextResponse.json({ error: "Full refresh failed" }, { status: 502 });
-    }
+    });
   }
 
   if (mode === "load") {
     logInfo(`[Sync] Load options: source=${source}, daysBack=${daysBack}, ownership=${ownership}, includeSharedDrives=${includeSharedDrives}${selectedSet ? `, ${selectedSet.size} docs selected` : ""}`);
   }
+
+  return createProgressStream(async (send: OnProgress) => {
+    return await executeLoadOrRefresh({
+      userId, userEmail, mode, source,
+      selectedSet, loadLabelIds, loadNotes, loadStatus, loadIsStarred, send,
+    });
+  });
+  });
+}
+
+async function executeLoadOrRefresh(opts: {
+  userId: string;
+  userEmail: string | undefined;
+  mode: "refresh" | "load";
+  source: string;
+  selectedSet: Set<string> | null;
+  loadLabelIds: string[];
+  loadNotes: string;
+  loadStatus: "INBOX" | "ARCHIVED" | undefined;
+  loadIsStarred: boolean | undefined;
+  send: OnProgress;
+}) {
+  const {
+    userId, userEmail, mode, source, selectedSet,
+    loadLabelIds, loadNotes, loadStatus, loadIsStarred, send,
+  } = opts;
   const t0 = Date.now();
 
   let driveDocs: import("@/lib/google-drive").DriveDoc[] = [];
@@ -108,53 +130,45 @@ export async function POST(req: NextRequest) {
   let driveAuth;
   let newPageToken: string | undefined;
 
-  try {
-    driveAuth = await getDriveClient(userId);
+  driveAuth = await getDriveClient(userId);
 
-    if (mode === "load") {
-      // Load mode: fetch metadata directly by selected doc IDs
-      const docIds = selectedSet ? [...selectedSet] : [];
-      logInfo(`[Sync] Load (${source}): fetching metadata for ${docIds.length} docs by ID`);
-      driveDocs = await fetchDocsByIds(userId, docIds);
-    } else {
-      // Refresh / full-refresh: use changes.list with saved token
-      const status = await getStatus(userId);
-      const savedToken = status?.driveChangesPageToken;
+  if (mode === "load") {
+    // Load mode: fetch metadata directly by selected doc IDs
+    const docIds = selectedSet ? [...selectedSet] : [];
+    logInfo(`[Sync] Load (${source}): fetching metadata for ${docIds.length} docs by ID`);
+    send({ phase: "metadata", count: docIds.length });
+    driveDocs = await fetchDocsByIds(userId, docIds);
+  } else {
+    // Refresh: use changes.list with saved token
+    send({ phase: "drive", status: "reading" });
+    const status = await getStatus(userId);
+    const savedToken = status?.driveChangesPageToken;
 
-      if (savedToken) {
-        logInfo(`[Sync] ${mode}: using changes.list with saved token`);
-        try {
-          const result = await listChanges(userId, savedToken);
-          driveDocs = result.docs;
-          deletedDocIds = result.deletedDocIds;
-          newPageToken = result.newPageToken;
-          logInfo(`[Sync] changes.list → ${driveDocs.length} changed docs, ${deletedDocIds.size} deletions, newPageToken ${newPageToken}`);
-        } catch (err: unknown) {
-          // Expired/invalid token → fall back to bootstrap
-          const code = (err as { code?: number | string })?.code;
-          if (code === 404 || code === "404") {
-            logWarning("[Sync] changes.list token expired, falling back to bootstrap (7-day files.list)");
-            newPageToken = await getChangesStartPageToken(userId);
-            driveDocs = await listRecentDocs(userId); // default 7-day window
-          } else {
-            throw err;
-          }
+    if (savedToken) {
+      logInfo(`[Sync] ${mode}: using changes.list with saved token`);
+      try {
+        const result = await listChanges(userId, savedToken);
+        driveDocs = result.docs;
+        deletedDocIds = result.deletedDocIds;
+        newPageToken = result.newPageToken;
+        logInfo(`[Sync] changes.list -> ${driveDocs.length} changed docs, ${deletedDocIds.size} deletions, newPageToken ${newPageToken}`);
+      } catch (err: unknown) {
+        // Expired/invalid token -> fall back to bootstrap
+        const code = (err as { code?: number | string })?.code;
+        if (code === 404 || code === "404") {
+          logWarning("[Sync] changes.list token expired, falling back to bootstrap (7-day files.list)");
+          newPageToken = await getChangesStartPageToken(userId);
+          driveDocs = await listRecentDocs(userId);
+        } else {
+          throw err;
         }
-      } else {
-        // Bootstrap: no saved token — establish baseline and do a 7-day scan
-        logInfo(`[Sync] ${mode}: no saved token, bootstrapping (7-day files.list)`);
-        newPageToken = await getChangesStartPageToken(userId);
-        driveDocs = await listRecentDocs(userId); // default 7-day window
       }
+    } else {
+      logInfo(`[Sync] ${mode}: no saved token, bootstrapping (7-day files.list)`);
+      newPageToken = await getChangesStartPageToken(userId);
+      driveDocs = await listRecentDocs(userId);
     }
-  } catch (err) {
-    const reauth = invalidGrantResponse(err);
-    if (reauth) return reauth;
-    logError("[Sync] Drive error:", err);
-    return NextResponse.json(
-      { error: "Failed to fetch from Google Drive" },
-      { status: 502 }
-    );
+    send({ phase: "drive", status: "done", count: driveDocs.length });
   }
 
   let added = 0;
@@ -273,13 +287,27 @@ export async function POST(req: NextRequest) {
   // mode (via changes.list). Load mode only processes the specific docs the user
   // selected, so there's no meaningful "missing from results" set to check.
 
-  // Sync comments: refresh syncs only changed docs; load syncs docs returned by Drive
+  // Sync comments for docs returned by Drive
   const commentDocs = await prisma.doc.findMany({
     where: { userId, isDeleted: false, googleDocId: { in: [...driveDocIds] } },
   });
   logInfo(`[Sync] Syncing comments for ${commentDocs.length} docs (${mode === "refresh" ? "changed docs only" : "selected docs"})`);
+
+  let syncCompleted = 0;
+  let lastProgressTime = 0;
+  const syncTotal = commentDocs.length;
+  send({ phase: "sync", completed: 0, total: syncTotal });
   const syncResults = await Promise.all(
-    commentDocs.map((doc) => syncComments(doc, driveAuth, userEmail))
+    commentDocs.map(async (doc) => {
+      const result = await syncComments(doc, driveAuth, userEmail);
+      syncCompleted++;
+      const now = Date.now();
+      if (syncCompleted === syncTotal || now - lastProgressTime >= 500) {
+        lastProgressTime = now;
+        send({ phase: "sync", completed: syncCompleted, total: syncTotal });
+      }
+      return result;
+    })
   );
   const commentsCreated = syncResults.reduce((sum, r) => sum + r.commentsCreated, 0);
   const commentsUpdated = syncResults.reduce((sum, r) => sum + r.commentsUpdated, 0);
@@ -349,7 +377,7 @@ export async function POST(req: NextRequest) {
     ? `, ${pluralize(suggestionsCreated, "new suggestion")}, ${pluralize(suggestionsUpdated, "updated suggestion")}`
     : "";
   logInfo(`[Sync] ${mode} complete in ${elapsed}ms: ${counts.join(", ")}, ${commentStr}${suggestionStr}`);
-  return NextResponse.json({
+  return {
     mode,
     added,
     updated,
@@ -360,8 +388,5 @@ export async function POST(req: NextRequest) {
     commentsUpdated,
     suggestionsCreated,
     suggestionsUpdated,
-    // Backward compatibility
-    comments: commentsCreated + suggestionsCreated
-  });
-  });
+  };
 }

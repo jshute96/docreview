@@ -3,6 +3,12 @@
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
+import {
+  fetchWithProgress,
+  handleRefreshProgress,
+  formatResultParts,
+  dismissProgressToasts,
+} from "@/lib/stream-progress";
 import { X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -137,7 +143,10 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
     abortRef.current = controller;
     setScanning(true);
     setScanResult(null);
+    const scanToastId = "scan-progress";
+    const sourceLabel = source === "gmail" ? "Gmail" : "Drive";
     try {
+      toast.loading(`Scanning ${sourceLabel}...`, { id: scanToastId });
       const scanBody = source === "gmail"
         ? { source: "gmail", daysBack: options.daysBack }
         : { source: "drive", ...options };
@@ -154,7 +163,10 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       setRemovedDocIds(new Set());
       resetHighlights();
       setDocListRows(Math.min(15, Math.max(5, result.docs.filter((d) => viewMode === "all" || d.isNew).length)));
+      const newCount = result.docs.filter(d => d.isNew).length;
+      toast.success(`Found ${result.total} documents in ${sourceLabel} (${newCount} new)`, { id: scanToastId, duration: 4000 });
     } catch (err) {
+      toast.dismiss(scanToastId);
       if (err instanceof Error && err.name === "AbortError") return;
       if (!isAuthError(err)) toast.error(`Failed to scan ${source === "gmail" ? "Gmail" : "Google Drive"}`);
     } finally {
@@ -169,8 +181,9 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
     setAdding(true);
     const contextId = generateContextId();
     try {
-      const syncRes = await apiFetch("/api/docs?mode=load", {
+      const data = await fetchWithProgress<Record<string, number>>("/api/docs?mode=load", {
         method: "POST",
+        contextId,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...options,
@@ -182,10 +195,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
           status: addToInbox ? "INBOX" : "ARCHIVED",
         }),
         signal: controller.signal,
-        contextId,
-      });
-      if (!syncRes.ok) throw new Error("Sync failed");
-      const data = await syncRes.json();
+      }, handleRefreshProgress);
 
       const docsRes = await apiFetch("/api/docs?includeArchived=true", {
         signal: controller.signal,
@@ -198,17 +208,11 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       broadcastChange({ type: "docs" }, contextId);
       setOpen(false);
 
-      const parts = [
-        data.added > 0 ? `${data.added} new` : "",
-        data.updated > 0 ? `${data.updated} updated` : "",
-        data.deleted > 0 ? `${data.deleted} deleted` : "",
-      ]
-        .filter(Boolean)
-        .join(", ");
-      toast.success(`Load complete — ${parts || "no updates"}`, {
-        duration: 8000,
-      });
+      dismissProgressToasts();
+      const { summary } = formatResultParts(data);
+      toast.success(`Load complete — ${summary}`, { duration: 8000 });
     } catch (err) {
+      dismissProgressToasts();
       if (err instanceof Error && err.name === "AbortError") return;
       if (!isAuthError(err)) toast.error("Failed to sync with Google Drive");
     } finally {

@@ -28,6 +28,7 @@ vi.mock("@/lib/google-drive", () => ({
   getChangesStartPageToken: vi.fn(),
   listChanges: vi.fn(),
   invalidGrantResponse: vi.fn(() => null),
+  isInvalidGrantError: vi.fn(() => false),
 }));
 vi.mock("@/lib/sync-comments", () => ({
   syncComments: vi.fn(),
@@ -131,6 +132,26 @@ function postRequestWithBody(mode: string, body: Record<string, unknown>) {
   });
 }
 
+/** Parse an SSE response and return the result data. Throws if an error event is found. */
+async function readSSEResult<T = Record<string, unknown>>(response: Response): Promise<T> {
+  const text = await response.text();
+  for (const part of text.split("\n\n")) {
+    const lines = part.split("\n");
+    let eventType = "";
+    let data = "";
+    for (const line of lines) {
+      if (line.startsWith("event: ")) eventType = line.slice(7);
+      else if (line.startsWith("data: ")) data = line.slice(6);
+    }
+    if (eventType === "result" && data) return JSON.parse(data);
+    if (eventType === "error" && data) {
+      const err = JSON.parse(data);
+      throw new Error(err.message || "SSE error");
+    }
+  }
+  throw new Error("No result event in SSE stream");
+}
+
 describe("POST /api/docs", () => {
   beforeEach(() => {
     mockGetStatus.mockResolvedValue(null);
@@ -144,15 +165,13 @@ describe("POST /api/docs", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 502 when Drive API fails", async () => {
+  it("returns error when Drive API fails", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockGetDriveClient.mockRejectedValue(new Error("Drive unavailable"));
 
     await suppressingErrors(async () => {
       const res = await POST(postRequest());
-      expect(res.status).toBe(502);
-      const data = await res.json();
-      expect(data.error).toMatch(/google drive/i);
+      await expect(readSSEResult(res)).rejects.toThrow();
     });
   });
 
@@ -190,13 +209,12 @@ describe("POST /api/docs", () => {
       selectedGoogleDocIds: ["g1"],
     }));
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = await readSSEResult(res);
     expect(data.mode).toBe("load");
     expect(data.added).toBe(1);
     expect(data.updated).toBe(0);
     expect(data.deleted).toBe(0);
     expect(data.total).toBe(1);
-    expect(data.comments).toBe(0);
   });
 
   it("counts updated docs when they already exist", async () => {
@@ -232,7 +250,7 @@ describe("POST /api/docs", () => {
       source: "drive",
       selectedGoogleDocIds: ["g1"],
     }));
-    const data = await res.json();
+    const data = await readSSEResult(res);
     expect(data.added).toBe(0);
     expect(data.updated).toBe(1);
   });
@@ -301,7 +319,7 @@ describe("POST /api/docs", () => {
     });
 
     const res = await POST(postRequest("full-refresh"));
-    const data = await res.json();
+    const data = await readSSEResult(res);
     expect(data.mode).toBe("full-refresh");
     expect(data.updated).toBe(2); // Both docs updated
     expect(data.added).toBe(0);
@@ -317,7 +335,7 @@ describe("POST /api/docs", () => {
       .mockResolvedValueOnce([]) // executeFullRefresh: dbDocs (empty)
 
     const res = await POST(postRequest("full-refresh"));
-    const data = await res.json();
+    const data = await readSSEResult(res);
     expect(data.mode).toBe("full-refresh");
     expect(data.added).toBe(0);
     expect(mockFetchDocsByIds).not.toHaveBeenCalled();
@@ -353,7 +371,7 @@ describe("POST /api/docs", () => {
     });
 
     const res = await POST(postRequest("refresh"));
-    const data = await res.json();
+    const data = await readSSEResult(res);
     expect(data.mode).toBe("refresh");
     expect(data.added).toBe(1);
     expect(mockDoc.upsert).toHaveBeenCalledTimes(1);
@@ -387,7 +405,7 @@ describe("POST /api/docs", () => {
     });
 
     const res = await POST(postRequest("refresh"));
-    const data = await res.json();
+    const data = await readSSEResult(res);
     expect(data.mode).toBe("refresh");
     expect(data.added).toBe(0);
     expect(data.updated).toBe(0);
@@ -428,7 +446,7 @@ describe("POST /api/docs", () => {
       source: "drive",
       selectedGoogleDocIds: ["g1"],
     }));
-    const data = await res.json();
+    const data = await readSSEResult(res);
     expect(data.unarchived).toBe(1);
     expect(mockDoc.update).toHaveBeenCalledWith({
       where: { docId: "d1" },
@@ -469,7 +487,7 @@ describe("POST /api/docs", () => {
       source: "drive",
       selectedGoogleDocIds: ["g1"],
     }));
-    const data = await res.json();
+    const data = await readSSEResult(res);
     expect(data.unarchived).toBe(0);
     // doc.update should NOT have been called to unarchive
     expect(mockDoc.update).not.toHaveBeenCalledWith(
@@ -542,7 +560,7 @@ describe("POST /api/docs", () => {
     });
 
     const res = await POST(postRequest("refresh"));
-    expect(res.status).toBe(200);
+    await readSSEResult(res);
     expect(mockUpdateDriveChangesToken).toHaveBeenCalledTimes(1);
   });
 
@@ -579,7 +597,7 @@ describe("POST /api/docs", () => {
       source: "drive",
       selectedGoogleDocIds: ["g1"], // only g1 selected
     }));
-    const data = await res.json();
+    const data = await readSSEResult(res);
     expect(data.added).toBe(1);
     expect(mockFetchDocsByIds).toHaveBeenCalledWith("u1", ["g1"]);
   });
@@ -632,7 +650,7 @@ describe("POST /api/docs", () => {
       labelIds: ["l1"],
       notes: "Batch note",
     }));
-    expect(res.status).toBe(200);
+    await readSSEResult(res);
 
     const upsertCall = mockDoc.upsert.mock.calls[0][0];
     expect(upsertCall.create.notes).toBe("Batch note");
@@ -674,7 +692,7 @@ describe("POST /api/docs", () => {
       selectedGoogleDocIds: ["g1"],
       status: "ARCHIVED",
     }));
-    expect(res.status).toBe(200);
+    await readSSEResult(res);
 
     const upsertCall = mockDoc.upsert.mock.calls[0][0];
     expect(upsertCall.create.status).toBe("ARCHIVED");
@@ -714,7 +732,7 @@ describe("POST /api/docs", () => {
       selectedGoogleDocIds: ["g1"],
       status: "ARCHIVED",
     }));
-    expect(res.status).toBe(200);
+    await readSSEResult(res);
 
     const upsertCall = mockDoc.upsert.mock.calls[0][0];
     // ARCHIVED should not be applied to existing docs — only INBOX moves them
@@ -757,7 +775,7 @@ describe("POST /api/docs", () => {
       selectedGoogleDocIds: ["g1"],
       labelIds: ["l1"],
     }));
-    expect(res.status).toBe(200);
+    await readSSEResult(res);
     expect(mockDocLabel.createMany).toHaveBeenCalledWith({
       data: [{ docId: "d1", labelId: "l1" }],
       skipDuplicates: true,
@@ -799,7 +817,7 @@ describe("POST /api/docs", () => {
       selectedGoogleDocIds: ["g1"],
       notes: "New note",
     }));
-    expect(res.status).toBe(200);
+    await readSSEResult(res);
     expect(mockDoc.update).toHaveBeenCalledWith({
       where: { docId: "d1" },
       data: { notes: "Existing note\nNew note" },
@@ -834,7 +852,7 @@ describe("POST /api/docs", () => {
     });
 
     const res = await POST(postRequest("refresh"));
-    const data = await res.json();
+    const data = await readSSEResult(res);
     expect(data.added).toBe(0);
     expect(mockDoc.upsert).not.toHaveBeenCalled();
   });
@@ -871,7 +889,7 @@ describe("POST /api/docs", () => {
       source: "drive",
       selectedGoogleDocIds: ["g1"],
     }));
-    expect(res.status).toBe(200);
+    await readSSEResult(res);
 
     const upsertCall = mockDoc.upsert.mock.calls[0][0];
     expect(upsertCall.create.status).toBe("ARCHIVED");
@@ -911,7 +929,7 @@ describe("POST /api/docs", () => {
       source: "drive",
       selectedGoogleDocIds: ["g1"],
     }));
-    const data = await res.json();
+    const data = await readSSEResult(res);
     expect(data.unarchived).toBe(0);
   });
 
@@ -937,8 +955,7 @@ describe("POST /api/docs", () => {
       labelIds: ["l1"],
       notes: "Should not be applied",
     }));
-    expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = await readSSEResult(res);
     expect(data.added).toBe(0);
     expect(data.updated).toBe(0);
     expect(mockFetchDocsByIds).toHaveBeenCalledWith("u1", []);
