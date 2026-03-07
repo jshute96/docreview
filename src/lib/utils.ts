@@ -74,6 +74,16 @@ export function formatDateFriendly(d: Date | string | null, now?: number): { tex
   return { text, tooltip };
 }
 
+/** Append text to existing notes, adding a newline separator if needed. */
+export function appendNotes(existing: string | null, addition: string): string {
+  let notes = existing ?? "";
+  if (notes.length > 0 && !notes.endsWith("\n")) {
+    notes += "\n";
+  }
+  notes += addition;
+  return notes;
+}
+
 /** Simple pluralization: pluralize(count, "apple") -> "1 apple", "2 apples", "0 apples". */
 export function pluralize(count: number, singular: string, plural?: string): string {
   const p = plural ?? `${singular}s`;

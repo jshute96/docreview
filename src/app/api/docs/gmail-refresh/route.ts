@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     logInfo(`[GmailRefresh] Scanning since ${formatDate(since)}`);
 
     // Scan Gmail for doc notifications
-    const { docs: gmailDocs, errorCount: scannerErrorCount, skipCount } = await scanGmailNotifications(userId, since);
+    const { docs: gmailDocs, shareNotes, errorCount: scannerErrorCount, skipCount } = await scanGmailNotifications(userId, since);
     if (gmailDocs.length === 0) {
       logInfo(`[GmailRefresh] No docs found in Gmail (${scannerErrorCount} errors, ${skipCount} skipped)`);
       // Only update timestamp if there were no actual errors
@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
     const syncRes = await upsertDocsAndSyncComments(userId, userEmail, driveDocs, {
       existingDocIds,
       fromGmailDocIdSet: gmailDocIdSet,
+      shareNotes,
       mode: "refresh"
     });
 

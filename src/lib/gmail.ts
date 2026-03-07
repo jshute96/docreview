@@ -1,11 +1,13 @@
 import { gmail as createGmail } from "@googleapis/gmail";
 import { drive as createDrive } from "@googleapis/drive";
-import { getDriveClient, parseGoogleDocId } from "@/lib/google-drive";
+import { getDriveClient } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { formatDate } from "@/lib/utils";
+import { extractBodyText, extractDocId, parseShareNote } from "@/lib/gmail-parse";
 
 export interface GmailDocIdResult {
   docIds: string[];
+  shareNotes: Map<string, string>;
   errorCount: number;
 }
 
@@ -20,6 +22,7 @@ export interface GmailScanDoc {
 
 export interface GmailScanResult {
   docs: GmailScanDoc[];
+  shareNotes: Map<string, string>;
   errorCount: number;
   skipCount: number;
 }
@@ -61,7 +64,7 @@ export async function scanGmailForDocIds(
 
   if (messageIds.length === 0) {
     logInfo("[Gmail] No notification emails found");
-    return { docIds: [], errorCount: 0 };
+    return { docIds: [], shareNotes: new Map(), errorCount: 0 };
   }
 
   logInfo(`[Gmail] Total messages to process: ${messageIds.length}`);
@@ -69,6 +72,7 @@ export async function scanGmailForDocIds(
   // Fetch each message and extract doc links
   let errorCount = 0;
   const docIdSet = new Set<string>();
+  const shareNotes = new Map<string, string>();
 
   await Promise.all(
     messageIds.map(async (messageId) => {
@@ -97,6 +101,12 @@ export async function scanGmailForDocIds(
         if (docId) {
           logInfo(`[Gmail] ${messageId}: "${subject}" → doc ${docId} (${Date.now() - t0}ms)`);
           docIdSet.add(docId);
+
+          // Extract share note from sharing emails (not comment notifications)
+          const shareNote = body ? parseShareNote(headers, body) : null;
+          if (shareNote) {
+            shareNotes.set(docId, shareNote);
+          }
         } else {
           logError(`[Gmail] ${messageId}: "${subject}" → no doc link found in body (${Date.now() - t0}ms)`);
           errorCount++;
@@ -109,8 +119,8 @@ export async function scanGmailForDocIds(
   );
 
   const docIds = [...docIdSet];
-  logInfo(`[Gmail] Scan complete: ${docIds.length} unique doc IDs, ${errorCount} errors`);
-  return { docIds, errorCount };
+  logInfo(`[Gmail] Scan complete: ${docIds.length} unique doc IDs, ${shareNotes.size} share notes, ${errorCount} errors`);
+  return { docIds, shareNotes, errorCount };
 }
 
 /** Scan Gmail for Google Doc notification emails and resolve doc metadata via Drive. */
@@ -118,8 +128,8 @@ export async function scanGmailNotifications(
   userId: string,
   since: Date
 ): Promise<GmailScanResult> {
-  const { docIds, errorCount: scanErrors } = await scanGmailForDocIds(userId, since);
-  if (docIds.length === 0) return { docs: [], errorCount: scanErrors, skipCount: 0 };
+  const { docIds, shareNotes, errorCount: scanErrors } = await scanGmailForDocIds(userId, since);
+  if (docIds.length === 0) return { docs: [], shareNotes, errorCount: scanErrors, skipCount: 0 };
 
   const auth = await getDriveClient(userId);
   const driveClient = createDrive({ version: "v3", auth });
@@ -168,51 +178,5 @@ export async function scanGmailNotifications(
   );
 
   logInfo(`[Gmail] Scan complete: ${results.length} docs, ${errorCount} errors, ${skipCount} skipped`);
-  return { docs: results, errorCount, skipCount };
-}
-
-/** Extract plaintext body from a Gmail message payload. */
-function extractBodyText(
-  payload: { mimeType?: string | null; body?: { data?: string | null } | null; parts?: unknown[] | null } | null | undefined
-): string | null {
-  if (!payload) return null;
-
-  // Simple single-part message
-  if (payload.body?.data) {
-    return Buffer.from(payload.body.data, "base64url").toString("utf-8");
-  }
-
-  // Multipart — search parts recursively
-  if (payload.parts) {
-    for (const part of payload.parts as Array<typeof payload>) {
-      // Prefer text/plain
-      if (part?.mimeType === "text/plain" && part.body?.data) {
-        return Buffer.from(part.body.data, "base64url").toString("utf-8");
-      }
-      // Recurse into nested multipart
-      const nested = extractBodyText(part);
-      if (nested) return nested;
-    }
-    // Fall back to text/html
-    for (const part of payload.parts as Array<typeof payload>) {
-      if (part?.mimeType === "text/html" && part?.body?.data) {
-        return Buffer.from(part.body.data, "base64url").toString("utf-8");
-      }
-    }
-  }
-
-  return null;
-}
-
-/** Extract a Google Doc/Sheet/Slides ID from email body text. */
-function extractDocId(body: string): string | null {
-  // Match URLs like docs.google.com/document/d/DOC_ID or drive.google.com/open?id=DOC_ID
-  const urlMatch = body.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
-  if (urlMatch) return parseGoogleDocId(`/d/${urlMatch[1]}/`);
-
-  // Also try ?id= format
-  const idMatch = body.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
-  if (idMatch) return idMatch[1];
-
-  return null;
+  return { docs: results, shareNotes, errorCount, skipCount };
 }

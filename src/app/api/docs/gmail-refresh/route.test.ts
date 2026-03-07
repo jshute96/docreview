@@ -47,7 +47,7 @@ describe("Gmail Refresh API", () => {
 
   it("handles empty gmail results", async () => {
     vi.mocked(getStatus).mockResolvedValue({ lastGmailUpdateTimestamp: new Date() } as any);
-    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [], errorCount: 0, skipCount: 0 });
+    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [], errorCount: 0, skipCount: 0, shareNotes: new Map() });
 
     const req = new NextRequest("http://localhost/api/docs/gmail-refresh", { method: "POST" });
     const res = await POST(req);
@@ -75,7 +75,7 @@ describe("Gmail Refresh API", () => {
     };
 
     vi.mocked(getStatus).mockResolvedValue(null);
-    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [gmailDoc] as any, errorCount: 0, skipCount: 0 });
+    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [gmailDoc] as any, errorCount: 0, skipCount: 0, shareNotes: new Map() });
     vi.mocked(fetchDocsByIds).mockResolvedValue([driveDoc] as any);
     vi.mocked(getDriveClient).mockResolvedValue({} as any);
     vi.mocked(prisma.doc.findMany).mockResolvedValue([]); // existingDocIds query
@@ -109,7 +109,7 @@ describe("Gmail Refresh API", () => {
     };
 
     vi.mocked(getStatus).mockResolvedValue(null);
-    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [gmailDoc] as any, errorCount: 0, skipCount: 0 });
+    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [gmailDoc] as any, errorCount: 0, skipCount: 0, shareNotes: new Map() });
     vi.mocked(fetchDocsByIds).mockResolvedValue([]); // g1 missing from Drive
     vi.mocked(prisma.doc.findMany).mockResolvedValue([{ googleDocId: "g1" }] as any); // existingDocIds
     vi.mocked(handleMissingGmailDocs).mockResolvedValue(1);
@@ -125,7 +125,7 @@ describe("Gmail Refresh API", () => {
 
   it("skips timestamp update on errors", async () => {
     vi.mocked(getStatus).mockResolvedValue(null);
-    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [], errorCount: 1, skipCount: 0 });
+    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [], errorCount: 1, skipCount: 0, shareNotes: new Map() });
 
     const req = new NextRequest("http://localhost/api/docs/gmail-refresh", { method: "POST" });
     await POST(req);

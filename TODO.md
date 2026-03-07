@@ -1,20 +1,28 @@
-P0:
-
-P1:
+required cleanup:
 * disable debug logging on drive changes scan
 * decide whether to keep last-view-time pinning on Reply/Resolve
     * clean up UI for edit-last-viwed-timestamp
+
+P0:
+
+P1:
 * handle gmail notifications
   * share request emails - from me, to me
-  * I shared with you emails
-* refine gmail flows
-* Remember state/tag for @mentioned on comment, with mine/replied and resolved
-* More decoration - favicon.
-* Cancel API requests and other work on tab close?
+  * suggestions - what can we capture?
+    * links with proper ID inside the doc?
+    * accept/reject links
+    * thread contents? (maybe)
+  * requesting your review
+  * item assigned to you
 
 Easy:
 * scroll bars for lots of docs
 * Button for search in Drive (from docs search box)
+* load dialog is too tall, collapse the first section
+* Text is hard to read on unselected tags.  Especially white.
+
+* Remember state/tag for @mentioned on comment, with mine/replied and resolved
+* Cancel API requests and other work on tab close?
 
 * Dialog boxes
   * dialog box moves on new vs add
@@ -60,7 +68,7 @@ Easy:
 * can we open the doc diff viewer
 * can we find a way to open diffs between timestamps we choose?
 
-* cosmetic
+## cosmetic
   * better visual for the cross-out filter buttons
   * tooltip display for longer notes
   * editable notes box inline on the comments page?

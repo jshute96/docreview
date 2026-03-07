@@ -19,10 +19,10 @@ dialog scan route still uses the full `scanGmailNotifications()` wrapper.
 
 ## Scanner — `scanGmailForDocIds(userId, since)`
 
-The low-level scanner accepts a `Date` and returns `{ docIds: string[], errorCount }`.
+The low-level scanner accepts a `Date` and returns `{ docIds, shareNotes, errorCount }`.
 It performs only Gmail API calls (no Drive metadata fetch). The convenience wrapper
 `scanGmailNotifications()` calls it then fetches Drive metadata, returning
-`{ docs: GmailScanDoc[], errorCount }`.
+`{ docs: GmailScanDoc[], shareNotes, errorCount }`.
 
 ### Steps
 
@@ -35,11 +35,31 @@ It performs only Gmail API calls (no Drive metadata fetch). The convenience wrap
    `after:` operator only has day-level granularity, so repeated calls within the
    same day would reprocess messages without this check
 4. Parses the plaintext body with regex to find a `/d/DOC_ID/` pattern
-5. For messages with a doc ID, calls Drive `files.get` to fetch real title,
+5. For sharing emails (from `drive-shares-dm-noreply@google.com`), extracts a share
+   note via `parseShareNote()` in `gmail-parse.ts` — includes sharer name/email from
+   Reply-To, date, and any custom message from the plaintext body
+6. For messages with a doc ID, calls Drive `files.get` to fetch real title,
    mimeType, webViewLink, and owner
-6. Messages with no doc link or failed Drive fetch are logged as errors and counted
-7. Deduplicates by googleDocId (multiple emails may reference the same doc)
-8. Returns `{ docs, errorCount }` — only successfully resolved docs are included
+7. Messages with no doc link or failed Drive fetch are logged as errors and counted
+8. Deduplicates by googleDocId (multiple emails may reference the same doc)
+9. Returns `{ docs, shareNotes, errorCount }` — only successfully resolved docs are included
+
+### Share Note Extraction — `gmail-parse.ts`
+
+When a sharing email is detected (From: `drive-shares-dm-noreply@google.com`),
+`parseShareNote()` builds a note string from email headers and body:
+
+- **Sharer**: extracted from `Reply-To` header (e.g., `"Jeff Shute <jshute@google.com>"`)
+- **Date**: from `Date` header, formatted via `formatDate(date, true)` (PST, no seconds)
+- **Message**: extracted structurally from the plaintext body — the URL paragraph is
+  found (language-independent), the next paragraph (locale-dependent boilerplate) is
+  skipped, and everything remaining is the custom share message
+
+Output format: `"Shared by Name (email) on YYYY-MM-DD HH:MM\ncustom message"`
+
+For **new docs**, the share note is set as the initial `notes` value in the upsert
+create block. For **existing docs**, it is appended via `appendNotes()`. Existing
+ARCHIVED docs are also unarchived to INBOX.
 
 ### OAuth Scope
 
@@ -83,9 +103,12 @@ the same endpoint with a single source.
 3. **Merge**: build `driveDocMap`, compute `gmailOnlyIds` (Gmail IDs not in Drive results)
 4. **Single metadata fetch**: `fetchDocsByIds` for Gmail-only IDs (no double-fetch)
 5. **Upsert loop**: Gmail-sourced new docs always INBOX; Drive-only new non-AUTHOR docs skipped
-6. **Deletions**: Drive `changes.list` deletions + `findDeletedDocIds` for missing Gmail docs
-7. **Comment sync** + **unarchive** for all upserted/updated docs
-8. **Save tokens**: Drive token if Drive succeeded (and no transient errors); Gmail timestamp if Gmail succeeded
+6. **Share notes**: for sharing emails, a note is set (new docs) or appended (existing docs)
+   with format `"Shared by Name (email) on DATE\nmessage"`. Existing ARCHIVED docs are
+   unarchived to INBOX — a (re)share is a strong signal the doc needs attention.
+7. **Deletions**: Drive `changes.list` deletions + `findDeletedDocIds` for missing Gmail docs
+8. **Comment sync** + **unarchive** for all upserted/updated docs
+9. **Save tokens**: Drive token if Drive succeeded (and no transient errors); Gmail timestamp if Gmail succeeded
 
 ### Timestamp Lifecycle
 

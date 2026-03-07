@@ -3,7 +3,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { listRecentDocs, fetchDocsByIds, getDriveClient, getChangesStartPageToken, listChanges } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
-import { pluralize } from "@/lib/utils";
+import { appendNotes, pluralize } from "@/lib/utils";
 import { executeFullRefresh } from "@/lib/refresh";
 import { getStatus, updateDriveChangesToken } from "@/lib/status";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
@@ -245,14 +245,9 @@ async function executeLoadOrRefresh(opts: {
         });
       }
       if (loadNotes) {
-        let newNotes = result.notes ?? "";
-        if (newNotes.length > 0 && !newNotes.endsWith("\n")) {
-          newNotes += "\n";
-        }
-        newNotes += loadNotes;
         await prisma.doc.update({
           where: { docId: result.docId },
-          data: { notes: newNotes },
+          data: { notes: appendNotes(result.notes, loadNotes) },
         });
       }
     }

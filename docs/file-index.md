@@ -137,7 +137,8 @@ Shadcn/ui components:
 |------|-------------|
 | `api-fetch.ts` | Client-side `apiFetch()` wrapper — intercepts 401 (expired Google token), shows deduplicated reauth toast, throws `ApiAuthError`; `isAuthError()` helper for catch blocks |
 | `google-drive.ts` | Google Drive/Docs API client — OAuth2 with token refresh, `invalidGrantResponse()` for API routes, changes feed (`changes.list`/`getStartPageToken`), file listing, `fetchDocsByIds` (batch metadata fetch by ID), comment fetching, `fetchAllThreads` (bulk thread fetch), `fetchDocContent` (combined document text + suggestion extraction in one Docs API call), thread detail, reply/resolve; OAuth2 client also used by Gmail scanner |
-| `gmail.ts` | Gmail notification scanner — `scanGmailForDocIds(userId, since)` queries Gmail for doc sharing/comment emails after a `Date`, extracts doc IDs from body (no Drive calls); `scanGmailNotifications` wraps it with Drive metadata fetch; filters by `internalDate` for timestamp-level precision |
+| `gmail.ts` | Gmail notification scanner — `scanGmailForDocIds(userId, since)` queries Gmail for doc sharing/comment emails after a `Date`, extracts doc IDs and share notes from body (no Drive calls); `scanGmailNotifications` wraps it with Drive metadata fetch; filters by `internalDate` for timestamp-level precision |
+| `gmail-parse.ts` | Gmail message parsing helpers — `parseShareNote` extracts sharer name/email/date/message from share notification emails; `extractShareMessage` structurally parses plaintext body (language-independent); `extractBodyText` decodes MIME payload; `extractDocId` finds doc IDs in email text |
 | `refresh.ts` | Combined refresh engine — `executeRefresh(userId, email, sources)` runs parallel Drive+Gmail discovery; `executeFullRefresh(userId, email)` and `refreshSelectedDocs(userId, email, docIds)` run exhaustive syncs via shared `refreshGoogleDocIds` helper |
 | `auth-utils.ts` | Centralized authentication helpers for Server Components and API routes |
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates/deletes DB records, computes unarchive signals |
@@ -157,7 +158,7 @@ Shadcn/ui components:
 | `status.ts` | Read/write `Status` table — tracks `driveChangesPageToken` and `lastGmailUpdateTimestamp` per user for incremental sync |
 | `stream-progress.ts` | Client-side SSE reader + toast handlers — `fetchWithProgress()` reads SSE streams, `handleRefreshProgress()` maps events to Sonner toasts, `formatResultParts()` formats result summaries |
 | `tri-state.ts` | `TriState` type (`off`/`include`/`exclude`), cycle function, partition helper |
-| `utils.ts` | `cn()` (clsx+twMerge), `contrastText()` for label colors, `formatDate()` (full timestamp for logging), `formatDateFriendly()` (relative display format) |
+| `utils.ts` | `cn()` (clsx+twMerge), `contrastText()` for label colors, `formatDate()` (full timestamp for logging), `formatDateFriendly()` (relative display format), `appendNotes()` (append text to existing notes with newline separator) |
 | `__mocks__/prisma.ts` | Vitest mock of PrismaClient for unit tests |
 
 ## Types & Test Utilities

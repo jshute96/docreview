@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { DocRole, DocStatus, Prisma } from "@prisma/client";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 import type { BulkEditState } from "@/lib/bulk-edit";
+import { appendNotes as appendToNotes } from "@/lib/utils";
 import { runWithRequestId } from "@/lib/request-context";
 
 const VALID_BULK_STATES = new Set(["as-is", "set", "clear"]);
@@ -94,13 +95,7 @@ export async function PATCH(req: NextRequest) {
     else if (typedIsStarred === "clear") data.isStarred = false;
 
     if (typedAppendNotes && typedAppendNotes.trim().length > 0) {
-      const currentNotes = doc.notes ?? "";
-      let newNotes = currentNotes;
-      if (newNotes.length > 0 && !newNotes.endsWith("\n")) {
-        newNotes += "\n";
-      }
-      newNotes += typedAppendNotes;
-      data.notes = newNotes;
+      data.notes = appendToNotes(doc.notes, typedAppendNotes);
     }
 
     const currentLabelIds = new Set(doc.labels.map((l) => l.labelId));

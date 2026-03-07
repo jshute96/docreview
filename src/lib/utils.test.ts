@@ -1,5 +1,27 @@
 import { describe, it, expect } from "vitest";
-import { contrastText, formatDate, formatDateFriendly } from "./utils";
+import { appendNotes, contrastText, formatDate, formatDateFriendly } from "./utils";
+
+describe("appendNotes", () => {
+  it("returns addition when existing is null", () => {
+    expect(appendNotes(null, "new note")).toBe("new note");
+  });
+
+  it("returns addition when existing is empty string", () => {
+    expect(appendNotes("", "new note")).toBe("new note");
+  });
+
+  it("adds newline separator when existing has no trailing newline", () => {
+    expect(appendNotes("existing", "new note")).toBe("existing\nnew note");
+  });
+
+  it("does not double newline when existing ends with newline", () => {
+    expect(appendNotes("existing\n", "new note")).toBe("existing\nnew note");
+  });
+
+  it("handles multi-line existing notes", () => {
+    expect(appendNotes("line1\nline2", "line3")).toBe("line1\nline2\nline3");
+  });
+});
 
 describe("contrastText", () => {
   it("returns dark text for white background", () => {

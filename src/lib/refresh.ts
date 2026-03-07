@@ -12,7 +12,7 @@ import { scanGmailForDocIds } from "@/lib/gmail";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "@/lib/status";
 import { logError, logWarning, logInfo, logToFile } from "@/lib/log";
-import { formatDate, pluralize } from "@/lib/utils";
+import { appendNotes, formatDate, pluralize } from "@/lib/utils";
 import type { OnProgress } from "@/lib/progress-events";
 import type { Doc } from "@prisma/client";
 
@@ -53,17 +53,19 @@ export async function upsertDocsAndSyncComments(
   options: {
     existingDocIds: Set<string>;
     fromGmailDocIdSet?: Set<string>;
+    shareNotes?: Map<string, string>;
     mode?: "refresh" | "full-refresh" | "selected" | "load";
     docId?: string; // Optional: restrict upsert to a specific docId (for single-doc refresh)
   },
   onProgress?: OnProgress,
 ): Promise<RefreshResult> {
-  const { existingDocIds, fromGmailDocIdSet = new Set(), mode = "refresh", docId } = options;
+  const { existingDocIds, fromGmailDocIdSet = new Set(), shareNotes, mode = "refresh", docId } = options;
   const driveAuth = await getDriveClient(userId);
 
   let added = 0;
   let updated = 0;
   let deleted = 0;
+  let unarchived = 0;
   let skipNotAuthor = 0;
 
   const processedDocs: Doc[] = [];
@@ -95,9 +97,10 @@ export async function upsertDocsAndSyncComments(
         lastModifiedInDrive: doc.lastModifiedInDrive,
         owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
+        notes: shareNotes?.get(doc.googleDocId) ?? null,
         // Mode-based status defaults:
         // All new docs discovered via Drive activity start as ARCHIVED to avoid noise
-        // from old docs resurfacing. We rely on Gmail notifications or the 
+        // from old docs resurfacing. We rely on Gmail notifications or the
         // subsequent comment sync (Phase 3) to move them to INBOX if relevant.
         status: fromGmail ? "INBOX" : "ARCHIVED",
       },
@@ -111,6 +114,25 @@ export async function upsertDocsAndSyncComments(
         isDeleted: false,
       },
     });
+
+    // Append share note and unarchive existing docs discovered via Gmail.
+    // parseShareNote() returns a note for ALL share emails (even without a custom
+    // message), so this fires for every share — not just ones with a message attached.
+    // A (re)share is a strong signal the doc needs attention, so we always unarchive.
+    const shareNote = shareNotes?.get(doc.googleDocId);
+    if (isExisting && shareNote) {
+      const newNotes = appendNotes(result.notes, shareNote);
+      const unarchive = result.status === "ARCHIVED";
+      await prisma.doc.update({
+        where: { docId: result.docId },
+        data: { notes: newNotes, ...(unarchive ? { status: "INBOX" } : {}) },
+      });
+      result.notes = newNotes;
+      if (unarchive) {
+        result.status = "INBOX";
+        unarchived++;
+      }
+    }
 
     processedDocs.push(result);
 
@@ -150,7 +172,6 @@ export async function upsertDocsAndSyncComments(
   const suggestionsCreated = syncResults.reduce((sum, r) => sum + r.suggestionsCreated, 0);
   const suggestionsUpdated = syncResults.reduce((sum, r) => sum + r.suggestionsUpdated, 0);
 
-  let unarchived = 0;
   for (let i = 0; i < processedDocs.length; i++) {
     const res = syncResults[i];
     if (res.isDeleted) {
@@ -314,6 +335,7 @@ export async function executeRefresh(
   let driveSucceeded = false;
 
   let gmailDocIds: string[] = [];
+  let gmailShareNotes = new Map<string, string>();
   let gmailErrorCount = 0;
   let gmailSucceeded = false;
 
@@ -395,6 +417,7 @@ export async function executeRefresh(
       logInfo(`[Refresh] Gmail: scanning since ${formatDate(since)}`);
       const result = await scanGmailForDocIds(userId, since);
       gmailDocIds = result.docIds;
+      gmailShareNotes = result.shareNotes;
       gmailErrorCount = result.errorCount;
       gmailSucceeded = true;
       logInfo(`[Refresh] Gmail: ${gmailDocIds.length} doc IDs (${gmailErrorCount} errors)`);
@@ -435,7 +458,7 @@ export async function executeRefresh(
     userId,
     userEmail,
     allDiscoveryDocs,
-    { existingDocIds, fromGmailDocIdSet: gmailDocIdSet, mode: "refresh" },
+    { existingDocIds, fromGmailDocIdSet: gmailDocIdSet, shareNotes: gmailShareNotes, mode: "refresh" },
     onProgress,
   );
 
