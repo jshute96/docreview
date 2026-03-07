@@ -640,9 +640,14 @@ export interface DriveChangesResult {
   docs: DriveDoc[];
   deletedDocIds: Set<string>;
   newPageToken: string;
+  rawChangeCount: number;
 }
 
-export async function listChanges(userId: string, pageToken: string): Promise<DriveChangesResult> {
+export async function listChanges(
+  userId: string,
+  pageToken: string,
+  onProgress?: (stats: { count: number; docsCount: number; deletedCount: number }) => void
+): Promise<DriveChangesResult> {
   logInfo(`[Drive] listChanges: starting with token ${pageToken}`);
   const auth = await getDriveClient(userId);
   const drive = createDrive({ version: "v3", auth });
@@ -651,6 +656,7 @@ export async function listChanges(userId: string, pageToken: string): Promise<Dr
   const changesByFileId = new Map<string, { removed: boolean; file?: { id?: string | null; name?: string | null; mimeType?: string | null; webViewLink?: string | null; modifiedTime?: string | null; createdTime?: string | null; owners?: { me?: boolean | null; displayName?: string | null }[] | null; trashed?: boolean | null } | null }>();
   let currentToken: string | undefined = pageToken;
   let newStartToken: string | undefined;
+  let rawChangeCount = 0;
 
   do {
     const t0 = Date.now();
@@ -663,9 +669,11 @@ export async function listChanges(userId: string, pageToken: string): Promise<Dr
       }),
       `[Drive] changes.list${currentToken ? " (page)" : ""}`
     );
-    logInfo(`[Drive] changes.list (page ${currentToken ?? "null"}) → ${res.data.changes?.length ?? 0} changes (${Date.now() - t0}ms)`);
+    const pageChanges = res.data.changes ?? [];
+    rawChangeCount += pageChanges.length;
+    logInfo(`[Drive] changes.list (page ${currentToken ?? "null"}) → ${pageChanges.length} changes (${Date.now() - t0}ms)`);
 
-    for (const change of res.data.changes ?? []) {
+    for (const change of pageChanges) {
       if (!change.fileId) continue;
       logToFile(DEBUG_FILE, `RAW CHANGE: "${change.file?.name}" (ID: ${change.fileId})`, { change });
       changesByFileId.set(change.fileId, {
@@ -673,6 +681,18 @@ export async function listChanges(userId: string, pageToken: string): Promise<Dr
         file: change.file,
       });
     }
+
+    // Report progress based on unique supported files and raw changes found so far
+    let docsCount = 0;
+    let deletedCount = 0;
+    for (const c of changesByFileId.values()) {
+      if (c.removed || c.file?.trashed === true) {
+        deletedCount++;
+      } else if (c.file?.mimeType && SUPPORTED_MIME_TYPES.has(c.file.mimeType)) {
+        docsCount++;
+      }
+    }
+    onProgress?.({ count: rawChangeCount, docsCount, deletedCount });
 
     if (res.data.newStartPageToken) {
       newStartToken = res.data.newStartPageToken;
@@ -710,15 +730,22 @@ export async function listChanges(userId: string, pageToken: string): Promise<Dr
   }
 
   logInfo(`[Drive] changes summary: ${docs.length} changed docs, ${deletedDocIds.size} deleted (${changesByFileId.size} total changes), next token: ${newPageToken}`);
-  return { docs, deletedDocIds, newPageToken };
+  return { docs, deletedDocIds, newPageToken, rawChangeCount };
 }
 
 /** Fetch Drive metadata for specific doc IDs (via individual files.get calls). */
-export async function fetchDocsByIds(userId: string, docIds: string[]): Promise<DriveDoc[]> {
+export async function fetchDocsByIds(
+  userId: string,
+  docIds: string[],
+  onProgress?: (count: number) => void
+): Promise<DriveDoc[]> {
   if (docIds.length === 0) return [];
 
   const auth = await getDriveClient(userId);
   const drive = createDrive({ version: "v3", auth });
+
+  let completedCount = 0;
+  onProgress?.(0);
 
   const results = await Promise.all(
     docIds.map(async (id) => {
@@ -745,6 +772,9 @@ export async function fetchDocsByIds(userId: string, docIds: string[]): Promise<
       } catch (err) {
         logError(`[Drive] files.get ${id} failed (${Date.now() - t0}ms):`, err);
         return null;
+      } finally {
+        completedCount++;
+        onProgress?.(completedCount);
       }
     })
   );
@@ -757,7 +787,12 @@ export interface ListRecentDocsOptions {
   includeSharedDrives?: boolean;
 }
 
-export async function listRecentDocs(userId: string, since?: Date, options?: ListRecentDocsOptions): Promise<DriveDoc[]> {
+export async function listRecentDocs(
+  userId: string,
+  since?: Date,
+  options?: ListRecentDocsOptions,
+  onProgress?: (stats: { count: number; docsCount: number; deletedCount: number }) => void
+): Promise<DriveDoc[]> {
   const auth = await getDriveClient(userId);
   const drive = createDrive({ version: "v3", auth });
 
@@ -780,6 +815,7 @@ export async function listRecentDocs(userId: string, since?: Date, options?: Lis
 
   const docs: DriveDoc[] = [];
   let pageToken: string | undefined;
+  let rawCount = 0;
 
   do {
     const t0 = Date.now();
@@ -796,9 +832,11 @@ export async function listRecentDocs(userId: string, since?: Date, options?: Lis
       }),
       `[Drive] files.list (recent docs${pageToken ? " page" : ""})`
     );
-    logInfo(`[Drive] files.list (recent docs${pageToken ? ", page " + pageToken : ""}) → ${res.data.files?.length ?? 0} files (${Date.now() - t0}ms)`);
+    const pageFiles = res.data.files ?? [];
+    rawCount += pageFiles.length;
+    logInfo(`[Drive] files.list (recent docs${pageToken ? ", page " + pageToken : ""}) → ${pageFiles.length} files (${Date.now() - t0}ms)`);
 
-    for (const file of res.data.files ?? []) {
+    for (const file of pageFiles) {
       if (!file.id || !file.name) continue;
       logToFile(DEBUG_FILE, `RAW FILE: "${file.name}" (ID: ${file.id})`, { file });
       const isOwner = file.owners?.some((o) => o.me === true) ?? false;
@@ -813,6 +851,8 @@ export async function listRecentDocs(userId: string, since?: Date, options?: Lis
         owner: file.owners?.[0]?.displayName ?? null,
       });
     }
+
+    onProgress?.({ count: rawCount, docsCount: docs.length, deletedCount: 0 });
 
     pageToken = res.data.nextPageToken ?? undefined;
   } while (pageToken);

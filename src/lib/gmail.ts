@@ -4,6 +4,7 @@ import { getDriveClient } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { formatDate } from "@/lib/utils";
 import { extractBodyText, extractDocId, parseShareNote } from "@/lib/gmail-parse";
+import type { OnProgress } from "./progress-events";
 
 export interface GmailDocIdResult {
   docIds: string[];
@@ -30,7 +31,8 @@ export interface GmailScanResult {
 /** Scan Gmail for Google Doc notification emails and return just doc IDs (no Drive API calls). */
 export async function scanGmailForDocIds(
   userId: string,
-  since: Date
+  since: Date,
+  onProgress?: (count: number, total?: number) => void
 ): Promise<GmailDocIdResult> {
   const auth = await getDriveClient(userId);
   const gmailClient = createGmail({ version: "v1", auth });
@@ -67,12 +69,16 @@ export async function scanGmailForDocIds(
     return { docIds: [], shareNotes: new Map(), errorCount: 0 };
   }
 
-  logInfo(`[Gmail] Total messages to process: ${messageIds.length}`);
+  const total = messageIds.length;
+  logInfo(`[Gmail] Total messages to process: ${total}`);
 
   // Fetch each message and extract doc links
   let errorCount = 0;
   const docIdSet = new Set<string>();
   const shareNotes = new Map<string, string>();
+
+  let processedCount = 0;
+  onProgress?.(0, total);
 
   await Promise.all(
     messageIds.map(async (messageId) => {
@@ -114,6 +120,9 @@ export async function scanGmailForDocIds(
       } catch (err) {
         logError(`[Gmail] Failed to fetch message ${messageId} (${Date.now() - t0}ms):`, err);
         errorCount++;
+      } finally {
+        processedCount++;
+        onProgress?.(processedCount, total);
       }
     })
   );
@@ -126,10 +135,17 @@ export async function scanGmailForDocIds(
 /** Scan Gmail for Google Doc notification emails and resolve doc metadata via Drive. */
 export async function scanGmailNotifications(
   userId: string,
-  since: Date
+  since: Date,
+  onProgress?: OnProgress
 ): Promise<GmailScanResult> {
-  const { docIds, shareNotes, errorCount: scanErrors } = await scanGmailForDocIds(userId, since);
-  if (docIds.length === 0) return { docs: [], shareNotes, errorCount: scanErrors, skipCount: 0 };
+  const { docIds, shareNotes, errorCount: scanErrors } = await scanGmailForDocIds(userId, since, (count, total) => {
+    onProgress?.({ phase: "gmail", status: "reading", count, total });
+  });
+  if (docIds.length === 0) {
+    onProgress?.({ phase: "gmail", status: "done", count: 0, errorCount: scanErrors });
+    return { docs: [], shareNotes, errorCount: scanErrors, skipCount: 0 };
+  }
+  onProgress?.({ phase: "gmail", status: "done", count: docIds.length, errorCount: scanErrors });
 
   const auth = await getDriveClient(userId);
   const driveClient = createDrive({ version: "v3", auth });
@@ -137,6 +153,9 @@ export async function scanGmailNotifications(
   let errorCount = scanErrors;
   let skipCount = 0;
   const results: GmailScanDoc[] = [];
+
+  let completedCount = 0;
+  onProgress?.({ phase: "metadata", completed: 0, total: docIds.length });
 
   await Promise.all(
     docIds.map(async (docId) => {
@@ -173,6 +192,9 @@ export async function scanGmailNotifications(
           logError(`[Gmail] Drive metadata failed for ${docId} (${Date.now() - t0}ms):`, err);
           errorCount++;
         }
+      } finally {
+        completedCount++;
+        onProgress?.({ phase: "metadata", completed: completedCount, total: docIds.length });
       }
     })
   );

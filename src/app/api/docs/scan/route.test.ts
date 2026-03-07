@@ -15,6 +15,7 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/google-drive", () => ({
   listRecentDocs: vi.fn(),
   invalidGrantResponse: vi.fn(() => null),
+  isInvalidGrantError: vi.fn(() => false),
 }));
 
 import { POST } from "./route";
@@ -39,6 +40,35 @@ function scanRequest(body?: Record<string, unknown>) {
       ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
       : {}),
   });
+}
+
+/** Helper to read the final 'result' object from the SSE stream. */
+async function readSSEResult(res: Response): Promise<any> {
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("No body");
+  const decoder = new TextDecoder();
+  let result;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const text = decoder.decode(value);
+    const lines = text.split("\n");
+    for (const line of lines) {
+      if (line.startsWith("event: result")) {
+        // Next line should be data: ...
+      } else if (line.startsWith("data: ")) {
+        try {
+          const data = JSON.parse(line.slice(6));
+          // If we see an error object in any data, we should probably know
+          if (data.authExpired || data.error) return data;
+          result = data;
+        } catch { /* skip non-JSON */ }
+      } else if (line.startsWith("event: error")) {
+         // Next line data will be parsed above
+      }
+    }
+  }
+  return result;
 }
 
 describe("POST /api/docs/scan", () => {
@@ -79,7 +109,7 @@ describe("POST /api/docs/scan", () => {
 
     const res = await POST(scanRequest({ daysBack: 14 }));
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = await readSSEResult(res);
     expect(data.total).toBe(2);
     expect(data.existingCount).toBe(1);
     expect(data.docs).toHaveLength(2);
@@ -104,17 +134,20 @@ describe("POST /api/docs/scan", () => {
       "u1",
       expect.any(Date),
       { ownership: "owned", includeSharedDrives: true },
+      expect.any(Function),
     );
   });
 
-  it("returns 502 when Drive API fails", async () => {
+  it("returns error event when Drive API fails", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findMany.mockResolvedValue([]);
     mockListRecentDocs.mockRejectedValue(new Error("Drive error"));
 
     await suppressingErrors(async () => {
       const res = await POST(scanRequest());
-      expect(res.status).toBe(502);
+      expect(res.status).toBe(200); // SSE always returns 200 initially
+      const data = await readSSEResult(res);
+      expect(data.message).toBeDefined();
     });
   });
 
@@ -125,7 +158,7 @@ describe("POST /api/docs/scan", () => {
 
     const res = await POST(scanRequest());
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = await readSSEResult(res);
     expect(data.total).toBe(0);
     expect(data.docs).toEqual([]);
   });

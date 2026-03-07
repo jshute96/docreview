@@ -117,6 +117,34 @@ partially handled.
 
 ---
 
+## Progress Reporting (SSE)
+
+Long-running operations (Refresh, Full Refresh, Load, Scan) use **Server-Sent Events (SSE)**
+to report progress to the UI in real time.
+
+- **Server-side:** `createProgressStream` (`src/lib/sse.ts`) wraps the operation. It provides
+  a `send(event)` callback to the executor.
+- **Client-side:** `fetchWithProgress` (`src/lib/stream-progress.ts`) reads the stream and
+  dispatches events to `handleRefreshProgress`, which updates Sonner toasts.
+
+### Progress Phases
+
+Progress events track four distinct phases:
+
+1.  **`drive` (Discovery):** Scanning the Drive changes feed or recent files.
+    - Reports raw **changes** read from the API (e.g., "Reading changes from Drive (4449 found)...").
+2.  **`gmail` (Discovery):** Scanning Gmail notifications.
+    - Reports messages scanned out of the total found (e.g., "Reading notifications from Gmail (12 of 50)...").
+3.  **`metadata` (Processing):** Fetching Drive metadata for discovered or selected IDs.
+    - Reports documents processed out of the total (e.g., "Fetching metadata for 5 of 1650 documents...").
+4.  **`sync` (Syncing):** Fetching and updating comments/suggestions from Drive/Docs APIs.
+    - Reports documents synced out of the total (e.g., "Reading comments for 10 of 1650 documents...").
+
+Once the stream ends, the final result is sent as a `result` event, and the UI displays
+a document-focused summary (e.g., "Refresh complete — 1650 documents (2 new, 5 updated, 1 deleted)").
+
+---
+
 ## Phase 1 — Doc Discovery
 
 ### Load mode: `files.get` per selected doc
@@ -410,7 +438,7 @@ Sample output for a typical Refresh:
 [Comments] ghi789: 8 comments from Drive (2 new, 1 updated, 1 deleted); 0 suggestions (0 new, 1 updated, 1 resolved) → unarchive
 [Refresh] Drive: 1 of 1 deletions were tracked docs
 [Refresh] Saving changes token for future refreshes
-[Refresh] Complete in 892ms: 0 docs added, 3 docs updated, 1 doc deleted, 1 doc unarchived, 3 new comment threads, 4 updated comment threads, 2 new suggestions, 1 updated suggestion, 45 docs skipped (not author) (0 errors)
+[Refresh] Complete in 892ms: 5 Drive changes processed, 0 docs added, 3 docs updated, 1 doc deleted, 1 doc unarchived, 3 new comment threads, 4 updated comment threads, 2 new suggestions, 1 updated suggestion, 45 docs skipped (not author) (0 errors)
 ```
 
 Key state transitions are logged:
@@ -428,6 +456,7 @@ Key state transitions are logged:
 | `Sync issues (errors: N), skipping timestamp update` | Gmail/Sync error prevented advancing the scan window |
 | `→ unarchive` suffix on comment sync line | Doc will be moved from ARCHIVED back to INBOX |
 | `N docs skipped (not author)` | Count of new discovered docs that were skipped because the user isn't the owner |
+| `N Drive changes processed` | Total raw volume reported by the Drive API during discovery |
 
 ---
 

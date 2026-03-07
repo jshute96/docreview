@@ -143,30 +143,29 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
     abortRef.current = controller;
     setScanning(true);
     setScanResult(null);
-    const scanToastId = "scan-progress";
+    const contextId = generateContextId();
     const sourceLabel = source === "gmail" ? "Gmail" : "Drive";
     try {
-      toast.loading(`Scanning ${sourceLabel}...`, { id: scanToastId });
       const scanBody = source === "gmail"
         ? { source: "gmail", daysBack: options.daysBack }
         : { source: "drive", ...options };
-      const res = await apiFetch("/api/docs/scan", {
+      const result = await fetchWithProgress<ScanResult>("/api/docs/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(scanBody),
         signal: controller.signal,
-        contextId: generateContextId(),
-      });
-      if (!res.ok) throw new Error("Scan failed");
-      const result: ScanResult = await res.json();
+        contextId,
+      }, handleRefreshProgress);
+
       setScanResult(result);
       setRemovedDocIds(new Set());
       resetHighlights();
       setDocListRows(Math.min(15, Math.max(5, result.docs.filter((d) => viewMode === "all" || d.isNew).length)));
       const newCount = result.docs.filter(d => d.isNew).length;
-      toast.success(`Found ${result.total} documents in ${sourceLabel} (${newCount} new)`, { id: scanToastId, duration: 4000 });
+      dismissProgressToasts();
+      toast.success(`Found ${result.total} documents in ${sourceLabel} (${newCount} new)`, { duration: 4000 });
     } catch (err) {
-      toast.dismiss(scanToastId);
+      dismissProgressToasts();
       if (err instanceof Error && err.name === "AbortError") return;
       if (!isAuthError(err)) toast.error(`Failed to scan ${source === "gmail" ? "Gmail" : "Google Drive"}`);
     } finally {

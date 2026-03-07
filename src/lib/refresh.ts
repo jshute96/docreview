@@ -31,6 +31,8 @@ export interface RefreshResult {
   suggestionsUpdated: number;
   errorCount: number;
   skipNotAuthor?: number;
+  driveChangesRead?: number;
+  totalDocuments?: number;
   // Extra stats for safety checks
   successCount?: number;
   totalAttempted?: number;
@@ -259,8 +261,10 @@ async function refreshGoogleDocIds(
   logToFile(DEBUG_FILE, `Starting exhaustive refresh (${mode}) for ${googleDocIds.length} IDs`);
 
   // Exhaustive metadata fetch for these specific IDs
-  onProgress?.({ phase: "metadata", count: googleDocIds.length });
-  const driveDocs = (await fetchDocsByIds(userId, googleDocIds)) || [];
+  onProgress?.({ phase: "metadata", completed: 0, total: googleDocIds.length });
+  const driveDocs = (await fetchDocsByIds(userId, googleDocIds, (count) => {
+    onProgress?.({ phase: "metadata", completed: count, total: googleDocIds.length });
+  })) || [];
 
   const dbDocs = await prisma.doc.findMany({
     where: { userId },
@@ -365,32 +369,40 @@ export async function executeRefresh(
     }
   })());
 
+  let driveChangesRead = 0;
+
   if (includeDrive) {
     discoveryPromises.push((async () => {
-      onProgress?.({ phase: "drive", status: "reading" });
+      onProgress?.({ phase: "drive", status: "reading", count: 0 });
       const savedToken = status?.driveChangesPageToken;
       if (savedToken) {
         logInfo("[Refresh] Drive: using changes.list with saved token");
         logToFile(DEBUG_FILE, "-------------------------------------");
         logToFile(DEBUG_FILE, "Starting changes.list sync");
         try {
-          const result = await listChanges(userId, savedToken);
+          const result = await listChanges(userId, savedToken, (stats) => {
+            onProgress?.({ phase: "drive", status: "reading", ...stats });
+          });
           driveDocs = result.docs;
+          driveChangesRead = result.rawChangeCount;
           deletedDocIdsFromDrive = result.deletedDocIds;
           newPageToken = result.newPageToken;
           driveSucceeded = true;
           logToFile(DEBUG_FILE, `Ended changes.list sync: ${driveDocs.length} changed docs, ${deletedDocIdsFromDrive.size} total deletions reported by Drive`);
-          onProgress?.({ phase: "drive", status: "done", count: driveDocs.length });
+          onProgress?.({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: result.rawChangeCount });
         } catch (err: unknown) {
           const code = (err as { code?: number | string })?.code;
           if (code === 404 || code === "404") {
             logWarning("[Refresh] Drive: changes.list token expired, falling back to 7-day files.list");
             logToFile(DEBUG_FILE, "Token expired, falling back to files.list");
             newPageToken = await getChangesStartPageToken(userId);
-            driveDocs = await listRecentDocs(userId);
+            driveDocs = await listRecentDocs(userId, undefined, undefined, (stats) => {
+              onProgress?.({ phase: "drive", status: "reading", ...stats });
+            });
+            driveChangesRead = driveDocs.length;
             driveSucceeded = true;
             logToFile(DEBUG_FILE, `Ended files.list sync (fallback): ${driveDocs.length} docs`);
-            onProgress?.({ phase: "drive", status: "done", count: driveDocs.length });
+            onProgress?.({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: driveDocs.length });
           } else {
             logToFile(DEBUG_FILE, "Ended changes.list sync with error", { error: err });
             throw err;
@@ -401,21 +413,26 @@ export async function executeRefresh(
         logToFile(DEBUG_FILE, "-------------------------------------");
         logToFile(DEBUG_FILE, "Starting files.list sync (bootstrap)");
         newPageToken = await getChangesStartPageToken(userId);
-        driveDocs = await listRecentDocs(userId);
+        driveDocs = await listRecentDocs(userId, undefined, undefined, (stats) => {
+          onProgress?.({ phase: "drive", status: "reading", ...stats });
+        });
+        driveChangesRead = driveDocs.length;
         driveSucceeded = true;
         logToFile(DEBUG_FILE, `Ended files.list sync (bootstrap): ${driveDocs.length} docs`);
-        onProgress?.({ phase: "drive", status: "done", count: driveDocs.length });
+        onProgress?.({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: driveDocs.length });
       }
     })());
   }
 
   if (includeGmail) {
     discoveryPromises.push((async () => {
-      onProgress?.({ phase: "gmail", status: "reading" });
+      onProgress?.({ phase: "gmail", status: "reading", count: 0 });
       const since = status?.lastGmailUpdateTimestamp
         ?? new Date(Date.now() - DEFAULT_GMAIL_DAYS_BACK * 24 * 60 * 60 * 1000);
       logInfo(`[Refresh] Gmail: scanning since ${formatDate(since)}`);
-      const result = await scanGmailForDocIds(userId, since);
+      const result = await scanGmailForDocIds(userId, since, (count, total) => {
+        onProgress?.({ phase: "gmail", status: "reading", count, total });
+      });
       gmailDocIds = result.docIds;
       gmailShareNotes = result.shareNotes;
       gmailErrorCount = result.errorCount;
@@ -441,7 +458,10 @@ export async function executeRefresh(
   if (extraIds.length > 0) {
     const staleSuffix = staleOnlyIds.length > 0 ? `, ${staleOnlyIds.length} stale catch-up` : "";
     logInfo(`[Refresh] Fetching Drive metadata for ${extraIds.length} extra docs (${gmailOnlyIds.length} Gmail-only${staleSuffix})`);
-    extraDocs = await fetchDocsByIds(userId, extraIds);
+    onProgress?.({ phase: "metadata", completed: 0, total: extraIds.length });
+    extraDocs = await fetchDocsByIds(userId, extraIds, (count) => {
+      onProgress?.({ phase: "metadata", completed: count, total: extraIds.length });
+    });
   }
 
   const allDiscoveryDocs = [...driveDocs, ...extraDocs];
@@ -516,8 +536,9 @@ export async function executeRefresh(
   const skipStr = syncRes.skipNotAuthor && syncRes.skipNotAuthor > 0
     ? `, ${pluralize(syncRes.skipNotAuthor, "doc")} skipped (not author)`
     : "";
-  logInfo(`[Refresh] Complete in ${elapsed}ms: ${counts.join(", ")}, ${commentStr}${suggestionStr}${skipStr} (${pluralize(totalErrorCount, "error")})`);
-  return { ...syncRes, deleted: totalDeleted, errorCount: totalErrorCount };
+  const driveStr = driveChangesRead > 0 ? `${pluralize(driveChangesRead, "Drive change")} processed, ` : "";
+  logInfo(`[Refresh] Complete in ${elapsed}ms: ${driveStr}${counts.join(", ")}, ${commentStr}${suggestionStr}${skipStr} (${pluralize(totalErrorCount, "error")})`);
+  return { ...syncRes, deleted: totalDeleted, errorCount: totalErrorCount, driveChangesRead, totalDocuments: allDiscoveryDocs.length };
 }
 
 export async function refreshSelectedDocs(

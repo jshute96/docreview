@@ -65,8 +65,16 @@ hidden (not applicable). Switching sources clears any existing scan results.
 ### Phase 1 — Scan
 
 The user configures search options and clicks **Scan**. This calls `POST /api/docs/scan`
-(read-only — no DB writes). The response returns all matching docs, each flagged with
-`isNew` to indicate whether it's already tracked. The default view shows only new docs.
+(read-only — no DB writes). 
+
+This endpoint uses **Server-Sent Events (SSE)** to report real-time scanning progress
+in a toast message:
+- **Drive Scan:** Reports raw objects scanned from the API (e.g., "Reading changes from Drive (1650 found)...").
+- **Gmail Scan:** Reports messages scanned out of the total found, followed by a metadata
+  fetching phase for discovered IDs (e.g., "Reading notifications from Gmail (12 of 50)...").
+
+Once the scan completes, the results are displayed in the dialog list, flagged with
+`isNew` to indicate whether they are already tracked. The default view shows only new docs.
 
 ### Phase 2 — Review & Add
 
@@ -121,6 +129,9 @@ between the scan and load endpoints.
 
 Read-only scan. Queries Drive or Gmail with the specified options, compares against
 the DB, and returns results without modifying anything.
+
+This is an **SSE (Server-Sent Events)** endpoint that streams progress events before
+sending the final result.
 
 **Request body (Drive):**
 ```json

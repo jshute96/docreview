@@ -274,7 +274,7 @@ describe("POST /api/docs", () => {
       source: "drive",
       selectedGoogleDocIds: ["g1", "g2"],
     }));
-    expect(mockFetchDocsByIds).toHaveBeenCalledWith("u1", ["g1", "g2"]);
+    expect(mockFetchDocsByIds).toHaveBeenCalledWith("u1", ["g1", "g2"], expect.any(Function));
     expect(mockListRecentDocs).not.toHaveBeenCalled();
   });
 
@@ -599,7 +599,7 @@ describe("POST /api/docs", () => {
     }));
     const data = await readSSEResult(res);
     expect(data.added).toBe(1);
-    expect(mockFetchDocsByIds).toHaveBeenCalledWith("u1", ["g1"]);
+    expect(mockFetchDocsByIds).toHaveBeenCalledWith("u1", ["g1"], expect.any(Function));
   });
 
   it("load mode returns 400 for invalid label IDs", async () => {
@@ -958,7 +958,7 @@ describe("POST /api/docs", () => {
     const data = await readSSEResult(res);
     expect(data.added).toBe(0);
     expect(data.updated).toBe(0);
-    expect(mockFetchDocsByIds).toHaveBeenCalledWith("u1", []);
+    expect(mockFetchDocsByIds).toHaveBeenCalledWith("u1", [], expect.any(Function));
     expect(mockDoc.upsert).not.toHaveBeenCalled();
   });
 });

@@ -101,17 +101,27 @@ export function handleRefreshProgress(event: ProgressEvent) {
   switch (event.phase) {
     case "drive":
       if (event.status === "reading") {
-        toast.loading("Reading changes from Drive...", { id: PROGRESS_DRIVE });
-      } else {
         const msg = event.count > 0
-          ? `Read ${event.count} changes from Drive`
+          ? `Reading changes from Drive (${event.count} found)...`
+          : "Reading changes from Drive...";
+        toast.loading(msg, { id: PROGRESS_DRIVE });
+      } else {
+        const countToShow = event.totalChanges ?? event.count;
+        const msg = countToShow > 0
+          ? `Read ${countToShow} changes from Drive`
           : "No new changes from Drive";
         toast.success(msg, { id: PROGRESS_DRIVE, duration: 4000 });
       }
       break;
     case "gmail":
       if (event.status === "reading") {
-        toast.loading("Reading changes from Gmail...", { id: PROGRESS_GMAIL });
+        let msg = "Reading notifications from Gmail...";
+        if (event.total !== undefined && event.total > 0) {
+          msg = `Reading notifications from Gmail (${event.count} of ${event.total})...`;
+        } else if (event.count > 0) {
+          msg = `Reading notifications from Gmail (${event.count} found)...`;
+        }
+        toast.loading(msg, { id: PROGRESS_GMAIL });
       } else {
         const msg = event.count > 0
           ? `Read ${event.count} changes from Gmail`
@@ -124,11 +134,15 @@ export function handleRefreshProgress(event: ProgressEvent) {
       }
       break;
     case "metadata":
-      toast.loading(`Fetching ${event.count} documents...`, { id: PROGRESS_SYNC });
+      if (event.completed < event.total) {
+        toast.loading(`Fetching metadata for ${event.completed} of ${event.total} documents...`, { id: PROGRESS_SYNC });
+      } else {
+        toast.success(`Fetched metadata for ${event.total} documents`, { id: PROGRESS_SYNC, duration: 2000 });
+      }
       break;
     case "sync":
       if (event.completed < event.total) {
-        toast.loading(`Synced ${event.completed} of ${event.total} documents...`, { id: PROGRESS_SYNC });
+        toast.loading(`Reading comments for ${event.completed} of ${event.total} documents...`, { id: PROGRESS_SYNC });
       } else {
         toast.success(`Synced ${event.total} documents`, { id: PROGRESS_SYNC, duration: 4000 });
       }
@@ -146,13 +160,21 @@ export function formatResultParts(data: {
   deleted?: number;
   unarchived?: number;
   errorCount?: number;
+  totalDocuments?: number;
 }): { summary: string; errorSuffix: string } {
   const parts = [
     (data.added ?? 0) > 0 ? `${data.added} new` : "",
     (data.updated ?? 0) > 0 ? `${data.updated} updated` : "",
     (data.deleted ?? 0) > 0 ? `${data.deleted} deleted` : "",
     (data.unarchived ?? 0) > 0 ? `${data.unarchived} unarchived` : "",
-  ].filter(Boolean).join(", ");
+  ].filter(Boolean);
+
+  const stats = parts.join(", ") || "no updates";
+  const count = data.totalDocuments ?? 0;
+  const summary = count > 0
+    ? `${count} documents (${stats})`
+    : stats;
+
   const errorSuffix = (data.errorCount ?? 0) > 0 ? ` (${data.errorCount} errors)` : "";
-  return { summary: parts || "no updates", errorSuffix };
+  return { summary, errorSuffix };
 }

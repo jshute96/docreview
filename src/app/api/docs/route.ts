@@ -132,33 +132,46 @@ async function executeLoadOrRefresh(opts: {
 
   driveAuth = await getDriveClient(userId);
 
+  let driveChangesRead = 0;
+
   if (mode === "load") {
     // Load mode: fetch metadata directly by selected doc IDs
     const docIds = selectedSet ? [...selectedSet] : [];
     logInfo(`[Sync] Load (${source}): fetching metadata for ${docIds.length} docs by ID`);
-    send({ phase: "metadata", count: docIds.length });
-    driveDocs = await fetchDocsByIds(userId, docIds);
+    send({ phase: "metadata", completed: 0, total: docIds.length });
+    driveDocs = await fetchDocsByIds(userId, docIds, (count) => {
+      send({ phase: "metadata", completed: count, total: docIds.length });
+    });
+    driveChangesRead = driveDocs.length;
   } else {
     // Refresh: use changes.list with saved token
-    send({ phase: "drive", status: "reading" });
+    send({ phase: "drive", status: "reading", count: 0 });
     const status = await getStatus(userId);
     const savedToken = status?.driveChangesPageToken;
 
     if (savedToken) {
       logInfo(`[Sync] ${mode}: using changes.list with saved token`);
       try {
-        const result = await listChanges(userId, savedToken);
+        const result = await listChanges(userId, savedToken, (stats) => {
+          send({ phase: "drive", status: "reading", ...stats });
+        });
         driveDocs = result.docs;
+        driveChangesRead = result.rawChangeCount;
         deletedDocIds = result.deletedDocIds;
         newPageToken = result.newPageToken;
         logInfo(`[Sync] changes.list -> ${driveDocs.length} changed docs, ${deletedDocIds.size} deletions, newPageToken ${newPageToken}`);
+        send({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: result.rawChangeCount });
       } catch (err: unknown) {
         // Expired/invalid token -> fall back to bootstrap
         const code = (err as { code?: number | string })?.code;
         if (code === 404 || code === "404") {
           logWarning("[Sync] changes.list token expired, falling back to bootstrap (7-day files.list)");
           newPageToken = await getChangesStartPageToken(userId);
-          driveDocs = await listRecentDocs(userId);
+          driveDocs = await listRecentDocs(userId, undefined, undefined, (stats) => {
+            send({ phase: "drive", status: "reading", ...stats });
+          });
+          driveChangesRead = driveDocs.length;
+          send({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: driveDocs.length });
         } else {
           throw err;
         }
@@ -166,9 +179,12 @@ async function executeLoadOrRefresh(opts: {
     } else {
       logInfo(`[Sync] ${mode}: no saved token, bootstrapping (7-day files.list)`);
       newPageToken = await getChangesStartPageToken(userId);
-      driveDocs = await listRecentDocs(userId);
+      driveDocs = await listRecentDocs(userId, undefined, undefined, (stats) => {
+        send({ phase: "drive", status: "reading", ...stats });
+      });
+      driveChangesRead = driveDocs.length;
+      send({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: driveDocs.length });
     }
-    send({ phase: "drive", status: "done", count: driveDocs.length });
   }
 
   let added = 0;
@@ -383,5 +399,7 @@ async function executeLoadOrRefresh(opts: {
     commentsUpdated,
     suggestionsCreated,
     suggestionsUpdated,
+    driveChangesRead,
+    totalDocuments: driveDocs.length,
   };
 }

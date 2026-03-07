@@ -13,7 +13,7 @@
 // The client reads these as they arrive using the fetch ReadableStream API,
 // which lets us update toasts in real time as each phase completes.
 
-import { isInvalidGrantError } from "./google-drive";
+import { invalidGrantResponse } from "./google-drive";
 import { logError, logWarning } from "./log";
 import type { OnProgress, ProgressEvent } from "./progress-events";
 
@@ -54,10 +54,11 @@ export function createProgressStream(
       const result = await execute((event: ProgressEvent) => write("progress", event));
       write("result", result);
     } catch (err) {
-      if (isInvalidGrantError(err)) {
-        logWarning("[SSE] Google authorization expired during streaming operation");
+      if (invalidGrantResponse(err)) {
+        logWarning("[SSE] Google authorization expired during streaming");
         write("error", { authExpired: true });
       } else {
+
         logError("[SSE] Error during streaming operation:", err);
         write("error", { message: err instanceof Error ? err.message : "Unknown error" });
       }
