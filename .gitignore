@@ -46,6 +46,8 @@ scripts/data-export.json
 # log files
 /logs/
 
+/tmp/
+
 # claude code - actually, include config and commands
 # .claude/
 

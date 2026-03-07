@@ -1,0 +1,1402 @@
+Delivered-To: docreview.dave@gmail.com
+Received: by 2002:a05:7208:53c1:b0:ff:9408:1912 with SMTP id u1csp295184rbd;
+        Sat, 7 Mar 2026 10:42:28 -0800 (PST)
+X-Received: by 2002:ad4:5c86:0:b0:899:fdeb:6ace with SMTP id 6a1803df08f44-89a246e2886mr140621786d6.23.1772908948214;
+        Sat, 07 Mar 2026 10:42:28 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; t=1772908948; cv=none;
+        d=google.com; s=arc-20240605;
+        b=iXcMVHEOKfg2yBvGjbaX4TjYhKUfFg9dcbw9Jc0KN6XoCLCsNlZVbiDM8yXa03OemC
+         1R3R6q4X9EeAQaC22am1PK1z08NvBGr8tJcMijLyKTY2qzXzGbh3bObsAsUK/eB0ADsL
+         x97j0zTUol1OVLGEvN78GmyCzy8thzfVnFhX/DywX+YrijJZJ8lxB+lbq0mpSDl/rWl6
+         QS4lsHJtwt99qOVRiJRXvWyeU096ARa4SH3F4joso/Slru+1lUw/1puu9/qQHtQAwEz8
+         wCZpU3OJ4cNchbnISvgJ6t0NvhzT6zoJeyLj6eV0V7QVzb18W3NzAtIk7nVeRLOkpiP+
+         FvDQ==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
+        h=to:from:subject:message-id:gmsai:reply-to:feedback-id:references
+         :date:mime-version:dkim-signature;
+        bh=3wTcSYyHCmH/5CXmykqqrEjVfKYE+zSS5ifmFRLIVmg=;
+        fh=vqyCNxHClNs+C9H286QZve7sy8P02Zp/Xxm4PT++dMg=;
+        b=MrXj92LDhYeIePnG1MD/HcZCIW3iZUuuGiCKFa0H897eSoXoLy5ykPq9zB3TFOxbll
+         LSN/a46TM+LMGqc2BIFtsUFE31sZXZ2NCxwZCyoe7LlHy/giBVSU5y7+QQfFK11zhaCu
+         V+2daHb5KUtUr4X7mmrjuevwOHlrZ+8crpcmldtjroH0afOa420aTvx3v5601mATa076
+         C7OpM4gk0w+ufK9OSCQTm12iZq2GCs9H18z/dCuHP39KVgcmZXPUKCgr2RTl2+n54RRL
+         wdMWSYrByv/52B2nZUfqPpYGOb577kAqvJsqPyH+6PAehLRFMk9NC4sTRz1GRxBcqVDx
+         zPEw==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@docs.google.com header.s=20230601 header.b="VM/jKZb4";
+       spf=pass (google.com: domain of 3k3gsarapahwhtrrjsyx-stwjuq3ithx.lttlqj.htr@docos.bounces.google.com designates 209.85.220.69 as permitted sender) smtp.mailfrom=3k3GsaRAPAHwhtrrjsyx-stwjuq3ithx.lttlqj.htr@docos.bounces.google.com;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=docs.google.com;
+       dara=pass header.i=@gmail.com
+Return-Path: <3k3GsaRAPAHwhtrrjsyx-stwjuq3ithx.lttlqj.htr@docos.bounces.google.com>
+Received: from mail-sor-f69.google.com (mail-sor-f69.google.com. [209.85.220.69])
+        by mx.google.com with SMTPS id 6a1803df08f44-89a31476cb6sor18774876d6.2.2026.03.07.10.42.28
+        for <docreview.dave@gmail.com>
+        (Google Transport Security);
+        Sat, 07 Mar 2026 10:42:28 -0800 (PST)
+Received-SPF: pass (google.com: domain of 3k3gsarapahwhtrrjsyx-stwjuq3ithx.lttlqj.htr@docos.bounces.google.com designates 209.85.220.69 as permitted sender) client-ip=209.85.220.69;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@docs.google.com header.s=20230601 header.b="VM/jKZb4";
+       spf=pass (google.com: domain of 3k3gsarapahwhtrrjsyx-stwjuq3ithx.lttlqj.htr@docos.bounces.google.com designates 209.85.220.69 as permitted sender) smtp.mailfrom=3k3GsaRAPAHwhtrrjsyx-stwjuq3ithx.lttlqj.htr@docos.bounces.google.com;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=docs.google.com;
+       dara=pass header.i=@gmail.com
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=docs.google.com; s=20230601; t=1772908948; x=1773513748; dara=google.com;
+        h=to:from:subject:message-id:gmsai:reply-to:feedback-id:references
+         :date:mime-version:from:to:cc:subject:date:message-id:reply-to;
+        bh=3wTcSYyHCmH/5CXmykqqrEjVfKYE+zSS5ifmFRLIVmg=;
+        b=VM/jKZb4Nx11USxSKKw+DiW3jZKrAhUO0KdYZJ1tpNmkSF2w/462c/Oi15V4w/nBHW
+         t18sOG8Wz+nllTSULNZW1fe0km6BwrldCxsico5r8IGZKxXjw9pDGPeZBvS0FrZq+vJs
+         dW5PygR3rLE4f109M3CaK5omUqsTvhZ+eO7zqTAD7LmdG2FmDlitwa449aEKMObNAtUf
+         5q4fnL2SsP6bgkYtiVFa9ziVWYwIRN5I9Me1XOVMnSglN+IQ7eFEupWU01tJ/j700q9Z
+         6YGArDaW7Ql6e/405Tdc/Khw9bMotwnDi5dbDzvA4M8YJ+ZK2SEQJiNj/kXu6roV/wKA
+         dTYw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20230601; t=1772908948; x=1773513748;
+        h=to:from:subject:message-id:gmsai:reply-to:feedback-id:references
+         :date:mime-version:x-gm-message-state:from:to:cc:subject:date
+         :message-id:reply-to;
+        bh=3wTcSYyHCmH/5CXmykqqrEjVfKYE+zSS5ifmFRLIVmg=;
+        b=QjitYkE3Ui9zC98Ih61KzDqs1rKNs7aSc/pbaomKjrR8bq2DasA6ozMX0hBlhLZmdr
+         stUvscRXqHm8S9HPpe6bnzhPlnWMYRA6dBX/DR0nwY2Hmzb8LKin+DA00OMa/TwGxzsY
+         HbVbaj6uKdCrPhVUquAJQKHW9KiFaMNo5jp553lV+AIQbJuq3ctG3LAeaZtZBobNm9iT
+         s4o1rCmDVCVM6iZwm/uJp2imO4JfC+UUbUdlXwQdhIPbUJvxZ9mJ6tJyP4BWNWxqosXO
+         OreGkzA/1Yw/nFgeG1NbEYSr4Wd03Iu0DfAZHJavKe3ruvJ7ROJcWsFkEKINouUneVVQ
+         aF6A==
+X-Gm-Message-State: AOJu0YzBXCDc1MBogIaqewduJapqFvAa39UlLiT16WNbDtObxoP/965q
+	p5XSY6B1i+fkwK4m2X3Oav6zN3bvVv/bmJvn5S9nPuUv
+MIME-Version: 1.0
+X-Received: by 2002:a05:6214:21c5:b0:894:7716:48dd with SMTP id
+ 6a1803df08f44-89a308d7d2cmr93048876d6.29.1772908947788; Sat, 07 Mar 2026
+ 10:42:27 -0800 (PST)
+Date: Sat, 07 Mar 2026 10:42:27 -0800
+X-Document-ID: xDgAAAMQ2MeZSGlRUJl5qQr-pVqkrJkYQcl8ytg
+References: <d+eERnQUFBTVEyTWVaU0dsUlVKbDVxUXItcFZxa3JKa1lRY2w4eXRnOg@docs.google.com>
+X-No-Auto-Attachment: 1
+Feedback-ID: MailTypeComment:EditorsNotification
+Reply-to: No Reply <d+noreply@docs.google.com>
+gmsai: true
+X-Google-Notification-Metadata: CgISAA
+X-Notifications: 0000020a756fec82
+X-Notifications-Bounce-Info: AeDslajw5pMxi4aKz3VINpHkWeSoArlwOh9XRN4HYjq7JW3w_Bc2iDY93Ns1UZYUOogRgOTeZyvS6TjEj9XHV44hyhWK6BTA9zsgw2zX9iDDc0Djds4DNq5_qfIXCAr4fLKZYIT_tjovH2A5LKvnK30wPBb6Oc42T8UfXK1hvyMYYhehhpM8M6j6lWB5P0pxslh9amiqGCnWl3z_D5ObVe4MNntQfYh-Ywsd0a9QTgZvJBsueQoNQV3jsTN4bZc4-EFuqetxiK2rL18DJyeIfJ3GdlNbW4ANBQmD8wNjAwNjA0MDQxNTM1NTk2OTMzMg
+Message-ID: <k2hUVzvj5i8oCW3rCJgefA@notifications.google.com>
+Subject: shared doc from dave
+From: "Jeff Shute (Google Docs)" <comments-noreply@docs.google.com>
+To: docreview.dave@gmail.com
+Content-Type: multipart/alternative; boundary="0000000000000d54e5064c738830"
+
+--0000000000000d54e5064c738830
+Content-Type: text/plain; charset="UTF-8"; format=flowed; delsp=yes
+Content-Transfer-Encoding: base64
+
+TmV3IGFjdGl2aXR5IGluIHRoZSBmb2xsb3dpbmcgZG9jdW1lbnQNCnNoYXJlZCBkb2MgZnJvbSBk
+YXZlICANCihodHRwczovL2RvY3MuZ29vZ2xlLmNvbS9kb2N1bWVudC9kLzFBaDhzY0UxbXlOWGRY
+SUpLSFRBVUxadWVFWnJxalo1MjdzanZ2SmlLUXZrL2VkaXQ/dXNwPWNvbW1lbnRfZW1haWxfZG9j
+dW1lbnQmdHM9NjlhYzcxOTMmdXNwX2RtPWZhbHNlJnRhYj10LjApDQoNCjEgY29tbWVudA0KDQou
+DQpKZWZmIFNodXRlDQp8IEVhd2cNCmhlbGxvDQoNCkRhdmUNCmFiYw0KDQpKZWZmIFNodXRlDQpk
+ZWYNCg0KUmVwbHkgKFJlcGx5ICANCjxkK0FPUkdwUmVzQTA1ZXVta2syemZkUVF4TE9HTjdGQUxZ
+Q2p1ODhadGJhRHhTMDNta1RKeFR4cjVCZ1BPajhjRHVMU29xbXh1QW1CRTlxcWJaWmVXajFnS1pY
+dm1ZOXY5c3ZKMGJmbE9xTmZyZlc1Rk93SnV1WklfTXlwRnlMU1dCZHByTXVwQmlqd2xtWDBYNl84
+T1RvTE1HdTVSOTBhZDdpZ0Bkb2NzLmdvb2dsZS5jb20+KQ0KT3BlbiAgDQooaHR0cHM6Ly9kb2Nz
+Lmdvb2dsZS5jb20vZG9jdW1lbnQvZC8xQWg4c2NFMW15TlhkWElKS0hUQVVMWnVlRVpycWpaNTI3
+c2p2dkppS1F2ay9lZGl0P2Rpc2NvPUFBQUIxYWdkdDJBJnVzcD1jb21tZW50X2VtYWlsX2Rpc2N1
+c3Npb24mdHM9NjlhYzcxOTMmdXNwX2RtPWZhbHNlKQ0KDQozIHN1Z2dlc3Rpb25zDQoNCi4NCkpl
+ZmYgU2h1dGUNCkRlbGV0ZTog4oCcQWV3Z+KAnQ0KDQpSZXBseSAoUmVwbHkgIA0KPGQrQU9SR3BS
+ZXVtem1uT29ob2NnZUdxeUk5aS15dWxyS2Zrcmh4bnBvbWxUNnltTU9FbFI3TWlHSVJrbWpfb2x6
+V1JuTElXSHFXckZkRDlhaUZNN25QUTZMWEc5Q3BrMHVVcld3Q2lSM0JTR2Z2dzg4OVJhdFZpcjNw
+a1hCTWlSbFk2eU43OWtPNTlxVkdMSDhtZXd0NEtPOHhxNC1XNnB2VFdRQGRvY3MuZ29vZ2xlLmNv
+bT4pDQpPcGVuICANCihodHRwczovL2RvY3MuZ29vZ2xlLmNvbS9kb2N1bWVudC9kLzFBaDhzY0Ux
+bXlOWGRYSUpLSFRBVUxadWVFWnJxalo1MjdzanZ2SmlLUXZrL2VkaXQ/ZGlzY289QUFBQjFhZ2R0
+MkUmdXNwPXN1Z2dlc3Rpb25fZW1haWxfZGlzY3Vzc2lvbiZ0cz02OWFjNzE5MyZ1c3BfZG09ZmFs
+c2UpDQoNCi4NCkplZmYgU2h1dGUNCkFkZDog4oCcZGRk4oCdDQoNClJlcGx5IChSZXBseSAgDQo8
+ZCtBT1JHcFJka1NwNFcyU0c2NFJRWHJpUDRSMzlzT3hsaGJKM2VySm10NFdiYmM3UmV2NktOUEFF
+R0xkWE0zZHJIejY4ZmtvcXRrVGlCOEdTZFAwTEhBQzVHVVFacXF6UXJHVnpRZHlXMldQeWdiVHBQ
+QmE2d3k0YnBLOTRHN0RFWENpRU1QUFhheG1KNzlBUnNCanpQd2JVLUEtcm9jdjNPMHdAZG9jcy5n
+b29nbGUuY29tPikNCk9wZW4gIA0KKGh0dHBzOi8vZG9jcy5nb29nbGUuY29tL2RvY3VtZW50L2Qv
+MUFoOHNjRTFteU5YZFhJSktIVEFVTFp1ZUVacnFqWjUyN3NqdnZKaUtRdmsvZWRpdD9kaXNjbz1B
+QUFCMWFnZHQySSZ1c3A9c3VnZ2VzdGlvbl9lbWFpbF9kaXNjdXNzaW9uJnRzPTY5YWM3MTkzJnVz
+cF9kbT1mYWxzZSkNCg0KLg0KSmVmZiBTaHV0ZQ0KUmVwbGFjZTog4oCcR2HigJ0gd2l0aCDigJxn
+ZXfigJ0NCg0KUmVwbHkgKFJlcGx5ICANCjxkK0FPUkdwUmVtUWxROW5ZSE0wU3JVRmhGX0pCOFdm
+VUJKdld5VEI1c3lVczZIUkNjUUNkY2lkVDRxckVpQnRvZkR3TDcxX1N5Qlo5T2RGVEtGQ1lLVUNf
+MzRNX3Q3eGxNRVFFSnFBbzlKQnltSU9yWFMyVHR1bHBJVEc3N3laeFgxOEMtMGNESkZmcUdrY2Jn
+YnNGa2RiSTRXOFNyZnNKTFcwd0Bkb2NzLmdvb2dsZS5jb20+KQ0KT3BlbiAgDQooaHR0cHM6Ly9k
+b2NzLmdvb2dsZS5jb20vZG9jdW1lbnQvZC8xQWg4c2NFMW15TlhkWElKS0hUQVVMWnVlRVpycWpa
+NTI3c2p2dkppS1F2ay9lZGl0P2Rpc2NvPUFBQUIxYWdkdDJNJnVzcD1zdWdnZXN0aW9uX2VtYWls
+X2Rpc2N1c3Npb24mdHM9NjlhYzcxOTMmdXNwX2RtPWZhbHNlKQ0KDQpHb29nbGUgTExDLCAxNjAw
+IEFtcGhpdGhlYXRyZSBQYXJrd2F5LCBNb3VudGFpbiBWaWV3LCBDQSA5NDA0MywgVVNBDQoNCllv
+dSBoYXZlIHJlY2VpdmVkIHRoaXMgZW1haWwgYmVjYXVzZSB5b3UgYXJlIGEgcGFydGljaXBhbnQg
+aW4gdGhlIHVwZGF0ZWQgIA0KaXRlbXMgb3Igc3Vic2NyaWJlZCB0byBub3RpZmljYXRpb25zIG9u
+IHNoYXJlZCBkb2MgZnJvbSBkYXZlICANCihodHRwczovL2RvY3MuZ29vZ2xlLmNvbS9kb2N1bWVu
+dC9kLzFBaDhzY0UxbXlOWGRYSUpLSFRBVUxadWVFWnJxalo1MjdzanZ2SmlLUXZrL2VkaXQ/dXNw
+PWNvbW1lbnRfZW1haWxfZG9jdW1lbnQmdHM9NjlhYzcxOTMmdXNwX2RtPWZhbHNlJnRhYj10LjAp
+LiAgDQpDaGFuZ2Ugd2hhdCBHb29nbGUgc2VuZHMgeW91ICANCihodHRwczovL2RvY3MuZ29vZ2xl
+LmNvbS9kb2N1bWVudC91LzExNjc5NzA2MjcxODk0MjA1NjcxMi9kb2Nvcy9ub3RpZnk/b3VpZD0x
+MTY3OTcwNjI3MTg5NDIwNTY3MTImaWQ9MUFoOHNjRTFteU5YZFhJSktIVEFVTFp1ZUVacnFqWjUy
+N3NqdnZKaUtRdmsmdGl0bGU9c2hhcmVkK2RvYytmcm9tK2RhdmUmcmVzb3VyY2VrZXkpLiAgDQpZ
+b3UgY2Fubm90IHJlcGx5IHRvIHRoaXMgZW1haWwuDQo=
+--0000000000000d54e5064c738830
+Content-Type: text/x-amp-html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!doctype html><html amp4email data-css-strict><head><meta charset=3D"utf-8=
+"><meta name=3D"email.contentIds" content=3D"AAAB1agdt2M,AAAB1agdt2I,AAAB1a=
+gdt2E,AAAB1agdt2A"><script async src=3D"https://cdn.ampproject.org/v0.js"><=
+/script><script async custom-element=3D"amp-list" src=3D"https://cdn.amppro=
+ject.org/v0/amp-list-0.1.js"></script><script async custom-template=3D"amp-=
+mustache" src=3D"https://cdn.ampproject.org/v0/amp-mustache-0.2.js"></scrip=
+t><script async custom-element=3D"amp-form" src=3D"https://cdn.ampproject.o=
+rg/v0/amp-form-0.1.js"></script><script async custom-element=3D"amp-bind" s=
+rc=3D"https://cdn.ampproject.org/v0/amp-bind-0.1.js"></script><style amp4em=
+ail-boilerplate>body{visibility:hidden}</style><style amp-custom>.material-=
+button{-webkit-appearance: none; cursor: pointer; outline: none;}.material-=
+button:focus {outline: 1px solid transparent;}.material-button:disabled{cur=
+sor: initial; outline: none;}.material-button-transparent {background-color=
+: transparent; color: #0B57D0;}.material-button-transparent:hover {backgrou=
+nd-color: rgba(11, 87, 208, .08);}.material-button-transparent:focus {backg=
+round-color: rgba(11, 87, 208, .10);}.material-button-transparent:active {b=
+ackground-color: rgba(11, 87, 208, .10); box-shadow: 0 1px 3px 1px rgba(60,=
+ 64, 67, .15);}.material-button-transparent:disabled{background-color: tran=
+sparent; color: #3c4043; opacity: 0.38;}.material-text-input{border: none; =
+border-bottom: 1px solid #3c4043;}.material-text-input:focus{border-bottom:=
+ 2px solid #2277e8;}.tombstone-text {color: #3c4043; font: italic 14px Robo=
+to, Arial, Helvetica, sans-serif; margin: 18px 0 18px 0; width: 100%; text-=
+align: center;}.tombstone-post, .tombstone-post + .non-tombstone-post, .tom=
+bstone-post + .posts-section-end {border-top: 1px dashed #BDC1C6;}.non-tomb=
+stone-post + .tombstone-post, .non-tombstone-post + .non-tombstone-post {ma=
+rgin-top: 12px;}.tombstone-post + .non-tombstone-post {padding-top: 12px;}a=
+ {color: #0B57D0;}input:disabled {opacity: 0.4;}.screenreader-hidden-offscr=
+een {position: absolute; left: -10000px; top: auto; height: 1px; overflow: =
+hidden;}#document-chip-section {align-items: center; display: flex;}#docume=
+nt-chip-section > * + * {margin-left: 12px;}#document-chip {align-items: ce=
+nter; display: flex; flex: 1; margin-right: auto; max-width: calc(100% - 12=
+pxpx); min-width: 0; flex-basis: calc((100% - 12px) * 0.45);}#subscription-=
+accordion {cursor: pointer;}#subscription-accordion-icon, #subscription-acc=
+ordion-arrow {height: 24px; width: 24px;}#subscription-accordion-icon > * {=
+visibility: hidden;}#subscription-accordion-text {color: #5F6368; font: 400=
+ 14px/20px Roboto, Arial, Helvetica, sans-serif; letter-spacing: 0.25px; wh=
+ite-space: nowrap;}@media screen and (max-width: 500px) {#subscription-acco=
+rdion-text {display: none;}}#subscription-accordion-icon.comments-all.edits=
+-true > #subscription-accordion-icon-all, #subscription-accordion-icon.comm=
+ents-all.edits-disabled > #subscription-accordion-icon-all, #subscription-a=
+ccordion-icon.comments-all.edits-false > #subscription-accordion-icon-impor=
+tant, #subscription-accordion-icon.comments-important > #subscription-accor=
+dion-icon-important, #subscription-accordion-icon.comments-none.edits-true =
+> #subscription-accordion-icon-important, #subscription-accordion-icon.comm=
+ents-none.edits-false > #subscription-accordion-icon-none, #subscription-ac=
+cordion-icon.comments-none.edits-disabled > #subscription-accordion-icon-no=
+ne {visibility: visible;}.stack {position: relative;}.stack > * {bottom: 0;=
+ left: 0; position: absolute; right: 0; top: 0;}#subscription-section {marg=
+in: 0; text-align: center;}@media screen and (max-width: 500px) {#subscript=
+ion-section {text-align: left;}}#subscription-controls {display: inline-blo=
+ck; margin: -6px 0; max-width: 100%; text-align: initial;}#subscription-con=
+trols > * + * {margin-top: 12px;}#subscription-controls-notice {color: #D93=
+025; font: 400 12px/16px Roboto, Arial, Helvetica, sans-serif;}.subscriptio=
+n-form {align-items: baseline; color: #5F6368; display: flex; flex-directio=
+n: row; font: 400 14px/20px Google Sans, Roboto, Arial, Helvetica, sans-ser=
+if; letter-spacing: 0.25px; white-space: nowrap;}.subscription-form > label=
+ {display: flex; flex-direction: column; font: 500 11px/16px Roboto, Arial,=
+ Helvetica, sans-serif; letter-spacing: 0.8px; text-transform: uppercase;}.=
+subscription-select {margin-left: 10px; min-width: 0; position: relative;}.=
+subscription-native-select {border: none; bottom: 0; cursor: pointer; heigh=
+t: 100%; left: 0; margin: 0; opacity: 0; position: absolute; right: 0; top:=
+ 0; width: 100%; z-index: 1;}.subscription-native-select:hover + .subscript=
+ion-custom-select, .subscription-native-select:focus + .subscription-custom=
+-select {background-color: #F8F9FA;}.subscription-native-select:focus + .su=
+bscription-custom-select {outline: 1px solid transparent;}label:hover + .su=
+bscription-select > .subscription-custom-select, .subscription-native-selec=
+t:disabled + .subscription-custom-select {background-color: white; outline:=
+ none;}.subscription-native-select, .subscription-custom-select {border-rad=
+ius: 4px;}.subscription-custom-select {align-items: center; background-colo=
+r: white; border: 1px solid #DADCE0; display: flex; flex-direction: row; pa=
+dding: 6px 4px 6px 10px;}.subscription-custom-select-labels {display: flex;=
+ flex-direction: column; font-weight: 500; margin-right: 12px; overflow: hi=
+dden;}.subscription-custom-select-labels > :not(.subscription-measuring-lab=
+el) {overflow: hidden; text-overflow: ellipsis;}.subscription-measuring-lab=
+el {height: 0; visibility: hidden;}.subscription-custom-select-arrow {borde=
+r-color: #5F6368 transparent; border-style: solid; border-width: 5px 5px 0 =
+5px; height: 0; margin: 7.5px 7px; width: 0;}.visible {visibility: visible;=
+}.hidden {visibility: hidden;}.none {display: none;}.inline {display: inlin=
+e;}.block {display: block;}.disabled {opacity: 0.4;}.discussions-container =
+{margin-top: 20px;}.discussions-container > * + * {border-top: 1px solid #e=
+ee; margin-top: 20px; padding-top: 20px;}.discussions-container-no-separato=
+r {padding-top: 20px;}.discussions-container-no-separator > * + * {margin-t=
+op: 40px;}.resolving-discussion {opacity: 0.4;}.resolving-discussion .resol=
+ve-button {visibility: hidden;}.submitting-reply .reply-form-textarea {opac=
+ity: 0.4;}.submitting-reply .resolve-button {visibility: hidden;}.reply-err=
+or-text {display: none;}.submit-error .reply-error-text {display: block;}.p=
+ost-dark-text {color: #3c4043;}.head-post {margin-top: 0px; word-break: bre=
+ak-word; word-wrap: break-word;}.reply-post {word-break: break-word; word-w=
+rap: break-word;}.post-light-text {color: #777777;}@media screen and (min-w=
+idth: 601px) {.discussion-open-button {float: right;}}.docos-availability-b=
+anner {align-items: center; background-color: #fdf7e2; border-radius: 8px; =
+display: flex; gap: 4px; margin: 10px 0 8px 42px; outline: 1px solid transp=
+arent; padding: 8px;}.docos-availability-banner-text {font-family: Google S=
+ans Text, Roboto, Arial, Helvetica, sans-serif; font-size: 12px; line-heigh=
+t: 16px;}.docos-availability-icon {flex-shrink: 0;}.docos-availability-bann=
+er-dismiss-button {background: none; border: none; cursor: pointer; height:=
+ 12px; margin-left: auto; margin-right: 3px; padding: 0; width: 12px;}.flex=
+ {display: flex;}.flex-column {flex-direction: column;}.align-start {align-=
+items: flex-start;}.align-center {align-items: center;}.align-baseline {ali=
+gn-items: baseline;}.align-end {align-items: flex-end;}.flex-space-column-1=
+2px > * + * {margin-top: 12px;}.flex-space-column-16px > * + * {margin-top:=
+ 16px;}.flex-space-column-20px > * + * {margin-top: 20px;}.flex-space-row-8=
+px > * + * {margin-left: 8px;}@media screen and (max-width: 600px) {.docume=
+nt-content-snippet ul, .document-content-snippet ol {padding-left: 20px;}}<=
+/style></head><body><div style=3D"font: 14px Roboto, Arial, Helvetica, sans=
+-serif;"><template type=3D"amp-mustache" id=3D"inline-action-post">{{#post}=
+}<div style=3D"word-break: break-word; word-wrap: break-word;"><div class=
+=3D"{{#isHeadPost}}head-post{{/isHeadPost}}{{^isHeadPost}}reply-post{{/isHe=
+adPost}} {{#isVisibleTombstone}}tombstone-post{{/isVisibleTombstone}}{{^isV=
+isibleTombstone}}non-tombstone-post{{/isVisibleTombstone}}">{{#isVisibleTom=
+bstone}}<div class=3D"tombstone-text">Reply was deleted</div>{{/isVisibleTo=
+mbstone}}{{^isVisibleTombstone}}<table role=3D"presentation" cellpadding=3D=
+"0" cellspacing=3D"0" style=3D"width: 100%;" class=3D"{{#isNew}}post-dark-t=
+ext{{/isNew}}{{^isNew}}post-light-text{{/isNew}}"><tr><td style=3D"vertical=
+-align: top; width: 44px;"><amp-img src=3D"{{authorPhotoUrl}}" alt=3D"" hei=
+ght=3D"32" width=3D"32" style=3D"border-radius: 50%;box-sizing: border-box;=
+ display: block;"></amp-img></td><td><h3 style=3D"display: inline-block; fo=
+nt: 500 14px Google Sans, Roboto, Arial, Helvetica, sans-serif; letter-spac=
+ing: .25px; line-height: 20px; margin: 6px 0 2px 0;">{{authorName}}</h3>{{#=
+creationTime}} <span style=3D"color: #5F6368; font: 400 12px/16px Roboto, A=
+rial, Helvetica, sans-serif; letter-spacing: 0.2px; white-space: nowrap;">=
+=E2=80=A2 {{creationTime}}</span>{{/creationTime}}{{#isNew}}<h4 style=3D"ba=
+ckground: #0B57D0; border-radius: 8px; color: #fff; display: inline-block; =
+font: 700 12px/16px Roboto, Arial, Helvetica, sans-serif; margin-bottom: 0;=
+ margin-top: 0; margin-left: 10px; padding: 0 6px;">New</h4>{{/isNew}}<div =
+style=3D"font: 400 14px Roboto, Arial, Helvetica, sans-serif; line-height: =
+20px; letter-spacing: .2px;">{{#htmlBody}}<div style=3D"margin-top: 6px;" c=
+lass=3D"notranslate">{{{htmlBody}}}</div>{{/htmlBody}}{{#htmlActionText}}<d=
+iv style=3D"margin-top: 6px;"><i>{{{htmlActionText}}}</i></div>{{/htmlActio=
+nText}}{{#postReactions}}<div style=3D"font-size: 12px; margin-top: 6px;">{=
+{#reactions}}<div>{{summary}}</div>{{/reactions}}</div>{{/postReactions}}{{=
+#showCopiedText}}<div style=3D"margin: 18px 0;height: 1px; background-color=
+: #eee;"></div><div style=3D"color: #3c4043; font: italic 14px Roboto, Aria=
+l, Helvetica, sans-serif; margin: 18px 0 6px 0; width: 100%;">Comments abov=
+e copied from original document</div>{{/showCopiedText}}</div></td></tr></t=
+able>{{/isVisibleTombstone}}</div></div>{{/post}}</template><amp-list id=3D=
+"discussionList" diffable binding=3D"refresh-evaluate" layout=3D"container"=
+ single-item items=3D"." src=3D"https://docs.google.com/document/d/1Ah8scE1=
+myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/dynamicmail/comments?emailToken=3DAORG=
+pRcKCH9HoKsa1QT6oO9ePI2cnBkD7ZO-vqo1UEoK7sjbjWDPRFh2E7gpUzxPimCmstqXg0zOd9N=
+WKlVTJoZUpelMkz8winK0nPog4i3HAiHsASRvKD0-2611PDNyP3XSCRQTpnob&amp;buildLabe=
+l=3Deditors.documents-frontend_20260302.00_p2&amp;clientVersion=3D3&amp;ema=
+ilType=3Dcomments&amp;ts=3D69ac7193&amp;hasDocSummary=3Dfalse&amp;openComme=
+ntIds=3DAAAB1agdt2A&amp;fnpi_AAAB1agdt2A=3DAAAB1agdt2U&amp;openSuggestionId=
+s=3DAAAB1agdt2E&amp;fnpi_AAAB1agdt2E=3DAAAB1agdt2E&amp;openSuggestionIds=3D=
+AAAB1agdt2I&amp;fnpi_AAAB1agdt2I=3DAAAB1agdt2I&amp;openSuggestionIds=3DAAAB=
+1agdt2M&amp;fnpi_AAAB1agdt2M=3DAAAB1agdt2M&amp;ct_cs=3DCEy15AoHN0k4d8QMoMm8=
+IA%3D%3D&amp;hl=3Den&amp;tz=3DUTC&amp;context_AAAB1agdt2M=3DH4sIAAAAAAAA_wM=
+AAAAAAAAAAAA&amp;context_AAAB1agdt2I=3DH4sIAAAAAAAA_wMAAAAAAAAAAAA&amp;cont=
+ext_AAAB1agdt2E=3DH4sIAAAAAAAA_wMAAAAAAAAAAAA&amp;context_AAAB1agdt2A=3DH4s=
+IAAAAAAAA_-WTXwrCMAzGrzLq85i-iIyuIDJ2jq5N67BrR1oZ3sazeDLHpsgc-G-PviWB_L58Ca=
+FNJCvMiAlIIh9OBjJSc9SVTZeEUd9wywqgSR8M6eV8T5NmUiqR0ffISBjufUa8QACLwCVgvK-kB=
+Bs7pYYy6bA7V9dgQ4fhGB4qPeOGLrk4aHRHK2PhjMN0oRSs1hvCct7qUce3qmDlWPPJ-we728J4=
+hp8I8wDF3ztoZXfj2Sbm9WtoCz4Pkb-yMP3DK5ozb2LbAwAA&amp;headRevision=3D23"><di=
+v role=3D"list"><table style=3D"border-collapse: collapse; width: 100%; bac=
+kground-color: white; text-align: center;" role=3D"presentation"><tr><td st=
+yle=3D"padding: 24px 0 16px 0;"><table style=3D"border-collapse: collapse;f=
+ont-family: Roboto, Arial, Helvetica, sans-serif;hyphens: auto; overflow-wr=
+ap: break-word; word-wrap: break-word; word-break: break-word;width: 90%; m=
+argin: auto;max-width: 700px;min-width: 280px; text-align: left;" role=3D"p=
+resentation"><tr><td style=3D"padding: 0;"><div class=3D"flex flex-column f=
+lex-space-column-16px"><div><table style=3D"width:100%; table-layout:fixed;=
+" role=3D"presentation"><tr><td style=3D"padding: 0;" dir=3D"ltr"><div id=
+=3D"overview-card-contents"><div class=3D"flex flex-column flex-space-colum=
+n-12px"><div><h1 style=3D"color: #3c4043; font: 400 18px Google Sans, Robot=
+o, Arial, Helvetica, sans-serif; margin: 0;">New activity in the following =
+document</h1></div><div><div class=3D"flex flex-column flex-space-column-12=
+px"><div id=3D"document-chip-section"><div id=3D"document-chip"><a href=3D"=
+https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJi=
+KQvk/edit?usp=3Dcomment_email_document&amp;ts=3D69ac7193&amp;usp_dm=3Dtrue&=
+amp;tab=3Dt.0" target=3D"_blank" style=3D"color: #3c4043; display: inline-b=
+lock; max-width: 100%; text-decoration: none; vertical-align: top;border: 1=
+px solid #DADCE0; border-radius: 16px; white-space: nowrap;min-width: 0;"><=
+div style=3D"line-height: 18px; overflow: hidden; text-overflow: ellipsis;p=
+adding: 6px 12px;"><span style=3D"display: inline-block; vertical-align: mi=
+ddle; min-width: 26px; width: 26px;"><amp-img src=3D"https://ssl.gstatic.co=
+m/docs/doclist/images/mediatype/icon_1_document_x64.png" width=3D"18" heigh=
+t=3D"18" style=3D"vertical-align: top;" role=3D"presentation"></amp-img></s=
+pan><span style=3D"font: 500 14px/18px Google Sans, Roboto, Arial, Helvetic=
+a, sans-serif; display: inline; letter-spacing: 0.2px; vertical-align: midd=
+le;">shared doc from dave</span></div></a></div></div></div></div></div></d=
+iv></td></tr></table></div><div><table style=3D"width:100%; border: 1px sol=
+id #dadce0; border-radius: 8px; border-spacing: 0; table-layout:fixed; bord=
+er-collapse: separate;" role=3D"presentation"><tr><td style=3D"padding: 4.5=
+%;" dir=3D"ltr"><div class=3D"flex flex-column flex-space-column-20px"><div=
+><div><table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0" styl=
+e=3D"width: 100%"><tr><td style=3D"vertical-align: top; width: 32px;"><div =
+style=3D"background: #F1F3F4; border-radius: 50%; display: inline-block; he=
+ight: 18px; padding: 7px; width: 18px;"><amp-img src=3D"https://fonts.gstat=
+ic.com/s/i/googlematerialicons/comment/v18/gm_grey-48dp/1x/gm_comment_gm_gr=
+ey_48dp.png" height=3D"18px" width=3D"18px" aria-hidden=3D"true" style=3D"f=
+lex-shrink: 0;"></amp-img></div></td><td style=3D"vertical-align: top;"><h2=
+ style=3D"color: #3c4043; display: inline-block; font: 400 16px/32px Google=
+ Sans, Roboto, Arial, Helvetica, sans-serif; letter-spacing: .1px; margin: =
+0 0 0 10px;">1 comment</h2></td></tr></table><div><div style=3D"margin-top:=
+ 20px;overflow: visible; line-height: 20px;"><div class=3D"document-content=
+-snippet" style=3D"border: 1px solid #DADCE0; border-radius: 8px; padding: =
+12px 16px;hyphens: auto; overflow-wrap: break-word; word-wrap: break-word; =
+word-break: break-word;"><span class=3D"notranslate" style=3D"font: 400 14p=
+x Roboto, Arial, Helvetica, sans-serif; line-height: 20px; color: #3c4043;"=
+><p dir=3D"ltr" style=3D"margin:0"><span>Ge</span><span>=C2=A0</span></p><s=
+pan>=C2=A0</span><br><p dir=3D"ltr" style=3D"margin:0"><span class=3D"scree=
+nreader-hidden-offscreen">=C2=A0Comment start=C2=A0</span><span style=3D"ba=
+ckground-color:#ffe168">Eawg</span><span class=3D"screenreader-hidden-offsc=
+reen">=C2=A0Comment end=C2=A0</span><span>=C2=A0</span></p><p dir=3D"ltr" s=
+tyle=3D"margin:0"><span>Aewg</span><span>=C2=A0</span></p><p dir=3D"ltr" st=
+yle=3D"margin:0"><span>Aew</span><span>=C2=A0</span></p><p dir=3D"ltr" styl=
+e=3D"margin:0"><span>G</span><span>=C2=A0</span></p><p dir=3D"ltr" style=3D=
+"margin:0"><span>Aewg</span><span>=C2=A0</span></p><p dir=3D"ltr" style=3D"=
+margin:0"><span>Aew</span><span>=C2=A0</span></p><p dir=3D"ltr" style=3D"ma=
+rgin:0"><span>G</span><span>=C2=A0</span></p><p dir=3D"ltr" style=3D"margin=
+:0"><span>Awdddeg</span><span>=C2=A0</span></p><p dir=3D"ltr" style=3D"marg=
+in:0"><span>Ae</span><span>=C2=A0</span></p><p dir=3D"ltr" style=3D"margin:=
+0"><span>gewGa</span><span>=C2=A0</span></p><p dir=3D"ltr" style=3D"margin:=
+0"><span>Eg</span><span>=C2=A0</span></p><span>=C2=A0</span><br></span></di=
+v><div style=3D"height: 18px;"></div><div style=3D"margin-top: 0px; word-br=
+eak: break-word; word-wrap: break-word;" class=3D"non-tombstone-post"><tabl=
+e role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0" style=3D"color:=
+ #777777; width: 100%;"><tr><td style=3D"vertical-align: top; width: 44px;"=
+><amp-img src=3D"https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a=
+2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=3Ds50-c-k-no" alt=3D"" height=3D"32" =
+width=3D"32" style=3D"border-radius: 50%;box-sizing: border-box; display: b=
+lock;"></amp-img></td><td><h3 style=3D"display: inline-block; font: 500 14p=
+x Google Sans, Roboto, Arial, Helvetica, sans-serif; letter-spacing: .25px;=
+ line-height: 20px; margin: 6px 0 2px 0;">Jeff Shute</h3> <span style=3D"co=
+lor: #5F6368; font: 400 12px/16px Roboto, Arial, Helvetica, sans-serif; let=
+ter-spacing: 0.2px; white-space: nowrap;">=E2=80=A2 6:34=E2=80=AFPM, Mar 7 =
+(UTC)</span><div style=3D"font: 400 14px Roboto, Arial, Helvetica, sans-ser=
+if; line-height: 20px; letter-spacing: .2px;"><div style=3D"margin-top: 6px=
+;" class=3D"notranslate">hello</div></div></td></tr></table></div><div styl=
+e=3D"word-break: break-word; word-wrap: break-word;" class=3D"non-tombstone=
+-post"><table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0" sty=
+le=3D"color: #777777; width: 100%;"><tr><td style=3D"vertical-align: top; w=
+idth: 44px;"><amp-img src=3D"https://lh3.googleusercontent.com/a/ACg8ocIqvy=
+ihLhlu7EAe6OmyCV7RO2oyNqECfq3phRYNw2oiTFJqEw=3Ds50-c-k-no" alt=3D"" height=
+=3D"32" width=3D"32" style=3D"border-radius: 50%;box-sizing: border-box; di=
+splay: block;"></amp-img></td><td><h3 style=3D"display: inline-block; font:=
+ 500 14px Google Sans, Roboto, Arial, Helvetica, sans-serif; letter-spacing=
+: .25px; line-height: 20px; margin: 6px 0 2px 0;">Dave</h3> <span style=3D"=
+color: #5F6368; font: 400 12px/16px Roboto, Arial, Helvetica, sans-serif; l=
+etter-spacing: 0.2px; white-space: nowrap;">=E2=80=A2 6:36=E2=80=AFPM, Mar =
+7 (UTC)</span><div style=3D"font: 400 14px Roboto, Arial, Helvetica, sans-s=
+erif; line-height: 20px; letter-spacing: .2px;"><div style=3D"margin-top: 6=
+px;" class=3D"notranslate">abc</div></div></td></tr></table></div><div styl=
+e=3D"word-break: break-word; word-wrap: break-word;" class=3D"non-tombstone=
+-post"><table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0" sty=
+le=3D"color: #3c4043; width: 100%;"><tr><td style=3D"vertical-align: top; w=
+idth: 44px;"><amp-img src=3D"https://lh3.googleusercontent.com/a-/ALV-UjVTm=
+tBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=3Ds50-c-k-no" alt=3D"" he=
+ight=3D"32" width=3D"32" style=3D"border-radius: 50%;box-sizing: border-box=
+; display: block;"></amp-img></td><td><h3 style=3D"display: inline-block; f=
+ont: 500 14px Google Sans, Roboto, Arial, Helvetica, sans-serif; letter-spa=
+cing: .25px; line-height: 20px; margin: 6px 0 2px 0;">Jeff Shute</h3> <span=
+ style=3D"color: #5F6368; font: 400 12px/16px Roboto, Arial, Helvetica, san=
+s-serif; letter-spacing: 0.2px; white-space: nowrap;">=E2=80=A2 6:37=E2=80=
+=AFPM, Mar 7 (UTC)</span><h4 style=3D"background: #0B57D0; border-radius: 8=
+px; color: #fff; display: inline-block; font: 700 12px/16px Roboto, Arial, =
+Helvetica, sans-serif; margin-bottom: 0; margin-top: 0; margin-left: 10px; =
+padding: 0 6px;">New</h4><div style=3D"font: 400 14px Roboto, Arial, Helvet=
+ica, sans-serif; line-height: 20px; letter-spacing: .2px;"><div style=3D"ma=
+rgin-top: 6px;" class=3D"notranslate">def</div></div></td></tr></table></di=
+v><div class=3D"posts-section-end"></div><div style=3D"margin: 10px 0 0 42p=
+x; overflow: auto; padding: 2px;"><a href=3D"mailTo:Reply%20%3Cd+AORGpResA0=
+5eumkk2zfdQQxLOGN7FALYCju88ZtbaDxS03mkTJxTxr5BgPOj8cDuLSoqmxuAmBE9qqbZZeWj1=
+gKZXvmY9v9svJ0bflOqNfrfW5FOwJuuZI_MypFyLSWBdprMupBijwlmX0X6_8OToLMGu5R90ad7=
+ig@docs.google.com%3E?subject=3Dshared%20doc%20from%20dave" class=3D"materi=
+al-button material-button-transparent" target=3D"_blank" tabindex=3D"0" rol=
+e=3D"link" style=3D"padding: 0 8px;font: 500 14px/36px Google Sans, Roboto,=
+ Arial, Helvetica, sans-serif; border: none; border-radius: 18px; box-sizin=
+g: border-box; display: inline-block; letter-spacing: .25px; min-height: 36=
+px; text-align: center; text-decoration: none;margin-right: 12px;">Reply</a=
+><a href=3D"https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZr=
+qjZ527sjvvJiKQvk/edit?disco=3DAAAB1agdt2A&amp;usp=3Dcomment_email_discussio=
+n&amp;ts=3D69ac7193&amp;usp_dm=3Dtrue" class=3D"material-button material-bu=
+tton-transparent" target=3D"_blank" tabindex=3D"0" role=3D"link" style=3D"p=
+adding: 0 8px;font: 500 14px/36px Google Sans, Roboto, Arial, Helvetica, sa=
+ns-serif; border: none; border-radius: 18px; box-sizing: border-box; displa=
+y: inline-block; letter-spacing: .25px; min-height: 36px; text-align: cente=
+r; text-decoration: none;float: right;">Open</a></div></div></div></div></d=
+iv></div></td></tr></table></div><div><table style=3D"width:100%; border: 1=
+px solid #dadce0; border-radius: 8px; border-spacing: 0; table-layout:fixed=
+; border-collapse: separate;" role=3D"presentation"><tr><td style=3D"paddin=
+g: 4.5%;" dir=3D"ltr"><div class=3D"flex flex-column flex-space-column-20px=
+"><div><div><table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0=
+" style=3D"width: 100%"><tr><td style=3D"vertical-align: top; width: 32px;"=
+><div style=3D"background: #F1F3F4; border-radius: 50%; display: inline-blo=
+ck; height: 18px; padding: 7px; width: 18px;"><amp-img src=3D"https://fonts=
+.gstatic.com/s/i/googlematerialicons/rate_review/v11/gm_grey-48dp/1x/gm_rat=
+e_review_gm_grey_48dp.png" height=3D"18px" width=3D"18px" aria-hidden=3D"tr=
+ue" style=3D"flex-shrink: 0;"></amp-img></div></td><td style=3D"vertical-al=
+ign: top;"><h2 style=3D"color: #3c4043; display: inline-block; font: 400 16=
+px/32px Google Sans, Roboto, Arial, Helvetica, sans-serif; letter-spacing: =
+.1px; margin: 0 0 0 10px;">3 suggestions</h2></td></tr></table><div><div st=
+yle=3D"margin-top: 20px;overflow: visible; line-height: 20px;"><div style=
+=3D"margin-top: 0px; word-break: break-word; word-wrap: break-word;" class=
+=3D"non-tombstone-post"><table role=3D"presentation" cellpadding=3D"0" cell=
+spacing=3D"0" style=3D"color: #3c4043; width: 100%;"><tr><td style=3D"verti=
+cal-align: top; width: 44px;"><amp-img src=3D"https://lh3.googleusercontent=
+.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=3Ds50-c-=
+k-no" alt=3D"" height=3D"32" width=3D"32" style=3D"border-radius: 50%;box-s=
+izing: border-box; display: block;"></amp-img></td><td><h3 style=3D"display=
+: inline-block; font: 500 14px Google Sans, Roboto, Arial, Helvetica, sans-=
+serif; letter-spacing: .25px; line-height: 20px; margin: 6px 0 2px 0;">Jeff=
+ Shute</h3> <span style=3D"color: #5F6368; font: 400 12px/16px Roboto, Aria=
+l, Helvetica, sans-serif; letter-spacing: 0.2px; white-space: nowrap;">=E2=
+=80=A2 6:35=E2=80=AFPM, Mar 7 (UTC)</span><h4 style=3D"background: #0B57D0;=
+ border-radius: 8px; color: #fff; display: inline-block; font: 700 12px/16p=
+x Roboto, Arial, Helvetica, sans-serif; margin-bottom: 0; margin-top: 0; ma=
+rgin-left: 10px; padding: 0 6px;">New</h4><div style=3D"font: 400 14px Robo=
+to, Arial, Helvetica, sans-serif; line-height: 20px; letter-spacing: .2px;"=
+><div style=3D"margin-top: 6px;" class=3D"notranslate"><div style=3D"font-s=
+ize:13px;color:#333"><span style=3D"font-weight:bold">Delete:</span> <span =
+style=3D"white-space:pre-line;color:#777;font-style:italic">=E2=80=9CAewg=
+=E2=80=9D</span></div></div></div></td></tr></table></div><div class=3D"pos=
+ts-section-end"></div><div style=3D"margin: 10px 0 0 42px; overflow: auto; =
+padding: 2px;"><a href=3D"mailTo:Reply%20%3Cd+AORGpReumzmnOohocgeGqyI9i-yul=
+rKfkrhxnpomlT6ymMOElR7MiGIRkmj_olzWRnLIWHqWrFdD9aiFM7nPQ6LXG9Cpk0uUrWwCiR3B=
+SGfvw889RatVir3pkXBMiRlY6yN79kO59qVGLH8mewt4KO8xq4-W6pvTWQ@docs.google.com%=
+3E?subject=3Dshared%20doc%20from%20dave" class=3D"material-button material-=
+button-transparent" target=3D"_blank" tabindex=3D"0" role=3D"link" style=3D=
+"padding: 0 8px;font: 500 14px/36px Google Sans, Roboto, Arial, Helvetica, =
+sans-serif; border: none; border-radius: 18px; box-sizing: border-box; disp=
+lay: inline-block; letter-spacing: .25px; min-height: 36px; text-align: cen=
+ter; text-decoration: none;margin-right: 12px;">Reply</a><a href=3D"https:/=
+/docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/ed=
+it?disco=3DAAAB1agdt2E&amp;usp=3Dsuggestion_email_discussion&amp;ts=3D69ac7=
+193&amp;usp_dm=3Dtrue" class=3D"material-button material-button-transparent=
+" target=3D"_blank" tabindex=3D"0" role=3D"link" style=3D"padding: 0 8px;fo=
+nt: 500 14px/36px Google Sans, Roboto, Arial, Helvetica, sans-serif; border=
+: none; border-radius: 18px; box-sizing: border-box; display: inline-block;=
+ letter-spacing: .25px; min-height: 36px; text-align: center; text-decorati=
+on: none;float: right;">Open</a></div></div></div><div style=3D"margin: 18p=
+x 0;height: 1px; background-color: #eee;"></div><div><div style=3D"margin-t=
+op: 20px;overflow: visible; line-height: 20px;"><div style=3D"margin-top: 0=
+px; word-break: break-word; word-wrap: break-word;" class=3D"non-tombstone-=
+post"><table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0" styl=
+e=3D"color: #3c4043; width: 100%;"><tr><td style=3D"vertical-align: top; wi=
+dth: 44px;"><amp-img src=3D"https://lh3.googleusercontent.com/a-/ALV-UjVTmt=
+BCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=3Ds50-c-k-no" alt=3D"" hei=
+ght=3D"32" width=3D"32" style=3D"border-radius: 50%;box-sizing: border-box;=
+ display: block;"></amp-img></td><td><h3 style=3D"display: inline-block; fo=
+nt: 500 14px Google Sans, Roboto, Arial, Helvetica, sans-serif; letter-spac=
+ing: .25px; line-height: 20px; margin: 6px 0 2px 0;">Jeff Shute</h3> <span =
+style=3D"color: #5F6368; font: 400 12px/16px Roboto, Arial, Helvetica, sans=
+-serif; letter-spacing: 0.2px; white-space: nowrap;">=E2=80=A2 6:36=E2=80=
+=AFPM, Mar 7 (UTC)</span><h4 style=3D"background: #0B57D0; border-radius: 8=
+px; color: #fff; display: inline-block; font: 700 12px/16px Roboto, Arial, =
+Helvetica, sans-serif; margin-bottom: 0; margin-top: 0; margin-left: 10px; =
+padding: 0 6px;">New</h4><div style=3D"font: 400 14px Roboto, Arial, Helvet=
+ica, sans-serif; line-height: 20px; letter-spacing: .2px;"><div style=3D"ma=
+rgin-top: 6px;" class=3D"notranslate"><div style=3D"font-size:13px;color:#3=
+33"><span style=3D"font-weight:bold">Add:</span> <span style=3D"white-space=
+:pre-line;color:#777;font-style:italic">=E2=80=9Cddd=E2=80=9D</span></div><=
+/div></div></td></tr></table></div><div class=3D"posts-section-end"></div><=
+div style=3D"margin: 10px 0 0 42px; overflow: auto; padding: 2px;"><a href=
+=3D"mailTo:Reply%20%3Cd+AORGpRdkSp4W2SG64RQXriP4R39sOxlhbJ3erJmt4Wbbc7Rev6K=
+NPAEGLdXM3drHz68fkoqtkTiB8GSdP0LHAC5GUQZqqzQrGVzQdyW2WPygbTpPBa6wy4bpK94G7D=
+EXCiEMPPXaxmJ79ARsBjzPwbU-A-rocv3O0w@docs.google.com%3E?subject=3Dshared%20=
+doc%20from%20dave" class=3D"material-button material-button-transparent" ta=
+rget=3D"_blank" tabindex=3D"0" role=3D"link" style=3D"padding: 0 8px;font: =
+500 14px/36px Google Sans, Roboto, Arial, Helvetica, sans-serif; border: no=
+ne; border-radius: 18px; box-sizing: border-box; display: inline-block; let=
+ter-spacing: .25px; min-height: 36px; text-align: center; text-decoration: =
+none;margin-right: 12px;">Reply</a><a href=3D"https://docs.google.com/docum=
+ent/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?disco=3DAAAB1agdt2I=
+&amp;usp=3Dsuggestion_email_discussion&amp;ts=3D69ac7193&amp;usp_dm=3Dtrue"=
+ class=3D"material-button material-button-transparent" target=3D"_blank" ta=
+bindex=3D"0" role=3D"link" style=3D"padding: 0 8px;font: 500 14px/36px Goog=
+le Sans, Roboto, Arial, Helvetica, sans-serif; border: none; border-radius:=
+ 18px; box-sizing: border-box; display: inline-block; letter-spacing: .25px=
+; min-height: 36px; text-align: center; text-decoration: none;float: right;=
+">Open</a></div></div></div><div style=3D"margin: 18px 0;height: 1px; backg=
+round-color: #eee;"></div><div><div style=3D"margin-top: 20px;overflow: vis=
+ible; line-height: 20px;"><div style=3D"margin-top: 0px; word-break: break-=
+word; word-wrap: break-word;" class=3D"non-tombstone-post"><table role=3D"p=
+resentation" cellpadding=3D"0" cellspacing=3D"0" style=3D"color: #3c4043; w=
+idth: 100%;"><tr><td style=3D"vertical-align: top; width: 44px;"><amp-img s=
+rc=3D"https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-C=
+r1MM5TG7oTXo6qFeXM6UuzrWGQ=3Ds50-c-k-no" alt=3D"" height=3D"32" width=3D"32=
+" style=3D"border-radius: 50%;box-sizing: border-box; display: block;"></am=
+p-img></td><td><h3 style=3D"display: inline-block; font: 500 14px Google Sa=
+ns, Roboto, Arial, Helvetica, sans-serif; letter-spacing: .25px; line-heigh=
+t: 20px; margin: 6px 0 2px 0;">Jeff Shute</h3> <span style=3D"color: #5F636=
+8; font: 400 12px/16px Roboto, Arial, Helvetica, sans-serif; letter-spacing=
+: 0.2px; white-space: nowrap;">=E2=80=A2 6:36=E2=80=AFPM, Mar 7 (UTC)</span=
+><h4 style=3D"background: #0B57D0; border-radius: 8px; color: #fff; display=
+: inline-block; font: 700 12px/16px Roboto, Arial, Helvetica, sans-serif; m=
+argin-bottom: 0; margin-top: 0; margin-left: 10px; padding: 0 6px;">New</h4=
+><div style=3D"font: 400 14px Roboto, Arial, Helvetica, sans-serif; line-he=
+ight: 20px; letter-spacing: .2px;"><div style=3D"margin-top: 6px;" class=3D=
+"notranslate"><div style=3D"font-size:13px;color:#333"><span style=3D"font-=
+weight:bold">Replace:</span> <span style=3D"white-space:pre-line;color:#777=
+;font-style:italic">=E2=80=9CGa=E2=80=9D</span> with <span style=3D"white-s=
+pace:pre-line;color:#777;font-style:italic">=E2=80=9Cgew=E2=80=9D</span></d=
+iv></div></div></td></tr></table></div><div class=3D"posts-section-end"></d=
+iv><div style=3D"margin: 10px 0 0 42px; overflow: auto; padding: 2px;"><a h=
+ref=3D"mailTo:Reply%20%3Cd+AORGpRemQlQ9nYHM0SrUFhF_JB8WfUBJvWyTB5syUs6HRCcQ=
+CdcidT4qrEiBtofDwL71_SyBZ9OdFTKFCYKUC_34M_t7xlMEQEJqAo9JBymIOrXS2TtulpITG77=
+yZxX18C-0cDJFfqGkcbgbsFkdbI4W8SrfsJLW0w@docs.google.com%3E?subject=3Dshared=
+%20doc%20from%20dave" class=3D"material-button material-button-transparent"=
+ target=3D"_blank" tabindex=3D"0" role=3D"link" style=3D"padding: 0 8px;fon=
+t: 500 14px/36px Google Sans, Roboto, Arial, Helvetica, sans-serif; border:=
+ none; border-radius: 18px; box-sizing: border-box; display: inline-block; =
+letter-spacing: .25px; min-height: 36px; text-align: center; text-decoratio=
+n: none;margin-right: 12px;">Reply</a><a href=3D"https://docs.google.com/do=
+cument/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?disco=3DAAAB1agd=
+t2M&amp;usp=3Dsuggestion_email_discussion&amp;ts=3D69ac7193&amp;usp_dm=3Dtr=
+ue" class=3D"material-button material-button-transparent" target=3D"_blank"=
+ tabindex=3D"0" role=3D"link" style=3D"padding: 0 8px;font: 500 14px/36px G=
+oogle Sans, Roboto, Arial, Helvetica, sans-serif; border: none; border-radi=
+us: 18px; box-sizing: border-box; display: inline-block; letter-spacing: .2=
+5px; min-height: 36px; text-align: center; text-decoration: none;float: rig=
+ht;">Open</a></div></div></div></div></div></div></td></tr></table></div></=
+div><table style=3D"border-collapse: collapse; width: 100%;" role=3D"presen=
+tation"><tr><td style=3D"padding: 24px 4.5%"><table style=3D"border-collaps=
+e: collapse; width: 100%;" dir=3D"ltr"><tr><td style=3D"padding: 0;font-fam=
+ily: Roboto, Arial, Helvetica, sans-serif; color: #5F6368; width: 100%; fon=
+t-size: 12px; line-height: 16px; min-height: 40px; letter-spacing: .3px;"><=
+p style=3D"margin: 0; padding: 0;">Google LLC, 1600 Amphitheatre Parkway, M=
+ountain View, CA 94043, USA<br><br>You have received this email because you=
+ are a participant in the updated items or subscribed to notifications on <=
+span class=3D"notranslate"><a href=3D"https://docs.google.com/document/d/1A=
+h8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?usp=3Dcomment_email_documen=
+t&amp;ts=3D69ac7193&amp;usp_dm=3Dtrue&amp;tab=3Dt.0" target=3D"_blank" styl=
+e=3D"color: #0B57D0; text-decoration: none;">shared doc from dave</a></span=
+>. <a target=3D"_blank" style=3D"color: #0B57D0; text-decoration: none;" hr=
+ef=3D"https://docs.google.com/document/u/116797062718942056712/docos/notify=
+?ouid=3D116797062718942056712&amp;id=3D1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sj=
+vvJiKQvk&amp;title=3Dshared+doc+from+dave&amp;resourcekey">Change what Goog=
+le sends you</a>. You cannot reply to this email.</p></td><td style=3D"padd=
+ing: 0;padding-left: 20px; min-width: 96px"><amp-img src=3D"https://www.gst=
+atic.com/images/branding/googlelogo/2x/googlelogo_tm_black54_color_96x40dp.=
+png" width=3D"96px" height=3D"40px"></amp-img></td></tr></table></td></tr><=
+/table></td></tr></table></td></tr></table></div><template type=3D"amp-must=
+ache">{{#eventInfos}}<table style=3D"border-collapse: collapse; width: 100%=
+; background-color: white; text-align: center;" role=3D"presentation"><tr><=
+td style=3D"padding: 24px 0 16px 0;"><table style=3D"border-collapse: colla=
+pse;font-family: Roboto, Arial, Helvetica, sans-serif;hyphens: auto; overfl=
+ow-wrap: break-word; word-wrap: break-word; word-break: break-word;width: 9=
+0%; margin: auto;max-width: 700px;min-width: 280px; text-align: left;" role=
+=3D"presentation"><tr><td style=3D"padding: 0;"><div class=3D"flex flex-col=
+umn flex-space-column-16px"><div><table style=3D"width:100%; table-layout:f=
+ixed;" role=3D"presentation"><tr><td style=3D"padding: 0;" dir=3D"ltr"><div=
+ id=3D"overview-card-contents"><div class=3D"flex flex-column flex-space-co=
+lumn-12px"><div><h1 style=3D"color: #3c4043; font: 400 18px Google Sans, Ro=
+boto, Arial, Helvetica, sans-serif; margin: 0;">New activity in the followi=
+ng document</h1></div><div><div class=3D"flex flex-column flex-space-column=
+-12px"><div id=3D"document-chip-section"><div id=3D"document-chip"><a href=
+=3D"https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sj=
+vvJiKQvk/edit?usp=3Dcomment_email_document&amp;ts=3D69ac7193&amp;usp_dm=3Dt=
+rue&amp;tab=3Dt.0" target=3D"_blank" style=3D"color: #3c4043; display: inli=
+ne-block; max-width: 100%; text-decoration: none; vertical-align: top;borde=
+r: 1px solid #DADCE0; border-radius: 16px; white-space: nowrap;min-width: 0=
+;"><div style=3D"line-height: 18px; overflow: hidden; text-overflow: ellips=
+is;padding: 6px 12px;"><span style=3D"display: inline-block; vertical-align=
+: middle; min-width: 26px; width: 26px;"><amp-img src=3D"https://ssl.gstati=
+c.com/docs/doclist/images/mediatype/icon_1_document_x64.png" width=3D"18" h=
+eight=3D"18" style=3D"vertical-align: top;" role=3D"presentation"></amp-img=
+></span><span style=3D"font: 500 14px/18px Google Sans, Roboto, Arial, Helv=
+etica, sans-serif; display: inline; letter-spacing: 0.2px; vertical-align: =
+middle;">shared doc from dave</span></div></a></div>{{#subscriptions}}<div =
+id=3D"subscription-accordion" role=3D"button" tabindex=3D"0" aria-label=3D"=
+Notification settings" aria-controls=3D"subscription-section" aria-expanded=
+=3D"false" data-amp-bind-aria-expanded=3D"!!(subscriptions &amp;&amp; subsc=
+riptions.expanded) ? 'true' : 'false'" on=3D"tap: AMP.setState({subscriptio=
+ns: {expanded: !!!(subscriptions &amp;&amp; subscriptions.expanded)}})"><di=
+v class=3D"flex align-center flex-space-row-8px"><div id=3D"subscription-ac=
+cordion-icon" aria-hidden=3D"true" class=3D"stack comments-{{comments.value=
+}} {{#edits}}edits-{{value}}{{/edits}}{{^edits}}edits-disabled{{/edits}}" d=
+ata-amp-bind-class=3D"'stack comments-' + ( (subscriptions &amp;&amp; subsc=
+riptions.comments &amp;&amp; subscriptions.comments.current) || &#39;{{comm=
+ents.value}}&#39; ) +{{#edits}}' edits-' + ( (subscriptions &amp;&amp; subs=
+criptions.edits &amp;&amp; subscriptions.edits.current) || &#39;{{edits.val=
+ue}}&#39; ){{/edits}}{{^edits}}' edits-disabled'{{/edits}}"><amp-img id=3D"=
+subscription-accordion-icon-all" src=3D"https://fonts.gstatic.com/s/i/googl=
+ematerialicons/notifications_active/v11/gm_grey-48dp/2x/gm_notifications_ac=
+tive_gm_grey_48dp.png" width=3D"24" height=3D"24"></amp-img><amp-img id=3D"=
+subscription-accordion-icon-important" src=3D"https://fonts.gstatic.com/s/i=
+/googlematerialicons/notifications/v13/gm_grey-48dp/2x/gm_notifications_gm_=
+grey_48dp.png" width=3D"24" height=3D"24"></amp-img><amp-img id=3D"subscrip=
+tion-accordion-icon-none" src=3D"https://fonts.gstatic.com/s/i/googlemateri=
+alicons/notifications_off/v10/gm_grey-48dp/2x/gm_notifications_off_gm_grey_=
+48dp.png" width=3D"24" height=3D"24"></amp-img></div><div id=3D"subscriptio=
+n-accordion-text" aria-hidden=3D"true">Notification settings</div><div id=
+=3D"subscription-accordion-arrow" class=3D"stack" aria-hidden=3D"true"><amp=
+-img src=3D"https://fonts.gstatic.com/s/i/googlematerialicons/expand_more/v=
+12/gm_grey-48dp/2x/gm_expand_more_gm_grey_48dp.png" width=3D"24" height=3D"=
+24" data-amp-bind-class=3D"!!(subscriptions &amp;&amp; subscriptions.expand=
+ed) ? 'hidden' : 'visible'"></amp-img><amp-img src=3D"https://fonts.gstatic=
+.com/s/i/googlematerialicons/expand_less/v10/gm_grey-48dp/2x/gm_expand_less=
+_gm_grey_48dp.png" width=3D"24" height=3D"24" class=3D"hidden" data-amp-bin=
+d-class=3D"!!(subscriptions &amp;&amp; subscriptions.expanded) ? 'visible' =
+: 'hidden'"></amp-img></div></div></div>{{/subscriptions}}</div>{{#subscrip=
+tions}}<div id=3D"subscription-section" role=3D"region" aria-labelledby=3D"=
+subscription-accordion" class=3D"none" data-amp-bind-class=3D"!!(subscripti=
+ons &amp;&amp; subscriptions.expanded) ? 'block' : 'none'"><div style=3D"ma=
+rgin: 18px 0;height: 1px; background-color: #eee;"></div><div id=3D"subscri=
+ption-controls">{{#comments}}<form id=3D"comments-subscription-form" class=
+=3D"subscription-form" action-xhr=3D"https://docs.google.com/document/d/1Ah=
+8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/dynamicmail/subscribe?emailToken=
+=3DAORGpRcKCH9HoKsa1QT6oO9ePI2cnBkD7ZO-vqo1UEoK7sjbjWDPRFh2E7gpUzxPimCmstqX=
+g0zOd9NWKlVTJoZUpelMkz8winK0nPog4i3HAiHsASRvKD0-2611PDNyP3XSCRQTpnob&amp;bu=
+ildLabel=3Deditors.documents-frontend_20260302.00_p2&amp;clientVersion=3D3&=
+amp;emailType=3Dcomments&amp;ts=3D69ac7193" method=3D"post" on=3D"submit-su=
+ccess: AMP.setState({subscriptions: {comments: {next: null}}}); submit-erro=
+r: AMP.setState({subscriptions: {comments: {current: subscriptions.comments=
+.previous, next: null}, error: true}});"><input type=3D"hidden" name=3D"typ=
+e" value=3D"comments"><input type=3D"hidden" name=3D"value" data-amp-bind-v=
+alue=3D"subscriptions.comments.next"><label for=3D"comments-subscription-na=
+tive-select"><span>Comments</span><span class=3D"subscription-measuring-lab=
+el" aria-hidden=3D"true">Comments<br>Edits</span></label><div id=3D"comment=
+s-subscription-select" class=3D"subscription-select"><select id=3D"comments=
+-subscription-native-select" class=3D"subscription-native-select" on=3D"cha=
+nge: AMP.setState({subscriptions: {comments: {previous: ( (subscriptions &a=
+mp;&amp; subscriptions.comments &amp;&amp; subscriptions.comments.current) =
+|| &#39;{{comments.value}}&#39; ), current: event.value, next: event.value}=
+, error: false}}),comments-subscription-form.submit;" data-amp-bind-disable=
+d=3D"!!(subscriptions &amp;&amp; ( (subscriptions.comments &amp;&amp; subsc=
+riptions.comments.next) || (subscriptions.edits &amp;&amp; subscriptions.ed=
+its.next) ))">{{#options.all}}<option value=3D"all" data-amp-bind-disabled=
+=3D"!!(subscriptions &amp;&amp; ( (subscriptions.comments &amp;&amp; subscr=
+iptions.comments.next) || (subscriptions.edits &amp;&amp; subscriptions.edi=
+ts.next) ))" selected data-amp-bind-selected=3D"( (subscriptions &amp;&amp;=
+ subscriptions.comments &amp;&amp; subscriptions.comments.current) || &#39;=
+{{comments.value}}&#39; ) =3D=3D 'all'">All</option>{{/options.all}}{{^opti=
+ons.all}}<option value=3D"all" data-amp-bind-disabled=3D"!!(subscriptions &=
+amp;&amp; ( (subscriptions.comments &amp;&amp; subscriptions.comments.next)=
+ || (subscriptions.edits &amp;&amp; subscriptions.edits.next) ))" data-amp-=
+bind-selected=3D"( (subscriptions &amp;&amp; subscriptions.comments &amp;&a=
+mp; subscriptions.comments.current) || &#39;{{comments.value}}&#39; ) =3D=
+=3D 'all'">All</option>{{/options.all}}{{#options.important}}<option value=
+=3D"important" data-amp-bind-disabled=3D"!!(subscriptions &amp;&amp; ( (sub=
+scriptions.comments &amp;&amp; subscriptions.comments.next) || (subscriptio=
+ns.edits &amp;&amp; subscriptions.edits.next) ))" selected data-amp-bind-se=
+lected=3D"( (subscriptions &amp;&amp; subscriptions.comments &amp;&amp; sub=
+scriptions.comments.current) || &#39;{{comments.value}}&#39; ) =3D=3D 'impo=
+rtant'">For you</option>{{/options.important}}{{^options.important}}<option=
+ value=3D"important" data-amp-bind-disabled=3D"!!(subscriptions &amp;&amp; =
+( (subscriptions.comments &amp;&amp; subscriptions.comments.next) || (subsc=
+riptions.edits &amp;&amp; subscriptions.edits.next) ))" data-amp-bind-selec=
+ted=3D"( (subscriptions &amp;&amp; subscriptions.comments &amp;&amp; subscr=
+iptions.comments.current) || &#39;{{comments.value}}&#39; ) =3D=3D 'importa=
+nt'">For you</option>{{/options.important}}{{#options.none}}<option value=
+=3D"none" data-amp-bind-disabled=3D"!!(subscriptions &amp;&amp; ( (subscrip=
+tions.comments &amp;&amp; subscriptions.comments.next) || (subscriptions.ed=
+its &amp;&amp; subscriptions.edits.next) ))" selected data-amp-bind-selecte=
+d=3D"( (subscriptions &amp;&amp; subscriptions.comments &amp;&amp; subscrip=
+tions.comments.current) || &#39;{{comments.value}}&#39; ) =3D=3D 'none'">No=
+ne</option>{{/options.none}}{{^options.none}}<option value=3D"none" data-am=
+p-bind-disabled=3D"!!(subscriptions &amp;&amp; ( (subscriptions.comments &a=
+mp;&amp; subscriptions.comments.next) || (subscriptions.edits &amp;&amp; su=
+bscriptions.edits.next) ))" data-amp-bind-selected=3D"( (subscriptions &amp=
+;&amp; subscriptions.comments &amp;&amp; subscriptions.comments.current) ||=
+ &#39;{{comments.value}}&#39; ) =3D=3D 'none'">None</option>{{/options.none=
+}}</select><div class=3D"subscription-custom-select" aria-hidden=3D"true" d=
+ata-amp-bind-class=3D"'subscription-custom-select' + (!!(subscriptions &amp=
+;&amp; ( (subscriptions.comments &amp;&amp; subscriptions.comments.next) ||=
+ (subscriptions.edits &amp;&amp; subscriptions.edits.next) )) ? ' disabled'=
+ : '')"><div class=3D"subscription-custom-select-labels"><span class=3D"{{#=
+options.all}}inline{{/options.all}}{{^options.all}}none{{/options.all}}" da=
+ta-amp-bind-class=3D"( (subscriptions &amp;&amp; subscriptions.comments &am=
+p;&amp; subscriptions.comments.current) || &#39;{{comments.value}}&#39; ) =
+=3D=3D 'all' ? 'inline' : 'none'">All</span><span class=3D"subscription-mea=
+suring-label">All</span><span class=3D"{{#options.important}}inline{{/optio=
+ns.important}}{{^options.important}}none{{/options.important}}" data-amp-bi=
+nd-class=3D"( (subscriptions &amp;&amp; subscriptions.comments &amp;&amp; s=
+ubscriptions.comments.current) || &#39;{{comments.value}}&#39; ) =3D=3D 'im=
+portant' ? 'inline' : 'none'">For you</span><span class=3D"subscription-mea=
+suring-label">For you</span><span class=3D"{{#options.none}}inline{{/option=
+s.none}}{{^options.none}}none{{/options.none}}" data-amp-bind-class=3D"( (s=
+ubscriptions &amp;&amp; subscriptions.comments &amp;&amp; subscriptions.com=
+ments.current) || &#39;{{comments.value}}&#39; ) =3D=3D 'none' ? 'inline' :=
+ 'none'">None</span><span class=3D"subscription-measuring-label">None</span=
+></div><div class=3D"subscription-custom-select-arrow">&nbsp;</div></div></=
+div></form>{{/comments}}{{#edits}}<form id=3D"edits-subscription-form" clas=
+s=3D"subscription-form" action-xhr=3D"https://docs.google.com/document/d/1A=
+h8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/dynamicmail/subscribe?emailToken=
+=3DAORGpRcKCH9HoKsa1QT6oO9ePI2cnBkD7ZO-vqo1UEoK7sjbjWDPRFh2E7gpUzxPimCmstqX=
+g0zOd9NWKlVTJoZUpelMkz8winK0nPog4i3HAiHsASRvKD0-2611PDNyP3XSCRQTpnob&amp;bu=
+ildLabel=3Deditors.documents-frontend_20260302.00_p2&amp;clientVersion=3D3&=
+amp;emailType=3Dcomments&amp;ts=3D69ac7193" method=3D"post" on=3D"submit-su=
+ccess: AMP.setState({subscriptions: {edits: {next: null}}}); submit-error: =
+AMP.setState({subscriptions: {edits: {current: subscriptions.edits.previous=
+, next: null}, error: true}});"><input type=3D"hidden" name=3D"type" value=
+=3D"edits"><input type=3D"hidden" name=3D"value" data-amp-bind-value=3D"sub=
+scriptions.edits.next"><label for=3D"edits-subscription-native-select"><spa=
+n>Edits</span><span class=3D"subscription-measuring-label" aria-hidden=3D"t=
+rue">Comments<br>Edits</span></label><div id=3D"edits-subscription-select" =
+class=3D"subscription-select"><select id=3D"edits-subscription-native-selec=
+t" class=3D"subscription-native-select" on=3D"change: AMP.setState({subscri=
+ptions: {edits: {previous: ( (subscriptions &amp;&amp; subscriptions.edits =
+&amp;&amp; subscriptions.edits.current) || &#39;{{edits.value}}&#39; ), cur=
+rent: event.value, next: event.value}, error: false}}),edits-subscription-f=
+orm.submit;" data-amp-bind-disabled=3D"!!(subscriptions &amp;&amp; ( (subsc=
+riptions.comments &amp;&amp; subscriptions.comments.next) || (subscriptions=
+.edits &amp;&amp; subscriptions.edits.next) ))">{{#options.true}}<option va=
+lue=3D"true" data-amp-bind-disabled=3D"!!(subscriptions &amp;&amp; ( (subsc=
+riptions.comments &amp;&amp; subscriptions.comments.next) || (subscriptions=
+.edits &amp;&amp; subscriptions.edits.next) ))" selected data-amp-bind-sele=
+cted=3D"( (subscriptions &amp;&amp; subscriptions.edits &amp;&amp; subscrip=
+tions.edits.current) || &#39;{{edits.value}}&#39; ) =3D=3D 'true'">Added or=
+ removed content</option>{{/options.true}}{{^options.true}}<option value=3D=
+"true" data-amp-bind-disabled=3D"!!(subscriptions &amp;&amp; ( (subscriptio=
+ns.comments &amp;&amp; subscriptions.comments.next) || (subscriptions.edits=
+ &amp;&amp; subscriptions.edits.next) ))" data-amp-bind-selected=3D"( (subs=
+criptions &amp;&amp; subscriptions.edits &amp;&amp; subscriptions.edits.cur=
+rent) || &#39;{{edits.value}}&#39; ) =3D=3D 'true'">Added or removed conten=
+t</option>{{/options.true}}{{#options.false}}<option value=3D"false" data-a=
+mp-bind-disabled=3D"!!(subscriptions &amp;&amp; ( (subscriptions.comments &=
+amp;&amp; subscriptions.comments.next) || (subscriptions.edits &amp;&amp; s=
+ubscriptions.edits.next) ))" selected data-amp-bind-selected=3D"( (subscrip=
+tions &amp;&amp; subscriptions.edits &amp;&amp; subscriptions.edits.current=
+) || &#39;{{edits.value}}&#39; ) =3D=3D 'false'">None</option>{{/options.fa=
+lse}}{{^options.false}}<option value=3D"false" data-amp-bind-disabled=3D"!!=
+(subscriptions &amp;&amp; ( (subscriptions.comments &amp;&amp; subscription=
+s.comments.next) || (subscriptions.edits &amp;&amp; subscriptions.edits.nex=
+t) ))" data-amp-bind-selected=3D"( (subscriptions &amp;&amp; subscriptions.=
+edits &amp;&amp; subscriptions.edits.current) || &#39;{{edits.value}}&#39; =
+) =3D=3D 'false'">None</option>{{/options.false}}</select><div class=3D"sub=
+scription-custom-select" aria-hidden=3D"true" data-amp-bind-class=3D"'subsc=
+ription-custom-select' + (!!(subscriptions &amp;&amp; ( (subscriptions.comm=
+ents &amp;&amp; subscriptions.comments.next) || (subscriptions.edits &amp;&=
+amp; subscriptions.edits.next) )) ? ' disabled' : '')"><div class=3D"subscr=
+iption-custom-select-labels"><span class=3D"{{#options.true}}inline{{/optio=
+ns.true}}{{^options.true}}none{{/options.true}}" data-amp-bind-class=3D"( (=
+subscriptions &amp;&amp; subscriptions.edits &amp;&amp; subscriptions.edits=
+.current) || &#39;{{edits.value}}&#39; ) =3D=3D 'true' ? 'inline' : 'none'"=
+>Added or removed content</span><span class=3D"subscription-measuring-label=
+">Added or removed content</span><span class=3D"{{#options.false}}inline{{/=
+options.false}}{{^options.false}}none{{/options.false}}" data-amp-bind-clas=
+s=3D"( (subscriptions &amp;&amp; subscriptions.edits &amp;&amp; subscriptio=
+ns.edits.current) || &#39;{{edits.value}}&#39; ) =3D=3D 'false' ? 'inline' =
+: 'none'">None</span><span class=3D"subscription-measuring-label">None</spa=
+n></div><div class=3D"subscription-custom-select-arrow">&nbsp;</div></div><=
+/div></form>{{/edits}}<span id=3D"subscription-controls-notice" class=3D"no=
+ne" data-amp-bind-class=3D"subscriptions && subscriptions.error ? 'block' :=
+ 'none'">Something went wrong, please retry</span></div></div>{{/subscripti=
+ons}}</div></div></div></div></td></tr></table></div><div><table style=3D"w=
+idth:100%; border: 1px solid #dadce0; border-radius: 8px; border-spacing: 0=
+; table-layout:fixed; border-collapse: separate;" role=3D"presentation"><tr=
+><td style=3D"padding: 4.5%;" dir=3D"ltr"><div class=3D"flex flex-column fl=
+ex-space-column-20px"><div><div><table role=3D"presentation" cellpadding=3D=
+"0" cellspacing=3D"0" style=3D"width: 100%"><tr><td style=3D"vertical-align=
+: top; width: 32px;"><div style=3D"background: #F1F3F4; border-radius: 50%;=
+ display: inline-block; height: 18px; padding: 7px; width: 18px;"><amp-img =
+src=3D"https://fonts.gstatic.com/s/i/googlematerialicons/comment/v18/gm_gre=
+y-48dp/1x/gm_comment_gm_grey_48dp.png" height=3D"18px" width=3D"18px" aria-=
+hidden=3D"true" style=3D"flex-shrink: 0;"></amp-img></div></td><td style=3D=
+"vertical-align: top;"><h2 style=3D"color: #3c4043; display: inline-block; =
+font: 400 16px/32px Google Sans, Roboto, Arial, Helvetica, sans-serif; lett=
+er-spacing: .1px; margin: 0 0 0 10px;">1 comment</h2></td></tr></table><div=
+ class=3D"discussions-container">{{#openCommentsAndTodos}}<div id=3D"discus=
+sion-{{docoId}}" style=3D"overflow: visible; line-height: 20px;">{{^isDelet=
+ed}}{{#htmlQuote}}<div class=3D"document-content-snippet" style=3D"border: =
+1px solid #DADCE0; border-radius: 8px; padding: 12px 16px;hyphens: auto; ov=
+erflow-wrap: break-word; word-wrap: break-word; word-break: break-word;"><s=
+pan class=3D"notranslate" style=3D"font: 400 14px Roboto, Arial, Helvetica,=
+ sans-serif; line-height: 20px; color: #3c4043;">{{{htmlQuote}}}</span></di=
+v><div style=3D"height: 18px;"></div>{{/htmlQuote}}{{#posts}}<div class=3D"=
+{{#isHeadPost}}head-post{{/isHeadPost}}{{^isHeadPost}}reply-post{{/isHeadPo=
+st}} {{#isVisibleTombstone}}tombstone-post{{/isVisibleTombstone}}{{^isVisib=
+leTombstone}}non-tombstone-post{{/isVisibleTombstone}}">{{#isVisibleTombsto=
+ne}}<div class=3D"tombstone-text">Reply was deleted</div>{{/isVisibleTombst=
+one}}{{^isVisibleTombstone}}<table role=3D"presentation" cellpadding=3D"0" =
+cellspacing=3D"0" style=3D"width: 100%;" class=3D"{{#isNew}}post-dark-text{=
+{/isNew}}{{^isNew}}post-light-text{{/isNew}}"><tr><td style=3D"vertical-ali=
+gn: top; width: 44px;"><amp-img src=3D"{{authorPhotoUrl}}" alt=3D"" height=
+=3D"32" width=3D"32" style=3D"border-radius: 50%;box-sizing: border-box; di=
+splay: block;"></amp-img></td><td><h3 style=3D"display: inline-block; font:=
+ 500 14px Google Sans, Roboto, Arial, Helvetica, sans-serif; letter-spacing=
+: .25px; line-height: 20px; margin: 6px 0 2px 0;">{{authorName}}</h3>{{#cre=
+ationTime}} <span style=3D"color: #5F6368; font: 400 12px/16px Roboto, Aria=
+l, Helvetica, sans-serif; letter-spacing: 0.2px; white-space: nowrap;">=E2=
+=80=A2 {{creationTime}}</span>{{/creationTime}}{{#isNew}}<h4 style=3D"backg=
+round: #0B57D0; border-radius: 8px; color: #fff; display: inline-block; fon=
+t: 700 12px/16px Roboto, Arial, Helvetica, sans-serif; margin-bottom: 0; ma=
+rgin-top: 0; margin-left: 10px; padding: 0 6px;">New</h4>{{/isNew}}<div sty=
+le=3D"font: 400 14px Roboto, Arial, Helvetica, sans-serif; line-height: 20p=
+x; letter-spacing: .2px;">{{#htmlBody}}<div style=3D"margin-top: 6px;" clas=
+s=3D"notranslate">{{{htmlBody}}}</div>{{/htmlBody}}{{#htmlActionText}}<div =
+style=3D"margin-top: 6px;"><i>{{{htmlActionText}}}</i></div>{{/htmlActionTe=
+xt}}{{#postReactions}}<div style=3D"font-size: 12px; margin-top: 6px;">{{#r=
+eactions}}<div>{{summary}}</div>{{/reactions}}</div>{{/postReactions}}{{#sh=
+owCopiedText}}<div style=3D"margin: 18px 0;height: 1px; background-color: #=
+eee;"></div><div style=3D"color: #3c4043; font: italic 14px Roboto, Arial, =
+Helvetica, sans-serif; margin: 18px 0 6px 0; width: 100%;">Comments above c=
+opied from original document</div>{{/showCopiedText}}</div></td></tr></tabl=
+e>{{/isVisibleTombstone}}</div>{{/posts}}<div class=3D"posts-section-end"><=
+/div>{{/isDeleted}}{{#isDeleted}}<div style=3D"color: #3c4043; font: italic=
+ 14px Roboto, Arial, Helvetica, sans-serif; margin: 0 0 6px 0; width: 100%;=
+">Comment was deleted</div>{{/isDeleted}}{{#canResolve}}<form id=3D"resolve=
+-form-{{docoId}}" method=3D"post" action-xhr=3D"https://docs.google.com/doc=
+ument/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/dynamicmail/resolve?em=
+ailToken=3DAORGpRcKCH9HoKsa1QT6oO9ePI2cnBkD7ZO-vqo1UEoK7sjbjWDPRFh2E7gpUzxP=
+imCmstqXg0zOd9NWKlVTJoZUpelMkz8winK0nPog4i3HAiHsASRvKD0-2611PDNyP3XSCRQTpno=
+b&amp;buildLabel=3Deditors.documents-frontend_20260302.00_p2&amp;clientVers=
+ion=3D3&amp;emailType=3Dcomments&amp;ts=3D69ac7193" on=3D"submit-success: d=
+iscussionList.refresh, AMP.setState({scope: {'pendingReply{{docoId}}': fals=
+e}, pendingReplies: {'{{docoId}}': ''}, cachedReplies: {'{{docoId}}': ''}})=
+; submit: discussion-{{docoId}}.toggleClass('class' =3D 'resolving-discussi=
+on'), AMP.setState({scope: {'replyButton{{docoId}}Disabled': true, 'pending=
+Reply{{docoId}}': true}, cachedReplies: pendingReplies}); submit-error: dis=
+cussion-{{docoId}}.toggleClass('class' =3D 'submit-error', force=3Dtrue), d=
+iscussion-{{docoId}}.toggleClass('class' =3D 'resolving-discussion'), AMP.s=
+etState({scope: {'replyButton{{docoId}}Disabled': pendingReplies['{{docoId}=
+}'] =3D=3D null || pendingReplies['{{docoId}}'] =3D=3D '', 'pendingReply{{d=
+ocoId}}': false}});"><div submit-success template=3D"inline-action-post"></=
+div><input type=3D"hidden" name=3D"replyText" data-amp-bind-value=3D"pendin=
+gReplies['{{docoId}}']"><input type=3D"hidden" name=3D"commentId" value=3D"=
+{{docoId}}"><input type=3D"hidden" name=3D"clientId" value=3D"{{replyClient=
+Id}}">{{#availabilityMessage}}<input type=3D"hidden" name=3D"hasAvailabilit=
+yMessage" value=3D"true">{{/availabilityMessage}}</form>{{/canResolve}}{{#c=
+anReply}}<form id=3D"reply-form-{{docoId}}" method=3D"post" autocomplete=3D=
+"off" action-xhr=3D"https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTA=
+ULZueEZrqjZ527sjvvJiKQvk/dynamicmail/reply?emailToken=3DAORGpRcKCH9HoKsa1QT=
+6oO9ePI2cnBkD7ZO-vqo1UEoK7sjbjWDPRFh2E7gpUzxPimCmstqXg0zOd9NWKlVTJoZUpelMkz=
+8winK0nPog4i3HAiHsASRvKD0-2611PDNyP3XSCRQTpnob&amp;buildLabel=3Deditors.doc=
+uments-frontend_20260302.00_p2&amp;clientVersion=3D3&amp;emailType=3Dcommen=
+ts&amp;ts=3D69ac7193" custom-validation-reporting=3D"as-you-go" on=3D"submi=
+t-success: discussionList.refresh, AMP.setState({scope: {'pendingReply{{doc=
+oId}}': false}, pendingReplies: {'{{docoId}}': ''}, cachedReplies: {'{{doco=
+Id}}': ''}}); submit: discussion-{{docoId}}.toggleClass('class' =3D 'submit=
+ting-reply'), AMP.setState({scope: {'replyButton{{docoId}}Disabled': true, =
+'pendingReply{{docoId}}': true}, cachedReplies: pendingReplies}); submit-er=
+ror: discussion-{{docoId}}.toggleClass('class' =3D 'submit-error', force=3D=
+true), discussion-{{docoId}}.toggleClass('class' =3D 'submitting-reply'), A=
+MP.setState({scope: {'replyButton{{docoId}}Disabled': false, 'pendingReply{=
+{docoId}}': false}}); valid: AMP.setState({scope: {'replyButton{{docoId}}Di=
+sabled': false}}); invalid: AMP.setState({scope: {'replyButton{{docoId}}Dis=
+abled': true}});"><div submit-success template=3D"inline-action-post"></div=
+><div class=3D"reply-form-textarea" style=3D"word-break: break-word; word-w=
+rap: break-word; margin-top: 12px;"><table role=3D"presentation" cellpaddin=
+g=3D"0" cellspacing=3D"0" style=3D"width: 100%;"><tr><td style=3D"vertical-=
+align: top; width: 44px; padding-top: 11px;"><amp-img src=3D"{{requestor.ph=
+otoUrl}}" alt=3D"" height=3D"32" width=3D"32" style=3D"border-radius: 50%;b=
+ox-sizing: border-box; display: block;"></amp-img></td><td><textarea autoex=
+pand style=3D"font-family: Roboto, Arial, Helvetica, sans-serif; font-size:=
+ 14px; background-color: #fbfbfb; border-radius: 4px 4px 0 0; box-sizing: b=
+order-box; color: #3c4043; height: 54px; letter-spacing: .2px; line-height:=
+ 20px; outline: none; padding: 16px 10px; resize: none; width: 100%; word-b=
+reak: break-word; vertical-align: top;" class=3D"material-text-input" name=
+=3D"replyText" autocomplete=3D"off" placeholder=3D"Reply" maxlength=3D"2048=
+" on=3D"input-throttled: AMP.setState({pendingReplies: {'{{docoId}}': event=
+.value}});" data-amp-bind-text=3D"cachedReplies['{{docoId}}'] || ''" data-a=
+mp-bind-disabled=3D"scope['pendingReply{{docoId}}']" pattern=3D".*\S+.*" ar=
+ia-label=3D"Reply" required></textarea><input type=3D"hidden" name=3D"comme=
+ntId" value=3D"{{docoId}}"><input type=3D"hidden" name=3D"clientId" value=
+=3D"{{replyClientId}}"></td></tr></table></div></form>{{/canReply}}<div sty=
+le=3D"margin: 10px 0 0 42px; overflow: auto; padding: 2px;">{{#canReply}}<i=
+nput id=3D"discussion-reply-button-{{docoId}}" type=3D"submit" style=3D"pad=
+ding: 0 8px;font: 500 14px/36px Google Sans, Roboto, Arial, Helvetica, sans=
+-serif; border: none; border-radius: 18px; box-sizing: border-box; display:=
+ inline-block; letter-spacing: .25px; min-height: 36px; text-align: center;=
+ text-decoration: none;margin-right: 12px;" role=3D"button" on=3D"tap:reply=
+-form-{{docoId}}.submit()" class=3D"material-button material-button-transpa=
+rent" value=3D"Reply" title=3D"Reply to comment" disabled data-amp-bind-dis=
+abled=3D"scope['replyButton{{docoId}}Disabled']" tabindex=3D"0">{{/canReply=
+}}{{#canResolve}}<input id=3D"discussion-resolve-button-{{docoId}}" type=3D=
+"submit" style=3D"padding: 0 8px;font: 500 14px/36px Google Sans, Roboto, A=
+rial, Helvetica, sans-serif; border: none; border-radius: 18px; box-sizing:=
+ border-box; display: inline-block; letter-spacing: .25px; min-height: 36px=
+; text-align: center; text-decoration: none;margin-right: 12px;" role=3D"bu=
+tton" on=3D"tap:resolve-form-{{docoId}}.submit()" class=3D"material-button =
+material-button-transparent resolve-button" value=3D"{{#isTodo}}Mark as don=
+e{{/isTodo}}{{^isTodo}}Resolve{{/isTodo}}" title=3D"{{#isTodo}}Mark action =
+item as done{{/isTodo}}{{^isTodo}}Mark as resolved{{/isTodo}}" tabindex=3D"=
+0">{{/canResolve}}<a id=3D"discussion-open-button-{{docoId}}" href=3D"{{dis=
+cussionLink}}" class=3D"material-button material-button-transparent discuss=
+ion-open-button" target=3D"_blank" tabindex=3D"0" role=3D"link" style=3D"pa=
+dding: 0 8px;font: 500 14px/36px Google Sans, Roboto, Arial, Helvetica, san=
+s-serif; border: none; border-radius: 18px; box-sizing: border-box; display=
+: inline-block; letter-spacing: .25px; min-height: 36px; text-align: center=
+; text-decoration: none;">Open</a></div><div style=3D"color: #d93025; font:=
+ 14px Roboto, Arial, Helvetica, sans-serif; height: 36px; line-height: 36px=
+; letter-spacing: 0.25px; margin-left: 36px; padding-left: 8px;" class=3D"r=
+eply-error-text">Something went wrong, please retry</div>{{#availabilityMes=
+sage}}<div hidden data-amp-bind-hidden=3D"availabilityBannerDismissed['{{do=
+coId}}'] || !pendingReplies['{{docoId}}']"><div class=3D"docos-availability=
+-banner"><amp-img alt=3D"" class=3D"docos-availability-icon" height=3D"20" =
+layout=3D"fixed" src=3D"https://www.gstatic.com/docs/common/notifications/e=
+vent_busy_orange.png" width=3D"20"></amp-img><div class=3D"docos-availabili=
+ty-banner-text">{{availabilityMessage}}</div><button class=3D"docos-availab=
+ility-banner-dismiss-button" on=3D"tap: AMP.setState({availabilityBannerDis=
+missed: {'{{docoId}}': true}})"><amp-img alt=3D"" height=3D"12" layout=3D"f=
+ixed" src=3D"https://fonts.gstatic.com/s/i/short-term/release/googlesymbols=
+/close/default/24px.svg" width=3D"12"></amp-img></button></div></div>{{/ava=
+ilabilityMessage}}</div>{{/openCommentsAndTodos}}</div></div></div></div></=
+td></tr></table></div><div><table style=3D"width:100%; border: 1px solid #d=
+adce0; border-radius: 8px; border-spacing: 0; table-layout:fixed; border-co=
+llapse: separate;" role=3D"presentation"><tr><td style=3D"padding: 4.5%;" d=
+ir=3D"ltr"><div class=3D"flex flex-column flex-space-column-20px"><div><div=
+><table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0" style=3D"=
+width: 100%"><tr><td style=3D"vertical-align: top; width: 32px;"><div style=
+=3D"background: #F1F3F4; border-radius: 50%; display: inline-block; height:=
+ 18px; padding: 7px; width: 18px;"><amp-img src=3D"https://fonts.gstatic.co=
+m/s/i/googlematerialicons/rate_review/v11/gm_grey-48dp/1x/gm_rate_review_gm=
+_grey_48dp.png" height=3D"18px" width=3D"18px" aria-hidden=3D"true" style=
+=3D"flex-shrink: 0;"></amp-img></div></td><td style=3D"vertical-align: top;=
+"><h2 style=3D"color: #3c4043; display: inline-block; font: 400 16px/32px G=
+oogle Sans, Roboto, Arial, Helvetica, sans-serif; letter-spacing: .1px; mar=
+gin: 0 0 0 10px;">3 suggestions</h2></td></tr></table><div class=3D"discuss=
+ions-container">{{#openSuggestions}}<div id=3D"discussion-{{docoId}}" style=
+=3D"overflow: visible; line-height: 20px;">{{^isDeleted}}{{#htmlQuote}}<div=
+ class=3D"document-content-snippet" style=3D"border: 1px solid #DADCE0; bor=
+der-radius: 8px; padding: 12px 16px;hyphens: auto; overflow-wrap: break-wor=
+d; word-wrap: break-word; word-break: break-word;"><span class=3D"notransla=
+te" style=3D"font: 400 14px Roboto, Arial, Helvetica, sans-serif; line-heig=
+ht: 20px; color: #3c4043;">{{{htmlQuote}}}</span></div><div style=3D"height=
+: 18px;"></div>{{/htmlQuote}}{{#posts}}<div class=3D"{{#isHeadPost}}head-po=
+st{{/isHeadPost}}{{^isHeadPost}}reply-post{{/isHeadPost}} {{#isVisibleTombs=
+tone}}tombstone-post{{/isVisibleTombstone}}{{^isVisibleTombstone}}non-tombs=
+tone-post{{/isVisibleTombstone}}">{{#isVisibleTombstone}}<div class=3D"tomb=
+stone-text">Reply was deleted</div>{{/isVisibleTombstone}}{{^isVisibleTombs=
+tone}}<table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0" styl=
+e=3D"width: 100%;" class=3D"{{#isNew}}post-dark-text{{/isNew}}{{^isNew}}pos=
+t-light-text{{/isNew}}"><tr><td style=3D"vertical-align: top; width: 44px;"=
+><amp-img src=3D"{{authorPhotoUrl}}" alt=3D"" height=3D"32" width=3D"32" st=
+yle=3D"border-radius: 50%;box-sizing: border-box; display: block;"></amp-im=
+g></td><td><h3 style=3D"display: inline-block; font: 500 14px Google Sans, =
+Roboto, Arial, Helvetica, sans-serif; letter-spacing: .25px; line-height: 2=
+0px; margin: 6px 0 2px 0;">{{authorName}}</h3>{{#creationTime}} <span style=
+=3D"color: #5F6368; font: 400 12px/16px Roboto, Arial, Helvetica, sans-seri=
+f; letter-spacing: 0.2px; white-space: nowrap;">=E2=80=A2 {{creationTime}}<=
+/span>{{/creationTime}}{{#isNew}}<h4 style=3D"background: #0B57D0; border-r=
+adius: 8px; color: #fff; display: inline-block; font: 700 12px/16px Roboto,=
+ Arial, Helvetica, sans-serif; margin-bottom: 0; margin-top: 0; margin-left=
+: 10px; padding: 0 6px;">New</h4>{{/isNew}}<div style=3D"font: 400 14px Rob=
+oto, Arial, Helvetica, sans-serif; line-height: 20px; letter-spacing: .2px;=
+">{{#htmlBody}}<div style=3D"margin-top: 6px;" class=3D"notranslate">{{{htm=
+lBody}}}</div>{{/htmlBody}}{{#htmlActionText}}<div style=3D"margin-top: 6px=
+;"><i>{{{htmlActionText}}}</i></div>{{/htmlActionText}}{{#postReactions}}<d=
+iv style=3D"font-size: 12px; margin-top: 6px;">{{#reactions}}<div>{{summary=
+}}</div>{{/reactions}}</div>{{/postReactions}}{{#showCopiedText}}<div style=
+=3D"margin: 18px 0;height: 1px; background-color: #eee;"></div><div style=
+=3D"color: #3c4043; font: italic 14px Roboto, Arial, Helvetica, sans-serif;=
+ margin: 18px 0 6px 0; width: 100%;">Comments above copied from original do=
+cument</div>{{/showCopiedText}}</div></td></tr></table>{{/isVisibleTombston=
+e}}</div>{{/posts}}<div class=3D"posts-section-end"></div>{{/isDeleted}}{{#=
+isDeleted}}<div style=3D"color: #3c4043; font: italic 14px Roboto, Arial, H=
+elvetica, sans-serif; margin: 0 0 6px 0; width: 100%;">Comment was deleted<=
+/div>{{/isDeleted}}{{#canResolve}}<form id=3D"resolve-form-{{docoId}}" meth=
+od=3D"post" action-xhr=3D"https://docs.google.com/document/d/1Ah8scE1myNXdX=
+IJKHTAULZueEZrqjZ527sjvvJiKQvk/dynamicmail/resolve?emailToken=3DAORGpRcKCH9=
+HoKsa1QT6oO9ePI2cnBkD7ZO-vqo1UEoK7sjbjWDPRFh2E7gpUzxPimCmstqXg0zOd9NWKlVTJo=
+ZUpelMkz8winK0nPog4i3HAiHsASRvKD0-2611PDNyP3XSCRQTpnob&amp;buildLabel=3Dedi=
+tors.documents-frontend_20260302.00_p2&amp;clientVersion=3D3&amp;emailType=
+=3Dcomments&amp;ts=3D69ac7193" on=3D"submit-success: discussionList.refresh=
+, AMP.setState({scope: {'pendingReply{{docoId}}': false}, pendingReplies: {=
+'{{docoId}}': ''}, cachedReplies: {'{{docoId}}': ''}}); submit: discussion-=
+{{docoId}}.toggleClass('class' =3D 'resolving-discussion'), AMP.setState({s=
+cope: {'replyButton{{docoId}}Disabled': true, 'pendingReply{{docoId}}': tru=
+e}, cachedReplies: pendingReplies}); submit-error: discussion-{{docoId}}.to=
+ggleClass('class' =3D 'submit-error', force=3Dtrue), discussion-{{docoId}}.=
+toggleClass('class' =3D 'resolving-discussion'), AMP.setState({scope: {'rep=
+lyButton{{docoId}}Disabled': pendingReplies['{{docoId}}'] =3D=3D null || pe=
+ndingReplies['{{docoId}}'] =3D=3D '', 'pendingReply{{docoId}}': false}});">=
+<div submit-success template=3D"inline-action-post"></div><input type=3D"hi=
+dden" name=3D"replyText" data-amp-bind-value=3D"pendingReplies['{{docoId}}'=
+]"><input type=3D"hidden" name=3D"commentId" value=3D"{{docoId}}"><input ty=
+pe=3D"hidden" name=3D"clientId" value=3D"{{replyClientId}}">{{#availability=
+Message}}<input type=3D"hidden" name=3D"hasAvailabilityMessage" value=3D"tr=
+ue">{{/availabilityMessage}}</form>{{/canResolve}}{{#canReply}}<form id=3D"=
+reply-form-{{docoId}}" method=3D"post" autocomplete=3D"off" action-xhr=3D"h=
+ttps://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiK=
+Qvk/dynamicmail/reply?emailToken=3DAORGpRcKCH9HoKsa1QT6oO9ePI2cnBkD7ZO-vqo1=
+UEoK7sjbjWDPRFh2E7gpUzxPimCmstqXg0zOd9NWKlVTJoZUpelMkz8winK0nPog4i3HAiHsASR=
+vKD0-2611PDNyP3XSCRQTpnob&amp;buildLabel=3Deditors.documents-frontend_20260=
+302.00_p2&amp;clientVersion=3D3&amp;emailType=3Dcomments&amp;ts=3D69ac7193"=
+ custom-validation-reporting=3D"as-you-go" on=3D"submit-success: discussion=
+List.refresh, AMP.setState({scope: {'pendingReply{{docoId}}': false}, pendi=
+ngReplies: {'{{docoId}}': ''}, cachedReplies: {'{{docoId}}': ''}}); submit:=
+ discussion-{{docoId}}.toggleClass('class' =3D 'submitting-reply'), AMP.set=
+State({scope: {'replyButton{{docoId}}Disabled': true, 'pendingReply{{docoId=
+}}': true}, cachedReplies: pendingReplies}); submit-error: discussion-{{doc=
+oId}}.toggleClass('class' =3D 'submit-error', force=3Dtrue), discussion-{{d=
+ocoId}}.toggleClass('class' =3D 'submitting-reply'), AMP.setState({scope: {=
+'replyButton{{docoId}}Disabled': false, 'pendingReply{{docoId}}': false}});=
+ valid: AMP.setState({scope: {'replyButton{{docoId}}Disabled': false}}); in=
+valid: AMP.setState({scope: {'replyButton{{docoId}}Disabled': true}});"><di=
+v submit-success template=3D"inline-action-post"></div><div class=3D"reply-=
+form-textarea" style=3D"word-break: break-word; word-wrap: break-word; marg=
+in-top: 12px;"><table role=3D"presentation" cellpadding=3D"0" cellspacing=
+=3D"0" style=3D"width: 100%;"><tr><td style=3D"vertical-align: top; width: =
+44px; padding-top: 11px;"><amp-img src=3D"{{requestor.photoUrl}}" alt=3D"" =
+height=3D"32" width=3D"32" style=3D"border-radius: 50%;box-sizing: border-b=
+ox; display: block;"></amp-img></td><td><textarea autoexpand style=3D"font-=
+family: Roboto, Arial, Helvetica, sans-serif; font-size: 14px; background-c=
+olor: #fbfbfb; border-radius: 4px 4px 0 0; box-sizing: border-box; color: #=
+3c4043; height: 54px; letter-spacing: .2px; line-height: 20px; outline: non=
+e; padding: 16px 10px; resize: none; width: 100%; word-break: break-word; v=
+ertical-align: top;" class=3D"material-text-input" name=3D"replyText" autoc=
+omplete=3D"off" placeholder=3D"Reply" maxlength=3D"2048" on=3D"input-thrott=
+led: AMP.setState({pendingReplies: {'{{docoId}}': event.value}});" data-amp=
+-bind-text=3D"cachedReplies['{{docoId}}'] || ''" data-amp-bind-disabled=3D"=
+scope['pendingReply{{docoId}}']" pattern=3D".*\S+.*" aria-label=3D"Reply" r=
+equired></textarea><input type=3D"hidden" name=3D"commentId" value=3D"{{doc=
+oId}}"><input type=3D"hidden" name=3D"clientId" value=3D"{{replyClientId}}"=
+></td></tr></table></div></form>{{/canReply}}<div style=3D"margin: 10px 0 0=
+ 42px; overflow: auto; padding: 2px;">{{#canReply}}<input id=3D"discussion-=
+reply-button-{{docoId}}" type=3D"submit" style=3D"padding: 0 8px;font: 500 =
+14px/36px Google Sans, Roboto, Arial, Helvetica, sans-serif; border: none; =
+border-radius: 18px; box-sizing: border-box; display: inline-block; letter-=
+spacing: .25px; min-height: 36px; text-align: center; text-decoration: none=
+;margin-right: 12px;" role=3D"button" on=3D"tap:reply-form-{{docoId}}.submi=
+t()" class=3D"material-button material-button-transparent" value=3D"Reply" =
+title=3D"Reply to comment" disabled data-amp-bind-disabled=3D"scope['replyB=
+utton{{docoId}}Disabled']" tabindex=3D"0">{{/canReply}}{{#canResolve}}<inpu=
+t id=3D"discussion-resolve-button-{{docoId}}" type=3D"submit" style=3D"padd=
+ing: 0 8px;font: 500 14px/36px Google Sans, Roboto, Arial, Helvetica, sans-=
+serif; border: none; border-radius: 18px; box-sizing: border-box; display: =
+inline-block; letter-spacing: .25px; min-height: 36px; text-align: center; =
+text-decoration: none;margin-right: 12px;" role=3D"button" on=3D"tap:resolv=
+e-form-{{docoId}}.submit()" class=3D"material-button material-button-transp=
+arent resolve-button" value=3D"{{#isTodo}}Mark as done{{/isTodo}}{{^isTodo}=
+}Resolve{{/isTodo}}" title=3D"{{#isTodo}}Mark action item as done{{/isTodo}=
+}{{^isTodo}}Mark as resolved{{/isTodo}}" tabindex=3D"0">{{/canResolve}}<a i=
+d=3D"discussion-open-button-{{docoId}}" href=3D"{{discussionLink}}" class=
+=3D"material-button material-button-transparent discussion-open-button" tar=
+get=3D"_blank" tabindex=3D"0" role=3D"link" style=3D"padding: 0 8px;font: 5=
+00 14px/36px Google Sans, Roboto, Arial, Helvetica, sans-serif; border: non=
+e; border-radius: 18px; box-sizing: border-box; display: inline-block; lett=
+er-spacing: .25px; min-height: 36px; text-align: center; text-decoration: n=
+one;">Open</a></div><div style=3D"color: #d93025; font: 14px Roboto, Arial,=
+ Helvetica, sans-serif; height: 36px; line-height: 36px; letter-spacing: 0.=
+25px; margin-left: 36px; padding-left: 8px;" class=3D"reply-error-text">Som=
+ething went wrong, please retry</div>{{#availabilityMessage}}<div hidden da=
+ta-amp-bind-hidden=3D"availabilityBannerDismissed['{{docoId}}'] || !pending=
+Replies['{{docoId}}']"><div class=3D"docos-availability-banner"><amp-img al=
+t=3D"" class=3D"docos-availability-icon" height=3D"20" layout=3D"fixed" src=
+=3D"https://www.gstatic.com/docs/common/notifications/event_busy_orange.png=
+" width=3D"20"></amp-img><div class=3D"docos-availability-banner-text">{{av=
+ailabilityMessage}}</div><button class=3D"docos-availability-banner-dismiss=
+-button" on=3D"tap: AMP.setState({availabilityBannerDismissed: {'{{docoId}}=
+': true}})"><amp-img alt=3D"" height=3D"12" layout=3D"fixed" src=3D"https:/=
+/fonts.gstatic.com/s/i/short-term/release/googlesymbols/close/default/24px.=
+svg" width=3D"12"></amp-img></button></div></div>{{/availabilityMessage}}</=
+div>{{/openSuggestions}}</div></div></div></div></td></tr></table></div></d=
+iv><table style=3D"border-collapse: collapse; width: 100%;" role=3D"present=
+ation"><tr><td style=3D"padding: 24px 4.5%"><table style=3D"border-collapse=
+: collapse; width: 100%;" dir=3D"ltr"><tr><td style=3D"padding: 0;font-fami=
+ly: Roboto, Arial, Helvetica, sans-serif; color: #5F6368; width: 100%; font=
+-size: 12px; line-height: 16px; min-height: 40px; letter-spacing: .3px;"><p=
+ style=3D"margin: 0; padding: 0;">Google LLC, 1600 Amphitheatre Parkway, Mo=
+untain View, CA 94043, USA<br><br>You have received this email because you =
+are a participant in the updated items or subscribed to notifications on <s=
+pan class=3D"notranslate"><a href=3D"https://docs.google.com/document/d/1Ah=
+8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?usp=3Dcomment_email_document=
+&amp;ts=3D69ac7193&amp;usp_dm=3Dtrue&amp;tab=3Dt.0" target=3D"_blank" style=
+=3D"color: #0B57D0; text-decoration: none;">shared doc from dave</a></span>=
+. <a target=3D"_blank" style=3D"color: #0B57D0; text-decoration: none;" hre=
+f=3D"https://docs.google.com/document/u/116797062718942056712/docos/notify?=
+ouid=3D116797062718942056712&amp;id=3D1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjv=
+vJiKQvk&amp;title=3Dshared+doc+from+dave&amp;resourcekey">Change what Googl=
+e sends you</a>. You cannot reply to this email.</p></td><td style=3D"paddi=
+ng: 0;padding-left: 20px; min-width: 96px"><amp-img src=3D"https://www.gsta=
+tic.com/images/branding/googlelogo/2x/googlelogo_tm_black54_color_96x40dp.p=
+ng" width=3D"96px" height=3D"40px"></amp-img></td></tr></table></td></tr></=
+table></td></tr></table></td></tr></table>{{/eventInfos}}</template></amp-l=
+ist></div></body></html>
+--0000000000000d54e5064c738830
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!doctype html><html><head><title></title><style>.tombstone-text {color: #3=
+c4043; font: italic 14px Roboto, Arial, Helvetica, sans-serif; margin: 18px=
+ 0 18px 0; width: 100%; text-align: center;}.tombstone-post, .tombstone-pos=
+t + .non-tombstone-post, .tombstone-post + .posts-section-end {border-top: =
+1px dashed #BDC1C6;}.non-tombstone-post + .tombstone-post, .non-tombstone-p=
+ost + .non-tombstone-post {margin-top: 12px;}.tombstone-post + .non-tombsto=
+ne-post {padding-top: 12px;}</style></head><body><div itemscope itemtype=3D=
+"http://schema.org/EmailMessage" style=3D"font: 14px Roboto, Arial, Helveti=
+ca, sans-serif;"><div itemprop=3D"about" itemscope itemtype=3D"http://schem=
+a.org/CreativeWork"><meta itemprop=3D"name" content=3D"shared doc from dave=
+"><meta itemprop=3D"url" content=3D"https://docs.google.com/document/d/1Ah8=
+scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?usp=3Dcomment_email_document&=
+amp;ts=3D69ac7193&amp;tab=3Dt.0"><table style=3D"border-collapse: collapse;=
+ width: 100%; background-color: white; text-align: center;" role=3D"present=
+ation"><tr><td style=3D"padding: 24px 0 16px 0;"><table style=3D"border-col=
+lapse: collapse;font-family: Roboto, Arial, Helvetica, sans-serif;hyphens: =
+auto; overflow-wrap: break-word; word-wrap: break-word; word-break: break-w=
+ord;width: 90%; margin: auto;max-width: 700px;min-width: 280px; text-align:=
+ left;" role=3D"presentation"><tr><td style=3D"padding: 0;"><div><div><tabl=
+e style=3D"width:100%; table-layout:fixed;" role=3D"presentation"><tr><td s=
+tyle=3D"padding: 0;" dir=3D"ltr"><div id=3D"overview-card-contents"><div><d=
+iv><h1 style=3D"color: #3c4043; font: 400 18px Google Sans, Roboto, Arial, =
+Helvetica, sans-serif; margin: 0;">New activity in the following document</=
+h1></div><div style=3D"margin-top: 12px;"><div><div><div id=3D"document-chi=
+p-section"><div id=3D"document-chip"><a href=3D"https://docs.google.com/doc=
+ument/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?usp=3Dcomment_ema=
+il_document&amp;ts=3D69ac7193&amp;usp_dm=3Dfalse&amp;tab=3Dt.0" target=3D"_=
+blank" style=3D"color: #3c4043; display: inline-block; max-width: 100%; tex=
+t-decoration: none; vertical-align: top;border: 1px solid #DADCE0; border-r=
+adius: 16px; white-space: nowrap;min-width: 0;"><div style=3D"line-height: =
+18px; overflow: hidden; text-overflow: ellipsis;padding: 6px 12px;"><span s=
+tyle=3D"display: inline-block; vertical-align: middle; min-width: 26px; wid=
+th: 26px;"><img src=3D"https://ssl.gstatic.com/docs/doclist/images/mediatyp=
+e/icon_1_document_x64.png" width=3D"18" height=3D"18" style=3D"vertical-ali=
+gn: top;" role=3D"presentation"></span><span style=3D"font: 500 14px/18px G=
+oogle Sans, Roboto, Arial, Helvetica, sans-serif; display: inline; letter-s=
+pacing: 0.2px; vertical-align: middle;">shared doc from dave</span></div></=
+a></div></div></div></div></div></div></div></td></tr></table></div><div st=
+yle=3D"margin-top: 16px;"><table style=3D"width:100%; border: 1px solid #da=
+dce0; border-radius: 8px; border-spacing: 0; table-layout:fixed; border-col=
+lapse: separate;" role=3D"presentation"><tr><td style=3D"padding: 4.5%;" di=
+r=3D"ltr"><div><div><div><table role=3D"presentation" cellpadding=3D"0" cel=
+lspacing=3D"0" style=3D"width: 100%"><tr><td style=3D"vertical-align: top; =
+width: 32px;"><div style=3D"background: #F1F3F4; border-radius: 50%; displa=
+y: inline-block; height: 18px; padding: 7px; width: 18px;"><img src=3D"http=
+s://fonts.gstatic.com/s/i/googlematerialicons/comment/v18/gm_grey-48dp/1x/g=
+m_comment_gm_grey_48dp.png" height=3D"18px" width=3D"18px" aria-hidden=3D"t=
+rue" style=3D"flex-shrink: 0;"></div></td><td style=3D"vertical-align: top;=
+"><h2 style=3D"color: #3c4043; display: inline-block; font: 400 16px/32px G=
+oogle Sans, Roboto, Arial, Helvetica, sans-serif; letter-spacing: .1px; mar=
+gin: 0 0 0 10px;">1 comment</h2></td></tr></table><div itemprop=3D"action" =
+itemscope itemtype=3D"http://schema.org/ViewAction"><meta itemprop=3D"url" =
+content=3D"https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrq=
+jZ527sjvvJiKQvk/edit?disco=3DAAAB1agdt2A&amp;usp=3Dcomment_email_discussion=
+&amp;ts=3D69ac7193"><meta itemprop=3D"name" content=3D"Open Discussion"></d=
+iv><div><div style=3D"margin-top: 20px;overflow: visible; line-height: 20px=
+;"><div class=3D"document-content-snippet" style=3D"border: 1px solid #DADC=
+E0; border-radius: 8px; padding: 12px 16px;hyphens: auto; overflow-wrap: br=
+eak-word; word-wrap: break-word; word-break: break-word;"><span class=3D"no=
+translate" style=3D"font: 400 14px Roboto, Arial, Helvetica, sans-serif; li=
+ne-height: 20px; color: #3c4043;">Eawg</span></div><div style=3D"height: 18=
+px;"></div><div style=3D"margin-top: 0px; word-break: break-word; word-wrap=
+: break-word;" class=3D"non-tombstone-post"><table role=3D"presentation" ce=
+llpadding=3D"0" cellspacing=3D"0" style=3D"color: #777777; width: 100%;"><t=
+r><td style=3D"vertical-align: top; width: 44px;"><img src=3D"https://lh3.g=
+oogleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6=
+UuzrWGQ=3Ds50-c-k-no" alt=3D"" height=3D"32" width=3D"32" style=3D"border-r=
+adius: 50%;box-sizing: border-box; display: block;"></td><td><h3 style=3D"d=
+isplay: inline-block; font: 500 14px Google Sans, Roboto, Arial, Helvetica,=
+ sans-serif; letter-spacing: .25px; line-height: 20px; margin: 6px 0 2px 0;=
+">Jeff Shute</h3> <span style=3D"color: #5F6368; font: 400 12px/16px Roboto=
+, Arial, Helvetica, sans-serif; letter-spacing: 0.2px; white-space: nowrap;=
+">=E2=80=A2 6:34=E2=80=AFPM, Mar 7 (UTC)</span><div style=3D"font: 400 14px=
+ Roboto, Arial, Helvetica, sans-serif; line-height: 20px; letter-spacing: .=
+2px;"><div style=3D"margin-top: 6px;" class=3D"notranslate">hello</div></di=
+v></td></tr></table></div><div style=3D"word-break: break-word; word-wrap: =
+break-word;" class=3D"non-tombstone-post"><table role=3D"presentation" cell=
+padding=3D"0" cellspacing=3D"0" style=3D"color: #777777; width: 100%;"><tr>=
+<td style=3D"vertical-align: top; width: 44px;"><img src=3D"https://lh3.goo=
+gleusercontent.com/a/ACg8ocIqvyihLhlu7EAe6OmyCV7RO2oyNqECfq3phRYNw2oiTFJqEw=
+=3Ds50-c-k-no" alt=3D"" height=3D"32" width=3D"32" style=3D"border-radius: =
+50%;box-sizing: border-box; display: block;"></td><td><h3 style=3D"display:=
+ inline-block; font: 500 14px Google Sans, Roboto, Arial, Helvetica, sans-s=
+erif; letter-spacing: .25px; line-height: 20px; margin: 6px 0 2px 0;">Dave<=
+/h3> <span style=3D"color: #5F6368; font: 400 12px/16px Roboto, Arial, Helv=
+etica, sans-serif; letter-spacing: 0.2px; white-space: nowrap;">=E2=80=A2 6=
+:36=E2=80=AFPM, Mar 7 (UTC)</span><div style=3D"font: 400 14px Roboto, Aria=
+l, Helvetica, sans-serif; line-height: 20px; letter-spacing: .2px;"><div st=
+yle=3D"margin-top: 6px;" class=3D"notranslate">abc</div></div></td></tr></t=
+able></div><div style=3D"word-break: break-word; word-wrap: break-word;" cl=
+ass=3D"non-tombstone-post"><table role=3D"presentation" cellpadding=3D"0" c=
+ellspacing=3D"0" style=3D"color: #3c4043; width: 100%;"><tr><td style=3D"ve=
+rtical-align: top; width: 44px;"><img src=3D"https://lh3.googleusercontent.=
+com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=3Ds50-c-k=
+-no" alt=3D"" height=3D"32" width=3D"32" style=3D"border-radius: 50%;box-si=
+zing: border-box; display: block;"></td><td><h3 style=3D"display: inline-bl=
+ock; font: 500 14px Google Sans, Roboto, Arial, Helvetica, sans-serif; lett=
+er-spacing: .25px; line-height: 20px; margin: 6px 0 2px 0;">Jeff Shute</h3>=
+ <span style=3D"color: #5F6368; font: 400 12px/16px Roboto, Arial, Helvetic=
+a, sans-serif; letter-spacing: 0.2px; white-space: nowrap;">=E2=80=A2 6:37=
+=E2=80=AFPM, Mar 7 (UTC)</span><h4 style=3D"background: #0B57D0; border-rad=
+ius: 8px; color: #fff; display: inline-block; font: 700 12px/16px Roboto, A=
+rial, Helvetica, sans-serif; margin-bottom: 0; margin-top: 0; margin-left: =
+10px; padding: 0 6px;">New</h4><div style=3D"font: 400 14px Roboto, Arial, =
+Helvetica, sans-serif; line-height: 20px; letter-spacing: .2px;"><div style=
+=3D"margin-top: 6px;" class=3D"notranslate">def</div></div></td></tr></tabl=
+e></div><div class=3D"posts-section-end"></div><div style=3D"margin: 10px 0=
+ 0 42px; overflow: auto; padding: 2px;"><a href=3D"mailTo:Reply%20%3Cd+AORG=
+pResA05eumkk2zfdQQxLOGN7FALYCju88ZtbaDxS03mkTJxTxr5BgPOj8cDuLSoqmxuAmBE9qqb=
+ZZeWj1gKZXvmY9v9svJ0bflOqNfrfW5FOwJuuZI_MypFyLSWBdprMupBijwlmX0X6_8OToLMGu5=
+R90ad7ig@docs.google.com%3E?subject=3Dshared%20doc%20from%20dave" class=3D"=
+material-button material-button-transparent" target=3D"_blank" tabindex=3D"=
+0" role=3D"link" style=3D"padding: 0 8px;font: 500 14px/36px Google Sans, R=
+oboto, Arial, Helvetica, sans-serif; border: none; border-radius: 18px; box=
+-sizing: border-box; display: inline-block; letter-spacing: .25px; min-heig=
+ht: 36px; text-align: center; text-decoration: none;background-color: trans=
+parent; color: #0B57D0; cursor: pointer;margin-right: 12px;">Reply</a><a hr=
+ef=3D"https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527=
+sjvvJiKQvk/edit?disco=3DAAAB1agdt2A&amp;usp=3Dcomment_email_discussion&amp;=
+ts=3D69ac7193&amp;usp_dm=3Dfalse" class=3D"material-button material-button-=
+transparent" target=3D"_blank" tabindex=3D"0" role=3D"link" style=3D"paddin=
+g: 0 8px;font: 500 14px/36px Google Sans, Roboto, Arial, Helvetica, sans-se=
+rif; border: none; border-radius: 18px; box-sizing: border-box; display: in=
+line-block; letter-spacing: .25px; min-height: 36px; text-align: center; te=
+xt-decoration: none;background-color: transparent; color: #0B57D0; cursor: =
+pointer;float: right;">Open</a></div></div></div></div></div></div></td></t=
+r></table></div><div style=3D"margin-top: 16px;"><table style=3D"width:100%=
+; border: 1px solid #dadce0; border-radius: 8px; border-spacing: 0; table-l=
+ayout:fixed; border-collapse: separate;" role=3D"presentation"><tr><td styl=
+e=3D"padding: 4.5%;" dir=3D"ltr"><div><div><div><table role=3D"presentation=
+" cellpadding=3D"0" cellspacing=3D"0" style=3D"width: 100%"><tr><td style=
+=3D"vertical-align: top; width: 32px;"><div style=3D"background: #F1F3F4; b=
+order-radius: 50%; display: inline-block; height: 18px; padding: 7px; width=
+: 18px;"><img src=3D"https://fonts.gstatic.com/s/i/googlematerialicons/rate=
+_review/v11/gm_grey-48dp/1x/gm_rate_review_gm_grey_48dp.png" height=3D"18px=
+" width=3D"18px" aria-hidden=3D"true" style=3D"flex-shrink: 0;"></div></td>=
+<td style=3D"vertical-align: top;"><h2 style=3D"color: #3c4043; display: in=
+line-block; font: 400 16px/32px Google Sans, Roboto, Arial, Helvetica, sans=
+-serif; letter-spacing: .1px; margin: 0 0 0 10px;">3 suggestions</h2></td><=
+/tr></table><div itemprop=3D"action" itemscope itemtype=3D"http://schema.or=
+g/ViewAction"><meta itemprop=3D"url" content=3D"https://docs.google.com/doc=
+ument/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?disco=3DAAAB1agdt=
+2E&amp;usp=3Dsuggestion_email_discussion&amp;ts=3D69ac7193"><meta itemprop=
+=3D"name" content=3D"Open Discussion"></div><div><div style=3D"margin-top: =
+20px;overflow: visible; line-height: 20px;"><div style=3D"margin-top: 0px; =
+word-break: break-word; word-wrap: break-word;" class=3D"non-tombstone-post=
+"><table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0" style=3D=
+"color: #3c4043; width: 100%;"><tr><td style=3D"vertical-align: top; width:=
+ 44px;"><img src=3D"https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCp=
+n_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=3Ds50-c-k-no" alt=3D"" height=3D"3=
+2" width=3D"32" style=3D"border-radius: 50%;box-sizing: border-box; display=
+: block;"></td><td><h3 style=3D"display: inline-block; font: 500 14px Googl=
+e Sans, Roboto, Arial, Helvetica, sans-serif; letter-spacing: .25px; line-h=
+eight: 20px; margin: 6px 0 2px 0;">Jeff Shute</h3> <span style=3D"color: #5=
+F6368; font: 400 12px/16px Roboto, Arial, Helvetica, sans-serif; letter-spa=
+cing: 0.2px; white-space: nowrap;">=E2=80=A2 6:35=E2=80=AFPM, Mar 7 (UTC)</=
+span><h4 style=3D"background: #0B57D0; border-radius: 8px; color: #fff; dis=
+play: inline-block; font: 700 12px/16px Roboto, Arial, Helvetica, sans-seri=
+f; margin-bottom: 0; margin-top: 0; margin-left: 10px; padding: 0 6px;">New=
+</h4><div style=3D"font: 400 14px Roboto, Arial, Helvetica, sans-serif; lin=
+e-height: 20px; letter-spacing: .2px;"><div style=3D"margin-top: 6px;" clas=
+s=3D"notranslate"><div style=3D"font-size:13px;color:#333"><span style=3D"f=
+ont-weight:bold">Delete:</span> <span style=3D"white-space:pre-line;color:#=
+777;font-style:italic">=E2=80=9CAewg=E2=80=9D</span></div></div></div></td>=
+</tr></table></div><div class=3D"posts-section-end"></div><div style=3D"mar=
+gin: 10px 0 0 42px; overflow: auto; padding: 2px;"><a href=3D"mailTo:Reply%=
+20%3Cd+AORGpReumzmnOohocgeGqyI9i-yulrKfkrhxnpomlT6ymMOElR7MiGIRkmj_olzWRnLI=
+WHqWrFdD9aiFM7nPQ6LXG9Cpk0uUrWwCiR3BSGfvw889RatVir3pkXBMiRlY6yN79kO59qVGLH8=
+mewt4KO8xq4-W6pvTWQ@docs.google.com%3E?subject=3Dshared%20doc%20from%20dave=
+" class=3D"material-button material-button-transparent" target=3D"_blank" t=
+abindex=3D"0" role=3D"link" style=3D"padding: 0 8px;font: 500 14px/36px Goo=
+gle Sans, Roboto, Arial, Helvetica, sans-serif; border: none; border-radius=
+: 18px; box-sizing: border-box; display: inline-block; letter-spacing: .25p=
+x; min-height: 36px; text-align: center; text-decoration: none;background-c=
+olor: transparent; color: #0B57D0; cursor: pointer;margin-right: 12px;">Rep=
+ly</a><a href=3D"https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZ=
+ueEZrqjZ527sjvvJiKQvk/edit?disco=3DAAAB1agdt2E&amp;usp=3Dsuggestion_email_d=
+iscussion&amp;ts=3D69ac7193&amp;usp_dm=3Dfalse" class=3D"material-button ma=
+terial-button-transparent" target=3D"_blank" tabindex=3D"0" role=3D"link" s=
+tyle=3D"padding: 0 8px;font: 500 14px/36px Google Sans, Roboto, Arial, Helv=
+etica, sans-serif; border: none; border-radius: 18px; box-sizing: border-bo=
+x; display: inline-block; letter-spacing: .25px; min-height: 36px; text-ali=
+gn: center; text-decoration: none;background-color: transparent; color: #0B=
+57D0; cursor: pointer;float: right;">Open</a></div></div></div><div itempro=
+p=3D"action" itemscope itemtype=3D"http://schema.org/ViewAction"><meta item=
+prop=3D"url" content=3D"https://docs.google.com/document/d/1Ah8scE1myNXdXIJ=
+KHTAULZueEZrqjZ527sjvvJiKQvk/edit?disco=3DAAAB1agdt2I&amp;usp=3Dsuggestion_=
+email_discussion&amp;ts=3D69ac7193"><meta itemprop=3D"name" content=3D"Open=
+ Discussion"></div><div style=3D"margin: 18px 0;height: 1px; background-col=
+or: #eee;"></div><div><div style=3D"margin-top: 20px;overflow: visible; lin=
+e-height: 20px;"><div style=3D"margin-top: 0px; word-break: break-word; wor=
+d-wrap: break-word;" class=3D"non-tombstone-post"><table role=3D"presentati=
+on" cellpadding=3D"0" cellspacing=3D"0" style=3D"color: #3c4043; width: 100=
+%;"><tr><td style=3D"vertical-align: top; width: 44px;"><img src=3D"https:/=
+/lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6=
+qFeXM6UuzrWGQ=3Ds50-c-k-no" alt=3D"" height=3D"32" width=3D"32" style=3D"bo=
+rder-radius: 50%;box-sizing: border-box; display: block;"></td><td><h3 styl=
+e=3D"display: inline-block; font: 500 14px Google Sans, Roboto, Arial, Helv=
+etica, sans-serif; letter-spacing: .25px; line-height: 20px; margin: 6px 0 =
+2px 0;">Jeff Shute</h3> <span style=3D"color: #5F6368; font: 400 12px/16px =
+Roboto, Arial, Helvetica, sans-serif; letter-spacing: 0.2px; white-space: n=
+owrap;">=E2=80=A2 6:36=E2=80=AFPM, Mar 7 (UTC)</span><h4 style=3D"backgroun=
+d: #0B57D0; border-radius: 8px; color: #fff; display: inline-block; font: 7=
+00 12px/16px Roboto, Arial, Helvetica, sans-serif; margin-bottom: 0; margin=
+-top: 0; margin-left: 10px; padding: 0 6px;">New</h4><div style=3D"font: 40=
+0 14px Roboto, Arial, Helvetica, sans-serif; line-height: 20px; letter-spac=
+ing: .2px;"><div style=3D"margin-top: 6px;" class=3D"notranslate"><div styl=
+e=3D"font-size:13px;color:#333"><span style=3D"font-weight:bold">Add:</span=
+> <span style=3D"white-space:pre-line;color:#777;font-style:italic">=E2=80=
+=9Cddd=E2=80=9D</span></div></div></div></td></tr></table></div><div class=
+=3D"posts-section-end"></div><div style=3D"margin: 10px 0 0 42px; overflow:=
+ auto; padding: 2px;"><a href=3D"mailTo:Reply%20%3Cd+AORGpRdkSp4W2SG64RQXri=
+P4R39sOxlhbJ3erJmt4Wbbc7Rev6KNPAEGLdXM3drHz68fkoqtkTiB8GSdP0LHAC5GUQZqqzQrG=
+VzQdyW2WPygbTpPBa6wy4bpK94G7DEXCiEMPPXaxmJ79ARsBjzPwbU-A-rocv3O0w@docs.goog=
+le.com%3E?subject=3Dshared%20doc%20from%20dave" class=3D"material-button ma=
+terial-button-transparent" target=3D"_blank" tabindex=3D"0" role=3D"link" s=
+tyle=3D"padding: 0 8px;font: 500 14px/36px Google Sans, Roboto, Arial, Helv=
+etica, sans-serif; border: none; border-radius: 18px; box-sizing: border-bo=
+x; display: inline-block; letter-spacing: .25px; min-height: 36px; text-ali=
+gn: center; text-decoration: none;background-color: transparent; color: #0B=
+57D0; cursor: pointer;margin-right: 12px;">Reply</a><a href=3D"https://docs=
+.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?di=
+sco=3DAAAB1agdt2I&amp;usp=3Dsuggestion_email_discussion&amp;ts=3D69ac7193&a=
+mp;usp_dm=3Dfalse" class=3D"material-button material-button-transparent" ta=
+rget=3D"_blank" tabindex=3D"0" role=3D"link" style=3D"padding: 0 8px;font: =
+500 14px/36px Google Sans, Roboto, Arial, Helvetica, sans-serif; border: no=
+ne; border-radius: 18px; box-sizing: border-box; display: inline-block; let=
+ter-spacing: .25px; min-height: 36px; text-align: center; text-decoration: =
+none;background-color: transparent; color: #0B57D0; cursor: pointer;float: =
+right;">Open</a></div></div></div><div itemprop=3D"action" itemscope itemty=
+pe=3D"http://schema.org/ViewAction"><meta itemprop=3D"url" content=3D"https=
+://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/=
+edit?disco=3DAAAB1agdt2M&amp;usp=3Dsuggestion_email_discussion&amp;ts=3D69a=
+c7193"><meta itemprop=3D"name" content=3D"Open Discussion"></div><div style=
+=3D"margin: 18px 0;height: 1px; background-color: #eee;"></div><div><div st=
+yle=3D"margin-top: 20px;overflow: visible; line-height: 20px;"><div style=
+=3D"margin-top: 0px; word-break: break-word; word-wrap: break-word;" class=
+=3D"non-tombstone-post"><table role=3D"presentation" cellpadding=3D"0" cell=
+spacing=3D"0" style=3D"color: #3c4043; width: 100%;"><tr><td style=3D"verti=
+cal-align: top; width: 44px;"><img src=3D"https://lh3.googleusercontent.com=
+/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=3Ds50-c-k-no=
+" alt=3D"" height=3D"32" width=3D"32" style=3D"border-radius: 50%;box-sizin=
+g: border-box; display: block;"></td><td><h3 style=3D"display: inline-block=
+; font: 500 14px Google Sans, Roboto, Arial, Helvetica, sans-serif; letter-=
+spacing: .25px; line-height: 20px; margin: 6px 0 2px 0;">Jeff Shute</h3> <s=
+pan style=3D"color: #5F6368; font: 400 12px/16px Roboto, Arial, Helvetica, =
+sans-serif; letter-spacing: 0.2px; white-space: nowrap;">=E2=80=A2 6:36=E2=
+=80=AFPM, Mar 7 (UTC)</span><h4 style=3D"background: #0B57D0; border-radius=
+: 8px; color: #fff; display: inline-block; font: 700 12px/16px Roboto, Aria=
+l, Helvetica, sans-serif; margin-bottom: 0; margin-top: 0; margin-left: 10p=
+x; padding: 0 6px;">New</h4><div style=3D"font: 400 14px Roboto, Arial, Hel=
+vetica, sans-serif; line-height: 20px; letter-spacing: .2px;"><div style=3D=
+"margin-top: 6px;" class=3D"notranslate"><div style=3D"font-size:13px;color=
+:#333"><span style=3D"font-weight:bold">Replace:</span> <span style=3D"whit=
+e-space:pre-line;color:#777;font-style:italic">=E2=80=9CGa=E2=80=9D</span> =
+with <span style=3D"white-space:pre-line;color:#777;font-style:italic">=E2=
+=80=9Cgew=E2=80=9D</span></div></div></div></td></tr></table></div><div cla=
+ss=3D"posts-section-end"></div><div style=3D"margin: 10px 0 0 42px; overflo=
+w: auto; padding: 2px;"><a href=3D"mailTo:Reply%20%3Cd+AORGpRemQlQ9nYHM0SrU=
+FhF_JB8WfUBJvWyTB5syUs6HRCcQCdcidT4qrEiBtofDwL71_SyBZ9OdFTKFCYKUC_34M_t7xlM=
+EQEJqAo9JBymIOrXS2TtulpITG77yZxX18C-0cDJFfqGkcbgbsFkdbI4W8SrfsJLW0w@docs.go=
+ogle.com%3E?subject=3Dshared%20doc%20from%20dave" class=3D"material-button =
+material-button-transparent" target=3D"_blank" tabindex=3D"0" role=3D"link"=
+ style=3D"padding: 0 8px;font: 500 14px/36px Google Sans, Roboto, Arial, He=
+lvetica, sans-serif; border: none; border-radius: 18px; box-sizing: border-=
+box; display: inline-block; letter-spacing: .25px; min-height: 36px; text-a=
+lign: center; text-decoration: none;background-color: transparent; color: #=
+0B57D0; cursor: pointer;margin-right: 12px;">Reply</a><a href=3D"https://do=
+cs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?=
+disco=3DAAAB1agdt2M&amp;usp=3Dsuggestion_email_discussion&amp;ts=3D69ac7193=
+&amp;usp_dm=3Dfalse" class=3D"material-button material-button-transparent" =
+target=3D"_blank" tabindex=3D"0" role=3D"link" style=3D"padding: 0 8px;font=
+: 500 14px/36px Google Sans, Roboto, Arial, Helvetica, sans-serif; border: =
+none; border-radius: 18px; box-sizing: border-box; display: inline-block; l=
+etter-spacing: .25px; min-height: 36px; text-align: center; text-decoration=
+: none;background-color: transparent; color: #0B57D0; cursor: pointer;float=
+: right;">Open</a></div></div></div></div></div></div></td></tr></table></d=
+iv></div><table style=3D"border-collapse: collapse; width: 100%;" role=3D"p=
+resentation"><tr><td style=3D"padding: 24px 4.5%"><table style=3D"border-co=
+llapse: collapse; width: 100%;" dir=3D"ltr"><tr><td style=3D"padding: 0;fon=
+t-family: Roboto, Arial, Helvetica, sans-serif; color: #5F6368; width: 100%=
+; font-size: 12px; line-height: 16px; min-height: 40px; letter-spacing: .3p=
+x;"><p style=3D"margin: 0; padding: 0;">Google LLC, 1600 Amphitheatre Parkw=
+ay, Mountain View, CA 94043, USA<br><br>You have received this email becaus=
+e you are a participant in the updated items or subscribed to notifications=
+ on <span class=3D"notranslate"><a href=3D"https://docs.google.com/document=
+/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?usp=3Dcomment_email_do=
+cument&amp;ts=3D69ac7193&amp;usp_dm=3Dfalse&amp;tab=3Dt.0" target=3D"_blank=
+" style=3D"color: #0B57D0; text-decoration: none;">shared doc from dave</a>=
+</span>. <a target=3D"_blank" style=3D"color: #0B57D0; text-decoration: non=
+e;" href=3D"https://docs.google.com/document/u/116797062718942056712/docos/=
+notify?ouid=3D116797062718942056712&amp;id=3D1Ah8scE1myNXdXIJKHTAULZueEZrqj=
+Z527sjvvJiKQvk&amp;title=3Dshared+doc+from+dave&amp;resourcekey">Change wha=
+t Google sends you</a>. You cannot reply to this email.</p></td><td style=
+=3D"padding: 0;padding-left: 20px; min-width: 96px"><img src=3D"https://www=
+.gstatic.com/images/branding/googlelogo/2x/googlelogo_tm_black54_color_96x4=
+0dp.png" width=3D"96px" height=3D"40px"></td></tr></table></td></tr></table=
+></td></tr></table></td></tr></table></div></div></body></html>
+--0000000000000d54e5064c738830--

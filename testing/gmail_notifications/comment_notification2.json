@@ -1,0 +1,119 @@
+{
+  "type": "comment",
+  "subject": "shared doc from dave",
+  "from": "\"Jeff Shute (Google Docs)\" <comments-noreply@docs.google.com>",
+  "to": "docreview.dave@gmail.com",
+  "date": "Sat, 07 Mar 2026 12:17:11 -0800",
+  "documentId": "1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk",
+  "documentTitle": "shared doc from dave",
+  "documentUrl": "https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?usp=comment_email_document&ts=69ac87c7&tab=t.0",
+  "xDocumentId": "xDgAAAMQ2MeZSGlRUJl5qQr-pVqkrJkYQcl8ytg",
+  "feedbackId": "MailTypeComment:EditorsNotification",
+  "recipientUserId": "116797062718942056712",
+  "comments": [
+    {
+      "quotedText": "Aew",
+      "discussionId": "AAAB03FPnH4",
+      "openUrl": "https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?disco=AAAB03FPnH4&usp=comment_email_discussion&ts=69ac87c7&usp_dm=false",
+      "replyTo": "d+AORGpRdrN0MO0HmppSA0CLwFPTKnY5tbMdLUz2cTyYOw8xeuOZ6vh1_kkDOfj8Nq-q7zHnIQoCjppl9g9Ok_DFfjHC6pHn8rp7eub9KRuL2fXXwfTzUJ9QTMLG6-OYVPcws-lZ46v9F7gDuqRiAKQe7hQtzigUpEkQ@docs.google.com",
+      "replies": [
+        {
+          "author": "Jeff Shute",
+          "time": "8:06 PM, Mar 7 (UTC)",
+          "text": "comment with mentions @jshute@gmail.com @docreview.dave@gmail.com",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        }
+      ]
+    },
+    {
+      "quotedText": "G",
+      "assignedTo": "you",
+      "discussionId": "AAAB03FPnH8",
+      "openUrl": "https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?disco=AAAB03FPnH8&usp=todo_email_discussion&ts=69ac87c7&usp_dm=false",
+      "replyTo": "d+AORGpRcze0_vQox0zT30Bogqww12lR-kwS4UxL_Uk2bzRk_qn53pvnmOZ_msevBdmfz-H2RU7zuI3YyiQd6ZoePPHoK4sP0fdT9WR_U7TfYwTj_YKWfCRPNNOJNzy_x2_DctuoKUYkrH5Kw19rg9XmPyNLyODSfRIQ@docs.google.com",
+      "replies": [
+        {
+          "author": "Jeff Shute",
+          "time": "8:07 PM, Mar 7 (UTC)",
+          "text": "assigning a comment to @docreview.dave@gmail.com",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        }
+      ]
+    },
+    {
+      "quotedText": "Eawg",
+      "discussionId": "AAAB1agdt2A",
+      "openUrl": "https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?disco=AAAB1agdt2A&usp=comment_email_discussion&ts=69ac87c7&usp_dm=false",
+      "replyTo": "d+AORGpRcvctCq0OVJL7t8_Oqe3OS2ODHpJdEYOVhYCeW5XyMzJvgTdN1C5bMB6lxbE1JiO0dVXSVk0vkOc_q86MQTMeiKZgywOYNjM7dskr5CfCksuGb_s0Y7HD1hVSTEsCz8hJYzDj4nk3IpTw_swmWLQO19n-1eyQ@docs.google.com",
+      "replies": [
+        {
+          "author": "Jeff Shute",
+          "time": "6:34 PM, Mar 7 (UTC)",
+          "text": "hello",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        },
+        {
+          "author": "Dave",
+          "time": "6:36 PM, Mar 7 (UTC)",
+          "text": "abc",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocIqvyihLhlu7EAe6OmyCV7RO2oyNqECfq3phRYNw2oiTFJqEw=s50-c-k-no"
+        },
+        {
+          "author": "Jeff Shute",
+          "time": "6:37 PM, Mar 7 (UTC)",
+          "text": "def",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        },
+        {
+          "author": "Dave",
+          "time": "8:02 PM, Mar 7 (UTC)",
+          "text": "adding an email comment",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocIqvyihLhlu7EAe6OmyCV7RO2oyNqECfq3phRYNw2oiTFJqEw=s50-c-k-no"
+        },
+        {
+          "author": "Jeff Shute",
+          "time": "8:06 PM, Mar 7 (UTC)",
+          "text": "comment from jeff on a comment",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        }
+      ]
+    }
+  ],
+  "suggestions": [
+    {
+      "author": "Jeff Shute",
+      "time": "6:36 PM, Mar 7 (UTC)",
+      "action": "Replace",
+      "text": "“Ga” → “gew”",
+      "oldText": "“Ga”",
+      "newText": "“gew”",
+      "isNew": false,
+      "discussionId": "AAAB1agdt2M",
+      "openUrl": "https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?disco=AAAB1agdt2M&usp=suggestion_email_discussion&ts=69ac87c7&usp_dm=false",
+      "replyTo": "d+AORGpRdYMLy1dF2IMOndRFU22WgrEWk60HKNVxuRbr2crNywCGHQ_rC3ZDmZ5fU5RfuwKh1nQLXD0PIT25xmNMfW63JyyjdlWh6tBmzWgOwVhFgUdvjW6V_MRBkBZ6fS-raAcd1U8ISlocCw-g4gRH6LOnDY12bizg@docs.google.com",
+      "replies": [
+        {
+          "author": "Dave",
+          "time": "8:03 PM, Mar 7 (UTC)",
+          "text": "adding an email comment on a suggesetion",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocIqvyihLhlu7EAe6OmyCV7RO2oyNqECfq3phRYNw2oiTFJqEw=s50-c-k-no"
+        },
+        {
+          "author": "Jeff Shute",
+          "time": "8:06 PM, Mar 7 (UTC)",
+          "text": "comment from jeff on a suggestion",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "type": "comment",
+  "subject": "shared doc from dave",
+  "from": "\"Jeff Shute (Google Docs)\" <comments-noreply@docs.google.com>",
+  "to": "docreview.dave@gmail.com",
+  "date": "Sat, 07 Mar 2026 10:42:27 -0800",
+  "documentId": "1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk",
+  "documentTitle": "shared doc from dave",
+  "documentUrl": "https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?usp=comment_email_document&ts=69ac7193&tab=t.0",
+  "xDocumentId": "xDgAAAMQ2MeZSGlRUJl5qQr-pVqkrJkYQcl8ytg",
+  "feedbackId": "MailTypeComment:EditorsNotification",
+  "recipientUserId": "116797062718942056712",
+  "comments": [
+    {
+      "quotedText": "Eawg",
+      "discussionId": "AAAB1agdt2A",
+      "openUrl": "https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?disco=AAAB1agdt2A&usp=comment_email_discussion&ts=69ac7193&usp_dm=false",
+      "replyTo": "d+AORGpResA05eumkk2zfdQQxLOGN7FALYCju88ZtbaDxS03mkTJxTxr5BgPOj8cDuLSoqmxuAmBE9qqbZZeWj1gKZXvmY9v9svJ0bflOqNfrfW5FOwJuuZI_MypFyLSWBdprMupBijwlmX0X6_8OToLMGu5R90ad7ig@docs.google.com",
+      "replies": [
+        {
+          "author": "Jeff Shute",
+          "time": "6:34 PM, Mar 7 (UTC)",
+          "text": "hello",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        },
+        {
+          "author": "Dave",
+          "time": "6:36 PM, Mar 7 (UTC)",
+          "text": "abc",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocIqvyihLhlu7EAe6OmyCV7RO2oyNqECfq3phRYNw2oiTFJqEw=s50-c-k-no"
+        },
+        {
+          "author": "Jeff Shute",
+          "time": "6:37 PM, Mar 7 (UTC)",
+          "text": "def",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        }
+      ]
+    }
+  ],
+  "suggestions": [
+    {
+      "author": "Jeff Shute",
+      "time": "6:35 PM, Mar 7 (UTC)",
+      "action": "Delete",
+      "text": "“Aewg”",
+      "isNew": true,
+      "discussionId": "AAAB1agdt2E",
+      "openUrl": "https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?disco=AAAB1agdt2E&usp=suggestion_email_discussion&ts=69ac7193&usp_dm=false",
+      "replyTo": "d+AORGpReumzmnOohocgeGqyI9i-yulrKfkrhxnpomlT6ymMOElR7MiGIRkmj_olzWRnLIWHqWrFdD9aiFM7nPQ6LXG9Cpk0uUrWwCiR3BSGfvw889RatVir3pkXBMiRlY6yN79kO59qVGLH8mewt4KO8xq4-W6pvTWQ@docs.google.com",
+      "replies": []
+    },
+    {
+      "author": "Jeff Shute",
+      "time": "6:36 PM, Mar 7 (UTC)",
+      "action": "Add",
+      "text": "“ddd”",
+      "isNew": true,
+      "discussionId": "AAAB1agdt2I",
+      "openUrl": "https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?disco=AAAB1agdt2I&usp=suggestion_email_discussion&ts=69ac7193&usp_dm=false",
+      "replyTo": "d+AORGpRdkSp4W2SG64RQXriP4R39sOxlhbJ3erJmt4Wbbc7Rev6KNPAEGLdXM3drHz68fkoqtkTiB8GSdP0LHAC5GUQZqqzQrGVzQdyW2WPygbTpPBa6wy4bpK94G7DEXCiEMPPXaxmJ79ARsBjzPwbU-A-rocv3O0w@docs.google.com",
+      "replies": []
+    },
+    {
+      "author": "Jeff Shute",
+      "time": "6:36 PM, Mar 7 (UTC)",
+      "action": "Replace",
+      "text": "“Ga” → “gew”",
+      "oldText": "“Ga”",
+      "newText": "“gew”",
+      "isNew": true,
+      "discussionId": "AAAB1agdt2M",
+      "openUrl": "https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?disco=AAAB1agdt2M&usp=suggestion_email_discussion&ts=69ac7193&usp_dm=false",
+      "replyTo": "d+AORGpRemQlQ9nYHM0SrUFhF_JB8WfUBJvWyTB5syUs6HRCcQCdcidT4qrEiBtofDwL71_SyBZ9OdFTKFCYKUC_34M_t7xlMEQEJqAo9JBymIOrXS2TtulpITG77yZxX18C-0cDJFfqGkcbgbsFkdbI4W8SrfsJLW0w@docs.google.com",
+      "replies": []
+    }
+  ]
+}
