@@ -52,3 +52,5 @@ scripts/data-export.json
 .gemini/
 
 .playwright-mcp/
+
+testing/test_users.json
