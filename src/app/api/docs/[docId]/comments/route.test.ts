@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { GET, PATCH } from "./route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, fetchAllThreads } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, fetchAllThreads } from "@/lib/google-drive";
 
 vi.mock("@/auth", () => ({
   auth: vi.fn(),
@@ -18,8 +18,10 @@ vi.mock("@/lib/prisma", () => ({
     },
   },
 }));
+const mockFilesGet = vi.fn();
 vi.mock("@/lib/google-drive", () => ({
   getDriveClient: vi.fn(),
+  createDriveService: vi.fn(() => ({ files: { get: mockFilesGet } })),
   fetchAllThreads: vi.fn(),
   invalidGrantResponse: vi.fn().mockReturnValue(null),
 }));
@@ -57,17 +59,19 @@ describe("GET /api/docs/[docId]/comments", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns 200 with threads", async () => {
+  it("returns 200 with threads and viewedByMeTime", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ docId: "d1", userId: "u1", googleDocId: "g1" });
     mockFetchAllThreads.mockResolvedValue([
       { id: "c1", author: "A", fromMe: false, content: "C", createdTime: "T", resolved: false, replies: [] },
     ]);
+    mockFilesGet.mockResolvedValue({ data: { viewedByMeTime: "2026-03-01T12:00:00Z" } });
     const req = new NextRequest("http://localhost/api/docs/d1/comments");
     const res = await GET(req, makeParams("d1"));
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.threads["c1"]).toBeDefined();
+    expect(data.viewedByMeTime).toBe("2026-03-01T12:00:00Z");
   });
 });
 

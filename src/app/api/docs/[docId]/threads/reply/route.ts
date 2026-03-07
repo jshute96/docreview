@@ -3,11 +3,13 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import {
   getDriveClient,
+  createDriveService,
   replyToComment,
   fetchThreadDetail,
   invalidGrantResponse,
 } from "@/lib/google-drive";
-import { logError } from "@/lib/log";
+import { logError, logInfo } from "@/lib/log";
+import { formatDate } from "@/lib/utils";
 import { runWithRequestId } from "@/lib/request-context";
 
 export async function POST(
@@ -47,12 +49,39 @@ export async function POST(
 
   try {
     const driveAuth = await getDriveClient(userId);
+    const drive = createDriveService(driveAuth);
 
     const trimmed = content?.trim() || "";
+
+    // Pin viewedByMeTime: read before, do the action, restore after
+    const getViewed = async () => {
+      const r = await drive.files.get({ fileId: doc.googleDocId, fields: "viewedByMeTime" });
+      return r.data.viewedByMeTime ?? null;
+    };
+
+    const fmt = (t: string | null) => t ? formatDate(t) : "null";
+
+    const viewedBefore = await getViewed();
+    logInfo(`[ViewedPin] Before reply/resolve: viewedByMeTime=${fmt(viewedBefore)} (doc=${doc.googleDocId}, comment=${commentId})`);
 
     // Single API call handles reply, resolve, or both
     if (trimmed || resolve) {
       await replyToComment(driveAuth, doc.googleDocId, commentId, trimmed, resolve);
+    }
+
+    const viewedAfter = await getViewed();
+    logInfo(`[ViewedPin] After reply/resolve: viewedByMeTime=${fmt(viewedAfter)} (was ${fmt(viewedBefore)})`);
+
+    if (viewedBefore) {
+      await drive.files.update({
+        fileId: doc.googleDocId,
+        requestBody: { viewedByMeTime: viewedBefore },
+        fields: "viewedByMeTime",
+      });
+      logInfo(`[ViewedPin] Restored viewedByMeTime to ${fmt(viewedBefore)}`);
+
+      const viewedRestored = await getViewed();
+      logInfo(`[ViewedPin] Verified after restore: viewedByMeTime=${fmt(viewedRestored)}`);
     }
 
     // Refresh thread data from Drive

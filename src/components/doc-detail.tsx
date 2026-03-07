@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { RefreshCw, Menu, Trash2 } from "lucide-react";
+import { RefreshCw, Menu, Trash2, Pencil } from "lucide-react";
 import type { Comment, Label } from "@prisma/client";
 import type { DocWithComments, DocWithLabels } from "@/types";
 import type { CommentThread, SuggestionContent } from "@/lib/google-drive";
@@ -31,6 +31,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FriendlyDate } from "@/components/friendly-date";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { DialogButtons } from "@/components/dialog-buttons";
+import { formatDate } from "@/lib/utils";
 import { createMatcher } from "@/lib/highlight";
 import { broadcastChange, useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
@@ -77,8 +85,34 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   const [threadMap, setThreadMap] = useState<Record<string, CommentThread>>({});
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
   const [documentText, setDocumentText] = useState<string | undefined>(undefined);
+  const [viewedByMeTime, setViewedByMeTime] = useState<string | null>(null);
   const [showUntrackDialog, setShowUntrackDialog] = useState(false);
   const [showReAddDialog, setShowReAddDialog] = useState(false);
+  const [showViewedTimeDialog, setShowViewedTimeDialog] = useState(false);
+  const [viewedTimeInput, setViewedTimeInput] = useState("");
+  const [savingViewedTime, setSavingViewedTime] = useState(false);
+
+  const viewedTimeInputValid = !isNaN(new Date(viewedTimeInput).getTime()) && viewedTimeInput.trim() !== "";
+
+  async function handleSaveViewedTime() {
+    setSavingViewedTime(true);
+    try {
+      const res = await apiFetch(`/api/docs/${doc.docId}/viewed-time`, {
+        method: "PUT",
+        body: JSON.stringify({ viewedByMeTime: new Date(viewedTimeInput).toISOString() }),
+        contextId: generateContextId(),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      const data = await res.json();
+      setViewedByMeTime(data.viewedByMeTime);
+      setShowViewedTimeDialog(false);
+      toast.success("Viewed time updated");
+    } catch {
+      toast.error("Failed to update viewed time");
+    } finally {
+      setSavingViewedTime(false);
+    }
+  }
 
   // Derive searchable text from threadMap (author names + all reply content)
   const threadText = useMemo(() => {
@@ -113,6 +147,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       if (res.ok) {
         const data = await res.json();
         setThreadMap(data.threads ?? {});
+        if (data.viewedByMeTime !== undefined) setViewedByMeTime(data.viewedByMeTime);
       }
     } catch { /* threads are optional */ }
   }
@@ -605,11 +640,50 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
             <span className="font-medium text-zinc-400">Modified:</span>{" "}
             <FriendlyDate date={doc.lastModifiedInDrive} />
           </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="font-medium text-zinc-400">Viewed:</span>{" "}
+            {viewedByMeTime ? <FriendlyDate date={viewedByMeTime} /> : "—"}
+            <button
+              onClick={() => {
+                setViewedTimeInput(viewedByMeTime ? formatDate(viewedByMeTime) : "");
+                setShowViewedTimeDialog(true);
+              }}
+              className="text-zinc-400 hover:text-zinc-600 transition-colors"
+              title="Edit viewed time"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+          </span>
           <span>
             <span className="font-medium text-zinc-400">DocId:</span>{" "}
             {doc.googleDocId}
           </span>
         </div>
+
+        <Dialog open={showViewedTimeDialog} onOpenChange={setShowViewedTimeDialog}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Edit Viewed Time</DialogTitle>
+            </DialogHeader>
+            <div className="p-6 pt-1">
+              <input
+                type="text"
+                value={viewedTimeInput}
+                onChange={(e) => setViewedTimeInput(e.target.value)}
+                placeholder="YYYY-MM-DD HH:MM:SS"
+                className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm font-mono focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+              />
+            </div>
+            <div className="p-6 pt-0">
+              <DialogButtons
+                onConfirm={handleSaveViewedTime}
+                onCancel={() => setShowViewedTimeDialog(false)}
+                confirmLabel={savingViewedTime ? "Saving…" : "OK"}
+                disabled={savingViewedTime || !viewedTimeInputValid}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
         <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-zinc-600">
           <span className="font-medium text-zinc-400">Labels:</span>
           <StarButton starred={doc.isStarred} onToggle={handleToggleStar} />

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, fetchAllThreads, invalidGrantResponse } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, fetchAllThreads, invalidGrantResponse } from "@/lib/google-drive";
 import type { CommentThread } from "@/lib/google-drive";
 import { CommentStatus } from "@prisma/client";
 import { runWithRequestId } from "@/lib/request-context";
@@ -34,14 +34,24 @@ export async function GET(
   }
 
   try {
-    const allThreads = await fetchAllThreads(driveAuth, doc.googleDocId);
+    const drive = createDriveService(driveAuth);
+    const [allThreads, fileRes] = await Promise.all([
+      fetchAllThreads(driveAuth, doc.googleDocId),
+      drive.files.get({
+        fileId: doc.googleDocId,
+        fields: "viewedByMeTime",
+      }),
+    ]);
 
     const threads: Record<string, CommentThread> = {};
     for (const t of allThreads) {
       threads[t.id] = t;
     }
 
-    return NextResponse.json({ threads });
+    return NextResponse.json({
+      threads,
+      viewedByMeTime: fileRes.data.viewedByMeTime ?? null,
+    });
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;

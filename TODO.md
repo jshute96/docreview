@@ -1,6 +1,9 @@
 P0:
 
 P1:
+* disable debug logging on drive changes scan
+* decide whether to keep last-view-time pinning on Reply/Resolve
+    * clean up UI for edit-last-viwed-timestamp
 * handle gmail notifications
   * share request emails - from me, to me
   * I shared with you emails
