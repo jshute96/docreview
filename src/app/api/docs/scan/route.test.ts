@@ -17,17 +17,22 @@ vi.mock("@/lib/google-drive", () => ({
   invalidGrantResponse: vi.fn(() => null),
   isInvalidGrantError: vi.fn(() => false),
 }));
+vi.mock("@/lib/gmail", () => ({
+  scanGmailNotifications: vi.fn(),
+}));
 
 import { POST } from "./route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { listRecentDocs } from "@/lib/google-drive";
+import { scanGmailNotifications } from "@/lib/gmail";
 
 const mockAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
 const mockDoc = prisma.doc as unknown as {
   findMany: ReturnType<typeof vi.fn>;
 };
 const mockListRecentDocs = vi.mocked(listRecentDocs);
+const mockScanGmailNotifications = vi.mocked(scanGmailNotifications);
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -42,33 +47,24 @@ function scanRequest(body?: Record<string, unknown>) {
   });
 }
 
-/** Helper to read the final 'result' object from the SSE stream. */
-async function readSSEResult(res: Response): Promise<any> {
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error("No body");
-  const decoder = new TextDecoder();
-  let result;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const text = decoder.decode(value);
-    const lines = text.split("\n");
+/** Parse an SSE response and return the result data. Throws if an error event is found. */
+async function readSSEResult<T = Record<string, unknown>>(response: Response): Promise<T> {
+  const text = await response.text();
+  for (const part of text.split("\n\n")) {
+    const lines = part.split("\n");
+    let eventType = "";
+    let data = "";
     for (const line of lines) {
-      if (line.startsWith("event: result")) {
-        // Next line should be data: ...
-      } else if (line.startsWith("data: ")) {
-        try {
-          const data = JSON.parse(line.slice(6));
-          // If we see an error object in any data, we should probably know
-          if (data.authExpired || data.error) return data;
-          result = data;
-        } catch { /* skip non-JSON */ }
-      } else if (line.startsWith("event: error")) {
-         // Next line data will be parsed above
-      }
+      if (line.startsWith("event: ")) eventType = line.slice(7);
+      else if (line.startsWith("data: ")) data = line.slice(6);
+    }
+    if (eventType === "result" && data) return JSON.parse(data);
+    if (eventType === "error" && data) {
+      const err = JSON.parse(data);
+      throw new Error(err.message || "SSE error");
     }
   }
-  return result;
+  throw new Error("No result event in SSE stream");
 }
 
 describe("POST /api/docs/scan", () => {
@@ -146,8 +142,7 @@ describe("POST /api/docs/scan", () => {
     await suppressingErrors(async () => {
       const res = await POST(scanRequest());
       expect(res.status).toBe(200); // SSE always returns 200 initially
-      const data = await readSSEResult(res);
-      expect(data.message).toBeDefined();
+      await expect(readSSEResult(res)).rejects.toThrow("Drive error");
     });
   });
 
@@ -161,5 +156,74 @@ describe("POST /api/docs/scan", () => {
     const data = await readSSEResult(res);
     expect(data.total).toBe(0);
     expect(data.docs).toEqual([]);
+  });
+
+  it("Gmail scan returns docs with isNew flag", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockScanGmailNotifications.mockResolvedValue({
+      docs: [
+        {
+          googleDocId: "g1",
+          title: "Shared Doc",
+          mimeType: "application/vnd.google-apps.document",
+          driveUrl: "https://docs.google.com/document/d/g1/edit",
+          owner: "Someone",
+          role: "REVIEWER" as const,
+        },
+        {
+          googleDocId: "g2",
+          title: "Another Doc",
+          mimeType: "application/vnd.google-apps.document",
+          driveUrl: "https://docs.google.com/document/d/g2/edit",
+          owner: "Other",
+          role: "REVIEWER" as const,
+        },
+      ],
+      shareNotes: new Map(),
+      errorCount: 1,
+      skipCount: 0,
+    });
+    // g1 already tracked
+    mockDoc.findMany.mockResolvedValue([{ googleDocId: "g1" }]);
+
+    const res = await POST(scanRequest({ source: "gmail", daysBack: 7 }));
+    expect(res.status).toBe(200);
+    const data = await readSSEResult(res);
+    expect(data.total).toBe(2);
+    expect(data.existingCount).toBe(1);
+    expect(data.errorCount).toBe(1);
+    expect(data.docs).toHaveLength(2);
+    expect(data.docs[0].isNew).toBe(false);
+    expect(data.docs[1].isNew).toBe(true);
+    expect(mockListRecentDocs).not.toHaveBeenCalled();
+  });
+
+  it("Gmail scan returns empty when no notifications found", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockScanGmailNotifications.mockResolvedValue({
+      docs: [],
+      shareNotes: new Map(),
+      errorCount: 0,
+      skipCount: 0,
+    });
+    mockDoc.findMany.mockResolvedValue([]);
+
+    const res = await POST(scanRequest({ source: "gmail", daysBack: 30 }));
+    const data = await readSSEResult(res);
+    expect(data.total).toBe(0);
+    expect(data.docs).toEqual([]);
+    expect(data.errorCount).toBe(0);
+  });
+
+  it("returns error event when Gmail API fails", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findMany.mockResolvedValue([]);
+    mockScanGmailNotifications.mockRejectedValue(new Error("Gmail error"));
+
+    await suppressingErrors(async () => {
+      const res = await POST(scanRequest({ source: "gmail", daysBack: 7 }));
+      expect(res.status).toBe(200);
+      await expect(readSSEResult(res)).rejects.toThrow("Gmail error");
+    });
   });
 });
