@@ -14,6 +14,8 @@ P1:
     * thread contents? (maybe)
   * requesting your review
   * item assigned to you
+* testing
+  * test scripts for playwright testing of all interactions
 
 Easy:
 * scroll bars for lots of docs
@@ -34,7 +36,6 @@ Easy:
   * support adding these from gmail notifications, with fill-in title and notes
   * try flow of adding a doc I am requesting permission to, with notes about what it was
 
-* "No comments on this doc" still shows if we try to load and fail.
 * Make refresh on a doc faster, and probably cheaper, by doing fewer API calls.
 * Mute state on docs
 * keyboard shortcuts
@@ -57,23 +58,22 @@ Easy:
   * capture linked-from notes when requesting permission
   * scroll to comments in the doc window without reloading
 
-* testing
-  * test scripts for playwright testing of all interactions
-
 * sandbox test environment
 * snapshot database and simulated or recorded google APIs
 * demo version with some fake docs or a starting snapshot
 
-* embedded pgvector index for semantic search on docs, titles, comments
-
 * can we open the doc diff viewer
 * can we find a way to open diffs between timestamps we choose?
 
+* can we get google docs to navigate to selected comments seamlessly
+  * some work in docs/notes-on-comment-navigation.md
+
 ## cosmetic
-  * better visual for the cross-out filter buttons
-  * tooltip display for longer notes
-  * editable notes box inline on the comments page?
-  * rendering glitch when toggling filters makes scroll bar appear
+* better visual for the cross-out filter buttons
+* tooltip display for longer notes
+* editable notes box inline on the comments page?
+* rendering glitch when toggling filters makes scroll bar appear
+* "No comments on this doc" still shows if we try to load and fail.
 
 ## gaps
 * no way to get suggestions cheaply or incrementally
@@ -96,6 +96,7 @@ Easy:
   * maybe just fetch the initial comments first
 * add a screen for labeling new docs that appeared during a refresh?
 * check and refine rules for detecting hasNewActivity on comment threads - reply count, change timestamp, etc.
+* embedded pgvector index for semantic search on docs, titles, comments
 
 ## low priority
 * rename a label
