@@ -2,6 +2,7 @@ required cleanup:
 * disable debug logging on drive changes scan
 * decide whether to keep last-view-time pinning on Reply/Resolve
     * clean up UI for edit-last-viwed-timestamp
+* strip personal data from logs
 
 P0:
 
@@ -16,12 +17,21 @@ P1:
   * item assigned to you
 * testing
   * test scripts for playwright testing of all interactions
+* no user info the database - fetch doc titles live
+  * cache them in browser-local state?
+* readonly user, and "query the db" script that can have be run unprompted
+* help screen, intro pages
+* "delete all my data" menu item
+* Load dialog - load months, or load all
+* check: Can we get comment locations in the doc contents fetch? (to get current location and commented text.)
 
 Easy:
 * scroll bars for lots of docs
 * Button for search in Drive (from docs search box)
 * load dialog is too tall, collapse the first section
 * Text is hard to read on unselected tags.  Especially white.
+* X-to-clear button when editing notes
+* link URL includes filters, labels, etc.
 
 * Remember state/tag for @mentioned on comment, with mine/replied and resolved
 * Cancel API requests and other work on tab close?
@@ -46,7 +56,7 @@ Easy:
 * hosting
   * cloud run
   * deployment scripts
-* offline mode - run with a database but no API login
+* offline mode - run with a database but no API login (sort of works already, requires logout)
 
 * add a doc I'm requesting permission to
   * record notes about where it came from, when I asked permission
@@ -54,7 +64,6 @@ Easy:
 
 * chrome plugin
   * add a doc
-  * standalone add page / dialog
   * capture linked-from notes when requesting permission
   * scroll to comments in the doc window without reloading
 
@@ -102,5 +111,18 @@ Easy:
 * rename a label
 * help for URLs: where to reference /add?doc=ID, etc.
 
-## tools
-* Figure out how to get playwrite MCP to work so it can look at a browser
+## wishlish for google APIs
+* suggestions don't work in APIs at all
+  * should be able to fetch them like comments, see replies, etc.
+  * should be able to reject and accept
+  * should use same AAAB... IDs as comments, not suggest... that gets embedded in docs
+  * should be able to link to a suggestion location with ?disco=ID links
+* comments
+  * should be able to get current doc text (it only gives the original text)
+  * should give current anchor location or unanchored state (it only has original location)
+
+## Possible V2 features
+* build doc veiwer and diff viewer, take over from doc's lame differ
+* support markdown docs too, with the same workflow, with comments in code review tools
+* plugin model so we can support other doc&comments backends
+
