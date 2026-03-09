@@ -68,7 +68,9 @@
       "mcp__playwright__browser_handle_dialog",
       "mcp__playwright2__browser_handle_dialog",
       "Bash(npx tsx:*)",
-      "Bash(./scripts/check-gmail-notifications.ts:*)"
+      "Bash(./scripts/check-gmail-notifications.ts:*)",
+      "Bash(npx playwright:*)",
+      "Bash(./scripts/query_database.sh:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

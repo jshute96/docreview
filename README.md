@@ -171,6 +171,39 @@ psql docreview
 echo "SELECT title, role, status FROM docs;" | npx prisma db execute --stdin
 ```
 
+### Readonly database user
+
+A readonly PostgreSQL user (`docreview_ro`) is available for safe ad-hoc queries.
+The `scripts/query_database.sh` script uses this user automatically.
+
+**One-time setup** (only needed once per PostgreSQL installation):
+
+```bash
+sudo -u postgres psql -c "
+CREATE USER docreview_ro WITH PASSWORD '<password>';
+GRANT CONNECT ON DATABASE docreview TO docreview_ro;
+GRANT USAGE ON SCHEMA public TO docreview_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO docreview_ro;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO docreview_ro;
+"
+```
+
+Then add the connection string to `.env`:
+```
+DATABASE_URL_RO=postgresql://docreview_ro:<password>@localhost:5432/docreview
+```
+
+**Usage:**
+
+```bash
+scripts/query_database.sh "SELECT count(*) FROM docs"
+scripts/query_database.sh -x "SELECT * FROM docs LIMIT 3"    # expanded display
+scripts/query_database.sh -f query.sql                       # from file
+scripts/query_database.sh --schema                           # dump all table schemas
+scripts/query_database.sh --schema docs                      # dump schema for one table
+scripts/query_database.sh --help                             # full usage
+```
+
 ## Commands
 
 ```bash

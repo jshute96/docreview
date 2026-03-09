@@ -19,7 +19,6 @@ P1:
   * test scripts for playwright testing of all interactions
 * no user info the database - fetch doc titles live
   * cache them in browser-local state?
-* readonly user, and "query the db" script that can have be run unprompted
 * help screen, intro pages
 * "delete all my data" menu item
 * Load dialog - load months, or load all

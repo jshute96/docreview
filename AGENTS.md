@@ -33,6 +33,14 @@ dropped `url = env(...)` support in schema.prisma).
 - **Database Safety**:
     - Ask for human review before making database schema changes or manual data updates.
     - Never run DDL or DML (updates/alters) directly on PostgreSQL; use Prisma migrations or ask for permission to run these.
+    - **Querying**: Use `scripts/query_database.sh` for read-only queries. It connects via a readonly PostgreSQL user (`docreview_ro`) so it cannot accidentally modify data.
+      ```bash
+      scripts/query_database.sh "SELECT count(*) FROM docs"
+      scripts/query_database.sh -x "SELECT * FROM docs LIMIT 3"  # expanded display
+      scripts/query_database.sh --schema                         # all table schemas
+      scripts/query_database.sh --schema comments                # one table's schema
+      scripts/query_database.sh -f query.sql                     # from file
+      ```
 - **Commit Preparation**:
   - Run `npm test` and `npm run typecheck` before committing code.
   - Ensure `README.md` is updated if setup or debugging commands change.

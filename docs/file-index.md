@@ -138,6 +138,7 @@ Shadcn/ui components:
 | `build-bookmarklet.mjs` | Builds both bookmarklets by minifying source files and updating `.txt` and `.ts` outputs |
 | `check-deps.mjs` | Checks that required Node.js version and dependencies are installed |
 | `check-db.mjs` | Checks that the database is reachable and migrations are up-to-date |
+| `query_database.sh` | Readonly SQL queries via `docreview_ro` user — supports inline SQL, file input, `--schema` |
 
 ## Contexts (`src/contexts/`)
 

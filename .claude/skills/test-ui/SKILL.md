@@ -240,39 +240,47 @@ await page.waitForTimeout(3000);
 
 You can check local database state to verify that UI actions had the expected effect, or to understand the current state of docs and comments.
 
-**Read the schema** at `prisma/schema.prisma` to understand table structure, column names, and relationships. Read docs in `docs/` to understand expected behavior.
-
-**IMPORTANT: Read-only access only.** Never run INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, or any other DDL/DML statements. Only run SELECT queries.
+**IMPORTANT: Use `scripts/query_database.sh` for all database queries.** This script connects via a readonly PostgreSQL user (`docreview_ro`) so it cannot accidentally modify data, and does not require permission prompts.
 
 ### How to query
 
 ```bash
-# Via psql
-psql docreview -c "SELECT ... ;"
+# Run a query
+scripts/query_database.sh "SELECT count(*) FROM docs"
+
+# Expanded display (one column per line)
+scripts/query_database.sh -x "SELECT * FROM docs LIMIT 3"
+
+# Dump table schemas
+scripts/query_database.sh --schema           # all tables
+scripts/query_database.sh --schema comments  # one table
+
+# From a file
+scripts/query_database.sh -f query.sql
 ```
 
 ### Filtering by test user
 
 All app data is scoped to a `user_id`. The test user's `user_id` is stored in `testing/test_users.json`. If it's not there yet, look it up:
 
-```sql
-SELECT user_id FROM users WHERE email = '<user>@gmail.com';
+```bash
+scripts/query_database.sh "SELECT user_id FROM users WHERE email = '<user>@gmail.com'"
 ```
 
 Then store it in `test_users.json` for future use.
 
 Always filter queries by `user_id` to see only the test user's data:
 
-```sql
--- List docs for the test user
-SELECT doc_id, title, status, role FROM docs WHERE user_id = '<user_id>';
+```bash
+# List docs for the test user
+scripts/query_database.sh "SELECT doc_id, title, status, role FROM docs WHERE user_id = '<user_id>'"
 
--- List comments for a doc
-SELECT c.comment_id, c.google_comment_id, c.resolved, c.status, c.reply_count
+# List comments for a doc
+scripts/query_database.sh "SELECT c.comment_id, c.google_comment_id, c.resolved, c.status, c.reply_count
 FROM comments c JOIN docs d ON c.doc_id = d.doc_id
-WHERE d.user_id = '<user_id>' AND d.title = 'Some Doc Title';
+WHERE d.user_id = '<user_id>' AND d.title = 'Some Doc Title'"
 
--- Check labels
-SELECT l.name, l.color FROM labels l WHERE l.user_id = '<user_id>';
+# Check labels
+scripts/query_database.sh "SELECT l.name, l.color FROM labels l WHERE l.user_id = '<user_id>'"
 ```
 
