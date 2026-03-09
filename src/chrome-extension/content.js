@@ -14,13 +14,19 @@
 //     doc links in the body.
 
 (async function() {
-  var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
+  var settings = await chrome.storage.sync.get({
+    baseUrl: DEFAULTS.baseUrl,
+    enableDocs: DEFAULTS.enableDocs,
+    enableDrive: DEFAULTS.enableDrive,
+    enableGmail: DEFAULTS.enableGmail
+  });
+  var baseUrl = settings.baseUrl;
   var iconUrl = chrome.runtime.getURL('icons/icon16.png');
 
   var hostname = location.hostname;
-  var isDocs = hostname.endsWith('docs.google.com');
-  var isDrive = hostname.endsWith('drive.google.com');
-  var isGmail = hostname.endsWith('mail.google.com');
+  var isDocs = hostname.endsWith('docs.google.com') && settings.enableDocs;
+  var isDrive = hostname.endsWith('drive.google.com') && settings.enableDrive;
+  var isGmail = hostname.endsWith('mail.google.com') && settings.enableGmail;
 
   if (!isDocs && !isDrive && !isGmail) return;
 

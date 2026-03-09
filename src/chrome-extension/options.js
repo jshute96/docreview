@@ -1,18 +1,34 @@
 // Docreview Chrome Extension — Options page
 
 var baseUrlInput = document.getElementById('baseUrl');
+var enableDocsInput = document.getElementById('enableDocs');
+var enableDriveInput = document.getElementById('enableDrive');
+var enableGmailInput = document.getElementById('enableGmail');
 var saveButton = document.getElementById('save');
 var cancelButton = document.getElementById('cancel');
 
-// Load current value
-chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl }, function(data) {
+// Load current values
+chrome.storage.sync.get({
+  baseUrl: DEFAULTS.baseUrl,
+  enableDocs: DEFAULTS.enableDocs,
+  enableDrive: DEFAULTS.enableDrive,
+  enableGmail: DEFAULTS.enableGmail
+}, function(data) {
   baseUrlInput.value = data.baseUrl;
+  enableDocsInput.checked = data.enableDocs;
+  enableDriveInput.checked = data.enableDrive;
+  enableGmailInput.checked = data.enableGmail;
 });
 
 // Save and close
 saveButton.addEventListener('click', function() {
   var url = baseUrlInput.value.replace(/\/+$/, ''); // strip trailing slashes
-  chrome.storage.sync.set({ baseUrl: url }, function() {
+  chrome.storage.sync.set({
+    baseUrl: url,
+    enableDocs: enableDocsInput.checked,
+    enableDrive: enableDriveInput.checked,
+    enableGmail: enableGmailInput.checked
+  }, function() {
     window.close();
   });
 });
