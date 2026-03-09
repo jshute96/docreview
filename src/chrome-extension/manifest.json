@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "Docreview",
+  "version": "1.0",
+  "description": "Adds Docreview links to Google Docs, Drive, and Gmail",
+  "permissions": ["storage", "activeTab", "contextMenus", "scripting"],
+  "host_permissions": [
+    "https://docs.google.com/*",
+    "https://drive.google.com/*",
+    "https://mail.google.com/*"
+  ],
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Open in Docreview"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://docs.google.com/*",
+        "https://drive.google.com/*",
+        "https://mail.google.com/*"
+      ],
+      "js": ["defaults.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/icon16.png"],
+      "matches": [
+        "https://docs.google.com/*",
+        "https://drive.google.com/*",
+        "https://mail.google.com/*"
+      ]
+    }
+  ]
+}

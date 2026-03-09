@@ -1,5 +1,7 @@
 # Docreview Bookmarklets
 
+> **Note:** The Chrome extension (`src/chrome-extension/`) supersedes these bookmarklets. It provides the same functionality — injecting Docreview icons into Google Docs, Drive, and Gmail — but activates automatically, adds toolbar and context menu actions, and handles Gmail's sandboxed AMP iframes (which bookmarklets cannot access). The extension's `content.js` was adapted from `bookmarklet-source.js`. The bookmarklets remain useful as a lightweight alternative that requires no extension installation.
+
 Two bookmarklets for quick access to Docreview from Google Workspace.
 
 ## Add Docreview links

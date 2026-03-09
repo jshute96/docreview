@@ -91,6 +91,12 @@ Gmail snapshots are ~4MB. Could potentially trim non-essential DOM (sidebar, hid
 ### Missing CSS
 Some Google-hosted stylesheets may not load from localhost, causing minor visual differences. The DOM structure is correct — just the styling may be off.
 
+## Chrome Extension
+
+The Chrome extension (`src/chrome-extension/`) uses the same DOM manipulation approach as the bookmarklets. Its `content.js` was adapted from `bookmarklet-source.js` with two key differences: the base URL comes from `chrome.storage.sync` instead of a build-time constant, and icons use `chrome.runtime.getURL()` instead of fetching from the server. The extension also adds a background service worker for toolbar/context menu actions and Gmail doc URL extraction via `chrome.scripting.executeScript(allFrames: true)`, which can reach sandboxed AMP iframes that content scripts can't access.
+
+DOM snapshot testing applies equally to the extension's content script — the same selectors and injection logic are used.
+
 ## Potential next steps
 
 - Save snapshots for other surfaces: Google Docs titlebar, Drive list view, Drive grid view, Gmail inbox list

@@ -29,6 +29,19 @@ One-line descriptions of every source file, grouped by layer.
 | `README.md` | Documentation for bookmarklet internals, build process, and manual install instructions |
 | `testing.md` | Test cases for interactive Playwright-based bookmarklet testing |
 
+## Chrome Extension (`src/chrome-extension/`)
+
+| File | Description |
+|------|-------------|
+| `manifest.json` | Manifest V3 config — permissions, host permissions, content script registration, service worker |
+| `background.js` | Service worker — toolbar click (opens doc in Docreview), context menus, Gmail doc URL extraction via `executeScript(allFrames)` |
+| `content.js` | Content script — injects Docreview icons into Docs titlebar, Drive file lists, Gmail notification emails; derived from `bookmarklet-source.js` |
+| `defaults.js` | Shared default config (base URL) loaded by all other scripts |
+| `options.html` | Settings page HTML — single URL input with Save/Cancel |
+| `options.js` | Settings page logic — reads/writes `chrome.storage.sync` |
+| `icons/` | Extension icons (16/48/128px PNGs converted from `public/docreview.svg`) |
+| `README.md` | User-facing docs — features, installation, configuration, architecture overview |
+
 ## Assets (`public/`)
 
 | File | Description |
