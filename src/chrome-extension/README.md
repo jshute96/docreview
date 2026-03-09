@@ -7,8 +7,10 @@ Adds Docreview integration to Google Docs, Google Drive, and Gmail.
 ### Google Docs
 A Docreview icon appears in the document titlebar (next to the sharing badges). Click it to open the document in Docreview.
 
+On "Access Denied" pages (documents you don't have permission to view), an "Add in Docreview" link appears above the "Request access" button. Clicking it opens the Add Document page with the doc URL prefilled and a note recording the request date.
+
 ### Google Drive
-Docreview icons appear next to file type icons in both list and grid views. Click any icon to open that file in Docreview.
+Docreview icons appear next to file type icons in both list and grid views (folders are excluded). Click any icon to open that file in Docreview.
 
 ### Gmail
 For Docs notification emails (comments, suggestions, sharing), an "Open in Docreview" link appears inside the email. Click it to open the referenced document in Docreview.

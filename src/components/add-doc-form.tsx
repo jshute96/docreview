@@ -50,6 +50,7 @@ interface DocFormProps {
   fixedMimeType?: string | null;
   // For URL mode
   initialUrl?: string;
+  initialNotes?: string;
   onUrlChange?: () => void;
   onExistingChange?: (isExisting: boolean) => void;
   // Custom API endpoint (defaults to /api/docs/add)
@@ -71,6 +72,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
     fixedTitle,
     fixedMimeType,
     initialUrl,
+    initialNotes,
     onUrlChange,
     onExistingChange,
     apiEndpoint = "/api/docs/add",
@@ -86,7 +88,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
     const [existingDocId, setExistingDocId] = useState<string | null>(fixedDocId ?? null);
     const [isExisting, setIsExisting] = useState(false);
     const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
-    const [notes, setNotes] = useState("");
+    const [notes, setNotes] = useState(initialNotes ?? "");
     const [isStarred, setIsStarred] = useState(false);
     const [addToInbox, setAddAsActive] = useState(true);
     const [processing, setProcessing] = useState(false);

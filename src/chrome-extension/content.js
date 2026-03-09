@@ -82,6 +82,48 @@
     badges.insertBefore(container, badges.firstChild);
   }
 
+  // Google Docs "Access Denied" page: inject an "Add in Docreview" link above the
+  // "Request access" button. This lets users track a document they've requested
+  // access to, with a prefilled note recording the request date.
+  function injectAccessDenied() {
+    if (document.getElementById('dr-access-denied')) return;
+
+    // The page has <h1 class="hA3Ymb">You need access</h1>
+    var heading = document.querySelector('h1.hA3Ymb');
+    if (!heading || heading.textContent !== 'You need access') return;
+
+    // Find the button's touch wrapper (div.VfPpkd-dgl2Hf-ppHlrf-sM5MNb)
+    var reqBtn = document.querySelector('button.DGBc1e');
+    if (!reqBtn) return;
+    var btnWrapper = reqBtn.closest('[data-is-touch-wrapper]');
+    if (!btnWrapper || !btnWrapper.parentElement) return;
+
+    var now = new Date();
+    var today = now.getFullYear() + '-'
+      + String(now.getMonth() + 1).padStart(2, '0') + '-'
+      + String(now.getDate()).padStart(2, '0');
+    var addUrl = baseUrl + '/add?doc=' + encodeURIComponent(location.href)
+      + '&notes=' + encodeURIComponent('You requested access on ' + today + '.');
+
+    var bar = document.createElement('div');
+    bar.id = 'dr-access-denied';
+    bar.style.cssText = 'display:block;margin-bottom:12px;font-family:Google Sans,Roboto,sans-serif;font-size:14px;color:#5f6368;';
+
+    var img = document.createElement('img');
+    img.src = iconUrl;
+    img.style.cssText = 'width:16px;height:16px;border-radius:2px;vertical-align:middle;margin-right:4px;';
+
+    var link = document.createElement('a');
+    link.href = addUrl;
+    link.target = '_blank';
+    link.style.cssText = 'color:#7c3aed;font-weight:500;text-decoration:none;';
+    link.appendChild(img);
+    link.appendChild(document.createTextNode('Add in Docreview'));
+
+    bar.appendChild(link);
+    btnWrapper.parentElement.insertBefore(bar, btnWrapper);
+  }
+
   // Google Drive: inject Docreview icons next to file type icons in list and grid views.
   function injectDrive() {
     // List/search view: file rows are <tr role="row">. Using "tr" excludes the
@@ -244,7 +286,8 @@
   // the initial page load (titlebar in Docs, file list in Drive, emails in Gmail).
   if (isDocs) {
     injectDocs();
-    new MutationObserver(injectDocs).observe(document.body, { childList: true, subtree: true });
+    injectAccessDenied();
+    new MutationObserver(function() { injectDocs(); injectAccessDenied(); }).observe(document.body, { childList: true, subtree: true });
   } else if (isDrive) {
     injectDrive();
     new MutationObserver(injectDrive).observe(document.body, { childList: true, subtree: true });

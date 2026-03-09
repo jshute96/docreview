@@ -18,6 +18,7 @@ import {
 interface AddDocPageClientProps {
   initialLabels: Label[];
   initialUrl?: string;
+  initialNotes?: string;
 }
 
 interface LastAdded {
@@ -30,6 +31,7 @@ interface LastAdded {
 export function AddDocPageClient({
   initialLabels,
   initialUrl,
+  initialNotes,
 }: AddDocPageClientProps) {
   const router = useRouter();
   const [labels, setLabels] = useState<Label[]>(initialLabels);
@@ -76,6 +78,7 @@ export function AddDocPageClient({
             <DocForm
               ref={contentRef}
               initialUrl={initialUrl}
+              initialNotes={initialNotes}
               onSuccess={handleSuccess}
               onUrlChange={() => setLastAdded(null)}
               onExistingChange={handleExistingChange}

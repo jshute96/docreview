@@ -10,7 +10,7 @@ One-line descriptions of every source file, grouped by layer.
 | `layout.tsx` | Root layout — Geist fonts, global CSS, Sonner toaster |
 | `login/page.tsx` | Login page — Google OAuth button, or offline-mode button |
 | `docs/page.tsx` | Doc list page (server) — fetches docs+labels, renders `DocTable` |
-| `add/page.tsx` | Add document page (server) — standalone add-doc form, accepts optional `?doc=` query param |
+| `add/page.tsx` | Add document page (server) — standalone add-doc form, accepts optional `?doc=` and `?notes=` query params |
 | `open/page.tsx` | Open page (server) — redirects to `/comments/<docId>` if doc exists, otherwise to `/add?doc=...` |
 | `bookmarklet/page.tsx` | Bookmarklet install page (server) — metadata and wrapper for `BookmarkletClient` |
 | `bookmarklet/bookmarklet-client.tsx` | Bookmarklet install page (client) — "Drag to Install" UI for both bookmarklets |
