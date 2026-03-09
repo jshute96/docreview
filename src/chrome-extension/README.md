@@ -59,3 +59,10 @@ The extension has four parts:
 **`options.html` + `options.js`** — Simple settings page for configuring the Docreview server URL, stored in `chrome.storage.sync`.
 
 **`defaults.js`** — Shared default configuration (base URL) loaded by all other scripts.
+
+**`icons/`** — 16/48/128px PNGs converted from `public/docreview.svg`. If the source SVG changes, regenerate with:
+```bash
+for size in 16 48 128; do
+  convert -background none -resize ${size}x${size} public/docreview.svg src/chrome-extension/icons/icon${size}.png
+done
+```

@@ -49,6 +49,10 @@
 
     btn.addEventListener('mousedown', suppress, true);
     btn.addEventListener('mouseup', suppress, true);
+    // Suppress mouseover/mouseout to prevent Drive's file preview tooltip
+    // from triggering when hovering the Docreview icon (jsaction="mouseover:...")
+    btn.addEventListener('mouseover', suppress, true);
+    btn.addEventListener('mouseout', suppress, true);
     btn.addEventListener('click', function(e) {
       suppress(e);
       window.open(openUrl, '_blank');
@@ -80,12 +84,19 @@
 
   // Google Drive: inject Docreview icons next to file type icons in list and grid views.
   function injectDrive() {
-    // List/search view: rows with role="row"
-    var rows = document.querySelectorAll('[role="row"]');
+    // List/search view: file rows are <tr role="row">. Using "tr" excludes the
+    // <div role="row"> that wraps folder gridcells in the suggested folders section.
+    var rows = document.querySelectorAll('tr[role="row"]');
     rows.forEach(function(row) {
       var nameArea = row.querySelector('[data-column-id="16"]') || row;
 
       if (nameArea.querySelector('.dr-link')) return;
+
+      // Skip folders — the name element's data-tooltip ends with "folder" (e.g.,
+      // "Read previously Shared folder") while files end with their type
+      // (e.g., "Bike Maintenance Google Sheets").
+      var nameEl = nameArea.querySelector('[data-tooltip]');
+      if (nameEl && /\bfolder$/i.test(nameEl.getAttribute('data-tooltip'))) return;
 
       var idEl = nameArea.querySelector('[data-id]') || row.querySelector('[data-id]');
       var docId = idEl ? idEl.getAttribute('data-id') : null;
@@ -105,7 +116,9 @@
     });
 
     // Grid view: cells with role="gridcell"
-    var gridItems = document.querySelectorAll('[role="gridcell"]');
+    // Skip folders (data-selection-key="2") — they can't be opened in Docreview.
+    // Files use data-selection-key="1".
+    var gridItems = document.querySelectorAll('[role="gridcell"][data-selection-key="1"]');
     gridItems.forEach(function(item) {
       if (item.querySelector('.dr-link')) return;
 
