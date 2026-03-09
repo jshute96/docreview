@@ -25,7 +25,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 # Parse DATABASE_URL_RO from .env
-DB_URL=$(grep -E '^DATABASE_URL_RO=' "$ENV_FILE" | head -1 | cut -d= -f2-)
+DB_URL=$(grep -E '^DATABASE_URL_RO=' "$ENV_FILE" | head -1 | cut -d= -f2- || true)
 
 if [[ -z "$DB_URL" ]]; then
   echo "Error: DATABASE_URL_RO not found in .env" >&2
