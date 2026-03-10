@@ -569,9 +569,11 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       {/* Header row: title left, buttons right */}
       <div className="flex items-start justify-between">
         <div className="flex items-center text-xl font-semibold pt-1">
-          <img src="/docreview.svg" alt="Docreview Logo" className="h-6 w-6 rounded-md shadow-sm mr-2 flex-shrink-0" />
-          <span className="flex-shrink-0 text-zinc-500 mr-2">Docreview:</span>
-          <DocTypeIcon mimeType={doc.mimeType} className="h-5 w-5 flex-shrink-0 translate-y-[3px] mr-1" />
+          <a href="/docs" className="flex-shrink-0 flex items-center text-zinc-500 hover:text-blue-600 mr-2">
+            <img src="/docreview.svg" alt="Docreview Logo" className="h-6 w-6 rounded-md shadow-sm mr-2" />
+            Docreview:
+          </a>
+          <DocTypeIcon mimeType={doc.mimeType} className="h-5 w-5 flex-shrink-0 mr-1" />
           <a
             href={doc.driveUrl}
             target="docreview-doc"
@@ -594,9 +596,6 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
           </Button>
           <Button variant="outline" size="sm" title="Open the document" className="text-zinc-900" asChild>
             <a href={doc.driveUrl} target="docreview-doc">Open</a>
-          </Button>
-          <Button variant="outline" size="sm" title="Back to the document list" className="text-zinc-900" asChild>
-            <a href="/docs">Doc list</a>
           </Button>
           <Button
             variant="outline"
