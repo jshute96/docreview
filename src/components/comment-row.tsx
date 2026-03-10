@@ -510,7 +510,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                     </div>
                   )}
                   <p className="text-sm text-zinc-400">
-                    Cannot show comments or accept or remove suggestions. Process suggestions in the doc.
+                    Cannot accept or reject suggestions, or show reply threads. Process suggestions in the doc.
                   </p>
                 </div>
               ) : (

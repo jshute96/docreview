@@ -102,8 +102,8 @@ export function handleRefreshProgress(event: ProgressEvent) {
     case "drive":
       if (event.status === "reading") {
         const msg = event.count > 0
-          ? `Scanning documents from Drive (${event.count} found)...`
-          : "Scanning documents from Drive...";
+          ? `Scanning changes from Drive (${event.count} found)...`
+          : "Scanning changes from Drive...";
         toast.loading(msg, { id: PROGRESS_DRIVE });
       } else {
         const isChanges = event.totalChanges !== undefined;

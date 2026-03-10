@@ -132,7 +132,7 @@ to report progress to the UI in real time.
 Progress events track four distinct phases:
 
 1.  **`drive` (Discovery):** Scanning the Drive changes feed or recent files.
-    - Reports raw **changes** read from the API (e.g., "Scanning documents from Drive (4449 found)...").
+    - Reports raw **changes** read from the API (e.g., "Scanning changes from Drive (4449 found)...").
 2.  **`gmail` (Discovery):** Scanning Gmail notifications.
     - Reports messages scanned out of the total found (e.g., "Reading notifications from Gmail (12 of 50)...").
 3.  **`metadata` (Processing):** Fetching Drive metadata for discovered or selected IDs.

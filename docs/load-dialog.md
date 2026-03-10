@@ -69,7 +69,7 @@ The user configures search options and clicks **Scan**. This calls `POST /api/do
 
 This endpoint uses **Server-Sent Events (SSE)** to report real-time scanning progress
 in a toast message:
-- **Drive Scan:** Reports raw objects scanned from the API (e.g., "Scanning documents from Drive (1650 found)...").
+- **Drive Scan:** Reports raw objects scanned from the API (e.g., "Scanning changes from Drive (1650 found)...").
 - **Gmail Scan:** Reports messages scanned out of the total found, followed by a metadata
   fetching phase for discovered IDs (e.g., "Reading notifications from Gmail (12 of 50)...").
 
