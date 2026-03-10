@@ -551,9 +551,19 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   return (
     <LabelProvider allLabels={labels} onLabelsChange={setLabels} onLabelDelete={handleLabelDelete}>
     <div className="flex flex-col gap-6">
-      {doc.isDeleted && (
+      {doc.accessState === "TRASHED" && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-center gap-2">
+          <span className="font-bold">Note:</span> This document is in the trash.
+        </div>
+      )}
+      {doc.accessState === "NOT_FOUND" && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-center gap-2">
           <span className="font-bold">Note:</span> This document was deleted from Google Drive or is no longer accessible.
+        </div>
+      )}
+      {doc.accessState === "DENIED" && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-center gap-2">
+          <span className="font-bold">Permission denied</span>
         </div>
       )}
       {/* Header row: title left, buttons right */}
@@ -567,7 +577,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
             target="docreview-doc"
             title="Open document"
             className={`hover:underline hover:text-blue-600 ${
-              doc.isDeleted ? "line-through text-zinc-400" : "text-zinc-900"
+              doc.accessState !== "OK" ? "line-through text-zinc-400" : "text-zinc-900"
             }`}
           >{doc.title}</a>
         </div>

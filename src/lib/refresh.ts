@@ -5,7 +5,7 @@ import {
   listRecentDocs,
   getChangesStartPageToken,
   fetchDocsByIds,
-  findDeletedDocIds,
+  findDeletedOrDeniedDocIds,
   type DriveDoc,
 } from "@/lib/google-drive";
 import { scanGmailForDocIds } from "@/lib/gmail";
@@ -113,7 +113,7 @@ export async function upsertDocsAndSyncComments(
         lastModifiedInDrive: doc.lastModifiedInDrive,
         owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
-        isDeleted: false,
+        accessState: "OK",
       },
     });
 
@@ -177,10 +177,13 @@ export async function upsertDocsAndSyncComments(
   for (let i = 0; i < processedDocs.length; i++) {
     const res = syncResults[i];
     if (res.isDeleted) {
-      await prisma.doc.update({ where: { docId: processedDocs[i].docId }, data: { isDeleted: true } });
+      await prisma.doc.update({ where: { docId: processedDocs[i].docId }, data: { accessState: "NOT_FOUND" } });
       deleted++;
       continue;
     }
+    // Note: res.permissionDenied means comment-level 403 (comments.list or
+    // Docs API suggestions), NOT file-level. files.get already succeeded for
+    // these docs, so accessState stays OK (see docs/access-states.md).
     if (processedDocs[i].status === "ARCHIVED" && res.shouldUnarchive && res.hasNonResolveActivity) {
       await prisma.doc.update({ where: { docId: processedDocs[i].docId }, data: { status: "INBOX" } });
       unarchived++;
@@ -210,26 +213,41 @@ export async function upsertDocsAndSyncComments(
 
 /**
  * Given a list of Google Doc IDs that were expected but not returned by a
- * Drive metadata fetch, check whether they are actually deleted/trashed and
- * mark them accordingly in the database.  Returns the number of docs marked.
+ * Drive metadata fetch, check whether they are actually deleted/trashed or
+ * permission-denied and mark them accordingly in the database.
+ * Returns the number of docs marked as deleted.
  */
-async function markMissingAsDeleted(
+async function markMissingAsDeletedOrDenied(
   userId: string,
   missingIds: string[],
   logLabel: string,
 ): Promise<number> {
   if (missingIds.length === 0) return 0;
-  logInfo(`[Refresh] Checking ${missingIds.length} missing ${logLabel} docs for deletion`);
-  const deletedIds = await findDeletedDocIds(userId, missingIds);
+  logInfo(`[Refresh] Checking ${missingIds.length} missing ${logLabel} docs for deletion/permission`);
+  const { trashedIds, deletedIds, permissionDeniedIds } = await findDeletedOrDeniedDocIds(userId, missingIds);
   let count = 0;
   for (const id of missingIds) {
-    if (deletedIds.has(id)) {
-      logToFile(DEBUG_FILE, `OUTCOME: DELETE (${logLabel.toUpperCase()} MISSING): ID: ${id}`);
+    if (trashedIds.has(id)) {
+      logToFile(DEBUG_FILE, `OUTCOME: TRASHED (${logLabel.toUpperCase()} MISSING): ID: ${id}`);
       await prisma.doc.updateMany({
         where: { userId, googleDocId: id },
-        data: { isDeleted: true },
+        data: { accessState: "TRASHED" },
       });
       count++;
+    } else if (deletedIds.has(id)) {
+      // 404 is ambiguous for DENIED docs — keep DENIED state (see docs/access-states.md)
+      logToFile(DEBUG_FILE, `OUTCOME: DELETE (${logLabel.toUpperCase()} MISSING): ID: ${id}`);
+      await prisma.doc.updateMany({
+        where: { userId, googleDocId: id, accessState: { not: "DENIED" } },
+        data: { accessState: "NOT_FOUND" },
+      });
+      count++;
+    } else if (permissionDeniedIds.has(id)) {
+      logToFile(DEBUG_FILE, `OUTCOME: PERMISSION DENIED (${logLabel.toUpperCase()} MISSING): ID: ${id}`);
+      await prisma.doc.updateMany({
+        where: { userId, googleDocId: id },
+        data: { accessState: "DENIED" },
+      });
     }
   }
   return count;
@@ -283,7 +301,7 @@ async function refreshGoogleDocIds(
   // Deletion detection: if fetchDocsByIds missed some docs, check if they are actually deleted
   const foundIds = new Set(driveDocs.map(d => d.googleDocId));
   const missingIds = googleDocIds.filter(id => !foundIds.has(id));
-  const additionalDeleted = await markMissingAsDeleted(userId, missingIds, mode);
+  const additionalDeleted = await markMissingAsDeletedOrDenied(userId, missingIds, mode);
 
   const elapsed = Date.now() - t0;
   const result = { ...syncRes, deleted: syncRes.deleted + additionalDeleted };
@@ -315,7 +333,7 @@ export async function handleMissingGmailDocs(
   existingDocIds: Set<string>
 ): Promise<number> {
   const missingIds = gmailDocIds.filter((id) => !returnedDocIds.has(id) && existingDocIds.has(id));
-  return markMissingAsDeleted(userId, missingIds, "Gmail");
+  return markMissingAsDeletedOrDenied(userId, missingIds, "gmail");
 }
 
 export async function executeRefresh(
@@ -334,7 +352,8 @@ export async function executeRefresh(
 
   // --- Discovery phase (parallel) ---
   let driveDocs: DriveDoc[] = [];
-  let deletedDocIdsFromDrive = new Set<string>();
+  let trashedDocIdsFromDrive = new Set<string>();
+  let removedDocIdsFromDrive = new Set<string>();
   let newPageToken: string | undefined;
   let driveSucceeded = false;
 
@@ -353,7 +372,7 @@ export async function executeRefresh(
     const rows = await prisma.$queryRaw<{ google_doc_id: string; title: string; comments_last_synced_at: Date | null }[]>`
       SELECT google_doc_id, title, comments_last_synced_at FROM docs
       WHERE user_id = ${userId}
-        AND is_deleted = false
+        AND access_state = 'OK'
         AND (
           comments_last_synced_at IS NULL
           OR (last_modified_in_drive IS NOT NULL AND comments_last_synced_at < last_modified_in_drive)
@@ -385,10 +404,11 @@ export async function executeRefresh(
           });
           driveDocs = result.docs;
           driveChangesRead = result.rawChangeCount;
-          deletedDocIdsFromDrive = result.deletedDocIds;
+          trashedDocIdsFromDrive = result.trashedDocIds;
+          removedDocIdsFromDrive = result.removedDocIds;
           newPageToken = result.newPageToken;
           driveSucceeded = true;
-          logToFile(DEBUG_FILE, `Ended changes.list sync: ${driveDocs.length} changed docs, ${deletedDocIdsFromDrive.size} total deletions reported by Drive`);
+          logToFile(DEBUG_FILE, `Ended changes.list sync: ${driveDocs.length} changed docs, ${trashedDocIdsFromDrive.size} trashed, ${removedDocIdsFromDrive.size} removed`);
           onProgress?.({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: result.rawChangeCount });
         } catch (err: unknown) {
           const code = (err as { code?: number | string })?.code;
@@ -483,20 +503,36 @@ export async function executeRefresh(
   );
 
   let extraDeleted = 0;
-  // Handle deletions from Drive changes.list
-  if (deletedDocIdsFromDrive.size > 0) {
-    const docsToDelete = await prisma.doc.findMany({
+  // Handle trashed docs from Drive changes.list
+  if (trashedDocIdsFromDrive.size > 0) {
+    const docsToTrash = await prisma.doc.findMany({
       where: {
         userId,
-        isDeleted: false,
-        googleDocId: { in: [...deletedDocIdsFromDrive] },
+        googleDocId: { in: [...trashedDocIdsFromDrive] },
       },
       select: { docId: true, googleDocId: true, title: true },
     });
-    logInfo(`[Refresh] Drive: ${docsToDelete.length} of ${deletedDocIdsFromDrive.size} deletions were tracked docs`);
-    for (const doc of docsToDelete) {
+    logInfo(`[Refresh] Drive: ${docsToTrash.length} of ${trashedDocIdsFromDrive.size} trashed were tracked docs`);
+    for (const doc of docsToTrash) {
+      logToFile(DEBUG_FILE, `OUTCOME: TRASHED: "${doc.title}" (ID: ${doc.googleDocId})`);
+      await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "TRASHED" } });
+      extraDeleted++;
+    }
+  }
+  // Handle removed docs from Drive changes.list (removed = no longer accessible, ambiguous)
+  if (removedDocIdsFromDrive.size > 0) {
+    const docsToRemove = await prisma.doc.findMany({
+      where: {
+        userId,
+        accessState: { not: "DENIED" }, // Don't overwrite DENIED with NOT_FOUND (404 ambiguity)
+        googleDocId: { in: [...removedDocIdsFromDrive] },
+      },
+      select: { docId: true, googleDocId: true, title: true },
+    });
+    logInfo(`[Refresh] Drive: ${docsToRemove.length} of ${removedDocIdsFromDrive.size} removals were tracked docs`);
+    for (const doc of docsToRemove) {
       logToFile(DEBUG_FILE, `OUTCOME: DELETE: "${doc.title}" (ID: ${doc.googleDocId})`);
-      await prisma.doc.update({ where: { docId: doc.docId }, data: { isDeleted: true } });
+      await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "NOT_FOUND" } });
       extraDeleted++;
     }
   }
@@ -561,7 +597,7 @@ export async function executeFullRefresh(
   onProgress?: OnProgress,
 ): Promise<RefreshResult> {
   const docs = await prisma.doc.findMany({
-    where: { userId, isDeleted: false },
+    where: { userId },
     select: { googleDocId: true }
   });
   const googleDocIds = docs.map(d => d.googleDocId);

@@ -70,18 +70,20 @@ export function DocRow({
   }
 
   const hasNotes = !!doc.notes?.trim();
+  const notOk = doc.accessState !== "OK";
+  const hasSubline = hasNotes || notOk;
   const notesTooltip = hasNotes
     ? doc.notes!.split("\n").slice(0, 20).join("\n") + (doc.notes!.split("\n").length > 20 ? "\n…" : "")
     : "";
 
   return (
     <tr className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
-      <td className={`pl-4 pr-0 ${hasNotes ? "pt-1.5 pb-0.5" : "py-1.5"} w-0`}>
+      <td className={`pl-4 pr-0 ${hasSubline ? "pt-1.5 pb-0.5" : "py-1.5"} w-0`}>
         <div className="flex items-center h-5">
           <StarButton starred={doc.isStarred} onToggle={handleToggleStar} />
         </div>
       </td>
-      <td className={`pl-2 pr-4 ${hasNotes ? "pt-1.5 pb-0.5" : "py-1.5"}`}>
+      <td className={`pl-2 pr-4 ${hasSubline ? "pt-1.5 pb-0.5" : "py-1.5"}`}>
         <div className="flex flex-wrap items-center gap-2">
           <a
             href={`/comments/${doc.docId}`}
@@ -89,7 +91,7 @@ export function DocRow({
             rel="noopener noreferrer"
             title="Open document comments page"
             className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline hover:text-blue-600 ${
-              doc.isDeleted ? "line-through text-zinc-400" : "text-zinc-900"
+              notOk ? "line-through text-zinc-400" : "text-zinc-900"
             }`}
           >
             <DocTypeIcon mimeType={doc.mimeType} />
@@ -104,10 +106,17 @@ export function DocRow({
             <LabelBadge key={dl.labelId} label={dl.label} />
           ))}
         </div>
-        {hasNotes && (
+        {(notOk || hasNotes) && (
           <p className="truncate text-sm text-zinc-400 w-0 min-w-full" title={notesTooltip}>
-            <span className="text-zinc-500">Notes: </span>
-            <span>{highlightText(doc.notes!.replace(/\n/g, " "), searchFilter)}</span>
+            {doc.accessState === "DENIED" && <span className="text-red-500">(No access) </span>}
+            {doc.accessState === "TRASHED" && <span className="text-red-500">(In trash) </span>}
+            {doc.accessState === "NOT_FOUND" && <span className="text-red-500">(Deleted) </span>}
+            {hasNotes && (
+              <>
+                <span className="text-zinc-500">Notes: </span>
+                <span>{highlightText(doc.notes!.replace(/\n/g, " "), searchFilter)}</span>
+              </>
+            )}
           </p>
         )}
       </td>

@@ -142,6 +142,24 @@ npm run typecheck   # type check without building
 
 A pre-commit hook (via Husky) runs `npm test` and `npm run typecheck` automatically before each commit.
 
+## Troubleshooting
+
+### "Compiling..." hangs in dev server
+
+Next.js compiles routes on-demand in dev mode. If the dev server gets stuck on
+"Compiling /api/..." and never finishes, the `.next` cache is likely stale or
+corrupted. Fix by clearing it and restarting:
+
+```bash
+# Stop the dev server (Ctrl+C), then:
+rm -rf .next
+npm run dev
+```
+
+The first request after a cold start may take several seconds to compile routes
+with deep dependency chains (e.g., `/api/docs/[docId]/refresh`). Subsequent
+requests will be fast.
+
 ## After Schema Changes
 
 If the Prisma schema (`prisma/schema.prisma`) has changed, regenerate the Prisma client and

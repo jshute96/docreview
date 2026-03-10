@@ -114,13 +114,14 @@ export interface DriveDoc {
   owner: string | null;
 }
 
-// Returns the subset of googleDocIds that are deleted (trashed, permanently deleted, or access revoked).
+// Returns the subset of googleDocIds that are deleted (trashed, permanently deleted)
+// and the subset that are permission-denied (403).
 // Runs all files.get calls in parallel rather than sequentially.
-export async function findDeletedDocIds(
+export async function findDeletedOrDeniedDocIds(
   userId: string,
   googleDocIds: string[]
-): Promise<Set<string>> {
-  if (googleDocIds.length === 0) return new Set();
+): Promise<{ trashedIds: Set<string>; deletedIds: Set<string>; permissionDeniedIds: Set<string> }> {
+  if (googleDocIds.length === 0) return { trashedIds: new Set(), deletedIds: new Set(), permissionDeniedIds: new Set() };
 
   const auth = await getDriveClient(userId);
   const drive = createDrive({ version: "v3", auth });
@@ -130,23 +131,30 @@ export async function findDeletedDocIds(
       const t0 = Date.now();
       try {
         const res = await drive.files.get({ fileId: id, fields: "trashed" });
-        const deleted = res.data.trashed === true;
-        logInfo(`[Drive] files.get ${id} → ${deleted ? "deleted/trashed" : "ok"} (${Date.now() - t0}ms)`);
-        return { id, deleted };
+        const trashed = res.data.trashed === true;
+        logInfo(`[Drive] files.get ${id} → ${trashed ? "trashed" : "ok"} (${Date.now() - t0}ms)`);
+        return { id, status: trashed ? "trashed" as const : "ok" as const };
       } catch (err: unknown) {
-        // Only treat 404/403 as deleted; skip transient errors (429, 5xx, network)
         const code = (err as { code?: number | string })?.code;
-        if (code === 404 || code === "404" || code === 403 || code === "403") {
-          logWarning(`[Drive] files.get ${id} → not found/access revoked (${Date.now() - t0}ms)`);
-          return { id, deleted: true };
+        if (code === 404 || code === "404") {
+          logWarning(`[Drive] files.get ${id} → not found (${Date.now() - t0}ms)`);
+          return { id, status: "deleted" as const };
+        }
+        if (code === 403 || code === "403") {
+          logWarning(`[Drive] files.get ${id} → permission denied (${Date.now() - t0}ms)`);
+          return { id, status: "denied" as const };
         }
         logError(`[Drive] files.get ${id} → transient error (skipping, ${Date.now() - t0}ms):`, err);
-        return { id, deleted: false };
+        return { id, status: "ok" as const };
       }
     })
   );
 
-  return new Set(results.filter((r) => r.deleted).map((r) => r.id));
+  return {
+    trashedIds: new Set(results.filter((r) => r.status === "trashed").map((r) => r.id)),
+    deletedIds: new Set(results.filter((r) => r.status === "deleted").map((r) => r.id)),
+    permissionDeniedIds: new Set(results.filter((r) => r.status === "denied").map((r) => r.id)),
+  };
 }
 
 export interface DriveComment {
@@ -638,7 +646,8 @@ export async function getChangesStartPageToken(userId: string): Promise<string> 
 
 export interface DriveChangesResult {
   docs: DriveDoc[];
-  deletedDocIds: Set<string>;
+  trashedDocIds: Set<string>;
+  removedDocIds: Set<string>;
   newPageToken: string;
   rawChangeCount: number;
 }
@@ -704,11 +713,16 @@ export async function listChanges(
   const newPageToken = newStartToken ?? pageToken;
 
   const docs: DriveDoc[] = [];
-  const deletedDocIds = new Set<string>();
+  const trashedDocIds = new Set<string>();
+  const removedDocIds = new Set<string>();
 
   for (const [fileId, change] of changesByFileId) {
-    if (change.removed || change.file?.trashed === true) {
-      deletedDocIds.add(fileId);
+    if (change.file?.trashed === true) {
+      trashedDocIds.add(fileId);
+      continue;
+    }
+    if (change.removed) {
+      removedDocIds.add(fileId);
       continue;
     }
 
@@ -729,8 +743,8 @@ export async function listChanges(
     });
   }
 
-  logInfo(`[Drive] changes summary: ${docs.length} changed docs, ${deletedDocIds.size} deleted (${changesByFileId.size} total changes), next token: ${newPageToken}`);
-  return { docs, deletedDocIds, newPageToken, rawChangeCount };
+  logInfo(`[Drive] changes summary: ${docs.length} changed docs, ${trashedDocIds.size} trashed, ${removedDocIds.size} removed (${changesByFileId.size} total changes), next token: ${newPageToken}`);
+  return { docs, trashedDocIds, removedDocIds, newPageToken, rawChangeCount };
 }
 
 /** Fetch Drive metadata for specific doc IDs (via individual files.get calls). */
@@ -769,8 +783,13 @@ export async function fetchDocsByIds(
           createdTimeInDrive: file.createdTime ? new Date(file.createdTime) : null,
           owner: file.owners?.[0]?.displayName ?? null,
         };
-      } catch (err) {
-        logError(`[Drive] files.get ${id} failed (${Date.now() - t0}ms):`, err);
+      } catch (err: unknown) {
+        const code = (err as { code?: number | string })?.code;
+        if (code === 404 || code === "404" || code === 403 || code === "403") {
+          logWarning(`[Drive] files.get ${id} → ${code === 403 || code === "403" ? "permission denied" : "not found"} (${Date.now() - t0}ms)`);
+        } else {
+          logError(`[Drive] files.get ${id} failed (${Date.now() - t0}ms):`, err);
+        }
         return null;
       } finally {
         completedCount++;

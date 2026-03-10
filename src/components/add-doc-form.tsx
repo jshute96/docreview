@@ -10,7 +10,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { apiFetch, isAuthError } from "@/lib/api-fetch";
-import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, XCircle } from "lucide-react";
 import type { DocWithLabels } from "@/types";
 import { LabelPicker } from "@/components/label-picker";
 import { DocTypeIcon } from "@/components/doc-type-icon";
@@ -92,6 +92,8 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
     const [isStarred, setIsStarred] = useState(false);
     const [addToInbox, setAddAsActive] = useState(true);
     const [processing, setProcessing] = useState(false);
+    const [permissionDenied, setPermissionDenied] = useState(false);
+    const [validDriveUrl, setValidDriveUrl] = useState<string | null>(null);
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const abortRef = useRef<AbortController | null>(null);
@@ -118,6 +120,8 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
       setNotes("");
       setAddAsActive(true);
       setProcessing(false);
+      setPermissionDenied(false);
+      setValidDriveUrl(null);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (abortRef.current) abortRef.current.abort();
     }
@@ -142,9 +146,19 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
         );
         const data = await res.json();
         if (res.ok) {
-          setValidTitle(data.title ?? null);
-          setValidMimeType(data.mimeType ?? null);
-          setValidationState("valid");
+          setValidDriveUrl(data.driveUrl ?? null);
+          if (data.permissionDenied) {
+            setPermissionDenied(true);
+            setValidTitle(data.title ?? "Unknown title");
+            setValidMimeType(data.mimeType ?? null);
+            setValidationState("valid");
+            setValidationError("Document not found or you don't have access");
+          } else {
+            setPermissionDenied(false);
+            setValidTitle(data.title ?? null);
+            setValidMimeType(data.mimeType ?? null);
+            setValidationState("valid");
+          }
           if (data.existing) {
             setIsExisting(true);
             setExistingDocId(data.docId ?? null);
@@ -179,6 +193,8 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
       setValidMimeType(null);
       setExistingDocId(null);
       setIsExisting(false);
+      setPermissionDenied(false);
+      setValidDriveUrl(null);
       onUrlChange?.();
 
       if (abortRef.current) {
@@ -217,6 +233,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
             isStarred,
             notes,
             status: addToInbox ? "INBOX" : "ARCHIVED",
+            ...(permissionDenied && validTitle ? { title: validTitle } : {}),
           }),
         });
         if (!res.ok) throw new Error("Action failed");
@@ -246,7 +263,9 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
         case "validating":
           return <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />;
         case "valid":
-          return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+          return permissionDenied
+            ? <AlertTriangle className="h-4 w-4 text-amber-500" />
+            : <CheckCircle2 className="h-4 w-4 text-green-500" />;
         case "invalid":
           return <XCircle className="h-4 w-4 text-red-500" />;
       }
@@ -279,32 +298,21 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
             )}
             {validTitle && (
               <div className="mt-1.5">
-                {existingDocId ? (
-                  <a
-                    href={`/comments/${existingDocId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-sm font-medium text-zinc-900 hover:underline line-clamp-1"
-                    title={validTitle}
-                  >
-                    <DocTypeIcon
-                      mimeType={validMimeType}
-                      className="h-4 w-4 flex-shrink-0"
-                    />
-                    {validTitle}
-                  </a>
-                ) : (
-                  <p
-                    className="flex items-center gap-1.5 text-sm font-medium text-zinc-900 line-clamp-1"
-                    title={validTitle}
-                  >
-                    <DocTypeIcon
-                      mimeType={validMimeType}
-                      className="h-4 w-4 flex-shrink-0"
-                    />
-                    {validTitle}
-                  </p>
-                )}
+                <a
+                  href={existingDocId ? `/comments/${existingDocId}` : (validDriveUrl ?? "#")}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center gap-1.5 text-sm font-medium hover:underline line-clamp-1 ${
+                    permissionDenied && !isExisting ? "text-zinc-400 hover:text-blue-600" : "text-zinc-900 hover:text-blue-600"
+                  }`}
+                  title={existingDocId ? validTitle : "Open document"}
+                >
+                  <DocTypeIcon
+                    mimeType={validMimeType}
+                    className="h-4 w-4 flex-shrink-0"
+                  />
+                  {validTitle}
+                </a>
               </div>
             )}
           </div>
@@ -329,6 +337,19 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
             className={`${TEXTAREA_CLASSES} w-full max-h-[200px]`}
           />
         </div>
+
+        {permissionDenied && !isExisting && (
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-zinc-900 flex-shrink-0">Set title:</label>
+            <input
+              type="text"
+              value={validTitle ?? ""}
+              onChange={(e) => setValidTitle(e.target.value)}
+              placeholder="Unknown title"
+              className="min-w-[60%] flex-1 rounded-md border border-zinc-300 px-2 py-1 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+            />
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           <Checkbox

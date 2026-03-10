@@ -84,7 +84,7 @@ describe("Single-doc Refresh API", () => {
 
     expect(vi.mocked(prisma.doc.update)).toHaveBeenCalledWith(expect.objectContaining({
       where: { docId },
-      data: { isDeleted: true }
+      data: { accessState: "NOT_FOUND" }
     }));
   });
 });

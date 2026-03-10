@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { fetchDocsByIds, findDeletedDocIds, getDriveClient, invalidGrantResponse } from "@/lib/google-drive";
+import { fetchDocsByIds, getDriveClient, invalidGrantResponse } from "@/lib/google-drive";
 import { scanGmailNotifications } from "@/lib/gmail";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";

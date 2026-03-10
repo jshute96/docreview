@@ -48,7 +48,7 @@ function makeDoc(overrides: Partial<Doc> = {}): Doc {
     mimeType: "application/vnd.google-apps.document",
     role: "REVIEWER",
     status: "INBOX",
-    isDeleted: false,
+    accessState: "OK",
     lastModifiedInDrive: new Date("2024-06-01"),
     owner: "Someone",
     createdTimeInDrive: new Date("2024-01-01"),

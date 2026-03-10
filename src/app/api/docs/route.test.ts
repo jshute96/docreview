@@ -23,7 +23,7 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/google-drive", () => ({
   listRecentDocs: vi.fn(),
   fetchDocsByIds: vi.fn(),
-  findDeletedDocIds: vi.fn(),
+  findDeletedOrDeniedDocIds: vi.fn(),
   getDriveClient: vi.fn(),
   getChangesStartPageToken: vi.fn(),
   listChanges: vi.fn(),
@@ -41,7 +41,7 @@ vi.mock("@/lib/status", () => ({
 import { GET, POST } from "./route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { listRecentDocs, fetchDocsByIds, findDeletedDocIds, getDriveClient, getChangesStartPageToken, listChanges } from "@/lib/google-drive";
+import { listRecentDocs, fetchDocsByIds, findDeletedOrDeniedDocIds, getDriveClient, getChangesStartPageToken, listChanges } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken } from "@/lib/status";
 
@@ -59,7 +59,7 @@ const mockDocLabel = prisma.docLabel as unknown as {
 };
 const mockListRecentDocs = vi.mocked(listRecentDocs);
 const mockFetchDocsByIds = vi.mocked(fetchDocsByIds);
-const mockFindDeletedDocIds = vi.mocked(findDeletedDocIds);
+const mockFindDeletedOrDeniedDocIds = vi.mocked(findDeletedOrDeniedDocIds);
 const mockGetDriveClient = vi.mocked(getDriveClient);
 const mockGetChangesStartPageToken = vi.mocked(getChangesStartPageToken);
 const mockListChanges = vi.mocked(listChanges);
