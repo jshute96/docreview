@@ -119,6 +119,16 @@ enum SuggestionType {
   @@map("suggestion_type")
 }
 
+// See docs/access-states.md for state transitions and display behavior.
+enum AccessState {
+  OK
+  TRASHED
+  NOT_FOUND
+  DENIED
+
+  @@map("access_state")
+}
+
 enum CommentStatus {
   INBOX
   ARCHIVED
@@ -150,7 +160,7 @@ model Doc {
   mimeType             String?    @map("mime_type")
   role                 DocRole    @default(REVIEWER)
   status               DocStatus  @default(INBOX)
-  isDeleted            Boolean    @default(false) @map("is_deleted") // soft-delete; set when Drive reports 404/403/trashed, cleared if doc reappears
+  accessState          AccessState @default(OK) @map("access_state")
   isStarred            Boolean    @default(false) @map("is_starred")
   lastModifiedInDrive  DateTime?  @map("last_modified_in_drive")    // Drive's modifiedTime (does NOT update when comments change)
   notes                String?    @map("notes")

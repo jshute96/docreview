@@ -70,7 +70,8 @@
       "Bash(npx tsx:*)",
       "Bash(./scripts/check-gmail-notifications.ts:*)",
       "Bash(npx playwright:*)",
-      "Bash(./scripts/query_database.sh:*)"
+      "Bash(./scripts/query_database.sh:*)",
+      "Bash(scripts/query_database.sh:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

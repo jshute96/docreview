@@ -14,7 +14,7 @@ function makeDoc(overrides: Partial<DocWithLabels> & { title: string }): DocWith
     mimeType: overrides.mimeType ?? "application/vnd.google-apps.document",
     role: overrides.role ?? "REVIEWER",
     status: overrides.status ?? "INBOX",
-    isDeleted: overrides.isDeleted ?? false,
+    accessState: overrides.accessState ?? "OK",
     lastModifiedInDrive: "lastModifiedInDrive" in overrides ? overrides.lastModifiedInDrive! : new Date("2024-06-01"),
     createdTimeInDrive: overrides.createdTimeInDrive ?? null,
     owner: overrides.owner ?? null,

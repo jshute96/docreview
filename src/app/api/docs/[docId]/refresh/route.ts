@@ -60,9 +60,17 @@ export async function POST(
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
     const code = (err as { code?: number })?.code;
-    if (code === 404 || code === 403) {
-      logWarning(`[Refresh] doc ${doc.docId} (${doc.googleDocId}) is deleted or inaccessible (code ${code})`);
-      await prisma.doc.update({ where: { docId }, data: { isDeleted: true } });
+    if (code === 404) {
+      // 404 is ambiguous for DENIED docs (Google returns 404 for permission denied too)
+      if (doc.accessState !== "DENIED") {
+        logWarning(`[Refresh] doc ${doc.docId} (${doc.googleDocId}) not found (code 404)`);
+        await prisma.doc.update({ where: { docId }, data: { accessState: "NOT_FOUND" } });
+      } else {
+        logWarning(`[Refresh] doc ${doc.docId} (${doc.googleDocId}) still inaccessible (code 404, keeping DENIED)`);
+      }
+    } else if (code === 403) {
+      logWarning(`[Refresh] doc ${doc.docId} (${doc.googleDocId}) permission denied (code 403)`);
+      await prisma.doc.update({ where: { docId }, data: { accessState: "DENIED" } });
     } else {
       logError("[Refresh] Failed to refresh file metadata:", err);
     }
@@ -70,7 +78,7 @@ export async function POST(
 
   if (driveDoc) {
     if (driveDoc.trashed) {
-      await prisma.doc.update({ where: { docId }, data: { isDeleted: true } });
+      await prisma.doc.update({ where: { docId }, data: { accessState: "TRASHED" } });
     } else {
       await upsertDocsAndSyncComments(userId, userEmail, [driveDoc], {
         existingDocIds: new Set([doc.googleDocId]),

@@ -33,11 +33,11 @@ export async function GET(req: NextRequest) {
     where: { userId_googleDocId: { userId, googleDocId: fileId } },
     select: {
       docId: true, title: true, mimeType: true,
-      notes: true, status: true, isStarred: true, isDeleted: true,
+      notes: true, status: true, isStarred: true, accessState: true,
       labels: { select: { labelId: true } },
     },
   });
-  const existing = existingRow?.isDeleted ? null : existingRow;
+  const existing = existingRow?.accessState !== "OK" ? null : existingRow;
 
   let f;
   try {
@@ -51,7 +51,22 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
-    return NextResponse.json({ error: "no_access" }, { status: 404 });
+    // Not found or permission denied — still allow adding
+    return NextResponse.json({
+      googleDocId: fileId,
+      title: existing?.title ?? "Unknown title",
+      mimeType: existing?.mimeType ?? "application/vnd.google-apps.document",
+      driveUrl: `https://docs.google.com/document/d/${fileId}/edit`,
+      permissionDenied: true,
+      ...(existing ? {
+        existing: true,
+        docId: existing.docId,
+        labels: existing.labels.map((l) => l.labelId),
+        notes: existing.notes,
+        status: existing.status,
+        isStarred: existing.isStarred,
+      } : {}),
+    });
   }
 
   if (f.trashed) {

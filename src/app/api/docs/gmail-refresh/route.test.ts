@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { POST } from "./route";
 import { getValidSession } from "@/lib/auth-utils";
 import { scanGmailNotifications } from "@/lib/gmail";
-import { fetchDocsByIds, findDeletedDocIds, getDriveClient } from "@/lib/google-drive";
+import { fetchDocsByIds, getDriveClient } from "@/lib/google-drive";
 import { handleMissingGmailDocs, upsertDocsAndSyncComments } from "@/lib/refresh";
 import { getStatus, updateGmailTimestamp } from "@/lib/status";
 import { prisma } from "@/lib/prisma";

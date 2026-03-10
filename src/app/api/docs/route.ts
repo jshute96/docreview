@@ -126,7 +126,8 @@ async function executeLoadOrRefresh(opts: {
   const t0 = Date.now();
 
   let driveDocs: import("@/lib/google-drive").DriveDoc[] = [];
-  let deletedDocIds = new Set<string>();
+  let trashedDocIds = new Set<string>();
+  let removedDocIds = new Set<string>();
   let driveAuth;
   let newPageToken: string | undefined;
 
@@ -157,9 +158,10 @@ async function executeLoadOrRefresh(opts: {
         });
         driveDocs = result.docs;
         driveChangesRead = result.rawChangeCount;
-        deletedDocIds = result.deletedDocIds;
+        trashedDocIds = result.trashedDocIds;
+        removedDocIds = result.removedDocIds;
         newPageToken = result.newPageToken;
-        logInfo(`[Sync] changes.list -> ${driveDocs.length} changed docs, ${deletedDocIds.size} deletions, newPageToken ${newPageToken}`);
+        logInfo(`[Sync] changes.list -> ${driveDocs.length} changed docs, ${trashedDocIds.size} trashed, ${removedDocIds.size} removed, newPageToken ${newPageToken}`);
         send({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: result.rawChangeCount });
       } catch (err: unknown) {
         // Expired/invalid token -> fall back to bootstrap
@@ -245,7 +247,7 @@ async function executeLoadOrRefresh(opts: {
         lastModifiedInDrive: doc.lastModifiedInDrive,
         owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
-        isDeleted: false,
+        accessState: "OK",
         ...(loadStatus === "INBOX" ? { status: "INBOX" as const } : {}),
         ...(loadIsStarred !== undefined ? { isStarred: loadIsStarred } : {}),
       },
@@ -277,19 +279,34 @@ async function executeLoadOrRefresh(opts: {
     }
   }
 
-  // Handle deletions detected by changes.list (refresh)
-  if (deletedDocIds.size > 0) {
-    logInfo(`[Sync] Processing ${deletedDocIds.size} deletions from changes.list`);
-    const docsToDelete = await prisma.doc.findMany({
+  // Handle trashed docs detected by changes.list
+  if (trashedDocIds.size > 0) {
+    logInfo(`[Sync] Processing ${trashedDocIds.size} trashed docs from changes.list`);
+    const docsToTrash = await prisma.doc.findMany({
       where: {
         userId,
-        isDeleted: false,
-        googleDocId: { in: [...deletedDocIds] },
+        googleDocId: { in: [...trashedDocIds] },
       },
       select: { docId: true },
     });
-    for (const doc of docsToDelete) {
-      await prisma.doc.update({ where: { docId: doc.docId }, data: { isDeleted: true } });
+    for (const doc of docsToTrash) {
+      await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "TRASHED" } });
+      deleted++;
+    }
+  }
+  // Handle removed docs detected by changes.list (ambiguous — could be deleted or permission revoked)
+  if (removedDocIds.size > 0) {
+    logInfo(`[Sync] Processing ${removedDocIds.size} removed docs from changes.list`);
+    const docsToRemove = await prisma.doc.findMany({
+      where: {
+        userId,
+        accessState: { not: "DENIED" },
+        googleDocId: { in: [...removedDocIds] },
+      },
+      select: { docId: true },
+    });
+    for (const doc of docsToRemove) {
+      await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "NOT_FOUND" } });
       deleted++;
     }
   }
@@ -300,7 +317,7 @@ async function executeLoadOrRefresh(opts: {
 
   // Sync comments for docs returned by Drive
   const commentDocs = await prisma.doc.findMany({
-    where: { userId, isDeleted: false, googleDocId: { in: [...driveDocIds] } },
+    where: { userId, accessState: "OK", googleDocId: { in: [...driveDocIds] } },
   });
   logInfo(`[Sync] Syncing comments for ${commentDocs.length} docs (${mode === "refresh" ? "changed docs only" : "selected docs"})`);
 
@@ -331,7 +348,7 @@ async function executeLoadOrRefresh(opts: {
   for (let i = 0; i < commentDocs.length; i++) {
     const res = syncResults[i];
     if (res.isDeleted) {
-      await prisma.doc.update({ where: { docId: commentDocs[i].docId }, data: { isDeleted: true } });
+      await prisma.doc.update({ where: { docId: commentDocs[i].docId }, data: { accessState: "NOT_FOUND" } });
       deleted++;
       continue;
     }

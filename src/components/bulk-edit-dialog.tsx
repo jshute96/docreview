@@ -414,10 +414,10 @@ export function BulkEditDialog({
                       onDoubleClick={() => window.open(`/comments/${doc.docId}`, "_blank")}
                       title="Click to select, double-click to open"
                       className={`flex items-center gap-2 ${
-                        doc.isDeleted ? "text-zinc-400 line-through" : ""
+                        doc.accessState !== "OK" ? "text-zinc-400 line-through" : ""
                       }`}
                     >
-                      <DocTypeIcon mimeType={doc.mimeType} className={`h-3 w-3 flex-shrink-0 ${doc.isDeleted ? "text-zinc-300" : ""}`} />
+                      <DocTypeIcon mimeType={doc.mimeType} className={`h-3 w-3 flex-shrink-0 ${doc.accessState !== "OK" ? "text-zinc-300" : ""}`} />
                       <span className="whitespace-nowrap pr-4 text-xs font-medium">
                         {doc.title}
                       </span>
