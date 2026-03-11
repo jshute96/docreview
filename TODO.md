@@ -40,10 +40,7 @@ Easy:
   * Load dialog upper bound of 365 days? and UI weirdness from that.
 
 * Better handling of docs I don't have permission to (vs deleted)
-  * rename `is_deleted` to `in_trash`
-  * add a `not_accessible` bit
   * support adding these from gmail notifications, with fill-in title and notes
-  * try flow of adding a doc I am requesting permission to, with notes about what it was
 
 * Make refresh on a doc faster, and probably cheaper, by doing fewer API calls.
 * Mute state on docs

@@ -92,9 +92,10 @@ async function findDocUrlsInTab(tabId) {
 // If multiple distinct docs are found, alert the user rather than guessing.
 async function openDocFromGmailTab(tabId) {
   var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
+  var tab = await chrome.tabs.get(tabId);
   var docUrls = await findDocUrlsInTab(tabId);
   if (docUrls.length === 1) {
-    chrome.tabs.create({ url: baseUrl + '/open?doc=' + encodeURIComponent(docUrls[0]) });
+    chrome.tabs.create({ url: baseUrl + '/open?doc=' + encodeURIComponent(docUrls[0]), index: tab.index + 1 });
   } else if (docUrls.length > 1) {
     chrome.scripting.executeScript({
       target: { tabId: tabId },
@@ -114,10 +115,15 @@ async function openDocFromGmailTab(tabId) {
 // Drive pages show file lists, not single documents, so the toolbar doesn't apply there.
 chrome.action.onClicked.addListener(async function(tab) {
   if (!tab.url || !isSupportedUrl(tab.url)) {
-    chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: function() { alert('Page is not a document supported in Docreview'); }
-    });
+    if (!tab.url || tab.url === 'chrome://newtab/' || tab.url === 'about:blank') {
+      var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
+      chrome.tabs.update(tab.id, { url: baseUrl });
+    } else {
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: function() { alert('Page is not a document supported in Docreview'); }
+      });
+    }
     return;
   }
 
@@ -138,7 +144,7 @@ chrome.action.onClicked.addListener(async function(tab) {
   }
 
   var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
-  chrome.tabs.create({ url: baseUrl + '/open?doc=' + encodeURIComponent(tab.url) });
+  chrome.tabs.create({ url: baseUrl + '/open?doc=' + encodeURIComponent(tab.url), index: tab.index + 1 });
 });
 
 // Handle "Open in Docreview" link clicks from the content script's injected Gmail bar.
@@ -166,10 +172,12 @@ chrome.runtime.onInstalled.addListener(function() {
 
 chrome.contextMenus.onClicked.addListener(async function(info) {
   var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
+  var [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  var newIndex = activeTab ? activeTab.index + 1 : undefined;
 
   if (info.menuItemId === 'open-docreview') {
-    chrome.tabs.create({ url: baseUrl });
+    chrome.tabs.create({ url: baseUrl, index: newIndex });
   } else if (info.menuItemId === 'add-page') {
-    chrome.tabs.create({ url: baseUrl + '/add' });
+    chrome.tabs.create({ url: baseUrl + '/add', index: newIndex });
   }
 });
