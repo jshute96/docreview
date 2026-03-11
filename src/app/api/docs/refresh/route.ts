@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
-import { executeRefresh, type RefreshSource } from "@/lib/refresh";
+import { executeRefresh } from "@/lib/refresh";
 import { logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 import { createProgressStream } from "@/lib/sse";
 
-const VALID_SOURCES = new Set<RefreshSource>(["drive", "gmail"]);
+const VALID_SOURCES = new Set(["drive", "gmail"]);
 
 export async function POST(req: NextRequest) {
   return runWithRequestId("POST", req, async () => {
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     // Parse and validate sources (default to both)
     const rawSources = Array.isArray(body.sources) ? body.sources : ["drive", "gmail"];
-    const sources = rawSources.filter((s): s is RefreshSource => VALID_SOURCES.has(s as RefreshSource));
+    const sources = rawSources.filter((s): s is string => VALID_SOURCES.has(s as string));
     if (sources.length === 0) {
       return NextResponse.json({ error: "No valid sources specified" }, { status: 400 });
     }
@@ -29,7 +29,11 @@ export async function POST(req: NextRequest) {
     logInfo(`[API] Refresh request: sources=${sources.join(",")}`);
 
     return createProgressStream(async (send) => {
-      return await executeRefresh(userId, userEmail, sources, send);
+      return await executeRefresh(userId, userEmail, {
+        drive: sources.includes("drive"),
+        gmail: sources.includes("gmail"),
+        onProgress: send,
+      });
     });
   });
 }

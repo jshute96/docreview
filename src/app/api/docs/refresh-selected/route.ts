@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
-import { refreshSelectedDocs } from "@/lib/refresh";
+import { executeRefresh } from "@/lib/refresh";
+import { prisma } from "@/lib/prisma";
 import { logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 import { createProgressStream } from "@/lib/sse";
@@ -22,10 +23,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No docIds specified" }, { status: 400 });
     }
 
+    // Convert DB docIds to Google Doc IDs
+    const docs = await prisma.doc.findMany({
+      where: { userId, docId: { in: docIds } },
+      select: { googleDocId: true },
+    });
+    const googleDocIds = docs.map(d => d.googleDocId);
+
     logInfo(`[API] Refresh selected request: ${docIds.length} docs`);
 
     return createProgressStream(async (send) => {
-      return await refreshSelectedDocs(userId, userEmail, docIds, send);
+      return await executeRefresh(userId, userEmail, {
+        googleDocIds,
+        mode: "selected",
+        onProgress: send,
+      });
     });
   });
 }

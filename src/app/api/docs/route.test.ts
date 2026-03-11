@@ -41,9 +41,9 @@ vi.mock("@/lib/status", () => ({
 import { GET, POST } from "./route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { listRecentDocs, fetchDocsByIds, findDeletedOrDeniedDocIds, getDriveClient, getChangesStartPageToken, listChanges } from "@/lib/google-drive";
+import { fetchDocsByIds, getDriveClient, getChangesStartPageToken } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
-import { getStatus, updateDriveChangesToken } from "@/lib/status";
+import { updateDriveChangesToken } from "@/lib/status";
 
 const mockAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
 const mockDoc = prisma.doc as unknown as {
@@ -57,14 +57,10 @@ const mockLabel = prisma.label as unknown as {
 const mockDocLabel = prisma.docLabel as unknown as {
   createMany: ReturnType<typeof vi.fn>;
 };
-const mockListRecentDocs = vi.mocked(listRecentDocs);
 const mockFetchDocsByIds = vi.mocked(fetchDocsByIds);
-const mockFindDeletedOrDeniedDocIds = vi.mocked(findDeletedOrDeniedDocIds);
 const mockGetDriveClient = vi.mocked(getDriveClient);
 const mockGetChangesStartPageToken = vi.mocked(getChangesStartPageToken);
-const mockListChanges = vi.mocked(listChanges);
 const mockSyncComments = vi.mocked(syncComments);
-const mockGetStatus = vi.mocked(getStatus);
 const mockUpdateDriveChangesToken = vi.mocked(updateDriveChangesToken);
 
 beforeEach(() => {
@@ -117,7 +113,7 @@ describe("GET /api/docs", () => {
   });
 });
 
-function postRequest(mode?: "refresh" | "full-refresh" | "load") {
+function postRequest(mode?: "full-refresh" | "load") {
   const url = mode
     ? `http://localhost/api/docs?mode=${mode}`
     : "http://localhost/api/docs";
@@ -154,7 +150,6 @@ async function readSSEResult<T = Record<string, unknown>>(response: Response): P
 
 describe("POST /api/docs", () => {
   beforeEach(() => {
-    mockGetStatus.mockResolvedValue(null);
     mockUpdateDriveChangesToken.mockResolvedValue(undefined);
     mockGetChangesStartPageToken.mockResolvedValue("token-1");
   });
@@ -275,7 +270,6 @@ describe("POST /api/docs", () => {
       selectedGoogleDocIds: ["g1", "g2"],
     }));
     expect(mockFetchDocsByIds).toHaveBeenCalledWith("u1", ["g1", "g2"], expect.any(Function));
-    expect(mockListRecentDocs).not.toHaveBeenCalled();
   });
 
   it("full-refresh mode syncs comments for all non-deleted docs", async () => {
@@ -309,8 +303,8 @@ describe("POST /api/docs", () => {
     const dbDoc1 = { docId: "d1", googleDocId: "g1" };
     const dbDoc2 = { docId: "d2", googleDocId: "g2" };
     mockDoc.findMany
-      .mockResolvedValueOnce([dbDoc1, dbDoc2]) // executeFullRefresh: fetch all non-deleted docs
-      .mockResolvedValueOnce([dbDoc1, dbDoc2]) // refreshGoogleDocIds: fetch all docs to check existingDocIds
+      .mockResolvedValueOnce([dbDoc1, dbDoc2]) // route.ts: fetch all googleDocIds
+      .mockResolvedValueOnce([dbDoc1, dbDoc2]) // executeDirectRefresh: existingDocIds
     mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
     mockSyncComments.mockResolvedValue({
       commentsCreated: 0, commentsUpdated: 0,
@@ -332,84 +326,13 @@ describe("POST /api/docs", () => {
     mockGetDriveClient.mockResolvedValue(driveAuth);
 
     mockDoc.findMany
-      .mockResolvedValueOnce([]) // executeFullRefresh: dbDocs (empty)
+      .mockResolvedValueOnce([]) // route.ts: fetch all googleDocIds (empty)
 
     const res = await POST(postRequest("full-refresh"));
     const data = await readSSEResult(res);
     expect(data.mode).toBe("full-refresh");
     expect(data.added).toBe(0);
     expect(mockFetchDocsByIds).not.toHaveBeenCalled();
-  });
-
-
-  it("refresh mode auto-adds new AUTHOR docs", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
-    mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
-      {
-        googleDocId: "g1",
-        title: "My New Doc",
-        driveUrl: "https://docs.google.com/document/d/g1/edit",
-        mimeType: "application/vnd.google-apps.document",
-        role: "AUTHOR" as const,
-        lastModifiedInDrive: new Date("2024-06-01"),
-        createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
-
-      },
-    ]);
-
-    mockDoc.findMany
-      .mockResolvedValueOnce([]) // existingDocIds — g1 not in DB
-      .mockResolvedValueOnce([]); // activeDocs for comment sync
-    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
-    mockSyncComments.mockResolvedValue({
-      commentsCreated: 0, commentsUpdated: 0,
-      suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
-    });
-
-    const res = await POST(postRequest("refresh"));
-    const data = await readSSEResult(res);
-    expect(data.mode).toBe("refresh");
-    expect(data.added).toBe(1);
-    expect(mockDoc.upsert).toHaveBeenCalledTimes(1);
-  });
-
-  it("refresh mode skips new REVIEWER docs", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
-    mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
-      {
-        googleDocId: "g1",
-        title: "Someone Else's Doc",
-        driveUrl: "https://docs.google.com/document/d/g1/edit",
-        mimeType: "application/vnd.google-apps.document",
-        role: "REVIEWER" as const,
-        lastModifiedInDrive: new Date("2024-06-01"),
-        createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Someone",
-
-      },
-    ]);
-
-    mockDoc.findMany
-      .mockResolvedValueOnce([]) // existingDocIds — g1 not in DB, skipped as REVIEWER
-      .mockResolvedValueOnce([]); // activeDocs for comment sync
-    mockSyncComments.mockResolvedValue({
-      commentsCreated: 0, commentsUpdated: 0,
-      suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
-    });
-
-    const res = await POST(postRequest("refresh"));
-    const data = await readSSEResult(res);
-    expect(data.mode).toBe("refresh");
-    expect(data.added).toBe(0);
-    expect(data.updated).toBe(0);
-    expect(mockDoc.upsert).not.toHaveBeenCalled();
   });
 
   it("unarchives archived doc when syncComments signals shouldUnarchive", async () => {
@@ -493,75 +416,6 @@ describe("POST /api/docs", () => {
     expect(mockDoc.update).not.toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: "INBOX" } })
     );
-  });
-
-  it("skips timestamp update when syncComments has a transient error", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
-    mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
-      {
-        googleDocId: "g1",
-        title: "Doc One",
-        driveUrl: "https://docs.google.com/document/d/g1/edit",
-        mimeType: "application/vnd.google-apps.document",
-        role: "AUTHOR" as const,
-        lastModifiedInDrive: new Date("2024-06-01"),
-        createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
-
-      },
-    ]);
-
-    const dbDoc = { docId: "d1", googleDocId: "g1", status: "INBOX" };
-    mockDoc.findMany
-      .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
-      .mockResolvedValueOnce([dbDoc]); // activeDocs for comment sync
-    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
-    // syncComments reports a transient error (e.g. 429 rate limit)
-    mockSyncComments.mockResolvedValue({
-      commentsCreated: 0, commentsUpdated: 0,
-      suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false, transientError: true
-    });
-
-    const res = await POST(postRequest("refresh"));
-    expect(res.status).toBe(200);
-    expect(mockUpdateDriveChangesToken).not.toHaveBeenCalled();
-  });
-
-  it("updates timestamp when all syncs succeed", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
-    mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
-      {
-        googleDocId: "g1",
-        title: "Doc One",
-        driveUrl: "https://docs.google.com/document/d/g1/edit",
-        mimeType: "application/vnd.google-apps.document",
-        role: "AUTHOR" as const,
-        lastModifiedInDrive: new Date("2024-06-01"),
-        createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
-
-      },
-    ]);
-
-    const dbDoc = { docId: "d1", googleDocId: "g1", status: "INBOX" };
-    mockDoc.findMany
-      .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
-      .mockResolvedValueOnce([dbDoc]); // activeDocs for comment sync
-    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
-    mockSyncComments.mockResolvedValue({
-      commentsCreated: 0, commentsUpdated: 0,
-      suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
-    });
-
-    const res = await POST(postRequest("refresh"));
-    await readSSEResult(res);
-    expect(mockUpdateDriveChangesToken).toHaveBeenCalledTimes(1);
   });
 
   it("load mode only fetches selected docs by ID", async () => {
@@ -822,39 +676,6 @@ describe("POST /api/docs", () => {
       where: { docId: "d1" },
       data: { notes: "Existing note\nNew note" },
     });
-  });
-
-  it("refresh skips new non-AUTHOR docs", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
-    mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockListRecentDocs.mockResolvedValue([
-      {
-        googleDocId: "g1",
-        title: "Some Doc",
-        driveUrl: "https://docs.google.com/document/d/g1/edit",
-        mimeType: "application/vnd.google-apps.document",
-        role: "REVIEWER" as const,
-        lastModifiedInDrive: new Date("2024-06-01"),
-        createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Someone",
-
-      },
-    ]);
-
-    mockDoc.findMany
-      .mockResolvedValueOnce([]) // existingDocIds
-      .mockResolvedValueOnce([]); // activeDocs for comment sync
-    mockSyncComments.mockResolvedValue({
-      commentsCreated: 0, commentsUpdated: 0,
-      suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
-    });
-
-    const res = await POST(postRequest("refresh"));
-    const data = await readSSEResult(res);
-    expect(data.added).toBe(0);
-    expect(mockDoc.upsert).not.toHaveBeenCalled();
   });
 
   it("load mode sets ARCHIVED for non-AUTHOR new docs (no loadStatus)", async () => {

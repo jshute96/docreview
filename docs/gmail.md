@@ -100,12 +100,14 @@ The toolbar **Refresh** button calls `POST /api/docs/refresh` with
 `sources: ["drive", "gmail"]`, running both sources in parallel via
 `executeRefresh()` in `src/lib/refresh.ts`. The hamburger menu offers
 source-specific refreshes ("Refresh from Drive", "Refresh from Gmail") using
-the same endpoint with a single source.
+the same endpoint with a single source. All refresh modes (including Full
+Refresh and Refresh Selected) flow through the same `executeRefresh()` function
+with different options — see [`refresh.md`](./refresh.md) for the full architecture.
 
-### Flow — `executeRefresh(userId, email, sources)`
+### Flow — `executeRefresh({ drive, gmail, onProgress })`
 
 1. `getDriveClient()` + `getStatus()` (shared setup)
-2. **Discovery phase** (parallel via `Promise.allSettled`):
+2. **Discovery phase** (parallel via `Promise.all`):
    - Drive (if active): `changes.list` with saved token, fallback to `listRecentDocs`
    - Gmail (if active): `scanGmailForDocIds(userId, since)` → doc IDs only
 3. **Merge**: build `driveDocMap`, compute `gmailOnlyIds` (Gmail IDs not in Drive results)

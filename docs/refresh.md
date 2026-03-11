@@ -12,19 +12,21 @@ There are four sync modes, triggered from different UI paths:
 | **Source Refresh** | "Refresh from Drive/Gmail" hamburger items | Drive or Gmail only | Same as Refresh, for active source | Changed/discovered docs |
 | **Refresh Selected** | "Refresh selected" hamburger item | `fetchDocsByIds` for filtered set | `findDeletedDocIds` for filtered set | Filtered docs |
 
-**Refresh** (the toolbar button) calls `POST /api/docs/refresh` which runs the combined
-engine in `src/lib/refresh.ts`. It scans both Drive and Gmail in parallel by default.
-The hamburger menu offers source-specific refreshes (Drive-only or Gmail-only) via the
-same endpoint with `{ sources: ["drive"] }` or `{ sources: ["gmail"] }`.
+All refresh modes (Refresh, Full Refresh, Refresh Selected, Source Refresh) flow through
+a single `executeRefresh()` function in `src/lib/refresh.ts` with different options:
 
-**Full Refresh** and **Refresh Selected** use a unified exhaustive path that bypasses the
-incremental changes feed and establishes no tokens. They perform direct metadata fetches
-(`fetchDocsByIds`) for a specific set of documents (all non-deleted docs or the UI-filtered
-set) and use `findDeletedDocIds` to prune documents that are no longer accessible in Drive.
+- **Refresh** (toolbar button): `POST /api/docs/refresh` → `executeRefresh({ drive: true, gmail: true })`
+- **Source Refresh** (hamburger): same endpoint with `{ drive: true }` or `{ gmail: true }`
+- **Full Refresh** (hamburger): `POST /api/docs?mode=full-refresh` → `executeRefresh({ googleDocIds: [...all], mode: "full-refresh" })`
+- **Refresh Selected** (hamburger): `POST /api/docs/refresh-selected` → `executeRefresh({ googleDocIds: [...selected], mode: "selected" })`
 
-**Load** still uses `POST /api/docs?mode=load`.
- Per-doc refresh
-(detail page) is separate — see below.
+When `googleDocIds` is provided, `executeRefresh` skips Drive/Gmail discovery and goes
+straight to metadata fetch via `fetchDocsByIds`, then upsert + comment sync + deletion
+detection. When `drive`/`gmail` booleans are set, it runs the full discovery phase
+(changes.list, Gmail scan) in parallel.
+
+**Load** still uses `POST /api/docs?mode=load` with its own load-specific logic. Per-doc
+refresh (detail page) is separate — see below.
 
 ## Per-doc Refresh (detail page)
 

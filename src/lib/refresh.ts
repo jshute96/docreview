@@ -12,14 +12,12 @@ import { scanGmailForDocIds, buildInaccessibleDocs, type GmailInaccessibleDoc } 
 import type { ParsedEmail } from "@/lib/parse-gmail-notification";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "@/lib/status";
-import { logError, logWarning, logInfo, logToFile } from "@/lib/log";
+import { logWarning, logInfo, logToFile } from "@/lib/log";
 import { appendNotes, formatDate, pluralize } from "@/lib/utils";
 import type { OnProgress } from "@/lib/progress-events";
 import type { Doc } from "@prisma/client";
 
 const DEBUG_FILE = "drive-changes-debug.log";
-
-export type RefreshSource = "drive" | "gmail";
 
 export interface RefreshResult {
   added: number;
@@ -256,79 +254,10 @@ async function markMissingAsDeletedOrDenied(
 }
 
 /**
- * Common logic to refresh a specific set of Google Doc IDs.
- * Used by Refresh Selected and Full Refresh.
- */
-async function refreshGoogleDocIds(
-  userId: string,
-  userEmail: string | undefined,
-  googleDocIds: string[],
-  mode: "selected" | "full-refresh",
-  onProgress?: OnProgress,
-): Promise<RefreshResult> {
-  const t0 = Date.now();
-  if (googleDocIds.length === 0) {
-    logInfo(`[Refresh] No docs to refresh (${mode})`);
-    return {
-      added: 0, updated: 0, deleted: 0, unarchived: 0,
-      commentsCreated: 0, commentsUpdated: 0, suggestionsCreated: 0, suggestionsUpdated: 0,
-      errorCount: 0
-    };
-  }
-
-  logInfo(`[Refresh] Refreshing ${googleDocIds.length} docs (${mode})`);
-  logToFile(DEBUG_FILE, "-------------------------------------");
-  logToFile(DEBUG_FILE, `Starting exhaustive refresh (${mode}) for ${googleDocIds.length} IDs`);
-
-  // Exhaustive metadata fetch for these specific IDs
-  onProgress?.({ phase: "metadata", completed: 0, total: googleDocIds.length });
-  const driveDocs = (await fetchDocsByIds(userId, googleDocIds, (count) => {
-    onProgress?.({ phase: "metadata", completed: count, total: googleDocIds.length });
-  })) || [];
-
-  const dbDocs = await prisma.doc.findMany({
-    where: { userId },
-    select: { googleDocId: true }
-  });
-  const existingDocIds = new Set(dbDocs.map(d => d.googleDocId));
-
-  const syncRes = await upsertDocsAndSyncComments(
-    userId,
-    userEmail,
-    driveDocs,
-    { existingDocIds, mode },
-    onProgress,
-  );
-
-  // Deletion detection: if fetchDocsByIds missed some docs, check if they are actually deleted
-  const foundIds = new Set(driveDocs.map(d => d.googleDocId));
-  const missingIds = googleDocIds.filter(id => !foundIds.has(id));
-  const additionalDeleted = await markMissingAsDeletedOrDenied(userId, missingIds, mode);
-
-  const elapsed = Date.now() - t0;
-  const result = { ...syncRes, deleted: syncRes.deleted + additionalDeleted };
-  const counts = [
-    pluralize(result.updated, "doc") + " updated",
-    pluralize(result.deleted, "doc") + " deleted",
-    pluralize(result.unarchived, "doc") + " unarchived",
-  ];
-  const commentStr = `${pluralize(result.commentsCreated, "new comment thread")}, ${pluralize(result.commentsUpdated, "updated comment thread")}`;
-  const suggestionStr = result.suggestionsCreated > 0 || result.suggestionsUpdated > 0
-    ? `, ${pluralize(result.suggestionsCreated, "new suggestion")}, ${pluralize(result.suggestionsUpdated, "updated suggestion")}`
-    : "";
-  const skipStr = result.skipNotAuthor && result.skipNotAuthor > 0
-    ? `, ${pluralize(result.skipNotAuthor, "doc")} skipped (not author)`
-    : "";
-  logInfo(`[Refresh] ${mode} complete in ${elapsed}ms: ${counts.join(", ")}, ${commentStr}${suggestionStr}${skipStr} (${pluralize(result.errorCount, "error")})`);
-  logToFile(DEBUG_FILE, `Ended exhaustive refresh (${mode}): ${result.updated} updated, ${result.deleted} deleted`);
-  return result;
-}
-
-/**
  * Handles Gmail docs that were not returned by fetchDocsByIds.
  * Checks if they were deleted/access revoked in Drive.
  */
-export async function handleMissingGmailDocs(
+async function handleMissingGmailDocs(
   userId: string,
   gmailDocIds: string[],
   returnedDocIds: Set<string>,
@@ -400,16 +329,98 @@ export async function insertInaccessibleDocs(
   return count;
 }
 
-export async function executeRefresh(
+/**
+ * Direct metadata refresh for a known set of Google Doc IDs.
+ * Used by "Refresh Selected" and "Full Refresh" (all docs).
+ * Skips Drive/Gmail discovery — goes straight to metadata fetch + upsert + sync.
+ */
+async function executeDirectRefresh(
   userId: string,
   userEmail: string | undefined,
-  sources: RefreshSource[],
+  googleDocIds: string[],
+  mode: "selected" | "full-refresh",
   onProgress?: OnProgress,
 ): Promise<RefreshResult> {
   const t0 = Date.now();
-  const includeDrive = sources.includes("drive");
-  const includeGmail = sources.includes("gmail");
-  logInfo(`[Refresh] Starting refresh (sources: ${sources.join(", ")})`);
+  if (googleDocIds.length === 0) {
+    logInfo(`[Refresh] No docs to refresh (${mode})`);
+    return {
+      added: 0, updated: 0, deleted: 0, unarchived: 0,
+      commentsCreated: 0, commentsUpdated: 0, suggestionsCreated: 0, suggestionsUpdated: 0,
+      errorCount: 0
+    };
+  }
+
+  logInfo(`[Refresh] Refreshing ${googleDocIds.length} docs (${mode})`);
+  logToFile(DEBUG_FILE, "-------------------------------------");
+  logToFile(DEBUG_FILE, `Starting direct refresh (${mode}) for ${googleDocIds.length} IDs`);
+
+  // Metadata fetch
+  onProgress?.({ phase: "metadata", completed: 0, total: googleDocIds.length });
+  const driveDocs = (await fetchDocsByIds(userId, googleDocIds, (count) => {
+    onProgress?.({ phase: "metadata", completed: count, total: googleDocIds.length });
+  })) || [];
+
+  const dbDocs = await prisma.doc.findMany({
+    where: { userId },
+    select: { googleDocId: true }
+  });
+  const existingDocIds = new Set(dbDocs.map(d => d.googleDocId));
+
+  const syncRes = await upsertDocsAndSyncComments(
+    userId,
+    userEmail,
+    driveDocs,
+    { existingDocIds, mode },
+    onProgress,
+  );
+
+  // Deletion detection: docs not returned by fetchDocsByIds may be deleted
+  const foundIds = new Set(driveDocs.map(d => d.googleDocId));
+  const missingIds = googleDocIds.filter(id => !foundIds.has(id));
+  const additionalDeleted = await markMissingAsDeletedOrDenied(userId, missingIds, mode);
+
+  const elapsed = Date.now() - t0;
+  const result = { ...syncRes, deleted: syncRes.deleted + additionalDeleted };
+  const counts = [
+    pluralize(result.updated, "doc") + " updated",
+    pluralize(result.deleted, "doc") + " deleted",
+    pluralize(result.unarchived, "doc") + " unarchived",
+  ];
+  const commentStr = `${pluralize(result.commentsCreated, "new comment thread")}, ${pluralize(result.commentsUpdated, "updated comment thread")}`;
+  const suggestionStr = result.suggestionsCreated > 0 || result.suggestionsUpdated > 0
+    ? `, ${pluralize(result.suggestionsCreated, "new suggestion")}, ${pluralize(result.suggestionsUpdated, "updated suggestion")}`
+    : "";
+  const skipStr = result.skipNotAuthor && result.skipNotAuthor > 0
+    ? `, ${pluralize(result.skipNotAuthor, "doc")} skipped (not author)`
+    : "";
+  logInfo(`[Refresh] ${mode} complete in ${elapsed}ms: ${counts.join(", ")}, ${commentStr}${suggestionStr}${skipStr} (${pluralize(result.errorCount, "error")})`);
+  logToFile(DEBUG_FILE, `Ended direct refresh (${mode}): ${result.updated} updated, ${result.deleted} deleted`);
+  return result;
+}
+
+export async function executeRefresh(
+  userId: string,
+  userEmail: string | undefined,
+  options: {
+    drive?: boolean;
+    gmail?: boolean;
+    googleDocIds?: string[];
+    mode?: "selected" | "full-refresh";
+    onProgress?: OnProgress;
+  },
+): Promise<RefreshResult> {
+  const t0 = Date.now();
+  const { drive: includeDrive = false, gmail: includeGmail = false, googleDocIds, mode, onProgress } = options;
+
+  // --- Direct metadata path (selected / full-refresh) ---
+  if (googleDocIds) {
+    return executeDirectRefresh(userId, userEmail, googleDocIds, mode ?? "selected", onProgress);
+  }
+
+  // --- Discovery path (drive / gmail / both) ---
+  const sourceNames = [includeDrive && "drive", includeGmail && "gmail"].filter(Boolean).join(", ");
+  logInfo(`[Refresh] Starting refresh (sources: ${sourceNames})`);
 
   // Shared setup
   const status = await getStatus(userId);
@@ -655,29 +666,3 @@ export async function executeRefresh(
   return { ...syncRes, added: syncRes.added + inaccessibleAdded, deleted: totalDeleted, errorCount: totalErrorCount, driveChangesRead, totalDocuments: allDiscoveryDocs.length };
 }
 
-export async function refreshSelectedDocs(
-  userId: string,
-  userEmail: string | undefined,
-  docIds: string[],
-  onProgress?: OnProgress,
-): Promise<RefreshResult> {
-  const docs = await prisma.doc.findMany({
-    where: { userId, docId: { in: docIds } },
-    select: { googleDocId: true }
-  });
-  const googleDocIds = docs.map(d => d.googleDocId);
-  return refreshGoogleDocIds(userId, userEmail, googleDocIds, "selected", onProgress);
-}
-
-export async function executeFullRefresh(
-  userId: string,
-  userEmail: string | undefined,
-  onProgress?: OnProgress,
-): Promise<RefreshResult> {
-  const docs = await prisma.doc.findMany({
-    where: { userId },
-    select: { googleDocId: true }
-  });
-  const googleDocIds = docs.map(d => d.googleDocId);
-  return refreshGoogleDocIds(userId, userEmail, googleDocIds, "full-refresh", onProgress);
-}
