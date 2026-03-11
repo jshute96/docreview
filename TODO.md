@@ -29,7 +29,6 @@ Easy:
 * Button for search in Drive (from docs search box)
 * load dialog is too tall, collapse the first section
 * Text is hard to read on unselected tags.  Especially white.
-* X-to-clear button when editing notes
 * link URL includes filters, labels, etc.
 
 * Remember state/tag for @mentioned on comment, with mine/replied and resolved
@@ -59,7 +58,6 @@ Easy:
   * built-in tag for PermissionPending, transition when I get permission
 
 * chrome plugin
-  * add a doc
   * capture linked-from notes when requesting permission
   * scroll to comments in the doc window without reloading
 
@@ -113,6 +111,7 @@ Easy:
   * should be able to reject and accept
   * should use same AAAB... IDs as comments, not suggest... that gets embedded in docs
   * should be able to link to a suggestion location with ?disco=ID links
+  * should see formatting suggestions somehow, but they aren't visible anywhere
 * comments
   * should be able to get current doc text (it only gives the original text)
   * should give current anchor location or unanchored state (it only has original location)

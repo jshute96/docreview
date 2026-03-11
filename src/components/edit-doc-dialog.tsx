@@ -21,6 +21,7 @@ import { useAutoResize } from "@/hooks/use-auto-resize";
 import { useLabelSync } from "@/hooks/use-label-sync";
 import { StarButton } from "@/components/star-button";
 import { useLabels } from "@/contexts/label-context";
+import { XIcon } from "@/components/x-icon";
 
 interface EditDocDialogProps {
   doc: DocWithLabels;
@@ -43,11 +44,20 @@ export function EditDocDialog({
   const [isStarred, setIsStarred] = useState(doc.isStarred);
   const [notes, setNotes] = useState(doc.notes ?? "");
   const [saving, setSaving] = useState(false);
+  const [notesScrollable, setNotesScrollable] = useState(false);
   const notesRef = useRef<HTMLTextAreaElement>(null);
 
   useLabelSync(allLabels, setSelectedLabelIds);
   const autoResize = useAutoResize(notesRef, notes);
-  useEffect(() => { if (open) requestAnimationFrame(autoResize); }, [open, autoResize]);
+  useEffect(() => {
+    if (open) requestAnimationFrame(autoResize);
+  }, [open, autoResize]);
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      const ta = notesRef.current;
+      if (ta) setNotesScrollable(ta.style.overflowY === "auto");
+    });
+  }, [notes, open]);
 
   function toggleLabel(id: string) {
     setSelectedLabelIds((prev) =>
@@ -170,14 +180,25 @@ export function EditDocDialog({
               <label className="mb-1.5 block text-xs font-medium text-zinc-900 uppercase tracking-wide">
                 Notes
               </label>
-              <textarea
-                ref={notesRef}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add notes…"
-                rows={1}
-                className={`${TEXTAREA_CLASSES} w-full max-h-[200px]`}
-              />
+              <div className="relative">
+                <textarea
+                  ref={notesRef}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add notes…"
+                  rows={1}
+                  className={`${TEXTAREA_CLASSES} w-full max-h-[200px]${notes ? " pr-6" : ""}`}
+                />
+                {notes && (
+                  <button
+                    onClick={() => setNotes("")}
+                    className={`absolute top-[9px] text-zinc-400 hover:text-zinc-600 ${notesScrollable ? "right-[18px]" : "right-1.5"}`}
+                    title="Clear notes"
+                  >
+                    <XIcon />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
