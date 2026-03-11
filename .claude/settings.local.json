@@ -71,7 +71,9 @@
       "Bash(./scripts/check-gmail-notifications.ts:*)",
       "Bash(npx playwright:*)",
       "Bash(./scripts/query_database.sh:*)",
-      "Bash(scripts/query_database.sh:*)"
+      "Bash(scripts/query_database.sh:*)",
+      "Bash(./scripts/parse-gmail-notification.ts:*)",
+      "Bash(./scripts/extract-email-body.ts:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

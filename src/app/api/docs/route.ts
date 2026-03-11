@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { listRecentDocs, fetchDocsByIds, getDriveClient, getChangesStartPageToken, listChanges } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { appendNotes, pluralize } from "@/lib/utils";
-import { executeFullRefresh } from "@/lib/refresh";
+import { executeFullRefresh, insertInaccessibleDocs } from "@/lib/refresh";
+import type { GmailInaccessibleDoc } from "@/lib/gmail";
 import { getStatus, updateDriveChangesToken } from "@/lib/status";
 import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
 import { parseLoadOptions } from "@/lib/load-options";
@@ -70,6 +71,14 @@ export async function POST(req: NextRequest) {
   const loadNotes: string = typeof loadBody.notes === "string" ? (loadBody.notes as string).trim() : "";
   const loadStatus: "INBOX" | "ARCHIVED" | undefined = typeof loadBody.status === "string" && (loadBody.status === "INBOX" || loadBody.status === "ARCHIVED") ? (loadBody.status as "INBOX" | "ARCHIVED") : undefined;
   const loadIsStarred: boolean | undefined = typeof loadBody.isStarred === "boolean" ? loadBody.isStarred : undefined;
+  const loadInaccessibleDocs: GmailInaccessibleDoc[] = Array.isArray(loadBody.inaccessibleDocs)
+    ? (loadBody.inaccessibleDocs as any[])
+        .filter((d: any) => d.googleDocId && d.title && (d.accessState === "NOT_FOUND" || d.accessState === "DENIED"))
+        .map((d: any) => ({
+          ...d,
+          emailDate: d.emailDate ? new Date(d.emailDate) : new Date(),
+        }))
+    : [];
 
   // Validate label ownership before proceeding
   if (loadLabelIds.length > 0) {
@@ -101,7 +110,7 @@ export async function POST(req: NextRequest) {
   return createProgressStream(async (send: OnProgress) => {
     return await executeLoadOrRefresh({
       userId, userEmail, mode, source,
-      selectedSet, loadLabelIds, loadNotes, loadStatus, loadIsStarred, send,
+      selectedSet, loadLabelIds, loadNotes, loadStatus, loadIsStarred, loadInaccessibleDocs, send,
     });
   });
   });
@@ -117,11 +126,12 @@ async function executeLoadOrRefresh(opts: {
   loadNotes: string;
   loadStatus: "INBOX" | "ARCHIVED" | undefined;
   loadIsStarred: boolean | undefined;
+  loadInaccessibleDocs: GmailInaccessibleDoc[];
   send: OnProgress;
 }) {
   const {
     userId, userEmail, mode, source, selectedSet,
-    loadLabelIds, loadNotes, loadStatus, loadIsStarred, send,
+    loadLabelIds, loadNotes, loadStatus, loadIsStarred, loadInaccessibleDocs, send,
   } = opts;
   const t0 = Date.now();
 
@@ -137,8 +147,10 @@ async function executeLoadOrRefresh(opts: {
 
   if (mode === "load") {
     // Load mode: fetch metadata directly by selected doc IDs
-    const docIds = selectedSet ? [...selectedSet] : [];
-    logInfo(`[Sync] Load (${source}): fetching metadata for ${docIds.length} docs by ID`);
+    // Exclude inaccessible docs — they can't be fetched from Drive
+    const inaccessibleIds = new Set(loadInaccessibleDocs.map(d => d.googleDocId));
+    const docIds = selectedSet ? [...selectedSet].filter(id => !inaccessibleIds.has(id)) : [];
+    logInfo(`[Sync] Load (${source}): fetching metadata for ${docIds.length} docs by ID${inaccessibleIds.size > 0 ? `, ${inaccessibleIds.size} inaccessible` : ""}`);
     send({ phase: "metadata", completed: 0, total: docIds.length });
     driveDocs = await fetchDocsByIds(userId, docIds, (count) => {
       send({ phase: "metadata", completed: count, total: docIds.length });
@@ -192,6 +204,16 @@ async function executeLoadOrRefresh(opts: {
   let added = 0;
   let updated = 0;
   let deleted = 0;
+
+  // Insert inaccessible docs directly (they can't be fetched from Drive)
+  if (mode === "load" && loadInaccessibleDocs.length > 0) {
+    added += await insertInaccessibleDocs(userId, loadInaccessibleDocs, {
+      labelIds: loadLabelIds,
+      extraNotes: loadNotes || undefined,
+      status: loadStatus,
+      isStarred: loadIsStarred,
+    });
+  }
 
   const driveDocIds = new Set(driveDocs.map((d) => d.googleDocId));
   logInfo(`[Sync] Drive returned ${driveDocs.length} docs — processing each:`);

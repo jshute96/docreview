@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ColorPicker, PRIMARY_COLORS } from "@/components/color-picker";
 import { DialogButtons } from "@/components/dialog-buttons";
 import { broadcastChange } from "@/lib/cross-tab";
@@ -374,7 +374,7 @@ export function ManageLabelsDialog({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Continue</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} className={buttonVariants({ variant: "outline" })}>Continue</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

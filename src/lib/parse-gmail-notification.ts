@@ -85,7 +85,7 @@ export type GmailNotification = CommentNotification | SharingNotification;
 // Header parsing
 // ---------------------------------------------------------------------------
 
-interface ParsedEmail {
+export interface ParsedEmail {
   headers: Map<string, string>;
   textBody: string;
   htmlBody: string;
@@ -394,7 +394,11 @@ function parseSharingNotification(email: ParsedEmail): SharingNotification {
 // ---------------------------------------------------------------------------
 
 export function parseGmailNotification(raw: string): GmailNotification {
-  const email = parseEmail(raw);
+  return parseGmailNotificationFromParsed(parseEmail(raw));
+}
+
+/** Parse from an already-parsed email (headers + bodies). Useful when data comes from the Gmail API. */
+export function parseGmailNotificationFromParsed(email: ParsedEmail): GmailNotification {
   const from = email.headers.get("from") || "";
 
   if (from.includes("comments-noreply@docs.google.com")) {

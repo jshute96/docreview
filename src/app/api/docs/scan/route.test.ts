@@ -187,6 +187,7 @@ describe("POST /api/docs/scan", () => {
         },
       ],
       shareNotes: new Map(),
+      inaccessibleDocs: [],
       errorCount: 1,
       skipCount: 0,
     });
@@ -210,6 +211,7 @@ describe("POST /api/docs/scan", () => {
     mockScanGmailNotifications.mockResolvedValue({
       docs: [],
       shareNotes: new Map(),
+      inaccessibleDocs: [],
       errorCount: 0,
       skipCount: 0,
     });

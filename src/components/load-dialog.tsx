@@ -52,6 +52,9 @@ interface ScanDoc {
   owner: string | null;
   role: "AUTHOR" | "REVIEWER";
   isNew: boolean;
+  accessState?: "NOT_FOUND" | "DENIED";
+  notes?: string;
+  emailDate?: string;
 }
 
 interface ScanResult {
@@ -188,6 +191,9 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
           ...options,
           source,
           selectedGoogleDocIds: effectiveDocs.map((d) => d.googleDocId),
+          inaccessibleDocs: effectiveDocs
+            .filter((d) => d.accessState)
+            .map((d) => ({ googleDocId: d.googleDocId, title: d.title, accessState: d.accessState, notes: d.notes, emailDate: d.emailDate })),
           labelIds: selectedLabelIds,
           notes,
           ...(isStarred ? { isStarred } : {}),

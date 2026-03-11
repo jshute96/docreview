@@ -38,9 +38,6 @@ Easy:
   * dialog box moves on new vs add
   * Load dialog upper bound of 365 days? and UI weirdness from that.
 
-* Better handling of docs I don't have permission to (vs deleted)
-  * support adding these from gmail notifications, with fill-in title and notes
-
 * Make refresh on a doc faster, and probably cheaper, by doing fewer API calls.
 * Mute state on docs
 * keyboard shortcuts

@@ -108,9 +108,9 @@ export function DocRow({
         </div>
         {(notOk || hasNotes) && (
           <p className="truncate text-sm text-zinc-400 w-0 min-w-full" title={notesTooltip}>
-            {doc.accessState === "DENIED" && <span className="text-red-500">(No access) </span>}
+            {doc.accessState === "DENIED" && <span className="text-red-500">(Permission denied) </span>}
             {doc.accessState === "TRASHED" && <span className="text-red-500">(In trash) </span>}
-            {doc.accessState === "NOT_FOUND" && <span className="text-red-500">(Deleted) </span>}
+            {doc.accessState === "NOT_FOUND" && <span className="text-red-500">(Not accessible) </span>}
             {hasNotes && (
               <>
                 <span className="text-zinc-500">Notes: </span>

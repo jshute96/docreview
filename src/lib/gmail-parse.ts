@@ -98,6 +98,31 @@ export function extractBodyText(
   return null;
 }
 
+/** Extract HTML body from a Gmail message payload. */
+export function extractHtmlBody(
+  payload: { mimeType?: string | null; body?: { data?: string | null } | null; parts?: unknown[] | null } | null | undefined
+): string | null {
+  if (!payload) return null;
+
+  // Simple single-part HTML message
+  if (payload.mimeType === "text/html" && payload.body?.data) {
+    return Buffer.from(payload.body.data, "base64url").toString("utf-8");
+  }
+
+  // Multipart — search parts recursively for text/html
+  if (payload.parts) {
+    for (const part of payload.parts as Array<typeof payload>) {
+      if (part?.mimeType === "text/html" && part.body?.data) {
+        return Buffer.from(part.body.data, "base64url").toString("utf-8");
+      }
+      const nested = extractHtmlBody(part);
+      if (nested) return nested;
+    }
+  }
+
+  return null;
+}
+
 /** Extract a Google Doc/Sheet/Slides ID from email body text. */
 export function extractDocId(body: string): string | null {
   // Match URLs like docs.google.com/document/d/DOC_ID or drive.google.com/open?id=DOC_ID

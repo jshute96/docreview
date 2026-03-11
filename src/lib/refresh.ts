@@ -8,7 +8,8 @@ import {
   findDeletedOrDeniedDocIds,
   type DriveDoc,
 } from "@/lib/google-drive";
-import { scanGmailForDocIds } from "@/lib/gmail";
+import { scanGmailForDocIds, buildInaccessibleDocs, type GmailInaccessibleDoc } from "@/lib/gmail";
+import type { ParsedEmail } from "@/lib/parse-gmail-notification";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "@/lib/status";
 import { logError, logWarning, logInfo, logToFile } from "@/lib/log";
@@ -229,23 +230,24 @@ async function markMissingAsDeletedOrDenied(
   for (const id of missingIds) {
     if (trashedIds.has(id)) {
       logToFile(DEBUG_FILE, `OUTCOME: TRASHED (${logLabel.toUpperCase()} MISSING): ID: ${id}`);
-      await prisma.doc.updateMany({
-        where: { userId, googleDocId: id },
+      // Only count as changed if the doc wasn't already TRASHED
+      const result = await prisma.doc.updateMany({
+        where: { userId, googleDocId: id, accessState: { not: "TRASHED" } },
         data: { accessState: "TRASHED" },
       });
-      count++;
+      count += result.count;
     } else if (deletedIds.has(id)) {
       // 404 is ambiguous for DENIED docs — keep DENIED state (see docs/access-states.md)
       logToFile(DEBUG_FILE, `OUTCOME: DELETE (${logLabel.toUpperCase()} MISSING): ID: ${id}`);
-      await prisma.doc.updateMany({
-        where: { userId, googleDocId: id, accessState: { not: "DENIED" } },
+      const result = await prisma.doc.updateMany({
+        where: { userId, googleDocId: id, accessState: { notIn: ["DENIED", "NOT_FOUND"] } },
         data: { accessState: "NOT_FOUND" },
       });
-      count++;
+      count += result.count;
     } else if (permissionDeniedIds.has(id)) {
       logToFile(DEBUG_FILE, `OUTCOME: PERMISSION DENIED (${logLabel.toUpperCase()} MISSING): ID: ${id}`);
       await prisma.doc.updateMany({
-        where: { userId, googleDocId: id },
+        where: { userId, googleDocId: id, accessState: { not: "DENIED" } },
         data: { accessState: "DENIED" },
       });
     }
@@ -336,6 +338,68 @@ export async function handleMissingGmailDocs(
   return markMissingAsDeletedOrDenied(userId, missingIds, "gmail");
 }
 
+/**
+ * Insert docs discovered via Gmail notifications that we can't access (404/403).
+ * Creates new DB entries with the appropriate accessState, skipping docs already in DB.
+ * Returns the number of docs inserted.
+ */
+export async function insertInaccessibleDocs(
+  userId: string,
+  docs: GmailInaccessibleDoc[],
+  options?: { labelIds?: string[]; extraNotes?: string; status?: "INBOX" | "ARCHIVED"; isStarred?: boolean },
+): Promise<number> {
+  if (docs.length === 0) return 0;
+
+  const existingGoogleDocIds = new Set(
+    (await prisma.doc.findMany({
+      where: { userId, googleDocId: { in: docs.map(d => d.googleDocId) } },
+      select: { googleDocId: true },
+    })).map(d => d.googleDocId)
+  );
+
+  let count = 0;
+  for (const doc of docs) {
+    if (existingGoogleDocIds.has(doc.googleDocId)) continue;
+    try {
+      let notes = doc.notes;
+      if (options?.extraNotes) {
+        notes = appendNotes(notes, options.extraNotes);
+      }
+
+      await prisma.$transaction(async (tx) => {
+        const result = await tx.doc.create({
+          data: {
+            userId,
+            googleDocId: doc.googleDocId,
+            title: doc.title,
+            driveUrl: `https://docs.google.com/document/d/${doc.googleDocId}/edit`,
+            accessState: doc.accessState,
+            status: options?.status ?? "INBOX",
+            role: "REVIEWER",
+            notes,
+            isStarred: options?.isStarred ?? false,
+            createdTimeInDrive: doc.emailDate,
+            lastModifiedInDrive: doc.emailDate,
+          },
+        });
+
+        if (options?.labelIds?.length) {
+          await tx.docLabel.createMany({
+            data: options.labelIds.map((labelId) => ({ docId: result.docId, labelId })),
+            skipDuplicates: true,
+          });
+        }
+      });
+
+      count++;
+      logInfo(`[Sync] Added inaccessible doc ${doc.googleDocId}: "${doc.title}" (${doc.accessState})`);
+    } catch (err) {
+      logWarning(`[Sync] Failed to insert inaccessible doc ${doc.googleDocId}:`, err);
+    }
+  }
+  return count;
+}
+
 export async function executeRefresh(
   userId: string,
   userEmail: string | undefined,
@@ -359,6 +423,7 @@ export async function executeRefresh(
 
   let gmailDocIds: string[] = [];
   let gmailShareNotes = new Map<string, string>();
+  let gmailEmailMeta = new Map<string, ParsedEmail>();
   let gmailErrorCount = 0;
   let gmailSucceeded = false;
 
@@ -455,6 +520,7 @@ export async function executeRefresh(
       });
       gmailDocIds = result.docIds;
       gmailShareNotes = result.shareNotes;
+      gmailEmailMeta = result.emailMeta;
       gmailErrorCount = result.errorCount;
       gmailSucceeded = true;
       logInfo(`[Refresh] Gmail: ${gmailDocIds.length} doc IDs (${gmailErrorCount} errors)`);
@@ -494,6 +560,17 @@ export async function executeRefresh(
     })).map((d) => d.googleDocId)
   );
 
+  // Insert inaccessible docs discovered via Gmail that failed Drive metadata fetch
+  let inaccessibleAdded = 0;
+  if (gmailOnlyIds.length > 0 && gmailEmailMeta.size > 0) {
+    const returnedExtraIds = new Set(extraDocs.map((d) => d.googleDocId));
+    const failedNewIds = gmailOnlyIds.filter((id) => !returnedExtraIds.has(id) && !existingDocIds.has(id));
+    if (failedNewIds.length > 0) {
+      const inaccessible = buildInaccessibleDocs(failedNewIds, gmailEmailMeta);
+      inaccessibleAdded = await insertInaccessibleDocs(userId, inaccessible);
+    }
+  }
+
   const syncRes = await upsertDocsAndSyncComments(
     userId,
     userEmail,
@@ -508,6 +585,7 @@ export async function executeRefresh(
     const docsToTrash = await prisma.doc.findMany({
       where: {
         userId,
+        accessState: { not: "TRASHED" }, // Only count docs not already trashed
         googleDocId: { in: [...trashedDocIdsFromDrive] },
       },
       select: { docId: true, googleDocId: true, title: true },
@@ -524,7 +602,7 @@ export async function executeRefresh(
     const docsToRemove = await prisma.doc.findMany({
       where: {
         userId,
-        accessState: { not: "DENIED" }, // Don't overwrite DENIED with NOT_FOUND (404 ambiguity)
+        accessState: { notIn: ["DENIED", "NOT_FOUND"] }, // Don't overwrite DENIED (404 ambiguity) or re-count NOT_FOUND
         googleDocId: { in: [...removedDocIdsFromDrive] },
       },
       select: { docId: true, googleDocId: true, title: true },
@@ -560,7 +638,7 @@ export async function executeRefresh(
   const totalErrorCount = gmailErrorCount + syncRes.errorCount;
   const totalDeleted = syncRes.deleted + extraDeleted;
   const counts = [
-    pluralize(syncRes.added, "doc") + " added",
+    pluralize(syncRes.added + inaccessibleAdded, "doc") + " added",
     pluralize(syncRes.updated, "doc") + " updated",
     pluralize(totalDeleted, "doc") + " deleted",
     pluralize(syncRes.unarchived, "doc") + " unarchived",
@@ -574,7 +652,7 @@ export async function executeRefresh(
     : "";
   const driveStr = driveChangesRead > 0 ? `${pluralize(driveChangesRead, "Drive change")} processed, ` : "";
   logInfo(`[Refresh] Complete in ${elapsed}ms: ${driveStr}${counts.join(", ")}, ${commentStr}${suggestionStr}${skipStr} (${pluralize(totalErrorCount, "error")})`);
-  return { ...syncRes, deleted: totalDeleted, errorCount: totalErrorCount, driveChangesRead, totalDocuments: allDiscoveryDocs.length };
+  return { ...syncRes, added: syncRes.added + inaccessibleAdded, deleted: totalDeleted, errorCount: totalErrorCount, driveChangesRead, totalDocuments: allDiscoveryDocs.length };
 }
 
 export async function refreshSelectedDocs(

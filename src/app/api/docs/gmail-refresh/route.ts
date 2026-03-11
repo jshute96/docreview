@@ -5,7 +5,7 @@ import { fetchDocsByIds, getDriveClient, invalidGrantResponse } from "@/lib/goog
 import { scanGmailNotifications } from "@/lib/gmail";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
-import { handleMissingGmailDocs, upsertDocsAndSyncComments } from "@/lib/refresh";
+import { handleMissingGmailDocs, insertInaccessibleDocs, upsertDocsAndSyncComments } from "@/lib/refresh";
 import { getStatus, updateGmailTimestamp } from "@/lib/status";
 import { formatDate, pluralize } from "@/lib/utils";
 
@@ -31,14 +31,18 @@ export async function POST(req: NextRequest) {
     logInfo(`[GmailRefresh] Scanning since ${formatDate(since)}`);
 
     // Scan Gmail for doc notifications
-    const { docs: gmailDocs, shareNotes, errorCount: scannerErrorCount, skipCount } = await scanGmailNotifications(userId, since);
+    const { docs: gmailDocs, inaccessibleDocs, shareNotes, errorCount: scannerErrorCount, skipCount } = await scanGmailNotifications(userId, since);
+
+    // Insert inaccessible docs (permission denied / not found) discovered via Gmail
+    const inaccessibleAdded = await insertInaccessibleDocs(userId, inaccessibleDocs);
+
     if (gmailDocs.length === 0) {
-      logInfo(`[GmailRefresh] No docs found in Gmail (${scannerErrorCount} errors, ${skipCount} skipped)`);
+      logInfo(`[GmailRefresh] No accessible docs found in Gmail (${scannerErrorCount} errors, ${skipCount} skipped, ${inaccessibleAdded} inaccessible added)`);
       // Only update timestamp if there were no actual errors
       if (scannerErrorCount === 0) {
         await updateGmailTimestamp(userId, new Date());
       }
-      return NextResponse.json({ added: 0, updated: 0, deleted: 0, unarchived: 0, errorCount: scannerErrorCount, comments: 0 });
+      return NextResponse.json({ added: inaccessibleAdded, updated: 0, deleted: 0, unarchived: 0, errorCount: scannerErrorCount, comments: 0 });
     }
 
     // Fetch full Drive metadata for discovered docs
@@ -79,8 +83,9 @@ export async function POST(req: NextRequest) {
     }
 
     const elapsed = Date.now() - t0;
+    const totalAdded = syncRes.added + inaccessibleAdded;
     const counts = [
-      pluralize(syncRes.added, "doc") + " added",
+      pluralize(totalAdded, "doc") + " added",
       pluralize(syncRes.updated, "doc") + " updated",
       pluralize(totalDeleted, "doc") + " deleted",
       pluralize(syncRes.unarchived, "doc") + " unarchived",
@@ -93,6 +98,7 @@ export async function POST(req: NextRequest) {
     
     return NextResponse.json({
       ...syncRes,
+      added: totalAdded,
       deleted: totalDeleted,
       errorCount: totalErrorCount,
       // Backward compatibility

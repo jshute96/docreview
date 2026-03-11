@@ -4,7 +4,7 @@ import { POST } from "./route";
 import { getValidSession } from "@/lib/auth-utils";
 import { scanGmailNotifications } from "@/lib/gmail";
 import { fetchDocsByIds, getDriveClient } from "@/lib/google-drive";
-import { handleMissingGmailDocs, upsertDocsAndSyncComments } from "@/lib/refresh";
+import { handleMissingGmailDocs, insertInaccessibleDocs, upsertDocsAndSyncComments } from "@/lib/refresh";
 import { getStatus, updateGmailTimestamp } from "@/lib/status";
 import { prisma } from "@/lib/prisma";
 
@@ -36,6 +36,7 @@ describe("Gmail Refresh API", () => {
     vi.resetAllMocks();
     vi.mocked(getValidSession).mockResolvedValue({ user: { id: userId, email: userEmail } } as any);
     vi.mocked(handleMissingGmailDocs).mockResolvedValue(0);
+    vi.mocked(insertInaccessibleDocs).mockResolvedValue(0);
   });
 
   it("returns unauthorized if no session", async () => {
@@ -47,7 +48,7 @@ describe("Gmail Refresh API", () => {
 
   it("handles empty gmail results", async () => {
     vi.mocked(getStatus).mockResolvedValue({ lastGmailUpdateTimestamp: new Date() } as any);
-    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [], errorCount: 0, skipCount: 0, shareNotes: new Map() });
+    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [], inaccessibleDocs: [], errorCount: 0, skipCount: 0, shareNotes: new Map() });
 
     const req = new NextRequest("http://localhost/api/docs/gmail-refresh", { method: "POST" });
     const res = await POST(req);
@@ -75,7 +76,7 @@ describe("Gmail Refresh API", () => {
     };
 
     vi.mocked(getStatus).mockResolvedValue(null);
-    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [gmailDoc] as any, errorCount: 0, skipCount: 0, shareNotes: new Map() });
+    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [gmailDoc] as any, inaccessibleDocs: [], errorCount: 0, skipCount: 0, shareNotes: new Map() });
     vi.mocked(fetchDocsByIds).mockResolvedValue([driveDoc] as any);
     vi.mocked(getDriveClient).mockResolvedValue({} as any);
     vi.mocked(prisma.doc.findMany).mockResolvedValue([]); // existingDocIds query
@@ -109,7 +110,7 @@ describe("Gmail Refresh API", () => {
     };
 
     vi.mocked(getStatus).mockResolvedValue(null);
-    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [gmailDoc] as any, errorCount: 0, skipCount: 0, shareNotes: new Map() });
+    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [gmailDoc] as any, inaccessibleDocs: [], errorCount: 0, skipCount: 0, shareNotes: new Map() });
     vi.mocked(fetchDocsByIds).mockResolvedValue([]); // g1 missing from Drive
     vi.mocked(prisma.doc.findMany).mockResolvedValue([{ googleDocId: "g1" }] as any); // existingDocIds
     vi.mocked(handleMissingGmailDocs).mockResolvedValue(1);
@@ -125,7 +126,7 @@ describe("Gmail Refresh API", () => {
 
   it("skips timestamp update on errors", async () => {
     vi.mocked(getStatus).mockResolvedValue(null);
-    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [], errorCount: 1, skipCount: 0, shareNotes: new Map() });
+    vi.mocked(scanGmailNotifications).mockResolvedValue({ docs: [], inaccessibleDocs: [], errorCount: 1, skipCount: 0, shareNotes: new Map() });
 
     const req = new NextRequest("http://localhost/api/docs/gmail-refresh", { method: "POST" });
     await POST(req);

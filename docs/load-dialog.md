@@ -172,7 +172,12 @@ sending the final result.
 ```
 
 `errorCount` is only present for Gmail scans and counts emails where no doc link
-could be extracted or Drive metadata could not be fetched.
+could be extracted.
+
+For Gmail scans, docs that fail Drive metadata fetch (404/403) are included in the
+results with `accessState`, `notes`, and `emailDate` fields. These are displayed in
+the scan list and, if selected, passed to the load endpoint as `inaccessibleDocs`
+for insertion with the user's chosen labels/notes/status.
 
 ### `POST /api/docs?mode=load`
 

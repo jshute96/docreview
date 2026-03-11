@@ -185,9 +185,9 @@ For each file Drive returns:
   Refresh and full-refresh skip these — reviewer docs must already be tracked in the DB or
   added manually via `/api/docs/add`. Default status is **ARCHIVED**.
 - **Existing doc:** `title`, `driveUrl`, `mimeType`, `lastModifiedInDrive`, `owner`,
-  `createdTimeInDrive`, and `isDeleted` are updated. `role` and `labels` are
+  `createdTimeInDrive`, and `accessState` are updated. `role` and `labels` are
   never touched; they belong to the user. `status` is preserved (only updated
-  via Gmail or Smart Unarchive triggers). Setting `isDeleted: false` on upsert
+  via Gmail or Smart Unarchive triggers). Setting `accessState: "OK"` on upsert
   means a doc that re-appears in Drive (e.g., shared again) is automatically restored.
 
 **What's preserved across refreshes:**
@@ -203,7 +203,7 @@ For each file Drive returns:
 
 `changes.list` naturally reports deletions. A change with `removed: true` or
 `file.trashed: true` is a deletion. The handler looks up matching non-deleted docs in the DB
-and marks them `isDeleted: true`. No extra API calls needed.
+and sets their `accessState` to `TRASHED` or `NOT_FOUND`. No extra API calls needed.
 
 ### Full Refresh / Refresh Selected: manual detection
 
@@ -220,10 +220,10 @@ Full Refresh via the changes feed.
 
 ### Soft delete
 
-`isDeleted` is a soft-delete flag. The doc stays in the database; the UI renders it with
-strikethrough. This preserves user-set role, status, and labels even after a doc is gone from
-Drive. If a doc re-appears in Drive (e.g., shared again), the upsert in Phase 1 clears
-`isDeleted`.
+`accessState` tracks file-level access. Non-OK docs stay in the database; the UI renders
+them with strikethrough. This preserves user-set role, status, and labels even after a doc
+is gone from Drive. If a doc re-appears in Drive (e.g., shared again), the upsert in Phase 1
+resets `accessState` to `OK`. See [`access-states.md`](./access-states.md) for full details.
 
 ---
 
@@ -323,7 +323,7 @@ The main POST response includes summary counts (`added`, `updated`, `deleted`, `
 `syncComments` catches Drive/Docs API errors per-doc so that a single doc's failure doesn't
 crash the entire sync.
 
-- **Permanent errors (404)** are treated as deletions. The doc is marked `isDeleted: true`.
+- **Permanent errors (404)** are treated as deletions. The doc is marked `accessState: "NOT_FOUND"`.
 - **Expected permission errors (403)** are treated as successful skips. If the user lacks
   comment permission for a doc (common for view-only shared docs), comment sync is skipped
   for that doc. This is **not** considered a transient error and does **not** block the
@@ -374,7 +374,7 @@ during the sync window are covered by the next sync. The timestamp is only writt
 |----------|--------|-----------|
 | Full success (comments + suggestions) | Yes | Everything synced |
 | Non-Docs file (no suggestions to sync) | Yes | Comments are the only sync target |
-| Comment fetch 404 (deleted) | No | Doc marked `isDeleted`, excluded from stale query |
+| Comment fetch 404 (deleted) | No | Doc marked `NOT_FOUND`, excluded from stale query |
 | Comment fetch 403 (permission denied) | Yes | Permissions rarely change; `lastModifiedInDrive` will trigger re-sync if they do |
 | Comment fetch transient error | No | Worth retrying next refresh |
 | Suggestion fetch 403 (permission denied) | Yes | Common for view-only docs; comments synced successfully |

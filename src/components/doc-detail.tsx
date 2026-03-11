@@ -13,7 +13,7 @@ import { DeleteReAddDialog } from "@/components/delete-readd-dialog";
 import { ROLE_COLORS } from "@/lib/role-colors";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -558,7 +558,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       )}
       {doc.accessState === "NOT_FOUND" && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-center gap-2">
-          <span className="font-bold">Note:</span> This document was deleted from Google Drive or is no longer accessible.
+          <span className="font-bold">Note:</span> This document is not accessible in Google Drive.
         </div>
       )}
       {doc.accessState === "DENIED" && (
@@ -886,7 +886,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleUntrack}>Continue</AlertDialogAction>
+          <AlertDialogAction onClick={handleUntrack} className={buttonVariants({ variant: "outline" })}>Continue</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

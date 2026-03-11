@@ -3,12 +3,14 @@ import { drive as createDrive } from "@googleapis/drive";
 import { getDriveClient } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { formatDate } from "@/lib/utils";
-import { extractBodyText, extractDocId, parseShareNote } from "@/lib/gmail-parse";
+import { extractBodyText, extractHtmlBody, extractDocId, parseShareNote } from "@/lib/gmail-parse";
+import { parseGmailNotificationFromParsed, type ParsedEmail } from "@/lib/parse-gmail-notification";
 import type { OnProgress } from "./progress-events";
 
 export interface GmailDocIdResult {
   docIds: string[];
   shareNotes: Map<string, string>;
+  emailMeta: Map<string, ParsedEmail>;
   errorCount: number;
 }
 
@@ -21,8 +23,17 @@ export interface GmailScanDoc {
   role: "AUTHOR" | "REVIEWER";
 }
 
+export interface GmailInaccessibleDoc {
+  googleDocId: string;
+  title: string;
+  accessState: "NOT_FOUND" | "DENIED";
+  notes: string;
+  emailDate: Date;
+}
+
 export interface GmailScanResult {
   docs: GmailScanDoc[];
+  inaccessibleDocs: GmailInaccessibleDoc[];
   shareNotes: Map<string, string>;
   errorCount: number;
   skipCount: number;
@@ -66,7 +77,7 @@ export async function scanGmailForDocIds(
 
   if (messageIds.length === 0) {
     logInfo("[Gmail] No notification emails found");
-    return { docIds: [], shareNotes: new Map(), errorCount: 0 };
+    return { docIds: [], shareNotes: new Map(), emailMeta: new Map(), errorCount: 0 };
   }
 
   const total = messageIds.length;
@@ -76,6 +87,7 @@ export async function scanGmailForDocIds(
   let errorCount = 0;
   const docIdSet = new Set<string>();
   const shareNotes = new Map<string, string>();
+  const emailMeta = new Map<string, ParsedEmail>();
 
   let processedCount = 0;
   onProgress?.(0, total);
@@ -108,6 +120,19 @@ export async function scanGmailForDocIds(
           logInfo(`[Gmail] ${messageId}: "${subject}" → doc ${docId} (${Date.now() - t0}ms)`);
           docIdSet.add(docId);
 
+          // Capture parsed email for use if Drive API fails
+          if (!emailMeta.has(docId)) {
+            const headerMap = new Map<string, string>();
+            for (const h of headers) {
+              if (h.name && h.value) headerMap.set(h.name.toLowerCase(), h.value);
+            }
+            emailMeta.set(docId, {
+              headers: headerMap,
+              textBody: body ?? "",
+              htmlBody: extractHtmlBody(res.data.payload) ?? "",
+            });
+          }
+
           // Extract share note from sharing emails (not comment notifications)
           const shareNote = body ? parseShareNote(headers, body) : null;
           if (shareNote) {
@@ -129,7 +154,61 @@ export async function scanGmailForDocIds(
 
   const docIds = [...docIdSet];
   logInfo(`[Gmail] Scan complete: ${docIds.length} unique doc IDs, ${shareNotes.size} share notes, ${errorCount} errors`);
-  return { docIds, shareNotes, errorCount };
+  return { docIds, shareNotes, emailMeta, errorCount };
+}
+
+/**
+ * Build GmailInaccessibleDoc entries for doc IDs that failed Drive metadata fetch.
+ * Uses email metadata captured during Gmail scanning for best-effort title/notes.
+ * Parses email HTML via parse-gmail-notification.ts for structured comment/sharing info.
+ */
+export function buildInaccessibleDocs(
+  failedDocIds: string[],
+  emailMeta: Map<string, ParsedEmail>,
+  accessState: "NOT_FOUND" | "DENIED" = "NOT_FOUND",
+): GmailInaccessibleDoc[] {
+  const results: GmailInaccessibleDoc[] = [];
+  for (const docId of failedDocIds) {
+    const email = emailMeta.get(docId);
+    if (!email) continue;
+    try {
+      const stateLabel = accessState === "DENIED" ? "permission denied" : "not found";
+      const dateRaw = email.headers.get("date") ?? "";
+      const date = dateRaw ? new Date(dateRaw) : null;
+      const dateStr = date && !isNaN(date.getTime()) ? formatDate(date, true) : dateRaw;
+
+      let title = email.headers.get("subject") ?? "(no subject)";
+      let notes = `Gmail notification received ${dateStr} (${stateLabel})`;
+
+      // Use the full notification parser for structured data extraction
+      if (email.htmlBody) {
+        try {
+          const parsed = parseGmailNotificationFromParsed(email);
+          if (parsed.documentTitle) {
+            title = parsed.documentTitle;
+          }
+          if (parsed.type === "comment" && parsed.comments.length > 0) {
+            const reply = parsed.comments[0].replies[0];
+            if (reply) {
+              notes += `\n${reply.author}: ${reply.text}`;
+            }
+          } else if (parsed.type === "sharing" && parsed.sharerName) {
+            notes += `\nShared by ${parsed.sharerName}`;
+          }
+        } catch {
+          // Fall back to subject as title if parser fails
+          logWarning(`[Gmail] Notification parser failed for ${docId}, using subject as title`);
+        }
+      }
+
+      const emailDate = date && !isNaN(date.getTime()) ? date : new Date();
+      results.push({ googleDocId: docId, title, accessState, notes, emailDate });
+      logInfo(`[Gmail] Created inaccessible doc entry for ${docId}: "${title}" (${accessState})`);
+    } catch (parseErr) {
+      logWarning(`[Gmail] Failed to parse email metadata for inaccessible doc ${docId}:`, parseErr);
+    }
+  }
+  return results;
 }
 
 /** Scan Gmail for Google Doc notification emails and resolve doc metadata via Drive. */
@@ -138,12 +217,12 @@ export async function scanGmailNotifications(
   since: Date,
   onProgress?: OnProgress
 ): Promise<GmailScanResult> {
-  const { docIds, shareNotes, errorCount: scanErrors } = await scanGmailForDocIds(userId, since, (count, total) => {
+  const { docIds, shareNotes, emailMeta, errorCount: scanErrors } = await scanGmailForDocIds(userId, since, (count, total) => {
     onProgress?.({ phase: "gmail", status: "reading", count, total });
   });
   if (docIds.length === 0) {
     onProgress?.({ phase: "gmail", status: "done", count: 0, errorCount: scanErrors });
-    return { docs: [], shareNotes, errorCount: scanErrors, skipCount: 0 };
+    return { docs: [], inaccessibleDocs: [], shareNotes, errorCount: scanErrors, skipCount: 0 };
   }
   onProgress?.({ phase: "gmail", status: "done", count: docIds.length, errorCount: scanErrors });
 
@@ -153,6 +232,7 @@ export async function scanGmailNotifications(
   let errorCount = scanErrors;
   let skipCount = 0;
   const results: GmailScanDoc[] = [];
+  const failedDocs: Array<{ docId: string; accessState: "NOT_FOUND" | "DENIED" }> = [];
 
   let completedCount = 0;
   onProgress?.({ phase: "metadata", completed: 0, total: docIds.length });
@@ -182,12 +262,11 @@ export async function scanGmailNotifications(
         logInfo(`[Gmail] Drive metadata for ${docId}: "${file.name}" (${Date.now() - t0}ms)`);
       } catch (err: any) {
         const code = err.code;
-        if (code === 404) {
-          logWarning(`[Gmail] Drive file not found: ${docId} (${Date.now() - t0}ms)`);
+        if (code === 404 || code === 403) {
+          const accessState = code === 403 ? "DENIED" as const : "NOT_FOUND" as const;
+          logWarning(`[Gmail] Drive ${accessState === "DENIED" ? "permission denied" : "file not found"}: ${docId} (${Date.now() - t0}ms)`);
           skipCount++;
-        } else if (code === 403) {
-          logWarning(`[Gmail] Drive permission denied for ${docId} (${Date.now() - t0}ms)`);
-          skipCount++;
+          failedDocs.push({ docId, accessState });
         } else {
           logError(`[Gmail] Drive metadata failed for ${docId} (${Date.now() - t0}ms):`, err);
           errorCount++;
@@ -199,6 +278,16 @@ export async function scanGmailNotifications(
     })
   );
 
-  logInfo(`[Gmail] Scan complete: ${results.length} docs, ${errorCount} errors, ${skipCount} skipped`);
-  return { docs: results, shareNotes, errorCount, skipCount };
+  // Build inaccessible doc entries from email metadata for failed Drive fetches
+  // Group by accessState since buildInaccessibleDocs takes a single state
+  const inaccessibleDocs: GmailInaccessibleDoc[] = [];
+  for (const state of ["NOT_FOUND", "DENIED"] as const) {
+    const ids = failedDocs.filter(f => f.accessState === state).map(f => f.docId);
+    if (ids.length > 0) {
+      inaccessibleDocs.push(...buildInaccessibleDocs(ids, emailMeta, state));
+    }
+  }
+
+  logInfo(`[Gmail] Scan complete: ${results.length} docs, ${inaccessibleDocs.length} inaccessible, ${errorCount} errors, ${skipCount} skipped`);
+  return { docs: results, inaccessibleDocs, shareNotes, errorCount, skipCount };
 }

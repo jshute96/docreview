@@ -19,10 +19,15 @@ dialog scan route still uses the full `scanGmailNotifications()` wrapper.
 
 ## Scanner — `scanGmailForDocIds(userId, since)`
 
-The low-level scanner accepts a `Date` and returns `{ docIds, shareNotes, errorCount }`.
-It performs only Gmail API calls (no Drive metadata fetch). The convenience wrapper
-`scanGmailNotifications()` calls it then fetches Drive metadata, returning
-`{ docs: GmailScanDoc[], shareNotes, errorCount }`.
+The low-level scanner accepts a `Date` and returns `{ docIds, shareNotes, emailMeta, errorCount }`.
+It performs only Gmail API calls (no Drive metadata fetch). The `emailMeta` map captures
+per-doc metadata (subject, from, date, body) for use when Drive API fails — see
+[Inaccessible Docs from Gmail](./access-states.md#inaccessible-docs-from-gmail).
+
+The convenience wrapper `scanGmailNotifications()` calls it then fetches Drive metadata,
+returning `{ docs: GmailScanDoc[], inaccessibleDocs: GmailInaccessibleDoc[], shareNotes, errorCount }`.
+Docs that return 404/403 from Drive are included in `inaccessibleDocs` with best-effort
+title and notes extracted from the email.
 
 ### Steps
 
@@ -40,9 +45,12 @@ It performs only Gmail API calls (no Drive metadata fetch). The convenience wrap
    Reply-To, date, and any custom message from the plaintext body
 6. For messages with a doc ID, calls Drive `files.get` to fetch real title,
    mimeType, webViewLink, and owner
-7. Messages with no doc link or failed Drive fetch are logged as errors and counted
-8. Deduplicates by googleDocId (multiple emails may reference the same doc)
-9. Returns `{ docs, shareNotes, errorCount }` — only successfully resolved docs are included
+7. Messages with no doc link are logged as errors and counted
+8. Docs that fail Drive fetch (404/403) are collected as `inaccessibleDocs` with
+   best-effort metadata from the email
+9. Deduplicates by googleDocId (multiple emails may reference the same doc)
+10. Returns `{ docs, inaccessibleDocs, shareNotes, errorCount }` — `docs` contains
+    successfully resolved docs; `inaccessibleDocs` contains docs that failed Drive fetch
 
 ### Share Note Extraction — `gmail-parse.ts`
 

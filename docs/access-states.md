@@ -108,6 +108,32 @@ from `TRASHED` (via 404, meaning permanently deleted from trash).
   - If files.get succeeds: sets `OK` with fresh metadata
   - If files.get fails: sets `DENIED` with user-provided or default title
 
+## Inaccessible Docs from Gmail
+
+When Gmail notifications reference docs that return 404 or 403 from Drive, the system
+creates DB entries with `NOT_FOUND` or `DENIED` access state rather than silently
+skipping them. This captures docs where someone @mentioned the user in a comment or
+shared a doc, but the user doesn't have access.
+
+**Metadata extraction from email:**
+- **Title**: extracted from the email subject (comment notifications use the doc title
+  as the subject; sharing notifications use `Document shared with you: "Title"`)
+- **Notes**: `"Gmail notification received DATE (permission denied|not found)"` with
+  optional second line for comment text (`"Author: comment"`) or sharing info
+  (`"Shared by Name"`)
+- **Timestamps**: `createdTimeInDrive` and `lastModifiedInDrive` are set to the email
+  date (since we can't access Drive metadata)
+
+This is handled by `buildInaccessibleDocs()` in `gmail.ts` (builds the entries from
+email metadata) and `insertInaccessibleDocs()` in `refresh.ts` (inserts them into the
+DB, skipping docs already tracked). All three Gmail code paths support this:
+
+| Path | How inaccessible docs are handled |
+|------|-----------------------------------|
+| **Refresh** (`executeRefresh`) | Gmail-only IDs that fail `fetchDocsByIds` and aren't already tracked → insert with default `NOT_FOUND` |
+| **Gmail Refresh** (`gmail-refresh/route.ts`) | `scanGmailNotifications` returns `inaccessibleDocs` with per-doc access state → insert |
+| **Load** (`scan/route.ts` + `docs/route.ts`) | Inaccessible docs included in scan results, passed through load body → insert with user's chosen labels/notes/status |
+
 ## Display
 
 ### /docs page (doc list)
@@ -116,8 +142,8 @@ from `TRASHED` (via 404, meaning permanently deleted from trash).
 |-------|-------------|---------|
 | `OK` | Normal | Notes only |
 | `TRASHED` | Strikethrough, gray | "(In trash)" in red, then notes |
-| `NOT_FOUND` | Strikethrough, gray | "(Deleted)" in red, then notes |
-| `DENIED` | Strikethrough, gray | "(No access)" in red, then notes |
+| `NOT_FOUND` | Strikethrough, gray | "(Not accessible)" in red, then notes |
+| `DENIED` | Strikethrough, gray | "(Permission denied)" in red, then notes |
 
 ### /comments/[docId] page
 
@@ -125,5 +151,5 @@ from `TRASHED` (via 404, meaning permanently deleted from trash).
 |-------|--------|
 | `OK` | None |
 | `TRASHED` | Red banner: "This document is in the trash." |
-| `NOT_FOUND` | Red banner: "This document was deleted from Google Drive or is no longer accessible." |
+| `NOT_FOUND` | Red banner: "This document is not accessible in Google Drive." |
 | `DENIED` | Red banner: "Permission denied" |

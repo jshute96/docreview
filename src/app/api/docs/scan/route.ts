@@ -35,9 +35,13 @@ export async function POST(req: NextRequest) {
         logInfo(`[Scan] Starting Gmail scan: daysBack=${daysBack}, since=${formatDate(since)}`);
 
         try {
-          const { docs: gmailDocs, errorCount } = await scanGmailNotifications(userId, since, send);
+          const { docs: gmailDocs, inaccessibleDocs, errorCount } = await scanGmailNotifications(userId, since, send);
 
-          const docs = gmailDocs.map(d => ({
+          const docs: Array<{
+            googleDocId: string; title: string; mimeType: string; driveUrl: string;
+            owner: string | null; role: string; isNew: boolean;
+            accessState?: string; notes?: string; emailDate?: string;
+          }> = gmailDocs.map(d => ({
             googleDocId: d.googleDocId,
             title: d.title,
             mimeType: d.mimeType,
@@ -47,11 +51,30 @@ export async function POST(req: NextRequest) {
             isNew: !existingDocIds.has(d.googleDocId),
           }));
 
+          // Include inaccessible docs (permission denied / not found) so they can be loaded
+          for (const d of inaccessibleDocs) {
+            if (!existingDocIds.has(d.googleDocId)) {
+              docs.push({
+                googleDocId: d.googleDocId,
+                title: d.title,
+                mimeType: "",
+                driveUrl: `https://docs.google.com/document/d/${d.googleDocId}/edit`,
+                owner: null,
+                role: "REVIEWER",
+                isNew: true,
+                accessState: d.accessState,
+                notes: d.notes,
+                emailDate: d.emailDate.toISOString(),
+              });
+            }
+          }
+
           const existingCount = docs.filter(d => !d.isNew).length;
-          logInfo(`[Scan] Gmail scan found ${gmailDocs.length} total docs, ${gmailDocs.length - existingCount} new, ${errorCount} errors`);
+          const totalDocs = gmailDocs.length + inaccessibleDocs.length;
+          logInfo(`[Scan] Gmail scan found ${gmailDocs.length} accessible docs, ${inaccessibleDocs.length} inaccessible, ${existingCount} existing, ${errorCount} errors`);
 
           return {
-            total: gmailDocs.length,
+            total: totalDocs,
             existingCount,
             errorCount,
             docs,
