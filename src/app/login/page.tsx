@@ -26,7 +26,7 @@ export default async function LoginPage({
       <div className="mb-8 flex flex-col items-center">
         <img src="/docreview.svg" alt="Docreview Logo" className="mb-4 h-16 w-16 shadow-lg rounded-xl" />
         <h1 className="mb-2 text-3xl font-bold tracking-tight text-zinc-900">Docreview</h1>
-        <p className="text-zinc-500">Your inbox for document reviews.</p>
+        <p className="text-lg text-zinc-500"><i>Your inbox for document reviews</i></p>
       </div>
         
         {error && (
