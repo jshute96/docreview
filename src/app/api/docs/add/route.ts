@@ -138,11 +138,20 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Replace labels on update
+    // Replace labels on update (transactional to avoid inconsistent state)
     if (existingRow) {
-      await prisma.docLabel.deleteMany({ where: { docId: doc.docId } });
-    }
-    if (labelIds.length > 0) {
+      await prisma.$transaction([
+        prisma.docLabel.deleteMany({ where: { docId: doc.docId } }),
+        ...(labelIds.length > 0
+          ? [prisma.docLabel.createMany({
+              data: labelIds.map((labelId: string) => ({ docId: doc.docId, labelId })),
+              skipDuplicates: true,
+            })]
+          : []),
+      ]);
+    } else if (labelIds.length > 0) {
+      // Labels were already created inline with the upsert's create branch
+      // but if the upsert hit the update branch, we need to add them
       await prisma.docLabel.createMany({
         data: labelIds.map((labelId: string) => ({ docId: doc.docId, labelId })),
         skipDuplicates: true,
