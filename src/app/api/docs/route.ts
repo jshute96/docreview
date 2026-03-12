@@ -13,6 +13,7 @@ import { logWarning, logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 import { createProgressStream } from "@/lib/sse";
 import type { OnProgress } from "@/lib/progress-events";
+import pLimit from "p-limit";
 
 export async function GET(req: NextRequest) {
   return runWithRequestId("GET", req, async () => {
@@ -258,9 +259,19 @@ async function executeLoad(opts: {
   let lastProgressTime = 0;
   const syncTotal = commentDocs.length;
   send({ phase: "sync", completed: 0, total: syncTotal });
+  let unarchived = 0;
+  const parallelismLimit = pLimit(10);
   const syncResults = await Promise.all(
-    commentDocs.map(async (doc) => {
+    commentDocs.map((doc) => parallelismLimit(async () => {
       const result = await syncComments(doc, driveAuth, userEmail);
+      // Apply DB updates immediately so partial progress is visible on page reload
+      if (result.isDeleted) {
+        await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "NOT_FOUND" } });
+        deleted++;
+      } else if (doc.status === "ARCHIVED" && result.shouldUnarchive && result.hasNonResolveActivity) {
+        await prisma.doc.update({ where: { docId: doc.docId }, data: { status: "INBOX" } });
+        unarchived++;
+      }
       syncCompleted++;
       const now = Date.now();
       if (syncCompleted === syncTotal || now - lastProgressTime >= 500) {
@@ -268,28 +279,12 @@ async function executeLoad(opts: {
         send({ phase: "sync", completed: syncCompleted, total: syncTotal });
       }
       return result;
-    })
+    }))
   );
   const commentsCreated = syncResults.reduce((sum, r) => sum + r.commentsCreated, 0);
   const commentsUpdated = syncResults.reduce((sum, r) => sum + r.commentsUpdated, 0);
   const suggestionsCreated = syncResults.reduce((sum, r) => sum + r.suggestionsCreated, 0);
   const suggestionsUpdated = syncResults.reduce((sum, r) => sum + r.suggestionsUpdated, 0);
-
-  // Unarchive ARCHIVED docs only when syncComments detected meaningful new activity.
-  // Also handle newly detected deletions from syncComments results.
-  let unarchived = 0;
-  for (let i = 0; i < commentDocs.length; i++) {
-    const res = syncResults[i];
-    if (res.isDeleted) {
-      await prisma.doc.update({ where: { docId: commentDocs[i].docId }, data: { accessState: "NOT_FOUND" } });
-      deleted++;
-      continue;
-    }
-    if (commentDocs[i].status === "ARCHIVED" && res.shouldUnarchive && res.hasNonResolveActivity) {
-      await prisma.doc.update({ where: { docId: commentDocs[i].docId }, data: { status: "INBOX" } });
-      unarchived++;
-    }
-  }
 
   // Initialize the Drive changes token so subsequent refreshes use changes.list.
   // Safety: if *every* doc failed, skip the token update.

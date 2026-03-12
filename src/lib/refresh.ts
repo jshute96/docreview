@@ -16,6 +16,7 @@ import { logWarning, logInfo, logToFile } from "@/lib/log";
 import { appendNotes, formatDate, pluralize } from "@/lib/utils";
 import type { OnProgress } from "@/lib/progress-events";
 import type { Doc } from "@prisma/client";
+import pLimit from "p-limit";
 
 const DEBUG_FILE = "drive-changes-debug.log";
 
@@ -156,9 +157,21 @@ export async function upsertDocsAndSyncComments(
   let lastProgressTime = 0;
   const syncTotal = processedDocs.length;
   onProgress?.({ phase: "sync", completed: 0, total: syncTotal });
+  const parallelismLimit = pLimit(10);
   const syncResults = await Promise.all(
-    processedDocs.map(async (doc) => {
+    processedDocs.map((doc) => parallelismLimit(async () => {
       const result = await syncComments(doc, driveAuth, userEmail);
+      // Apply DB updates immediately so partial progress is visible on page reload
+      if (result.isDeleted) {
+        await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "NOT_FOUND" } });
+        deleted++;
+      } else if (doc.status === "ARCHIVED" && result.shouldUnarchive && result.hasNonResolveActivity) {
+        // Note: result.permissionDenied means comment-level 403 (comments.list or
+        // Docs API suggestions), NOT file-level. files.get already succeeded for
+        // these docs, so accessState stays OK (see docs/access-states.md).
+        await prisma.doc.update({ where: { docId: doc.docId }, data: { status: "INBOX" } });
+        unarchived++;
+      }
       syncCompleted++;
       const now = Date.now();
       if (syncCompleted === syncTotal || now - lastProgressTime >= 500) {
@@ -166,28 +179,12 @@ export async function upsertDocsAndSyncComments(
         onProgress?.({ phase: "sync", completed: syncCompleted, total: syncTotal });
       }
       return result;
-    })
+    }))
   );
   const commentsCreated = syncResults.reduce((sum, r) => sum + r.commentsCreated, 0);
   const commentsUpdated = syncResults.reduce((sum, r) => sum + r.commentsUpdated, 0);
   const suggestionsCreated = syncResults.reduce((sum, r) => sum + r.suggestionsCreated, 0);
   const suggestionsUpdated = syncResults.reduce((sum, r) => sum + r.suggestionsUpdated, 0);
-
-  for (let i = 0; i < processedDocs.length; i++) {
-    const res = syncResults[i];
-    if (res.isDeleted) {
-      await prisma.doc.update({ where: { docId: processedDocs[i].docId }, data: { accessState: "NOT_FOUND" } });
-      deleted++;
-      continue;
-    }
-    // Note: res.permissionDenied means comment-level 403 (comments.list or
-    // Docs API suggestions), NOT file-level. files.get already succeeded for
-    // these docs, so accessState stays OK (see docs/access-states.md).
-    if (processedDocs[i].status === "ARCHIVED" && res.shouldUnarchive && res.hasNonResolveActivity) {
-      await prisma.doc.update({ where: { docId: processedDocs[i].docId }, data: { status: "INBOX" } });
-      unarchived++;
-    }
-  }
 
   const errorCount = syncResults.filter(r => r.transientError).length;
   const permissionErrorCount = syncResults.filter(r => r.permissionDenied).length;
