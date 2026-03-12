@@ -31,8 +31,10 @@ export async function POST(req: NextRequest) {
       );
 
       if (source === "gmail") {
-        const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
-        logInfo(`[Scan] Starting Gmail scan: daysBack=${daysBack}, since=${formatDate(since)}`);
+        const since = daysBack !== null
+          ? new Date(Math.max(0, Date.now() - daysBack * 24 * 60 * 60 * 1000))
+          : new Date(0);
+        logInfo(`[Scan] Starting Gmail scan: daysBack=${daysBack ?? "all"}, since=${formatDate(since)}`);
 
         try {
           const { docs: gmailDocs, inaccessibleDocs, errorCount } = await scanGmailNotifications(userId, since, send);
@@ -85,10 +87,12 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      logInfo(`[Scan] Starting Drive scan: daysBack=${daysBack}, ownership=${ownership}, includeSharedDrives=${includeSharedDrives}`);
+      logInfo(`[Scan] Starting Drive scan: daysBack=${daysBack ?? "all"}, ownership=${ownership}, includeSharedDrives=${includeSharedDrives}`);
 
       try {
-        const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+        const since = daysBack !== null
+          ? new Date(Math.max(0, Date.now() - daysBack * 24 * 60 * 60 * 1000))
+          : null;
         send({ phase: "drive", status: "reading", count: 0 });
         const driveDocs = await listRecentDocs(userId, since, { ownership, includeSharedDrives }, (stats) => {
           send({ phase: "drive", status: "reading", ...stats });

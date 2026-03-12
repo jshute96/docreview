@@ -38,8 +38,10 @@ import { broadcastChange } from "@/lib/cross-tab";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { StarButton } from "@/components/star-button";
 
+type TimeUnit = "days" | "months" | "years" | "all";
+
 interface LoadOptions {
-  daysBack: number;
+  daysBack: number | null;
   ownership: "all" | "owned" | "shared-with-me";
   includeSharedDrives: boolean;
 }
@@ -88,10 +90,17 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
   const [addToInbox, setAddAsActive] = useState(true);
   const [adding, setAdding] = useState(false);
   const [source, setSource] = useState<"drive" | "gmail">("drive");
-  const [daysBackText, setDaysBackText] = useState(
-    String(DEFAULT_OPTIONS.daysBack)
-  );
+  const [timeAmount, setTimeAmount] = useState("30");
+  const [timeUnit, setTimeUnit] = useState<TimeUnit>("days");
   const [docListRows, setDocListRows] = useState(5);
+
+  function computeDaysBack(amount: string, unit: TimeUnit): number | null {
+    if (unit === "all") return null;
+    const n = parseInt(amount, 10);
+    if (isNaN(n) || n < 1) return options.daysBack;
+    const multiplier = unit === "years" ? 365 : unit === "months" ? 30 : 1;
+    return n * multiplier;
+  }
 
   const abortRef = useRef<AbortController | null>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
@@ -121,7 +130,8 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       setNotes("");
       setIsStarred(false);
       setAddAsActive(true);
-      setDaysBackText(String(DEFAULT_OPTIONS.daysBack));
+      setTimeAmount("30");
+      setTimeUnit("days");
       resetHighlights();
     } else {
       abortRef.current?.abort();
@@ -322,31 +332,46 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                 Time window
               </label>
               <div className="flex items-center gap-2">
-                <input
-                  id="load-days-back"
-                  type="number"
-                  min={1}
-                  max={365}
-                  value={daysBackText}
-                  onFocus={(e) => e.target.select()}
+                {timeUnit !== "all" && (
+                  <input
+                    id="load-days-back"
+                    type="number"
+                    min={1}
+                    value={timeAmount}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      setTimeAmount(e.target.value);
+                      setOptions((o) => ({ ...o, daysBack: computeDaysBack(e.target.value, timeUnit) }));
+                    }}
+                    onBlur={() => {
+                      const v = parseInt(timeAmount, 10);
+                      if (isNaN(v) || v < 1) {
+                        setTimeAmount("30");
+                        setOptions((o) => ({ ...o, daysBack: computeDaysBack("30", timeUnit) }));
+                      }
+                    }}
+                    className="w-20 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                )}
+                <select
+                  value={timeUnit}
                   onChange={(e) => {
-                    setDaysBackText(e.target.value);
-                    const v = parseInt(e.target.value, 10);
-                    if (!isNaN(v) && v >= 1 && v <= 365) {
-                      setOptions((o) => ({ ...o, daysBack: v }));
+                    const unit = e.target.value as TimeUnit;
+                    setTimeUnit(unit);
+                    if (unit === "months" || unit === "years") {
+                      setTimeAmount("1");
+                      setOptions((o) => ({ ...o, daysBack: computeDaysBack("1", unit) }));
+                    } else {
+                      setOptions((o) => ({ ...o, daysBack: computeDaysBack(timeAmount, unit) }));
                     }
                   }}
-                  onBlur={() => {
-                    const v = parseInt(daysBackText, 10);
-                    if (isNaN(v) || v < 1 || v > 365) {
-                      setDaysBackText(String(options.daysBack));
-                    }
-                  }}
-                  className="w-20 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                />
-                <span className="text-sm text-zinc-500">
-                  days back from today
-                </span>
+                  className="rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  <option value="days">days back</option>
+                  <option value="months">months back</option>
+                  <option value="years">years back</option>
+                  <option value="all">all time</option>
+                </select>
               </div>
             </div>
 

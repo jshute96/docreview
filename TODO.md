@@ -36,7 +36,6 @@ Easy:
 
 * Dialog boxes
   * dialog box moves on new vs add
-  * Load dialog upper bound of 365 days? and UI weirdness from that.
 
 * Make refresh on a doc faster, and probably cheaper, by doing fewer API calls.
 * Mute state on docs

@@ -808,24 +808,28 @@ export interface ListRecentDocsOptions {
 
 export async function listRecentDocs(
   userId: string,
-  since?: Date,
+  since?: Date | null,
   options?: ListRecentDocsOptions,
   onProgress?: (stats: { count: number; docsCount: number; deletedCount: number }) => void
 ): Promise<DriveDoc[]> {
   const auth = await getDriveClient(userId);
   const drive = createDrive({ version: "v3", auth });
 
-  const cutoff = since ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const modifiedAfter = cutoff.toISOString();
+  // since: Date = filter by that date, undefined = 7-day default, null = no time filter
+  const cutoff = since === null ? null : (since ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
   const ownership = options?.ownership ?? "all";
   const includeSharedDrives = options?.includeSharedDrives ?? false;
 
+  // Guard against invalid dates (overflow from large daysBack values) — treat as all-time
+  const safeCutoff = cutoff && !isNaN(cutoff.getTime()) ? cutoff : null;
   // Build query
   const qParts = [
     "(mimeType='application/vnd.google-apps.document' or mimeType='application/vnd.google-apps.spreadsheet' or mimeType='application/vnd.google-apps.presentation')",
-    `modifiedTime > '${modifiedAfter}'`,
     "trashed = false",
   ];
+  if (safeCutoff) {
+    qParts.push(`modifiedTime > '${safeCutoff.toISOString()}'`);
+  }
   if (ownership === "owned") qParts.push("'me' in owners");
   if (ownership === "shared-with-me") qParts.push("sharedWithMe");
   const q = qParts.join(" and ");

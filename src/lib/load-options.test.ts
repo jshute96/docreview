@@ -17,15 +17,18 @@ describe("parseLoadOptions", () => {
     expect(parseLoadOptions({ daysBack: 1 }).daysBack).toBe(1);
   });
 
-  it("clamps daysBack to [1, 365]", () => {
+  it("clamps daysBack to minimum of 1", () => {
     expect(parseLoadOptions({ daysBack: 0 }).daysBack).toBe(1);
     expect(parseLoadOptions({ daysBack: -5 }).daysBack).toBe(1);
-    expect(parseLoadOptions({ daysBack: 999 }).daysBack).toBe(365);
+    expect(parseLoadOptions({ daysBack: 999 }).daysBack).toBe(999);
+  });
+
+  it("accepts null daysBack for all-time", () => {
+    expect(parseLoadOptions({ daysBack: null }).daysBack).toBeNull();
   });
 
   it("defaults daysBack for non-number values", () => {
     expect(parseLoadOptions({ daysBack: "30" }).daysBack).toBe(30);
-    expect(parseLoadOptions({ daysBack: null }).daysBack).toBe(30);
     expect(parseLoadOptions({ daysBack: true }).daysBack).toBe(30);
   });
 

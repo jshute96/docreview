@@ -1,6 +1,6 @@
 /** Validated scan/load options parsed from a request body. */
 export interface LoadOptions {
-  daysBack: number;
+  daysBack: number | null;
   ownership: "all" | "owned" | "shared-with-me";
   includeSharedDrives: boolean;
   source: "drive" | "gmail";
@@ -11,9 +11,9 @@ export interface LoadOptions {
  * Returns safe defaults for missing or invalid values.
  */
 export function parseLoadOptions(body: Record<string, unknown>): LoadOptions {
-  const daysBack = Math.max(1, Math.min(365,
-    typeof body.daysBack === "number" ? body.daysBack : 30,
-  ));
+  const daysBack = body.daysBack === null
+    ? null
+    : Math.max(1, typeof body.daysBack === "number" ? body.daysBack : 30);
   const ownership = (
     typeof body.ownership === "string" &&
     ["all", "owned", "shared-with-me"].includes(body.ownership)
