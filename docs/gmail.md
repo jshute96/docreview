@@ -39,17 +39,21 @@ title and notes extracted from the email.
 3. Filters by `internalDate >= since` for timestamp-level precision — the Gmail
    `after:` operator only has day-level granularity, so repeated calls within the
    same day would reprocess messages without this check
-4. Parses the plaintext body with regex to find a `/d/DOC_ID/` pattern
-5. For sharing emails (from `drive-shares-dm-noreply@google.com`), extracts a share
+4. Skips sharing notifications that are confirmations of our own shares — detected
+   by matching the `Reply-To` email against the logged-in user's email
+5. Parses the plaintext body with regex to find a `/d/DOC_ID/` pattern
+6. For sharing emails (from `drive-shares-dm-noreply@google.com`), extracts a share
    note via `parseShareNote()` in `gmail-parse.ts` — includes sharer name/email from
-   Reply-To, date, and any custom message from the plaintext body
-6. For messages with a doc ID, calls Drive `files.get` to fetch real title,
+   Reply-To, date, and any custom message from the plaintext body. Distinguishes
+   share invitations ("Shared by") from access requests ("Requested to share by")
+   based on the Subject header.
+7. For messages with a doc ID, calls Drive `files.get` to fetch real title,
    mimeType, webViewLink, and owner
-7. Messages with no doc link are logged as errors and counted
-8. Docs that fail Drive fetch (404/403) are collected as `inaccessibleDocs` with
+8. Messages with no doc link are logged as errors and counted
+9. Docs that fail Drive fetch (404/403) are collected as `inaccessibleDocs` with
    best-effort metadata from the email
-9. Deduplicates by googleDocId (multiple emails may reference the same doc)
-10. Returns `{ docs, inaccessibleDocs, shareNotes, errorCount }` — `docs` contains
+10. Deduplicates by googleDocId (multiple emails may reference the same doc)
+11. Returns `{ docs, inaccessibleDocs, shareNotes, errorCount }` — `docs` contains
     successfully resolved docs; `inaccessibleDocs` contains docs that failed Drive fetch
 
 ### Share Note Extraction — `gmail-parse.ts`
@@ -63,7 +67,9 @@ When a sharing email is detected (From: `drive-shares-dm-noreply@google.com`),
   found (language-independent), the next paragraph (locale-dependent boilerplate) is
   skipped, and everything remaining is the custom share message
 
-Output format: `"Shared by Name (email) on YYYY-MM-DD HH:MM\ncustom message"`
+Output format: `"Shared by Name (email) on YYYY-MM-DD HH:MM\ncustom message"` for
+invitations, or `"Requested to share by Name (email) on YYYY-MM-DD HH:MM"` for
+access requests (detected via "share request" in the Subject header).
 
 For **new docs**, the share note is set as the initial `notes` value in the upsert
 create block. For **existing docs**, it is appended via `appendNotes()`. Existing
@@ -114,8 +120,9 @@ with different options — see [`refresh.md`](./refresh.md) for the full archite
 4. **Single metadata fetch**: `fetchDocsByIds` for Gmail-only IDs (no double-fetch)
 5. **Upsert loop**: Gmail-sourced new docs always INBOX; Drive-only new non-AUTHOR docs skipped
 6. **Share notes**: for sharing emails, a note is set (new docs) or appended (existing docs)
-   with format `"Shared by Name (email) on DATE\nmessage"`. Existing ARCHIVED docs are
-   unarchived to INBOX — a (re)share is a strong signal the doc needs attention.
+   with format `"Shared by Name (email) on DATE\nmessage"` (or `"Requested to share by..."`
+   for access requests). Existing ARCHIVED docs are unarchived to INBOX — a (re)share is
+   a strong signal the doc needs attention.
 7. **Deletions**: Drive `changes.list` deletions + `findDeletedDocIds` for missing Gmail docs
 8. **Comment sync** + **unarchive** for all upserted/updated docs
 9. **Save tokens**: Drive token if Drive succeeded (and no transient errors); Gmail timestamp if Gmail succeeded

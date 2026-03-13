@@ -523,7 +523,7 @@ export async function executeRefresh(
       const since = status?.lastGmailUpdateTimestamp
         ?? new Date(Date.now() - DEFAULT_GMAIL_DAYS_BACK * 24 * 60 * 60 * 1000);
       logInfo(`[Refresh] Gmail: scanning since ${formatDate(since)}`);
-      const result = await scanGmailForDocIds(userId, since, (count, total) => {
+      const result = await scanGmailForDocIds(userId, since, userEmail, (count, total) => {
         onProgress?.({ phase: "gmail", status: "reading", count, total });
       });
       gmailDocIds = result.docIds;

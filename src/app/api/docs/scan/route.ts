@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
         logInfo(`[Scan] Starting Gmail scan: daysBack=${daysBack ?? "all"}, since=${formatDate(since)}`);
 
         try {
-          const { docs: gmailDocs, inaccessibleDocs, errorCount } = await scanGmailNotifications(userId, since, send);
+          const userEmail = session.user.email ?? undefined;
+          const { docs: gmailDocs, inaccessibleDocs, errorCount } = await scanGmailNotifications(userId, since, userEmail, send);
 
           const docs: Array<{
             googleDocId: string; title: string; mimeType: string; driveUrl: string;

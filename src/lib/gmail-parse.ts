@@ -1,7 +1,13 @@
 import { parseGoogleDocId } from "@/lib/google-drive";
 import { formatDate } from "@/lib/utils";
 
-/** Parse a share notification email and return a formatted note, or null if not a share email. */
+/**
+ * Parse a share notification email and return a formatted note, or null if not a share email.
+ * Called from scanGmailForDocIds for every sharing email. The resulting note is stored in the
+ * shareNotes map and later written to the doc's notes field by refresh.ts (for docs whose
+ * Drive metadata fetch succeeds). Distinguishes share invitations ("Shared by") from
+ * access requests ("Requested to share by") based on the Subject header.
+ */
 export function parseShareNote(
   headers: Array<{ name?: string | null; value?: string | null }>,
   body: string,
@@ -21,14 +27,19 @@ export function parseShareNote(
   const date = dateStr ? new Date(dateStr) : null;
   const dateFormatted = date && !isNaN(date.getTime()) ? formatDate(date, true) : null;
 
+  // Detect share requests vs invitations from Subject header
+  const subject = headers.find(h => h.name?.toLowerCase() === "subject")?.value ?? "";
+  const isRequest = /share request/i.test(subject);
+  const verb = isRequest ? "Requested to share by" : "Shared by";
+
   // Build sharer attribution
   let note: string;
   if (sharerName && sharerEmail) {
-    note = `Shared by ${sharerName} (${sharerEmail})`;
+    note = `${verb} ${sharerName} (${sharerEmail})`;
   } else if (sharerEmail) {
-    note = `Shared by ${sharerEmail}`;
+    note = `${verb} ${sharerEmail}`;
   } else {
-    note = "Shared";
+    note = isRequest ? "Requested to share" : "Shared";
   }
   if (dateFormatted) {
     note += ` on ${dateFormatted}`;

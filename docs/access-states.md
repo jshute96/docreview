@@ -120,7 +120,7 @@ shared a doc, but the user doesn't have access.
   as the subject; sharing notifications use `Document shared with you: "Title"`)
 - **Notes**: `"Gmail notification received DATE (permission denied|not found)"` with
   optional second line for comment text (`"Author: comment"`) or sharing info
-  (`"Shared by Name"`)
+  (`"Shared by Name"` or `"Requested to share by Name"` for access requests)
 - **Timestamps**: `createdTimeInDrive` and `lastModifiedInDrive` are set to the email
   date (since we can't access Drive metadata)
 

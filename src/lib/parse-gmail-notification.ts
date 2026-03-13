@@ -73,7 +73,8 @@ export interface SharingNotification {
   date: string;
   sharerName: string;
   sharerEmail: string;
-  permission: string; // "edit", "view", "comment"
+  permission: string; // "edit", "view", "comment", "writer"
+  isRequest: boolean; // true if this is a request for access, not an invitation
   documentTitle: string;
   documentUrl: string;
   documentId: string;
@@ -359,11 +360,20 @@ function parseSharingNotification(email: ParsedEmail): SharingNotification {
   const html = email.htmlBody;
   const headers = email.headers;
 
-  // "Jeff Shute shared a document" or "Jeff Shute (jshute@gmail.com) has invited you to edit"
-  const sharerMatch = html.match(/>([\w\s]+)\s*\(<a[^>]*mailto:([^"]+)"[^>]*>[^<]+<\/a>\)\s*has invited you to\s*<b>(\w+)<\/b>/);
+  // "Jeff Shute (jshute@gmail.com) has invited you to edit" — sharing invitation
+  const inviteMatch = html.match(/>([\w\s]+)\s*\(<a[^>]*mailto:([^"]+)"[^>]*>[^<]+<\/a>\)\s*has invited you to\s*<b>(\w+)<\/b>/);
+  // "Jeff Shute (jshute@gmail.com) is requesting access" — share request
+  const requestMatch = !inviteMatch ? html.match(/>([\w\s]+)\s*\(<a[^>]*mailto:([^"]+)"[^>]*>[^<]+<\/a>\)\s*is\s*<b>requesting access<\/b>/) : null;
+  const sharerMatch = inviteMatch || requestMatch;
   const sharerName = sharerMatch ? sharerMatch[1].trim() : "";
   const sharerEmail = sharerMatch ? sharerMatch[2] : (headers.get("reply-to")?.match(/<([^>]+)>/)?.[1] || "");
-  const permission = sharerMatch ? sharerMatch[3] : "";
+  // For invitations, permission is in the text ("edit", "view", "comment")
+  // For share requests, extract from URL role parameter
+  let permission = inviteMatch ? inviteMatch[3] : "";
+  if (requestMatch && !permission) {
+    const roleMatch = html.match(/role=(\w+)/);
+    permission = roleMatch ? roleMatch[1] : "";
+  }
 
   // Document title from chip
   const titleMatch = html.match(/vertical-align: middle;">([^<]+)<\/span><\/div><\/a>/);
@@ -383,6 +393,7 @@ function parseSharingNotification(email: ParsedEmail): SharingNotification {
     sharerName,
     sharerEmail,
     permission,
+    isRequest: !!requestMatch,
     documentTitle,
     documentUrl,
     documentId,

@@ -39,10 +39,16 @@ export interface GmailScanResult {
   skipCount: number;
 }
 
-/** Scan Gmail for Google Doc notification emails and return just doc IDs (no Drive API calls). */
+/**
+ * Scan Gmail for Google Doc notification emails and return doc IDs, share notes, and
+ * raw email metadata (no Drive API calls). This is the low-level scanner used by both
+ * Refresh (refresh.ts) and the Load dialog (via scanGmailNotifications). Share notes
+ * are generated here via parseShareNote() for docs whose Drive metadata fetch succeeds.
+ */
 export async function scanGmailForDocIds(
   userId: string,
   since: Date,
+  userEmail?: string,
   onProgress?: (count: number, total?: number) => void
 ): Promise<GmailDocIdResult> {
   const auth = await getDriveClient(userId);
@@ -111,6 +117,18 @@ export async function scanGmailForDocIds(
 
         const headers = res.data.payload?.headers ?? [];
         const subject = headers.find((h) => h.name?.toLowerCase() === "subject")?.value ?? "(no subject)";
+        const fromHeader = headers.find((h) => h.name?.toLowerCase() === "from")?.value ?? "";
+
+        // Skip sharing notifications that are confirmations of our own shares
+        // (reply-to contains our email, matching the logged-in user)
+        if (fromHeader.includes("drive-shares-dm-noreply@google.com")) {
+          const replyToHeader = headers.find((h) => h.name?.toLowerCase() === "reply-to")?.value ?? "";
+          const replyToEmail = replyToHeader.match(/<([^>]+)>/)?.[1]?.toLowerCase() ?? replyToHeader.trim().toLowerCase();
+          if (replyToEmail && userEmail && replyToEmail === userEmail.toLowerCase()) {
+            logInfo(`[Gmail] ${messageId}: skipped — sharing notification from self (reply-to: ${replyToEmail}) (${Date.now() - t0}ms)`);
+            return;
+          }
+        }
 
         // Extract doc URL from message body
         const body = extractBodyText(res.data.payload);
@@ -158,9 +176,11 @@ export async function scanGmailForDocIds(
 }
 
 /**
- * Build GmailInaccessibleDoc entries for doc IDs that failed Drive metadata fetch.
- * Uses email metadata captured during Gmail scanning for best-effort title/notes.
- * Parses email HTML via parse-gmail-notification.ts for structured comment/sharing info.
+ * Build GmailInaccessibleDoc entries for doc IDs that failed Drive metadata fetch (404/403).
+ * Uses email metadata captured during Gmail scanning for best-effort title and notes.
+ * Called by both Refresh (refresh.ts) and the Load dialog (scanGmailNotifications) when
+ * a Gmail notification references a doc the user can't access (e.g., @-mention in an
+ * unshared doc, or a share request for a doc with restricted access).
  */
 export function buildInaccessibleDocs(
   failedDocIds: string[],
@@ -193,7 +213,9 @@ export function buildInaccessibleDocs(
               notes += `\n${reply.author}: ${reply.text}`;
             }
           } else if (parsed.type === "sharing" && parsed.sharerName) {
-            notes += `\nShared by ${parsed.sharerName}`;
+            notes += parsed.isRequest
+              ? `\nRequested to share by ${parsed.sharerName}`
+              : `\nShared by ${parsed.sharerName}`;
           }
         } catch {
           // Fall back to subject as title if parser fails
@@ -211,13 +233,18 @@ export function buildInaccessibleDocs(
   return results;
 }
 
-/** Scan Gmail for Google Doc notification emails and resolve doc metadata via Drive. */
+/**
+ * All-in-one Gmail scanner: calls scanGmailForDocIds, fetches Drive metadata, and builds
+ * inaccessible doc entries for failed fetches. Only used by the Load dialog (scan/route.ts).
+ * Refresh does these steps separately for more control over the flow.
+ */
 export async function scanGmailNotifications(
   userId: string,
   since: Date,
+  userEmail?: string,
   onProgress?: OnProgress
 ): Promise<GmailScanResult> {
-  const { docIds, shareNotes, emailMeta, errorCount: scanErrors } = await scanGmailForDocIds(userId, since, (count, total) => {
+  const { docIds, shareNotes, emailMeta, errorCount: scanErrors } = await scanGmailForDocIds(userId, since, userEmail, (count, total) => {
     onProgress?.({ phase: "gmail", status: "reading", count, total });
   });
   if (docIds.length === 0) {
