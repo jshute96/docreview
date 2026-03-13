@@ -65,7 +65,11 @@ export function AddDocPageClient({
   return (
     <div className="min-h-screen bg-zinc-50">
       <div className="mx-auto max-w-lg px-4 py-8">
-        <h1 className="mb-6 text-lg font-semibold text-zinc-900">
+        <h1 className="mb-6 text-lg font-semibold text-zinc-900 flex items-center">
+          <a href="/docs" className="flex-shrink-0 flex items-center text-zinc-500 hover:text-blue-600 mr-2">
+            <img src="/docreview.svg" alt="Docreview Logo" className="h-6 w-6 rounded-md shadow-sm mr-2" />
+            Docreview:
+          </a>
           Add Document
         </h1>
 
@@ -127,9 +131,6 @@ export function AddDocPageClient({
                       title="Reset the form"
                     >
                       Clear
-                    </Button>
-                    <Button variant="outline" size="sm" asChild title="Go to the document list">
-                      <a href="/docs">Doc List</a>
                     </Button>
                   </div>
               )}

@@ -286,6 +286,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
                 placeholder="URL or doc ID"
                 value={url}
                 onChange={(e) => handleUrlChange(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 className="flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
               />
               <ValidationIcon />
@@ -345,6 +346,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
               type="text"
               value={validTitle ?? ""}
               onChange={(e) => setValidTitle(e.target.value)}
+              onFocus={(e) => e.target.select()}
               placeholder="Unknown title"
               className="min-w-[60%] flex-1 rounded-md border border-zinc-300 px-2 py-1 text-sm text-zinc-900 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             />

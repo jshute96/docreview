@@ -4,7 +4,7 @@ import { AddDocPageClient } from "@/components/add-doc-page-client";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Add Document - Docreview",
+  title: "Docreview: Add Document",
 };
 
 export default async function AddPage({

@@ -24,7 +24,13 @@ export function BookmarkletClient() {
 
   return (
     <div className="mx-auto max-w-[45rem] p-8">
-      <h1 className="mb-4 text-2xl font-bold">Docreview Bookmarklets</h1>
+      <h1 className="mb-4 text-2xl font-bold flex items-center">
+        <a href="/docs" className="flex-shrink-0 flex items-center text-zinc-500 hover:text-blue-600 mr-2">
+          <img src="/docreview.svg" alt="Docreview Logo" className="h-6 w-6 rounded-md shadow-sm mr-2" />
+          Docreview:
+        </a>
+        Bookmarklets
+      </h1>
 
       <p className="mb-6 text-muted-foreground">
         Drag the links below to your bookmarks bar to quickly access
