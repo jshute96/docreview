@@ -27,6 +27,7 @@ export default async function LoginPage({
         <img src="/docreview.svg" alt="Docreview Logo" className="mb-4 h-16 w-16 shadow-lg rounded-xl" />
         <h1 className="mb-2 text-3xl font-bold tracking-tight text-zinc-900">Docreview</h1>
         <p className="text-lg text-zinc-500"><i>Your inbox for document reviews</i></p>
+        <a href="https://github.com/jshute96/docreview" target="_blank" rel="noopener noreferrer" className="mt-2 text-base text-blue-500 hover:text-blue-700 underline">github.com/jshute96/docreview</a>
       </div>
         
         {error && (
@@ -34,10 +35,14 @@ export default async function LoginPage({
             <div className="mb-2 font-semibold">
               {error === "CredentialsSignin"
                 ? "Offline Sign-in Failed"
+                : error === "AccessDenied"
+                ? "Access Denied"
                 : `Error: ${error}`}
             </div>
             <p className="mb-3">
-              {getExpectedOfflineId() 
+              {error === "AccessDenied"
+                ? "Your account is not authorized to use this application."
+                : getExpectedOfflineId()
                 ? `User ID "${getExpectedOfflineId()}" was not found in the database.`
                 : "The default offline user could not be found or created."}
             </p>

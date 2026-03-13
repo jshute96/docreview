@@ -236,6 +236,10 @@ npx prisma studio                     # open DB browser at http://localhost:5555
 npx prisma generate                   # regenerate client after schema changes
 ```
 
+## Deploying to Google Cloud
+
+See [docs/gcp-deploy.md](docs/gcp-deploy.md) for full instructions on deploying to Cloud Run + Cloud SQL.
+
 ## Architecture
 
 - **Auth:** NextAuth.js v5 with Google OAuth. Always use `getValidSession()` or `requireAuth()` from `src/lib/auth-utils.ts` for consistency between online and offline modes.

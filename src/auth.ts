@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { OFFLINE_MODE, OFFLINE_USER_ID, FALLBACK_OFFLINE_USER } from "@/lib/offline";
+import { logError } from "@/lib/log";
 
 const offlineProviders = [
   Credentials({
@@ -65,12 +66,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   // Enforce secure cookies when the app is accessed via HTTPS (e.g. behind a proxy).
   // Without this, PKCE/state checks fail on the callback redirect.
   useSecureCookies,
+  logger: {
+    error(error) {
+      // Suppress stack traces for expected access denials
+      if (error instanceof Error && error.message?.includes("AccessDenied")) return;
+      if (error instanceof Error) {
+        logError(`[auth] ${error.message}`);
+      } else {
+        logError("[auth]", error);
+      }
+    },
+  },
   adapter: PrismaAdapter(prisma),
   providers: OFFLINE_MODE ? offlineProviders : googleProviders,
   // CredentialsProvider doesn't work with database sessions (PrismaAdapter
   // won't create a DB session for it), so use JWT in offline mode.
   session: { strategy: OFFLINE_MODE ? "jwt" : "database" },
   callbacks: {
+    signIn({ user, account }) {
+      // In offline mode or non-Google providers, allow all
+      if (account?.provider !== "google") return true;
+
+      const allowed = process.env.ALLOWED_EMAILS;
+      if (!allowed) return true; // No whitelist = allow everyone
+
+      const allowedList = allowed.split(",").map((e) => e.trim().toLowerCase());
+      const email = user.email?.toLowerCase();
+      if (!email || !allowedList.includes(email)) {
+        logError(`Sign-in denied for ${email ?? "unknown"}: not in ALLOWED_EMAILS`);
+        return false;
+      }
+      return true;
+    },
     session({ session, user, token }) {
       // Database strategy passes `user`; JWT strategy passes `token`
       session.user.id = user?.id ?? token?.sub ?? "";

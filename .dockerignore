@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.env*
+logs
+tmp
+.claude
+.gemini
+.playwright-mcp
+testing
+*.pem
