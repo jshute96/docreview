@@ -79,6 +79,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   const [comments, setComments] = useState<Comment[]>(initialDoc.comments);
   const [archiving, setArchiving] = useState(false);
   const [bulkArchiving, setBulkArchiving] = useState(false);
+  const [bulkArchivingResolved, setBulkArchivingResolved] = useState(false);
   const [bulkUnarchiving, setBulkUnarchiving] = useState(false);
   const [bulkMarkingRead, setBulkMarkingRead] = useState(false);
   const [bulkMarkingUnread, setBulkMarkingUnread] = useState(false);
@@ -383,6 +384,52 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   function handleArchiveAll() { void handleBulkStatusChange("INBOX", "ARCHIVED"); }
   function handleUnarchiveAll() { void handleBulkStatusChange("ARCHIVED", "INBOX"); }
+
+  async function handleArchiveAllResolved() {
+    const targets = filteredComments.filter((c) => c.status === "INBOX" && c.resolved);
+    if (targets.length === 0) return;
+
+    setBulkArchivingResolved(true);
+    const contextId = generateContextId();
+    try {
+      const commentIds = targets.map((c) => c.commentId);
+      const res = await apiFetch(`/api/docs/${doc.docId}/comments`, {
+        method: "PATCH",
+        body: JSON.stringify({ commentIds, status: "ARCHIVED" }),
+        contextId,
+      });
+      if (!res.ok) throw new Error("Failed");
+
+      const { count } = await res.json();
+      setComments((prev) =>
+        prev.map((c) =>
+          commentIds.includes(c.commentId) ? { ...c, status: "ARCHIVED" as const } : c
+        )
+      );
+
+      targets.forEach(c => {
+        const updated = { ...c, status: "ARCHIVED" as const };
+        if (wouldBeFilteredOut(updated)) {
+          setExitingIds((prev) => new Set(prev).add(updated.commentId));
+        }
+      });
+
+      setTimeout(() => {
+        setExitingIds((prev) => {
+          const next = new Set(prev);
+          targets.forEach(c => next.delete(c.commentId));
+          return next;
+        });
+      }, 200);
+
+      broadcastChange({ type: "comments", docId: doc.docId }, contextId);
+      toast.success(`Archived ${count} resolved comments`);
+    } catch {
+      toast.error("Failed to archive resolved comments");
+    } finally {
+      setBulkArchivingResolved(false);
+    }
+  }
 
   async function handleBulkReadChange(targetIsRead: boolean) {
     const targets = filteredComments.filter((c) => c.isRead !== targetIsRead);
@@ -803,6 +850,16 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                     >
                       {bulkMarkingRead ? "Marking..." : "Mark all read"}
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-5 px-1.5 text-[10px] text-zinc-900"
+                      title="Archive all visible inbox comments"
+                      onClick={handleArchiveAll}
+                      disabled={bulkArchiving || !filteredComments.some((c) => c.status === "INBOX")}
+                    >
+                      {bulkArchiving ? "Archiving..." : "Archive all"}
+                    </Button>
                     <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -816,11 +873,11 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
-                          onSelect={handleArchiveAll}
-                          disabled={bulkArchiving || !filteredComments.some((c) => c.status === "INBOX")}
-                          title="Archive all visible inbox comments"
+                          onSelect={handleArchiveAllResolved}
+                          disabled={bulkArchivingResolved || !filteredComments.some((c) => c.status === "INBOX" && c.resolved)}
+                          title="Archive all visible comments that are Resolved"
                         >
-                          {bulkArchiving ? "Archiving..." : "Archive all"}
+                          {bulkArchivingResolved ? "Archiving..." : "Archive all resolved"}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={handleUnarchiveAll}
