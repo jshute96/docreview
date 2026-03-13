@@ -12,13 +12,11 @@ import { scanGmailForDocIds, buildInaccessibleDocs, type GmailInaccessibleDoc } 
 import type { ParsedEmail } from "@/lib/parse-gmail-notification";
 import { syncComments } from "@/lib/sync-comments";
 import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "@/lib/status";
-import { logWarning, logInfo, logToFile } from "@/lib/log";
+import { logWarning, logInfo } from "@/lib/log";
 import { appendNotes, formatDate, pluralize } from "@/lib/utils";
 import type { OnProgress } from "@/lib/progress-events";
 import type { Doc } from "@prisma/client";
 import pLimit from "p-limit";
-
-const DEBUG_FILE = "drive-changes-debug.log";
 
 export interface RefreshResult {
   added: number;
@@ -80,7 +78,6 @@ export async function upsertDocsAndSyncComments(
     // Refresh/full-refresh: auto-add new docs I authored; skip others.
     // Shared docs arrive via Gmail notifications instead.
     if ((mode === "refresh" || mode === "full-refresh") && !isExisting && !fromGmail && doc.role !== "AUTHOR") {
-      logToFile(DEBUG_FILE, `OUTCOME: SKIP: "${doc.title}" (ID: ${doc.googleDocId}) — new REVIEWER doc (not in Gmail)`);
       skipNotAuthor++;
       continue;
     }
@@ -142,11 +139,9 @@ export async function upsertDocsAndSyncComments(
       if (mode !== "selected") {
         logInfo(`[Refresh]   UPDATE "${doc.title}"`);
       }
-      logToFile(DEBUG_FILE, `OUTCOME: UPDATE: "${doc.title}" (ID: ${doc.googleDocId})`);
       updated++;
     } else {
       logInfo(`[Refresh]   ADD "${doc.title}" — ${doc.role} (owner: ${doc.owner ?? "unknown"})${fromGmail ? " [Gmail]" : ""}`);
-      logToFile(DEBUG_FILE, `OUTCOME: ADD: "${doc.title}" (ID: ${doc.googleDocId}) — ${doc.role}${fromGmail ? " [Gmail]" : ""}`);
       added++;
     }
   }
@@ -224,7 +219,6 @@ async function markMissingAsDeletedOrDenied(
   let count = 0;
   for (const id of missingIds) {
     if (trashedIds.has(id)) {
-      logToFile(DEBUG_FILE, `OUTCOME: TRASHED (${logLabel.toUpperCase()} MISSING): ID: ${id}`);
       // Only count as changed if the doc wasn't already TRASHED
       const result = await prisma.doc.updateMany({
         where: { userId, googleDocId: id, accessState: { not: "TRASHED" } },
@@ -233,14 +227,12 @@ async function markMissingAsDeletedOrDenied(
       count += result.count;
     } else if (deletedIds.has(id)) {
       // 404 is ambiguous for DENIED docs — keep DENIED state (see docs/access-states.md)
-      logToFile(DEBUG_FILE, `OUTCOME: DELETE (${logLabel.toUpperCase()} MISSING): ID: ${id}`);
       const result = await prisma.doc.updateMany({
         where: { userId, googleDocId: id, accessState: { notIn: ["DENIED", "NOT_FOUND"] } },
         data: { accessState: "NOT_FOUND" },
       });
       count += result.count;
     } else if (permissionDeniedIds.has(id)) {
-      logToFile(DEBUG_FILE, `OUTCOME: PERMISSION DENIED (${logLabel.toUpperCase()} MISSING): ID: ${id}`);
       await prisma.doc.updateMany({
         where: { userId, googleDocId: id, accessState: { not: "DENIED" } },
         data: { accessState: "DENIED" },
@@ -349,9 +341,6 @@ async function executeDirectRefresh(
   }
 
   logInfo(`[Refresh] Refreshing ${googleDocIds.length} docs (${mode})`);
-  logToFile(DEBUG_FILE, "-------------------------------------");
-  logToFile(DEBUG_FILE, `Starting direct refresh (${mode}) for ${googleDocIds.length} IDs`);
-
   // Metadata fetch
   onProgress?.({ phase: "metadata", completed: 0, total: googleDocIds.length });
   const driveDocs = (await fetchDocsByIds(userId, googleDocIds, (count) => {
@@ -392,7 +381,6 @@ async function executeDirectRefresh(
     ? `, ${pluralize(result.skipNotAuthor, "doc")} skipped (not author)`
     : "";
   logInfo(`[Refresh] ${mode} complete in ${elapsed}ms: ${counts.join(", ")}, ${commentStr}${suggestionStr}${skipStr} (${pluralize(result.errorCount, "error")})`);
-  logToFile(DEBUG_FILE, `Ended direct refresh (${mode}): ${result.updated} updated, ${result.deleted} deleted`);
   return result;
 }
 
@@ -469,8 +457,6 @@ export async function executeRefresh(
       const savedToken = status?.driveChangesPageToken;
       if (savedToken) {
         logInfo("[Refresh] Drive: using changes.list with saved token");
-        logToFile(DEBUG_FILE, "-------------------------------------");
-        logToFile(DEBUG_FILE, "Starting changes.list sync");
         try {
           const result = await listChanges(userId, savedToken, (stats) => {
             onProgress?.({ phase: "drive", status: "reading", ...stats });
@@ -481,37 +467,30 @@ export async function executeRefresh(
           removedDocIdsFromDrive = result.removedDocIds;
           newPageToken = result.newPageToken;
           driveSucceeded = true;
-          logToFile(DEBUG_FILE, `Ended changes.list sync: ${driveDocs.length} changed docs, ${trashedDocIdsFromDrive.size} trashed, ${removedDocIdsFromDrive.size} removed`);
           onProgress?.({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: result.rawChangeCount });
         } catch (err: unknown) {
           const code = (err as { code?: number | string })?.code;
           if (code === 404 || code === "404") {
             logWarning("[Refresh] Drive: changes.list token expired, falling back to 7-day files.list");
-            logToFile(DEBUG_FILE, "Token expired, falling back to files.list");
             newPageToken = await getChangesStartPageToken(userId);
             driveDocs = await listRecentDocs(userId, undefined, undefined, (stats) => {
               onProgress?.({ phase: "drive", status: "reading", ...stats });
             });
             driveChangesRead = driveDocs.length;
             driveSucceeded = true;
-            logToFile(DEBUG_FILE, `Ended files.list sync (fallback): ${driveDocs.length} docs`);
             onProgress?.({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: driveDocs.length });
           } else {
-            logToFile(DEBUG_FILE, "Ended changes.list sync with error", { error: err });
             throw err;
           }
         }
       } else {
         logInfo("[Refresh] Drive: no saved token, bootstrapping (7-day files.list)");
-        logToFile(DEBUG_FILE, "-------------------------------------");
-        logToFile(DEBUG_FILE, "Starting files.list sync (bootstrap)");
         newPageToken = await getChangesStartPageToken(userId);
         driveDocs = await listRecentDocs(userId, undefined, undefined, (stats) => {
           onProgress?.({ phase: "drive", status: "reading", ...stats });
         });
         driveChangesRead = driveDocs.length;
         driveSucceeded = true;
-        logToFile(DEBUG_FILE, `Ended files.list sync (bootstrap): ${driveDocs.length} docs`);
         onProgress?.({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: driveDocs.length });
       }
     })());
@@ -600,7 +579,6 @@ export async function executeRefresh(
     });
     logInfo(`[Refresh] Drive: ${docsToTrash.length} of ${trashedDocIdsFromDrive.size} trashed were tracked docs`);
     for (const doc of docsToTrash) {
-      logToFile(DEBUG_FILE, `OUTCOME: TRASHED: "${doc.title}" (ID: ${doc.googleDocId})`);
       await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "TRASHED" } });
       extraDeleted++;
     }
@@ -617,7 +595,6 @@ export async function executeRefresh(
     });
     logInfo(`[Refresh] Drive: ${docsToRemove.length} of ${removedDocIdsFromDrive.size} removals were tracked docs`);
     for (const doc of docsToRemove) {
-      logToFile(DEBUG_FILE, `OUTCOME: DELETE: "${doc.title}" (ID: ${doc.googleDocId})`);
       await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "NOT_FOUND" } });
       extraDeleted++;
     }

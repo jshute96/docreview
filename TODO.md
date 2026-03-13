@@ -1,5 +1,4 @@
 required cleanup:
-* disable debug logging on drive changes scan
 * decide whether to keep last-view-time pinning on Reply/Resolve
     * clean up UI for edit-last-viwed-timestamp
 * strip personal data from logs

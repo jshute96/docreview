@@ -129,18 +129,6 @@ function writeToFile(level: string, message: string, args: unknown[], requestId?
 
 // --- Public API ---
 
-export function logToFile(filename: string, message: string, ...args: unknown[]) {
-  if (typeof window !== "undefined" || process.env.NODE_ENV === "test") return;
-  mkdirSync(LOG_DIR, { recursive: true });
-  const ts = pstTimestamp();
-  const userId = (getRequestUserId() ?? "-").padEnd(25);
-  const reqId = getRequestId();
-  const argsStr = formatArgs(args);
-  const stream = createWriteStream(join(LOG_DIR, filename), { flags: "a" });
-  stream.write(`${ts} ${userId} ${reqId} ${message}${argsStr}\n`);
-  stream.end();
-}
-
 export function logError(message: string, ...args: unknown[]) {
   console.error(`${RED}ERROR: ${message}${RESET}`, ...args);
   writeToFile("ERROR", message, args);

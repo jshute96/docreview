@@ -4,10 +4,8 @@ import { OAuth2Client } from "google-auth-library";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { OFFLINE_MODE, OfflineModeError } from "@/lib/offline";
-import { logError, logWarning, logInfo, logToFile } from "@/lib/log";
+import { logError, logWarning, logInfo } from "@/lib/log";
 import { withProgressLogging } from "./promise-utils";
-
-const DEBUG_FILE = "drive-changes-debug.log";
 import { formatDate } from "./utils";
 
 export const SUPPORTED_MIME_TYPES = new Set([
@@ -684,7 +682,6 @@ export async function listChanges(
 
     for (const change of pageChanges) {
       if (!change.fileId) continue;
-      logToFile(DEBUG_FILE, `RAW CHANGE: "${change.file?.name}" (ID: ${change.fileId})`, { change });
       changesByFileId.set(change.fileId, {
         removed: change.removed === true,
         file: change.file,
@@ -861,7 +858,6 @@ export async function listRecentDocs(
 
     for (const file of pageFiles) {
       if (!file.id || !file.name) continue;
-      logToFile(DEBUG_FILE, `RAW FILE: "${file.name}" (ID: ${file.id})`, { file });
       const isOwner = file.owners?.some((o) => o.me === true) ?? false;
       docs.push({
         googleDocId: file.id,
