@@ -161,6 +161,24 @@ describe("syncComments isInteresting logic", () => {
     expect(shouldUnarchive).toBe(false);
   });
 
+  it("does NOT unarchive for new comment on AUTHOR doc when isRead (my own comment)", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockFetchComments.mockResolvedValue([driveComment({ isRead: true })]);
+
+    const { shouldUnarchive } = await syncComments(doc, driveAuth);
+    expect(shouldUnarchive).toBe(false);
+  });
+
+  it("does NOT unarchive for new comment where I participated when isRead", async () => {
+    const doc = makeDoc({ role: "REVIEWER" });
+    mockFetchComments.mockResolvedValue([
+      driveComment({ iParticipated: true, isRead: true }),
+    ]);
+
+    const { shouldUnarchive } = await syncComments(doc, driveAuth);
+    expect(shouldUnarchive).toBe(false);
+  });
+
   it("unarchives for new comment where isThreadAuthor implies iParticipated", async () => {
     const doc = makeDoc({ role: "REVIEWER" });
     mockFetchComments.mockResolvedValue([
@@ -194,6 +212,19 @@ describe("syncComments isInteresting logic", () => {
     }]);
     mockFetchComments.mockResolvedValue([
       driveComment({ replyCount: 3, iParticipated: false, replyAuthorMeFlags: [false, false, false] }),
+    ]);
+
+    const { shouldUnarchive } = await syncComments(doc, driveAuth);
+    expect(shouldUnarchive).toBe(false);
+  });
+
+  it("does NOT unarchive when existing INBOX comment has new replies but isRead (my own reply)", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 1,
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({ replyCount: 3, isRead: true, replyAuthorMeFlags: [false, true, true] }),
     ]);
 
     const { shouldUnarchive } = await syncComments(doc, driveAuth);
@@ -700,6 +731,31 @@ describe("syncComments hasNonResolveActivity", () => {
 
     const { hasNonResolveActivity } = await syncComments(doc, driveAuth);
     expect(hasNonResolveActivity).toBe(true);
+  });
+
+  it("does NOT report non-resolve activity for new comment when isRead (my own comment)", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockFetchComments.mockResolvedValue([driveComment({ isRead: true })]);
+
+    const { hasNonResolveActivity } = await syncComments(doc, driveAuth);
+    expect(hasNonResolveActivity).toBe(false);
+  });
+
+  it("does NOT report non-resolve activity for existing comment with new replies when isRead", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX",
+      resolved: false, replyCount: 0, driveModifiedAt: new Date("2024-06-10"),
+    }]);
+    mockFetchComments.mockResolvedValue([
+      driveComment({
+        replyCount: 2, isRead: true, replyAuthorMeFlags: [true, true],
+        driveModifiedAt: new Date("2024-06-11"),
+      }),
+    ]);
+
+    const { hasNonResolveActivity } = await syncComments(doc, driveAuth);
+    expect(hasNonResolveActivity).toBe(false);
   });
 
   it("does NOT report non-resolve activity when no changes", async () => {

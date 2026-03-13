@@ -48,6 +48,8 @@ These comment changes trigger moving the document to Inbox:
   4. Exception: if the document is Archived and the only new comment activity is resolutions (no new
      comments, no new non-resolve replies), the document stays Archived.  This prevents resolved
      threads from resurfacing a document you've already dismissed.
+  5. Exception: comments in **read** state (where I'm the last commenter) never trigger unarchive.
+     My own activity shouldn't resurface an archived document, regardless of whether I'm Author or Reviewer.
 
 ---
 

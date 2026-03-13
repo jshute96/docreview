@@ -134,10 +134,12 @@ export async function syncComments(
         replyCount: c.replyCount,
       });
 
-      // Doc-level unarchive: new comment with INBOX status triggers unarchive
-      if (status === "INBOX") shouldUnarchive = true;
+      // Doc-level unarchive: new comment with INBOX status triggers unarchive,
+      // but not if the comment is already read (I'm the last commenter — my own
+      // activity shouldn't resurface an archived doc).
+      if (status === "INBOX" && !c.isRead) shouldUnarchive = true;
       // Track non-resolve activity: unresolved comments or @-mentions (even on resolved)
-      if (!c.resolved || mentionedInThread) hasNonResolveActivity = true;
+      if ((!c.resolved || mentionedInThread) && !c.isRead) hasNonResolveActivity = true;
     } else {
       const hasNewReplies = c.replyCount > existing.replyCount;
       const hasNewActivity =
@@ -181,8 +183,9 @@ export async function syncComments(
 
       const previousStatus = existing.status as "INBOX" | "ARCHIVED" | "MUTED";
 
-      // Track non-resolve activity for existing comments
-      if (hasNewActivity) {
+      // Track non-resolve activity for existing comments.
+      // Skip when isRead — my own activity shouldn't resurface an archived doc.
+      if (hasNewActivity && !c.isRead) {
         const isBeingResolved = c.resolved && !existing.resolved;
         const newReplyCount = c.replyCount - existing.replyCount;
         if (isBeingResolved && newReplyCount <= 1) {
@@ -202,6 +205,7 @@ export async function syncComments(
       if (newReplyMentionsMe) {
         // Rule 2: @-mention in new reply → INBOX (overrides MUTED and all other rules)
         status = "INBOX";
+        // @-mention always counts as activity even if isRead (someone explicitly asked for my attention)
         hasNonResolveActivity = true;
       } else if (c.resolved && c.iResolvedIt) {
         // Rule 1: I resolved it → ARCHIVED
@@ -229,18 +233,21 @@ export async function syncComments(
         // Otherwise: not relevant to me → preserve existing status
       }
 
-      // Doc-level unarchive rules (based on resulting comment status):
-      // 1. Comment transitions from non-INBOX to INBOX
-      if (previousStatus !== "INBOX" && status === "INBOX") {
-        shouldUnarchive = true;
-      }
-      // 2. Existing INBOX comment gets new replies (unless I resolved it myself)
-      if (previousStatus === "INBOX" && hasNewReplies && !(c.resolved && c.iResolvedIt)) {
-        shouldUnarchive = true;
-      }
-      // 3. INBOX comment resolved by someone else (before we transition it to ARCHIVED via rule 1)
-      if (previousStatus === "INBOX" && c.resolved && !c.iResolvedIt) {
-        shouldUnarchive = true;
+      // Doc-level unarchive rules (based on resulting comment status).
+      // All gated on !c.isRead: my own activity shouldn't resurface an archived doc.
+      if (!c.isRead) {
+        // 1. Comment transitions from non-INBOX to INBOX
+        if (previousStatus !== "INBOX" && status === "INBOX") {
+          shouldUnarchive = true;
+        }
+        // 2. Existing INBOX comment gets new replies (unless I resolved it myself)
+        if (previousStatus === "INBOX" && hasNewReplies && !(c.resolved && c.iResolvedIt)) {
+          shouldUnarchive = true;
+        }
+        // 3. INBOX comment resolved by someone else (before we transition it to ARCHIVED via rule 1)
+        if (previousStatus === "INBOX" && c.resolved && !c.iResolvedIt) {
+          shouldUnarchive = true;
+        }
       }
 
       // Only update isRead from Drive when driveModifiedAt changed (new activity)
