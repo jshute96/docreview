@@ -12,6 +12,8 @@ On "Access Denied" pages (documents you don't have permission to view), an "Add 
 ### Google Drive
 Docreview icons appear next to file type icons in both list and grid views (folders are excluded). Click any icon to open that file in Docreview.
 
+On "You need access" pages (files you don't have permission to view), an "Add in Docreview" link appears above the "Request access" button, just like on Google Docs access-denied pages.
+
 ### Gmail
 For Docs notification emails (comments, suggestions, sharing), an "Open in Docreview" link appears inside the email. Click it to open the referenced document in Docreview.
 

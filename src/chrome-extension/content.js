@@ -88,9 +88,11 @@
     badges.insertBefore(container, badges.firstChild);
   }
 
-  // Google Docs "Access Denied" page: inject an "Add in Docreview" link above the
-  // "Request access" button. This lets users track a document they've requested
-  // access to, with a prefilled note recording the request date.
+  // "Access Denied" / "You need access" page: inject an "Add in Docreview" link
+  // above the "Request access" button. This lets users track a document they've
+  // requested access to, with a prefilled note recording the request date.
+  // Works on both docs.google.com and drive.google.com access-denied pages
+  // (they share the same HTML structure).
   function injectAccessDenied() {
     if (document.getElementById('dr-access-denied')) return;
 
@@ -104,11 +106,23 @@
     var btnWrapper = reqBtn.closest('[data-is-touch-wrapper]');
     if (!btnWrapper || !btnWrapper.parentElement) return;
 
+    // On drive.google.com access-denied pages, the URL is like
+    // /drivesharing/u/0/accessdenied?...&itemId=DOC_ID&resourcekey=...
+    // Construct a proper Drive URL from itemId so /add gets a usable doc link.
+    var docUrl = location.href;
+    if (hostname.endsWith('drive.google.com')) {
+      var params = new URLSearchParams(location.search);
+      var itemId = params.get('itemId');
+      if (itemId) {
+        docUrl = 'https://drive.google.com/open?id=' + itemId;
+      }
+    }
+
     var now = new Date();
     var today = now.getFullYear() + '-'
       + String(now.getMonth() + 1).padStart(2, '0') + '-'
       + String(now.getDate()).padStart(2, '0');
-    var addUrl = baseUrl + '/add?doc=' + encodeURIComponent(location.href)
+    var addUrl = baseUrl + '/add?doc=' + encodeURIComponent(docUrl)
       + '&notes=' + encodeURIComponent('You requested access on ' + today + '.');
 
     var bar = document.createElement('div');
@@ -296,7 +310,8 @@
     new MutationObserver(function() { injectDocs(); injectAccessDenied(); }).observe(document.body, { childList: true, subtree: true });
   } else if (isDrive) {
     injectDrive();
-    new MutationObserver(injectDrive).observe(document.body, { childList: true, subtree: true });
+    injectAccessDenied();
+    new MutationObserver(function() { injectDrive(); injectAccessDenied(); }).observe(document.body, { childList: true, subtree: true });
   } else if (isGmail) {
     injectGmail();
     new MutationObserver(injectGmail).observe(document.body, { childList: true, subtree: true });
