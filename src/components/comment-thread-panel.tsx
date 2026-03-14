@@ -104,8 +104,8 @@ export function CommentThreadPanel({
     const container = replyContainerRef.current;
     if (!textarea || !measure || !container) return;
 
-    // Measure single-line text width via hidden span
-    measure.textContent = replyText || "";
+    // Measure single-line text width via hidden span (read value from DOM, not state)
+    measure.textContent = textarea.value || "";
     const textWidth = measure.getBoundingClientRect().width;
     const containerWidth = container.clientWidth;
     const minWidth = containerWidth * 0.25;
@@ -113,14 +113,17 @@ export function CommentThreadPanel({
     const targetWidth = Math.max(minWidth, Math.min(textWidth + padding, containerWidth));
     textarea.style.width = targetWidth + "px";
 
-    // Auto-grow height for wrapped text
+    // Auto-grow height: save/restore scroll position to prevent scroll jumps
+    const scrollParent = document.scrollingElement ?? document.documentElement;
+    const scrollTop = scrollParent.scrollTop;
     textarea.style.height = "auto";
     textarea.style.height = textarea.scrollHeight + "px";
-  }, [replyText]);
+    scrollParent.scrollTop = scrollTop;
+  }, []); // stable — reads value from DOM ref, no state deps
 
   useEffect(() => {
     resizeTextarea();
-  }, [resizeTextarea]);
+  }, [replyText, resizeTextarea]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Recalculate on container resize (window resize, layout changes)
   useEffect(() => {
