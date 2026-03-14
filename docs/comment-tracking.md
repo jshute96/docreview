@@ -21,7 +21,7 @@ filter and sort controls.
 |-------|--------|-------------|
 | `resolved` | Drive | Whether the thread is marked resolved |
 | `isThreadAuthor` | Drive | I created the original comment |
-| `iParticipated` | Drive | I'm involved in this thread (authored it or replied, including resolve actions) |
+| `isReplyAuthor` | Drive | I authored at least one reply in this thread (including resolve actions) |
 | `iResolvedIt` | Drive | I was the one who resolved it |
 | `driveCreatedAt` | Drive | When the comment was originally created |
 | `driveModifiedAt` | Drive | When the comment (or any reply) was last modified |
@@ -51,7 +51,7 @@ When a comment thread is seen for the first time (first matching rule wins):
 - **@-mention of me** anywhere in the thread → `INBOX` (even if resolved)
 - **Already resolved** (`resolved = true`) → `ARCHIVED`
 - **Unresolved** and I'm the doc author (`doc.role === "AUTHOR"`) → `INBOX`
-- **Unresolved** and I participated (`iParticipated`) → `INBOX`
+- **Unresolved** and I'm involved (`isThreadAuthor || isReplyAuthor`) → `INBOX`
 - **Otherwise** (unresolved but not relevant to me) → `ARCHIVED`
 
 Only comments relevant to the current user start in Inbox. Already-resolved threads
@@ -96,13 +96,13 @@ is the only case where a comment exits MUTED state.
 
 **MUTED** (without @-mention): If status is `MUTED` and no new reply mentions me, it is
 left unchanged. Muted threads stay hidden regardless of new Drive activity. Drive-side
-fields (`resolved`, `iParticipated`, `driveCreatedAt`, `driveModifiedAt`, `replyCount`)
+fields (`resolved`, `isReplyAuthor`, `driveCreatedAt`, `driveModifiedAt`, `replyCount`)
 are still updated when they differ, so the detail page reflects current state.
 
 **For all other statuses (INBOX, ARCHIVED, or MUTED with @-mention)**, apply this logic
 (first matching rule wins):
 
-1. Compare `resolved`, `iParticipated`, `status`, `driveCreatedAt`,
+1. Compare `resolved`, `isReplyAuthor`, `status`, `driveCreatedAt`,
    `driveModifiedAt`, and `replyCount` against the existing record. `isRead` is only
    compared when `driveModifiedAt` has changed (preserving manual toggles). Skip the
    update if all match.
@@ -199,7 +199,7 @@ The doc detail page provides three ways to narrow the comment table:
 
 **Tri-state badge filters** (AND-combined with show mode; each cycles off → include → exclude):
 - **Mine** — filter by `isThreadAuthor` (I started the thread)
-- **Replied** — filter by `iParticipated` (I replied in the thread)
+- **Replied** — filter by `isReplyAuthor` (I replied in the thread)
 - **Assigned** — filter by `assignedToMe` (comment assigned to me). Only shown when any comment has this status.
 - **@Mentioned** — filter by `mentionedMe` (I was @mentioned in the thread). Only shown when any comment has this status.
 - **Resolved** — filter by `resolved`
@@ -270,9 +270,10 @@ Each comment object includes author info and a list of replies. The replies arra
 once and used for three derived fields:
 
 - **`isThreadAuthor`** — `comment.author.me === true`: I created this thread.
-- **`iParticipated`** — `isThreadAuthor || replies.some(r => r.author?.me === true)`:
-  Am I involved in this thread at all? Includes thread authorship, substantive replies,
-  and resolve actions.
+- **`isReplyAuthor`** — `replies.some(r => r.author?.me === true)`:
+  Did I author any reply in this thread? Includes substantive replies and resolve actions.
+  Independent from `isThreadAuthor`; use `isThreadAuthor || isReplyAuthor` for "am I
+  involved at all".
 - **`iResolvedIt`** — find the last reply where `action === "resolve"`; true if
   `author.me === true`.
 - **`isRead`** — Initial value from Drive: if `replies.length > 0`,

@@ -215,7 +215,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   useCrossTabListener(handleCrossTab);
 
   const hasAnyMine = comments.some((c) => c.isThreadAuthor);
-  const hasAnyReplied = comments.some((c) => c.iParticipated && !c.isThreadAuthor);
+  const hasAnyReplied = comments.some((c) => c.isReplyAuthor);
   const hasAnyAssigned = comments.some((c) => c.assignedToMe);
   const hasAnyMentioned = comments.some((c) => c.mentionedMe);
 
@@ -229,7 +229,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   const [unreadFilter, setUnreadFilter] = useState<TriState>("off");
   const [isStarredFilter, setIsStarredFilter] = useState<TriState>("off");
   const [searchFilter, setSearchFilter] = useState("");
-  type SortCol = "driveCreatedAt" | "driveModifiedAt" | "replyCount" | "iParticipated" | "resolved";
+  type SortCol = "driveCreatedAt" | "driveModifiedAt" | "replyCount" | "isReplyAuthor" | "resolved";
   type SortDir = "asc" | "desc";
   const [sortCol, setSortCol] = useState<SortCol>("driveModifiedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -258,8 +258,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
     if (showMode === "resolved" && !c.resolved) return true;
     if (mineFilter === "include" && !c.isThreadAuthor) return true;
     if (mineFilter === "exclude" && c.isThreadAuthor) return true;
-    if (repliedFilter === "include" && !c.iParticipated) return true;
-    if (repliedFilter === "exclude" && c.iParticipated) return true;
+    if (repliedFilter === "include" && !c.isReplyAuthor) return true;
+    if (repliedFilter === "exclude" && c.isReplyAuthor) return true;
     if (assignedFilter === "include" && !c.assignedToMe) return true;
     if (assignedFilter === "exclude" && c.assignedToMe) return true;
     if (mentionedFilter === "include" && !c.mentionedMe) return true;

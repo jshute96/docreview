@@ -82,26 +82,26 @@ describe("deriveCommentFlags", () => {
     expect(result.isThreadAuthor).toBe(false);
   });
 
-  it("returns iParticipated true when a non-resolve reply is mine", () => {
+  it("returns isReplyAuthor true when a non-resolve reply is mine", () => {
     const result = deriveCommentFlags({ me: false }, [
       { action: null, author: { me: true } },
     ]);
-    expect(result.iParticipated).toBe(true);
+    expect(result.isReplyAuthor).toBe(true);
   });
 
-  it("returns iParticipated true when only resolve reply is mine", () => {
+  it("returns isReplyAuthor true when only resolve reply is mine", () => {
     const result = deriveCommentFlags({ me: false }, [
       { action: "resolve", author: { me: true } },
     ]);
-    expect(result.iParticipated).toBe(true);
+    expect(result.isReplyAuthor).toBe(true);
   });
 
-  it("returns iParticipated false when no replies are mine", () => {
+  it("returns isReplyAuthor false when no replies are mine", () => {
     const result = deriveCommentFlags({ me: false }, [
       { action: null, author: { me: false } },
       { action: null, author: { me: false } },
     ]);
-    expect(result.iParticipated).toBe(false);
+    expect(result.isReplyAuthor).toBe(false);
   });
 
   it("returns iResolvedIt true when last resolve reply is mine", () => {
@@ -128,16 +128,16 @@ describe("deriveCommentFlags", () => {
     expect(result.iResolvedIt).toBe(false);
   });
 
-  it("returns iParticipated true when thread author even with only others' replies", () => {
+  it("returns isReplyAuthor false when thread author with only others' replies", () => {
     const result = deriveCommentFlags({ me: true }, [
       { action: null, author: { me: false } },
     ]);
     expect(result.isThreadAuthor).toBe(true);
-    expect(result.iParticipated).toBe(true);
+    expect(result.isReplyAuthor).toBe(false);
   });
 
   it("handles empty replies array", () => {
     const result = deriveCommentFlags({ me: true }, []);
-    expect(result).toEqual({ isThreadAuthor: true, iParticipated: true, iResolvedIt: false, isRead: true });
+    expect(result).toEqual({ isThreadAuthor: true, isReplyAuthor: false, iResolvedIt: false, isRead: true });
   });
 });

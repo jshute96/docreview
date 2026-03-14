@@ -110,13 +110,13 @@ export async function syncComments(
       // New comment initial status (spec rules 1-6, first match wins):
       // Rule 2: @-mention of me → INBOX (even if resolved, overrides everything)
       // Rule 4: I'm the doc author → INBOX (if not resolved)
-      // Rule 5/6: I participated → INBOX (if not resolved)
+      // Rule 5/6: I participated (authored or replied) → INBOX (if not resolved)
       const mentionedInThread = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
       const status: "INBOX" | "ARCHIVED" = mentionedInThread
         ? "INBOX"
         : c.resolved
           ? "ARCHIVED"
-          : (doc.role === "AUTHOR" || c.iParticipated)
+          : (doc.role === "AUTHOR" || c.isThreadAuthor || c.isReplyAuthor)
             ? "INBOX"
             : "ARCHIVED";
 
@@ -126,7 +126,7 @@ export async function syncComments(
         type: "COMMENT",
         resolved: c.resolved,
         isThreadAuthor: c.isThreadAuthor,
-        iParticipated: c.iParticipated,
+        isReplyAuthor: c.isReplyAuthor,
         isRead: c.isRead,
         assignedToMe: c.assignedToMe,
         mentionedMe: mentionedInThread,
@@ -163,7 +163,7 @@ export async function syncComments(
         const mentionedInThreadMuted = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
         const changed =
           existing.resolved !== c.resolved ||
-          existing.iParticipated !== c.iParticipated ||
+          existing.isReplyAuthor !== c.isReplyAuthor ||
           existing.isRead !== effectiveIsRead ||
           existing.assignedToMe !== c.assignedToMe ||
           existing.mentionedMe !== mentionedInThreadMuted ||
@@ -176,7 +176,7 @@ export async function syncComments(
             where: { commentId: existing.commentId },
             data: {
               resolved: c.resolved,
-              iParticipated: c.iParticipated,
+              isReplyAuthor: c.isReplyAuthor,
               isRead: effectiveIsRead,
               assignedToMe: c.assignedToMe,
               mentionedMe: mentionedInThreadMuted,
@@ -232,7 +232,7 @@ export async function syncComments(
             status = "INBOX";
           }
           // If only self-replies, preserve existing status
-        } else if (c.iParticipated && !c.isThreadAuthor) {
+        } else if (c.isReplyAuthor && !c.isThreadAuthor) {
           // Rule 6: I participated (replied) on someone else's thread → INBOX
           // No self-reply filtering here: the spec says any activity on a thread
           // I replied on (that I didn't start) moves it to INBOX, including my
@@ -266,7 +266,7 @@ export async function syncComments(
       const mentionedInThreadUpdate = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
       const changed =
         existing.resolved !== c.resolved ||
-        existing.iParticipated !== c.iParticipated ||
+        existing.isReplyAuthor !== c.isReplyAuthor ||
         existing.isRead !== effectiveIsRead ||
         existing.assignedToMe !== c.assignedToMe ||
         existing.mentionedMe !== mentionedInThreadUpdate ||
@@ -280,7 +280,7 @@ export async function syncComments(
           where: { commentId: existing.commentId },
           data: {
             resolved: c.resolved,
-            iParticipated: c.iParticipated,
+            isReplyAuthor: c.isReplyAuthor,
             isRead: effectiveIsRead,
             assignedToMe: c.assignedToMe,
             mentionedMe: mentionedInThreadUpdate,
@@ -394,7 +394,7 @@ export async function syncComments(
         driveCreatedAt: doc.lastModifiedInDrive ?? new Date(),
       });
       // New suggestion: unarchive if I'm the doc author (suggestions have
-      // isThreadAuthor=false and iParticipated=false)
+      // isThreadAuthor=false and isReplyAuthor=false)
       if (doc.role === "AUTHOR") shouldUnarchive = true;
       hasNonResolveActivity = true;
     } else if (existing.suggestionType !== s.suggestionType) {

@@ -159,7 +159,7 @@ export interface DriveComment {
   id: string;
   resolved: boolean;
   isThreadAuthor: boolean;
-  iParticipated: boolean;
+  isReplyAuthor: boolean;
   iResolvedIt: boolean;
   isRead: boolean;
   assignedToMe: boolean;
@@ -176,9 +176,9 @@ export interface DriveComment {
 export function deriveCommentFlags(
   author: { me?: boolean | null } | undefined | null,
   replies: { action?: string | null; author?: { me?: boolean | null } | null }[]
-): { isThreadAuthor: boolean; iParticipated: boolean; iResolvedIt: boolean; isRead: boolean } {
+): { isThreadAuthor: boolean; isReplyAuthor: boolean; iResolvedIt: boolean; isRead: boolean } {
   const isThreadAuthor = author?.me === true;
-  const iParticipated = isThreadAuthor || replies.some(
+  const isReplyAuthor = replies.some(
     (r) => r.author?.me === true
   );
   const lastResolveReply = [...replies]
@@ -188,7 +188,7 @@ export function deriveCommentFlags(
   const isRead = replies.length > 0
     ? replies[replies.length - 1].author?.me === true
     : author?.me === true;
-  return { isThreadAuthor, iParticipated, iResolvedIt, isRead };
+  return { isThreadAuthor, isReplyAuthor, iResolvedIt, isRead };
 }
 
 export async function fetchComments(
@@ -491,7 +491,7 @@ function extractQuotedFileContent(
 export interface DriveThreadDetail {
   resolved: boolean;
   isThreadAuthor: boolean;
-  iParticipated: boolean;
+  isReplyAuthor: boolean;
   iResolvedIt: boolean;
   isRead: boolean;
   driveCreatedAt: Date | null;

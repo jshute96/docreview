@@ -135,7 +135,7 @@ export async function POST(
       data: {
         resolved: data.resolved,
         isThreadAuthor: data.isThreadAuthor,
-        iParticipated: data.iParticipated,
+        isReplyAuthor: data.isReplyAuthor,
         isRead: effectiveIsRead,
         ...(isMuted ? {} : { status }),
         driveCreatedAt: data.driveCreatedAt,

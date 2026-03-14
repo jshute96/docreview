@@ -265,7 +265,7 @@ comments typically trickle in one or two at a time.
 **Fields fetched per comment:** `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me))`
 
 **Fields stored per comment:** `driveCreatedAt`, `driveModifiedAt`, `replyCount` (= number
-of replies), plus `resolved`, `isThreadAuthor`, `iParticipated`, `iResolvedIt`. All Drive API
+of replies), plus `resolved`, `isThreadAuthor`, `isReplyAuthor`, `iResolvedIt`. All Drive API
 results are stored as `type: "COMMENT"`.
 
 **Deleted comment cleanup:** After processing all Drive results, any COMMENT records in the DB
@@ -284,7 +284,7 @@ skipped entirely otherwise — no write at all. Any previously-active suggestion
 returned by the Docs API is marked resolved.
 
 For full details on comment status logic (INBOX / ARCHIVED / MUTED, who-resolved-it
-detection, `isThreadAuthor` / `iParticipated`), see [`comment-tracking.md`](./comment-tracking.md).
+detection, `isThreadAuthor` / `isReplyAuthor`), see [`comment-tracking.md`](./comment-tracking.md).
 For the full picture on suggestions specifically, see [`suggestions.md`](./suggestions.md).
 
 ---

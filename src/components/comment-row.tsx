@@ -380,7 +380,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
               Mine
             </span>
           )}
-          {!isSuggestion && comment.iParticipated && !comment.isThreadAuthor && (
+          {!isSuggestion && comment.isReplyAuthor && !comment.isThreadAuthor && (
             <span title="You replied in this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700">
               Replied
             </span>

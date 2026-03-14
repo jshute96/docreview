@@ -19,9 +19,6 @@ export const docWithCountsInclude = {
       ]
     },
     select: {
-      type: true,
-      isThreadAuthor: true,
-      iParticipated: true,
       resolved: true,
       status: true,
       isRead: true,
@@ -35,22 +32,19 @@ export const docWithCommentsInclude = {
   comments: { orderBy: { driveCreatedAt: "asc" as const } },
 };
 
-/** Strip raw comments array and replace with computed _count */
+/** Add counts of comments in different states for the docs list page, and strip the raw comments array */
 export function withCommentCounts<
   T extends {
-    role: string;
-    comments: { type: string; isThreadAuthor: boolean; iParticipated: boolean; resolved: boolean; status: string; isRead: boolean }[]
+    comments: { resolved: boolean; status: string; isRead: boolean }[]
   },
 >(doc: T) {
   const { comments, ...rest } = doc;
-  const inboxFilter = (c: (typeof comments)[number]) =>
-    c.status === "INBOX" &&
-    (doc.role === "AUTHOR" || c.type === "SUGGESTION" || c.isThreadAuthor || c.iParticipated);
+  const isInbox = (c: (typeof comments)[number]) => c.status === "INBOX";
   return {
     ...rest,
     _count: {
-      unreadComments: comments.filter((c) => inboxFilter(c) && !c.isRead).length,
-      inboxComments: comments.filter(inboxFilter).length,
+      unreadComments: comments.filter((c) => isInbox(c) && !c.isRead).length,
+      inboxComments: comments.filter(isInbox).length,
       openComments: comments.filter((c) => !c.resolved).length,
     },
   };

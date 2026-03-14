@@ -76,7 +76,7 @@ function dbComment(overrides: Record<string, unknown> = {}) {
   return {
     commentId: "cr1", docId: "d1", googleCommentId: "c1",
     type: "COMMENT", suggestionType: null,
-    resolved: false, isThreadAuthor: false, iParticipated: false,
+    resolved: false, isThreadAuthor: false, isReplyAuthor: false,
     isRead: false, isStarred: false,
     assignedToMe: false, mentionedMe: false, mentionedMeUnreplied: false,
     status: "INBOX", driveCreatedAt: new Date("2024-06-01"),
@@ -92,7 +92,7 @@ function driveComment(overrides: Record<string, unknown> = {}) {
     id: "c1",
     resolved: false,
     isThreadAuthor: false,
-    iParticipated: false,
+    isReplyAuthor: false,
     iResolvedIt: false,
     isRead: false,
     assignedToMe: false,
@@ -140,7 +140,7 @@ describe("syncComments isInteresting logic", () => {
   it("unarchives for new comment where I participated (REVIEWER doc)", async () => {
     const doc = makeDoc({ role: "REVIEWER" });
     mockFetchComments.mockResolvedValue([
-      driveComment({ iParticipated: true }),
+      driveComment({ isReplyAuthor: true }),
     ]);
 
     const { shouldUnarchive } = await syncComments(doc, driveAuth);
@@ -150,7 +150,7 @@ describe("syncComments isInteresting logic", () => {
   it("does NOT unarchive for new comment on REVIEWER doc where I didn't participate", async () => {
     const doc = makeDoc({ role: "REVIEWER" });
     mockFetchComments.mockResolvedValue([
-      driveComment({ iParticipated: false }),
+      driveComment({ isReplyAuthor: false }),
     ]);
 
     const { shouldUnarchive } = await syncComments(doc, driveAuth);
@@ -160,7 +160,7 @@ describe("syncComments isInteresting logic", () => {
   it("does NOT unarchive when I resolved it myself", async () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockFetchComments.mockResolvedValue([
-      driveComment({ resolved: true, iResolvedIt: true, iParticipated: true }),
+      driveComment({ resolved: true, iResolvedIt: true, isReplyAuthor: true }),
     ]);
 
     const { shouldUnarchive } = await syncComments(doc, driveAuth);
@@ -189,17 +189,17 @@ describe("syncComments isInteresting logic", () => {
   it("does NOT unarchive for new comment where I participated when isRead", async () => {
     const doc = makeDoc({ role: "REVIEWER" });
     mockFetchComments.mockResolvedValue([
-      driveComment({ iParticipated: true, isRead: true }),
+      driveComment({ isReplyAuthor: true, isRead: true }),
     ]);
 
     const { shouldUnarchive } = await syncComments(doc, driveAuth);
     expect(shouldUnarchive).toBe(false);
   });
 
-  it("unarchives for new comment where isThreadAuthor implies iParticipated", async () => {
+  it("unarchives for new comment where isThreadAuthor (REVIEWER doc)", async () => {
     const doc = makeDoc({ role: "REVIEWER" });
     mockFetchComments.mockResolvedValue([
-      driveComment({ isThreadAuthor: true, iParticipated: true }),
+      driveComment({ isThreadAuthor: true }),
     ]);
 
     const { shouldUnarchive } = await syncComments(doc, driveAuth);
@@ -228,7 +228,7 @@ describe("syncComments isInteresting logic", () => {
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", replyCount: 1,
     }]);
     mockFetchComments.mockResolvedValue([
-      driveComment({ replyCount: 3, iParticipated: false, replyAuthorMeFlags: [false, false, false] }),
+      driveComment({ replyCount: 3, isReplyAuthor: false, replyAuthorMeFlags: [false, false, false] }),
     ]);
 
     const { shouldUnarchive } = await syncComments(doc, driveAuth);
@@ -338,8 +338,8 @@ describe("syncComments comment status", () => {
     expect(createCall.data[0].status).toBe("INBOX");
   });
 
-  it("creates new unresolved comment as INBOX when iParticipated", async () => {
-    mockFetchComments.mockResolvedValue([driveComment({ iParticipated: true })]);
+  it("creates new unresolved comment as INBOX when isReplyAuthor", async () => {
+    mockFetchComments.mockResolvedValue([driveComment({ isReplyAuthor: true })]);
 
     await syncComments(makeDoc(), driveAuth);
 
@@ -486,7 +486,7 @@ describe("syncComments self-reply detection", () => {
     }]);
     mockFetchComments.mockResolvedValue([
       driveComment({
-        isThreadAuthor: true, iParticipated: true,
+        isThreadAuthor: true, isReplyAuthor: true,
         replyCount: 1, replyAuthorMeFlags: [true],
         driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
       }),
@@ -506,7 +506,7 @@ describe("syncComments self-reply detection", () => {
     }]);
     mockFetchComments.mockResolvedValue([
       driveComment({
-        isThreadAuthor: true, iParticipated: true,
+        isThreadAuthor: true, isReplyAuthor: true,
         replyCount: 2, replyAuthorMeFlags: [true, false],
         driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
       }),
@@ -526,7 +526,7 @@ describe("syncComments self-reply detection", () => {
     }]);
     mockFetchComments.mockResolvedValue([
       driveComment({
-        isThreadAuthor: false, iParticipated: true,
+        isThreadAuthor: false, isReplyAuthor: true,
         replyCount: 2, replyAuthorMeFlags: [true, true],
         driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
       }),
@@ -544,7 +544,7 @@ describe("syncComments self-reply detection", () => {
 describe("syncComments @-mention detection", () => {
   it("new comment mentioning me → INBOX even on REVIEWER doc with no participation", async () => {
     mockFetchComments.mockResolvedValue([
-      driveComment({ mentionedMe: true, iParticipated: false }),
+      driveComment({ mentionedMe: true, isReplyAuthor: false }),
     ]);
 
     await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
