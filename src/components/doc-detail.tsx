@@ -240,6 +240,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
   // Increment to signal all rows to expand or collapse
   const [expandSignal, setExpandSignal] = useState(0);
+  const [expandUnreadSignal, setExpandUnreadSignal] = useState(0);
   const [collapseSignal, setCollapseSignal] = useState(0);
 
   function wouldBeFilteredOut(c: Comment): boolean {
@@ -873,6 +874,13 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
+                          onSelect={() => setExpandUnreadSignal((n) => n + 1)}
+                          disabled={!filteredComments.some((c) => !c.isRead)}
+                          title="Expand all unread comment threads"
+                        >
+                          Expand all unread
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                           onSelect={handleArchiveAllResolved}
                           disabled={bulkArchivingResolved || !filteredComments.some((c) => c.status === "INBOX" && c.resolved)}
                           title="Archive all visible comments that are Resolved"
@@ -915,6 +923,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
                   searchFilter={searchFilter}
                   documentText={documentText}
                   expandSignal={expandSignal}
+                  expandUnreadSignal={expandUnreadSignal}
                   collapseSignal={collapseSignal}
                 />
               ))}

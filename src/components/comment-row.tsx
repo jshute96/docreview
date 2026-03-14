@@ -26,6 +26,7 @@ interface CommentRowProps {
   searchFilter?: string;
   documentText?: string;
   expandSignal?: number;
+  expandUnreadSignal?: number;
   collapseSignal?: number;
 }
 
@@ -35,7 +36,7 @@ function splitContent(raw: string): { author: string | null; text: string } {
   return { author: raw.slice(0, sep), text: raw.slice(sep + 2) };
 }
 
-export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, collapseSignal }: CommentRowProps) {
+export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal }: CommentRowProps) {
   const isSuggestion = comment.type === "SUGGESTION";
   const currentModifiedMs = comment.driveModifiedAt
     ? new Date(comment.driveModifiedAt).getTime()
@@ -170,6 +171,13 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     setHasBeenExpanded(true);
     setExpanded(true);
   }, [expandSignal]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Expand All Unread — only expand if this comment is unread
+  useEffect(() => {
+    if (!expandUnreadSignal || expanded || comment.isRead) return;
+    setHasBeenExpanded(true);
+    setExpanded(true);
+  }, [expandUnreadSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!collapseSignal || !expanded || hasDirtyReply) return;
