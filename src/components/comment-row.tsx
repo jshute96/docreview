@@ -332,7 +332,13 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   const hasContentRow = isSuggestion ? (!!suggestionContent || comment.resolved) : !!content;
   const cellPy = hasContentRow ? "pt-1.5 pb-0" : "py-1.5";
   const { author, text } = content ? splitContent(content) : { author: null, text: "" };
-  const rowBg = hovered ? (comment.isRead ? "bg-green-100" : "bg-zinc-50") : (comment.isRead ? "bg-green-50" : "");
+  const isAssignedHighlight = comment.status === "INBOX" && comment.assignedToMe && !comment.resolved;
+  const isMentionedHighlight = !isAssignedHighlight && comment.status === "INBOX" && comment.mentionedMeUnreplied && !comment.isRead && !comment.resolved;
+  const rowBg = isAssignedHighlight
+    ? (hovered ? "bg-red-200" : "bg-red-100")
+    : isMentionedHighlight
+    ? (hovered ? "bg-amber-200" : "bg-amber-100")
+    : hovered ? (comment.isRead ? "bg-green-100" : "bg-zinc-50") : (comment.isRead ? "bg-green-50" : "");
   const rowCls = isExiting ? "pointer-events-none" : "transition-colors";
   const cellWrap = `grid${isExiting ? " transition-[grid-template-rows] duration-200 ease-out" : ""}`;
   const cellWrapStyle = { gridTemplateRows: isExiting ? "0fr" : "1fr" };

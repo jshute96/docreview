@@ -223,6 +223,12 @@ Both regex and literal substring matching are always attempted:
 - The same logic is used for both filtering (`matchesFilter`) and highlighting
   (`highlightText`), ensuring consistent behavior.
 
+**Row highlighting** (both comments page and docs page):
+- **Red background** — comment is in INBOX, assigned to me, and unresolved. On the docs page, the doc row is red if any comment matches.
+- **Amber background** — comment is in INBOX, has an unreplied @-mention of me, is unread, and unresolved. On the docs page, the doc row is amber if any comment matches.
+- **Green background** — comment is read (default read state). Only shown when neither red nor amber applies.
+- Red takes precedence over amber; both take precedence over green.
+
 The sortable data columns are Modified, Responses, and Status (which combines star, Mine/Replied/Assigned/@Mentioned badges, and Resolved/Open state into one column). The Assigned badge is shown in a darker style (amber-600) to stand out.
 Modified shows "—" when it equals Created (i.e., no replies have been added).
 

@@ -8,7 +8,7 @@ export type LabelWithCount = Label & {
 
 export type DocWithLabels = Doc & {
   labels: (DocLabel & { label: Label })[];
-  _count: { unreadComments: number; inboxComments: number; openComments: number };
+  _count: { unreadComments: number; inboxComments: number; openComments: number; assignedComments: number; mentionedComments: number };
 };
 
 export type DocWithComments = Doc & {

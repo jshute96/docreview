@@ -77,7 +77,13 @@ export function DocRow({
     : "";
 
   return (
-    <tr className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
+    <tr className={`border-b border-zinc-100 transition-colors ${
+      doc._count.assignedComments > 0
+        ? "bg-red-100 hover:bg-red-200"
+        : doc._count.mentionedComments > 0
+        ? "bg-amber-100 hover:bg-amber-200"
+        : "hover:bg-zinc-50"
+    }`}>
       <td className={`pl-4 pr-0 ${hasSubline ? "pt-1.5 pb-0.5" : "py-1.5"} w-0`}>
         <div className="flex items-center h-5">
           <StarButton starred={doc.isStarred} onToggle={handleToggleStar} />

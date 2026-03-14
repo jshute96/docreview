@@ -22,6 +22,8 @@ export const docWithCountsInclude = {
       resolved: true,
       status: true,
       isRead: true,
+      assignedToMe: true,
+      mentionedMeUnreplied: true,
     },
   },
 };
@@ -35,7 +37,7 @@ export const docWithCommentsInclude = {
 /** Add counts of comments in different states for the docs list page, and strip the raw comments array */
 export function withCommentCounts<
   T extends {
-    comments: { resolved: boolean; status: string; isRead: boolean }[]
+    comments: { resolved: boolean; status: string; isRead: boolean; assignedToMe: boolean; mentionedMeUnreplied: boolean }[]
   },
 >(doc: T) {
   const { comments, ...rest } = doc;
@@ -46,6 +48,8 @@ export function withCommentCounts<
       unreadComments: comments.filter((c) => isInbox(c) && !c.isRead).length,
       inboxComments: comments.filter(isInbox).length,
       openComments: comments.filter((c) => !c.resolved).length,
+      assignedComments: comments.filter((c) => isInbox(c) && c.assignedToMe && !c.resolved).length,
+      mentionedComments: comments.filter((c) => isInbox(c) && c.mentionedMeUnreplied && !c.isRead && !c.resolved).length,
     },
   };
 }

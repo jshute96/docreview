@@ -1,19 +1,24 @@
 import { describe, it, expect } from "vitest";
 import { withCommentCounts } from "./doc-queries";
 
+/** Shorthand: creates a comment with defaults for the new fields */
+function c(overrides: { status: string; resolved: boolean; isRead: boolean; assignedToMe?: boolean; mentionedMeUnreplied?: boolean }) {
+  return { assignedToMe: false, mentionedMeUnreplied: false, ...overrides };
+}
+
 describe("withCommentCounts", () => {
   it("counts all INBOX comments for REVIEWER", () => {
     const doc = {
       docId: "d1",
       role: "REVIEWER",
       comments: [
-        { status: "INBOX", resolved: false, isRead: false },
-        { status: "INBOX", resolved: false, isRead: true },
-        { status: "INBOX", resolved: false, isRead: false },
+        c({ status: "INBOX", resolved: false, isRead: false }),
+        c({ status: "INBOX", resolved: false, isRead: true }),
+        c({ status: "INBOX", resolved: false, isRead: false }),
         // Manual ARCHIVED unresolved thread: should NOT count
-        { status: "ARCHIVED", resolved: false, isRead: false },
+        c({ status: "ARCHIVED", resolved: false, isRead: false }),
         // Resolved but still INBOX: should count
-        { status: "INBOX", resolved: true, isRead: true },
+        c({ status: "INBOX", resolved: true, isRead: true }),
       ],
     };
     const result = withCommentCounts(doc);
@@ -26,9 +31,9 @@ describe("withCommentCounts", () => {
       docId: "d1",
       role: "AUTHOR",
       comments: [
-        { status: "INBOX", resolved: false, isRead: false },
-        { status: "INBOX", resolved: true, isRead: true },
-        { status: "ARCHIVED", resolved: false, isRead: false },
+        c({ status: "INBOX", resolved: false, isRead: false }),
+        c({ status: "INBOX", resolved: true, isRead: true }),
+        c({ status: "ARCHIVED", resolved: false, isRead: false }),
       ],
     };
     const result = withCommentCounts(doc);
@@ -39,10 +44,10 @@ describe("withCommentCounts", () => {
     const doc = {
       docId: "d1",
       comments: [
-        { status: "INBOX", resolved: false, isRead: false },
-        { status: "ARCHIVED", resolved: false, isRead: false },
-        { status: "MUTED", resolved: false, isRead: false },
-        { status: "ARCHIVED", resolved: true, isRead: false },
+        c({ status: "INBOX", resolved: false, isRead: false }),
+        c({ status: "ARCHIVED", resolved: false, isRead: false }),
+        c({ status: "MUTED", resolved: false, isRead: false }),
+        c({ status: "ARCHIVED", resolved: true, isRead: false }),
       ],
     };
     const result = withCommentCounts(doc);
@@ -50,18 +55,21 @@ describe("withCommentCounts", () => {
   });
 
   it("returns zero counts for empty comments", () => {
-    const doc = { docId: "d1", comments: [] as { resolved: boolean; status: string; isRead: boolean }[] };
+    const doc = { docId: "d1", comments: [] as ReturnType<typeof c>[] };
     const result = withCommentCounts(doc);
-    expect(result._count).toEqual({ unreadComments: 0, inboxComments: 0, openComments: 0 });
+    expect(result._count).toEqual({
+      unreadComments: 0, inboxComments: 0, openComments: 0,
+      assignedComments: 0, mentionedComments: 0,
+    });
   });
 
   it("unread counts only unread INBOX comments", () => {
     const doc = {
       docId: "d1",
       comments: [
-        { status: "INBOX", resolved: false, isRead: false },
-        { status: "INBOX", resolved: false, isRead: false },
-        { status: "INBOX", resolved: false, isRead: true },
+        c({ status: "INBOX", resolved: false, isRead: false }),
+        c({ status: "INBOX", resolved: false, isRead: false }),
+        c({ status: "INBOX", resolved: false, isRead: true }),
       ],
     };
     const result = withCommentCounts(doc);
@@ -74,11 +82,48 @@ describe("withCommentCounts", () => {
     const doc = {
       docId: "d1",
       title: "Test",
-      comments: [{ status: "INBOX", resolved: false, isRead: false }],
+      comments: [c({ status: "INBOX", resolved: false, isRead: false })],
     };
     const result = withCommentCounts(doc);
     expect(result).toHaveProperty("docId", "d1");
     expect(result).toHaveProperty("title", "Test");
     expect(result).not.toHaveProperty("comments");
+  });
+
+  it("counts assigned comments: INBOX + assignedToMe + unresolved", () => {
+    const doc = {
+      docId: "d1",
+      comments: [
+        c({ status: "INBOX", resolved: false, isRead: false, assignedToMe: true }),
+        c({ status: "INBOX", resolved: false, isRead: true, assignedToMe: true }),
+        // resolved assigned: should NOT count
+        c({ status: "INBOX", resolved: true, isRead: false, assignedToMe: true }),
+        // archived assigned: should NOT count
+        c({ status: "ARCHIVED", resolved: false, isRead: false, assignedToMe: true }),
+        // not assigned: should NOT count
+        c({ status: "INBOX", resolved: false, isRead: false }),
+      ],
+    };
+    const result = withCommentCounts(doc);
+    expect(result._count.assignedComments).toBe(2);
+  });
+
+  it("counts mentioned comments: INBOX + mentionedMeUnreplied + unread + unresolved", () => {
+    const doc = {
+      docId: "d1",
+      comments: [
+        c({ status: "INBOX", resolved: false, isRead: false, mentionedMeUnreplied: true }),
+        // read: should NOT count
+        c({ status: "INBOX", resolved: false, isRead: true, mentionedMeUnreplied: true }),
+        // resolved: should NOT count
+        c({ status: "INBOX", resolved: true, isRead: false, mentionedMeUnreplied: true }),
+        // archived: should NOT count
+        c({ status: "ARCHIVED", resolved: false, isRead: false, mentionedMeUnreplied: true }),
+        // not mentioned-unreplied: should NOT count
+        c({ status: "INBOX", resolved: false, isRead: false }),
+      ],
+    };
+    const result = withCommentCounts(doc);
+    expect(result._count.mentionedComments).toBe(1);
   });
 });

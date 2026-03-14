@@ -108,9 +108,11 @@ Easy:
 * comments
   * should be able to get current doc text (it only gives the original text)
   * should give current anchor location or unanchored state (it only has original location)
+  * should have a way to get emoji reactions on comments
 
 ## Possible V2 features
 * build doc veiwer and diff viewer, take over from doc's lame differ
 * support markdown docs too, with the same workflow, with comments in code review tools
 * plugin model so we can support other doc&comments backends
-
+  * code reviews too?
+* support other non-docs documents - any readable URL?  other drive files with comments?
