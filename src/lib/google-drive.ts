@@ -162,7 +162,9 @@ export interface DriveComment {
   iParticipated: boolean;
   iResolvedIt: boolean;
   isRead: boolean;
+  assignedToMe: boolean;
   mentionedMe: boolean;
+  mentionedMeUnreplied: boolean;
   driveCreatedAt: Date | null;
   driveModifiedAt: Date | null;
   replyCount: number;
@@ -208,7 +210,7 @@ export async function fetchComments(
       drive.comments.list({
         fileId: googleDocId,
         fields:
-          "nextPageToken, comments(id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me), mentionedEmailAddresses), mentionedEmailAddresses)",
+          "nextPageToken, comments(id, resolved, createdTime, modifiedTime, author(me), assigneeEmailAddress, replies(action, author(me), mentionedEmailAddresses), mentionedEmailAddresses)",
         ...(sinceStr ? { startModifiedTime: sinceStr } : {}),
         ...(pageToken ? { pageToken } : {}),
       }),
@@ -221,9 +223,13 @@ export async function fetchComments(
       const replies = c.replies ?? [];
       const flags = deriveCommentFlags(c.author, replies);
 
+      const assignedToMe = emailLower
+        ? (c as { assigneeEmailAddress?: string }).assigneeEmailAddress?.toLowerCase() === emailLower
+        : false;
       const mentionedMe = emailLower
         ? (c.mentionedEmailAddresses ?? []).some((e) => e.toLowerCase() === emailLower)
         : false;
+      const replyAuthorMeFlags = replies.map((r) => r.author?.me === true);
       const replyMentionedMeFlags = replies.map((r) =>
         emailLower
           ? ((r as { mentionedEmailAddresses?: string[] }).mentionedEmailAddresses ?? []).some(
@@ -232,16 +238,46 @@ export async function fetchComments(
           : false
       );
 
+      // mentionedMeUnreplied: true if there is a mention of me (in the
+      // comment itself or any reply) with no subsequent reply/resolve by me.
+      // Walk backwards through replies: if my reply or resolve comes before
+      // (i.e. after in time) the last mention, it's been replied to.
+      let mentionedMeUnreplied = false;
+      if (mentionedMe || replyMentionedMeFlags.some(Boolean)) {
+        // Find the index of the last mention of me (-1 means the comment itself)
+        let lastMentionIdx = -1;
+        for (let i = replyMentionedMeFlags.length - 1; i >= 0; i--) {
+          if (replyMentionedMeFlags[i]) { lastMentionIdx = i; break; }
+        }
+        if (lastMentionIdx === -1 && mentionedMe) {
+          // Mentioned in the comment itself; check if any reply is from me
+          mentionedMeUnreplied = !replyAuthorMeFlags.some(Boolean);
+        } else if (lastMentionIdx >= 0) {
+          // Check if there's a reply from me after the last mention
+          const hasMyReplyAfter = replyAuthorMeFlags.slice(lastMentionIdx + 1).some(Boolean);
+          mentionedMeUnreplied = !hasMyReplyAfter;
+        }
+      }
+
+      // Assignment takes precedence over @mention — if assigned to me,
+      // clear mention flags so they don't double-count.
+      const effectiveMentionedMe = assignedToMe ? false : mentionedMe;
+      const effectiveReplyMentionedMeFlags = assignedToMe
+        ? replyMentionedMeFlags.map(() => false)
+        : replyMentionedMeFlags;
+
       comments.push({
         id: c.id,
         resolved: c.resolved === true,
         ...flags,
-        mentionedMe,
+        assignedToMe,
+        mentionedMe: effectiveMentionedMe,
+        mentionedMeUnreplied: assignedToMe ? false : mentionedMeUnreplied,
         driveCreatedAt: c.createdTime ? new Date(c.createdTime) : null,
         driveModifiedAt: c.modifiedTime ? new Date(c.modifiedTime) : null,
         replyCount: replies.length,
-        replyAuthorMeFlags: replies.map((r) => r.author?.me === true),
-        replyMentionedMeFlags,
+        replyAuthorMeFlags,
+        replyMentionedMeFlags: effectiveReplyMentionedMeFlags,
       });
     }
 

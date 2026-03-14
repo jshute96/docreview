@@ -27,6 +27,9 @@ filter and sort controls.
 | `driveModifiedAt` | Drive | When the comment (or any reply) was last modified |
 | `replyCount` | Drive | Number of replies to the comment (not counting the original) |
 | `isRead` | Drive / User | Whether I've read this thread (see below) |
+| `assignedToMe` | Drive | The comment is assigned to me via `assigneeEmailAddress` |
+| `mentionedMe` | Drive | I was @mentioned anywhere in the thread (comment or any reply). Cleared when `assignedToMe` is true (assignment takes precedence) |
+| `mentionedMeUnreplied` | Drive | `mentionedMe` is true and there's no reply/resolve by me after the last mention. Cleared when `assignedToMe` is true |
 | `status` | User | `INBOX`, `ARCHIVED`, or `MUTED` — see below |
 
 ---
@@ -192,15 +195,20 @@ The doc detail page provides three ways to narrow the comment table:
 **Show mode** (mutually exclusive):
 - **Inbox** — only comments with `status = INBOX` (default)
 - **Open** — all unresolved comments regardless of status
-- **Resolved** — only resolved comments
 - **All** — every comment, including archived and muted
 
-**Toggle filters** (AND-combined with show mode):
-- **My threads** — keep only `iParticipated` (since `isThreadAuthor` implies `iParticipated`)
-- **My comments** — keep only `isThreadAuthor`
-- **Suggestions** — show only `type = SUGGESTION`
+**Tri-state badge filters** (AND-combined with show mode; each cycles off → include → exclude):
+- **Mine** — filter by `isThreadAuthor` (I started the thread)
+- **Replied** — filter by `iParticipated` (I replied in the thread)
+- **Assigned** — filter by `assignedToMe` (comment assigned to me). Only shown when any comment has this status.
+- **@Mentioned** — filter by `mentionedMe` (I was @mentioned in the thread). Only shown when any comment has this status.
+- **Resolved** — filter by `resolved`
+- **Unread** — filter by `!isRead` (someone else was the last to act)
 - **Starred** — tri-state star filter (off/starred-only/unstarred-only)
-- **Unread** — exclude threads where `isRead` (I wrote the last reply)
+- **Suggestions** — filter by `type = SUGGESTION`
+
+Mine, Replied, Assigned, and @Mentioned badges only appear in the filter bar when at
+least one comment in the doc has that status (regardless of current filter/view state).
 
 **Search filter**:
 The search bar at the top of the table allows filtering comments by text. The search is
@@ -215,7 +223,7 @@ Both regex and literal substring matching are always attempted:
 - The same logic is used for both filtering (`matchesFilter`) and highlighting
   (`highlightText`), ensuring consistent behavior.
 
-The sortable data columns are Modified, Responses, and Status (which combines star, Mine/Replied badges, and Resolved/Open state into one column).
+The sortable data columns are Modified, Responses, and Status (which combines star, Mine/Replied/Assigned/@Mentioned badges, and Resolved/Open state into one column). The Assigned badge is shown in a darker style (amber-600) to stand out.
 Modified shows "—" when it equals Created (i.e., no replies have been added).
 
 **Sort freezing on single-comment updates:** When you reply to, resolve, refresh, or
@@ -242,7 +250,7 @@ their own sync logic. They are displayed in the comment table and can be filtere
 
 - **Endpoint**: `GET /drive/v3/files/{fileId}/comments`
 - **`fields` is mandatory** — Drive returns nothing without it.
-- **Fields used for sync**: `id, resolved, createdTime, modifiedTime, author(me), mentionedEmailAddresses, replies(action, author(me), mentionedEmailAddresses)`
+- **Fields used for sync**: `id, resolved, createdTime, modifiedTime, author(me), assigneeEmailAddress, mentionedEmailAddresses, replies(action, author(me), mentionedEmailAddresses)`
 - **Fields used for thread display**: adds `content, htmlContent, quotedFileContent(mimeType, value), author(displayName), replies(content, htmlContent, createdTime, author(displayName))`
 - **`htmlContent`**: Read-only field with HTML formatting of comment/reply text (bold, italics, @mention links). The API recommends displaying `htmlContent` over plain `content`.
 - **`quotedFileContent`**: The document text the comment was anchored to at creation time. MIME type is typically `text/html` but in practice the value appears to contain no formatting markup. This is a snapshot — the text may have been edited or deleted since. The Drive API may also truncate long quoted text (the truncation format is undocumented). When the thread panel is shown, the quoted text is checked against the current document body (fetched once on page load via `/api/docs/[docId]/content`). If the text is no longer found, a warning is displayed. For Docs, the text is fetched via `fetchDocContent` (a single Docs API `documents.get` call that also extracts suggestion content); for Slides, via `fetchFileTextViaExport` (Drive `files.export` as `text/plain`). Sheets are not checked. Note: `fetchDocContent` uses `SUGGESTIONS_INLINE` mode, so the document text includes pending suggestion text — anchor-text matching may false-positive if a suggestion overlaps the anchor region, but the consequence is only a spurious warning.
@@ -275,8 +283,16 @@ once and used for three derived fields:
   the unread comment count on the docs page.
 - **`replyCount`** — `replies.length`: total number of replies to the original comment,
   including resolve actions. No extra API call; derived from the already-fetched replies.
-- **`mentionedMe`** — whether the initial comment's `mentionedEmailAddresses` includes
-  the current user's email (case-insensitive).
+- **`assignedToMe`** — whether `comment.assigneeEmailAddress` matches the current user's
+  email (case-insensitive). Assignment is a comment-level property, not per-reply.
+- **`mentionedMe`** (on DriveComment) — whether the initial comment's `mentionedEmailAddresses`
+  includes the current user's email (case-insensitive). On the DB record, this is the union
+  across the comment and all replies. **Cleared when `assignedToMe` is true** — assignment
+  takes precedence over @mention to avoid double-counting (Drive always @mentions the assignee).
+- **`mentionedMeUnreplied`** — true when `mentionedMe` is true (in the thread) and there
+  is no reply/resolve by me after the last mention. Computed by finding the last mention index
+  and checking for a subsequent reply from me. Cleared when `assignedToMe` is true.
 - **`replyMentionedMeFlags`** — per-reply boolean array: whether each reply's
   `mentionedEmailAddresses` includes the current user's email. Used alongside
   `replyAuthorMeFlags` to detect new @-mentions in new replies (via `.slice(existing.replyCount)`).
+  Cleared (all false) when `assignedToMe` is true.

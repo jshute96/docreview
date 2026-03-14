@@ -71,6 +71,21 @@ beforeEach(() => {
   mockFetchSuggestions.mockResolvedValue([]);
 });
 
+// Helper: a DB comment record (from Prisma findMany) with sensible defaults
+function dbComment(overrides: Record<string, unknown> = {}) {
+  return {
+    commentId: "cr1", docId: "d1", googleCommentId: "c1",
+    type: "COMMENT", suggestionType: null,
+    resolved: false, isThreadAuthor: false, iParticipated: false,
+    isRead: false, isStarred: false,
+    assignedToMe: false, mentionedMe: false, mentionedMeUnreplied: false,
+    status: "INBOX", driveCreatedAt: new Date("2024-06-01"),
+    driveModifiedAt: new Date("2024-06-10"), replyCount: 0,
+    createdAt: new Date(), updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
 // Helper: a single Drive comment with sensible defaults
 function driveComment(overrides: Record<string, unknown> = {}) {
   return {
@@ -80,7 +95,9 @@ function driveComment(overrides: Record<string, unknown> = {}) {
     iParticipated: false,
     iResolvedIt: false,
     isRead: false,
+    assignedToMe: false,
     mentionedMe: false,
+    mentionedMeUnreplied: false,
     driveCreatedAt: new Date("2024-06-01"),
     driveModifiedAt: new Date("2024-06-10"),
     replyCount: 0,

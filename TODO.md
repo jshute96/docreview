@@ -13,7 +13,6 @@ P1:
     * accept/reject links
     * thread contents? (maybe)
   * requesting your review
-  * item assigned to you
 * testing
   * test scripts for playwright testing of all interactions
 * no user info the database - fetch doc titles live
@@ -30,7 +29,6 @@ Easy:
 * Text is hard to read on unselected tags.  Especially white.
 * link URL includes filters, labels, etc.
 
-* Remember state/tag for @mentioned on comment, with mine/replied and resolved
 * Cancel API requests and other work on tab close?
 
 * Dialog boxes

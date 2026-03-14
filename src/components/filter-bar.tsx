@@ -84,7 +84,7 @@ export function FilterBar({
           value={isAuthor}
           onChange={onIsAuthorChange}
           colors={TRISTATE_COLORS.author}
-          className="rounded-full"
+          className="rounded"
           title="Docs that have the Author tag"
         />
 
@@ -130,7 +130,7 @@ export function FilterBar({
           onChange={onHasCommentsChange}
           colors={TRISTATE_COLORS.author}
           className="rounded"
-          title="With open comments"
+          title="Docs with open comments"
         />
 
       </div>

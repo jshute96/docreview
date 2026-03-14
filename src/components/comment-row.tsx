@@ -385,6 +385,16 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
               Replied
             </span>
           )}
+          {!isSuggestion && comment.assignedToMe && (
+            <span title="Comment assigned to you" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-amber-600 text-white">
+              Assigned
+            </span>
+          )}
+          {!isSuggestion && comment.mentionedMe && (
+            <span title="You were @mentioned in this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700">
+              @Mentioned
+            </span>
+          )}
           {comment.resolved && (
             <span title="This comment has been resolved" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-zinc-100 text-zinc-500">
               Resolved

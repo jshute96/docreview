@@ -1,59 +1,102 @@
 "use client";
 
 import type { TriState } from "@/lib/tri-state";
+import { TriStateButton, type TriStateColorConfig } from "@/components/tri-state-button";
 import { TriStateStarButton } from "@/components/star-button";
 import { XIcon } from "@/components/x-icon";
 
+const COMMENT_TRISTATE_COLORS: Record<string, TriStateColorConfig> = {
+  mine: {
+    off: "bg-blue-100 text-blue-700 ring-1 ring-blue-300 hover:bg-blue-200",
+    include: "bg-blue-600 text-white ring-1 ring-blue-700",
+    exclude: "bg-blue-100 text-blue-700 ring-1 ring-blue-300",
+  },
+  replied: {
+    off: "bg-violet-100 text-violet-700 ring-1 ring-violet-300 hover:bg-violet-200",
+    include: "bg-violet-600 text-white ring-1 ring-violet-700",
+    exclude: "bg-violet-100 text-violet-700 ring-1 ring-violet-300",
+  },
+  assigned: {
+    off: "bg-amber-100 text-amber-700 ring-1 ring-amber-300 hover:bg-amber-200",
+    include: "bg-amber-600 text-white ring-1 ring-amber-700",
+    exclude: "bg-amber-100 text-amber-700 ring-1 ring-amber-300",
+  },
+  mentioned: {
+    off: "bg-orange-100 text-orange-700 ring-1 ring-orange-300 hover:bg-orange-200",
+    include: "bg-orange-600 text-white ring-1 ring-orange-700",
+    exclude: "bg-orange-100 text-orange-700 ring-1 ring-orange-300",
+  },
+  resolved: {
+    off: "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-300 hover:bg-zinc-200",
+    include: "bg-zinc-600 text-white ring-1 ring-zinc-700",
+    exclude: "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-300",
+  },
+  suggestions: {
+    off: "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-300 hover:bg-zinc-200",
+    include: "bg-zinc-600 text-white ring-1 ring-zinc-700",
+    exclude: "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-300",
+  },
+  unread: {
+    off: "bg-green-50 text-green-700 ring-1 ring-green-300 hover:bg-green-100",
+    include: "bg-green-600 text-white ring-1 ring-green-700",
+    exclude: "bg-green-50 text-green-700 ring-1 ring-green-300",
+  },
+};
+
 type ShowMode = "inbox" | "open" | "resolved" | "all";
 interface CommentFilterBarProps {
-  myThreadsFilter: boolean;
-  myCommentsFilter: boolean;
+  mineFilter: TriState;
+  repliedFilter: TriState;
+  assignedFilter: TriState;
+  mentionedFilter: TriState;
+  showMine?: boolean;
+  showReplied?: boolean;
+  showAssigned?: boolean;
+  showMentioned?: boolean;
+  resolvedFilter: TriState;
   showMode: ShowMode;
-  suggestionsOnly: boolean;
+  suggestionsFilter: TriState;
   isStarred: TriState;
-  unrepliedFilter: boolean;
+  unreadFilter: TriState;
   searchFilter: string;
-  onMyThreadsChange: (v: boolean) => void;
-  onMyCommentsChange: (v: boolean) => void;
+  onMineChange: (v: TriState) => void;
+  onRepliedChange: (v: TriState) => void;
+  onAssignedChange: (v: TriState) => void;
+  onMentionedChange: (v: TriState) => void;
+  onResolvedChange: (v: TriState) => void;
   onShowModeChange: (v: ShowMode) => void;
-  onSuggestionsOnlyChange: (v: boolean) => void;
+  onSuggestionsChange: (v: TriState) => void;
   onIsStarredChange: (v: TriState) => void;
-  onUnrepliedChange: (v: boolean) => void;
+  onUnreadChange: (v: TriState) => void;
   onSearchFilterChange: (v: string) => void;
 }
 
 export function CommentFilterBar({
-  myThreadsFilter,
-  myCommentsFilter,
+  mineFilter,
+  repliedFilter,
+  assignedFilter,
+  mentionedFilter,
+  showMine = true,
+  showReplied = true,
+  showAssigned = true,
+  showMentioned = true,
+  resolvedFilter,
   showMode,
-  suggestionsOnly,
+  suggestionsFilter,
   isStarred,
-  unrepliedFilter,
+  unreadFilter,
   searchFilter,
-  onMyThreadsChange,
-  onMyCommentsChange,
+  onMineChange,
+  onRepliedChange,
+  onAssignedChange,
+  onMentionedChange,
+  onResolvedChange,
   onShowModeChange,
-  onSuggestionsOnlyChange,
+  onSuggestionsChange,
   onIsStarredChange,
-  onUnrepliedChange,
+  onUnreadChange,
   onSearchFilterChange,
 }: CommentFilterBarProps) {
-  function toggleBtn(active: boolean, label: string, onClick: () => void, title?: string) {
-    return (
-      <button
-        onClick={onClick}
-        title={title}
-        className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-          active
-            ? "bg-zinc-800 text-white"
-            : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
-        }`}
-      >
-        {label}
-      </button>
-    );
-  }
-
   return (
     <fieldset className="rounded-lg border border-zinc-200 px-4 py-2">
       <legend className="px-1 text-xs font-medium text-zinc-900 uppercase tracking-wide">
@@ -62,40 +105,41 @@ export function CommentFilterBar({
       <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
 
-        {toggleBtn(myThreadsFilter, "My threads", () => onMyThreadsChange(!myThreadsFilter), "Threads I participated in")}
-        <div className="h-4 w-px bg-zinc-200" />
-        {toggleBtn(myCommentsFilter, "My comments", () => onMyCommentsChange(!myCommentsFilter), "Threads I started")}
+        <div className="flex flex-wrap items-center gap-2">
+          {showMine && <TriStateButton label="Mine" value={mineFilter} onChange={onMineChange} colors={COMMENT_TRISTATE_COLORS.mine} title="Threads you started" className="rounded" />}
+          {showReplied && <TriStateButton label="Replied" value={repliedFilter} onChange={onRepliedChange} colors={COMMENT_TRISTATE_COLORS.replied} title="Threads you replied in" className="rounded" />}
+          {showAssigned && <TriStateButton label="Assigned" value={assignedFilter} onChange={onAssignedChange} colors={COMMENT_TRISTATE_COLORS.assigned} title="Comments assigned to you" className="rounded" />}
+          {showMentioned && <TriStateButton label="@Mentioned" value={mentionedFilter} onChange={onMentionedChange} colors={COMMENT_TRISTATE_COLORS.mentioned} title="Threads where you were @mentioned" className="rounded" />}
+          <TriStateButton label="Resolved" value={resolvedFilter} onChange={onResolvedChange} colors={COMMENT_TRISTATE_COLORS.resolved} title="Resolved comments" className="rounded" />
+          <TriStateButton label="Unread" value={unreadFilter} onChange={onUnreadChange} colors={COMMENT_TRISTATE_COLORS.unread} title="Unread comments" className="rounded" />
+        </div>
         <div className="h-4 w-px bg-zinc-200" />
         <TriStateStarButton value={isStarred} onChange={onIsStarredChange} />
         <div className="h-4 w-px bg-zinc-200" />
-        {toggleBtn(suggestionsOnly, "Suggestions", () => onSuggestionsOnlyChange(!suggestionsOnly), "Show suggestions")}
+        <TriStateButton label="Suggestions" value={suggestionsFilter} onChange={onSuggestionsChange} colors={COMMENT_TRISTATE_COLORS.suggestions} title="Suggestions" className="rounded" />
 
         <div className="h-4 w-px bg-zinc-200" />
 
-        <div className="flex items-center gap-1">
-          {(["inbox", "open", "resolved", "all"] as const).map((mode) => (
+        <div className="flex items-center gap-2">
+          {(["inbox", "open", "all"] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => onShowModeChange(mode)}
               title={{
                 inbox: "Show inbox comments",
                 open: "Show all unresolved comments",
-                resolved: "Show only resolved comments",
                 all: "Show all comments including resolved"
               }[mode]}
               className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
                 showMode === mode
                   ? "bg-zinc-800 text-white"
-                  : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+                  : "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-300 hover:bg-zinc-200"
               }`}
             >
               {mode.charAt(0).toUpperCase() + mode.slice(1)}
             </button>
           ))}
         </div>
-
-        <div className="h-4 w-px bg-zinc-200" />
-        {toggleBtn(unrepliedFilter, "Unread", () => onUnrepliedChange(!unrepliedFilter), "Show only unread comments")}
 
       </div>
 

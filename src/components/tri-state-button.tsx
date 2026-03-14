@@ -70,9 +70,9 @@ export interface TriStateColorConfig {
 
 export const TRISTATE_COLORS = {
   author: {
-    off: "bg-blue-50 text-blue-400 hover:bg-blue-100",
-    include: "bg-blue-600 text-white",
-    exclude: "bg-blue-50 text-blue-400",
+    off: "bg-blue-100 text-blue-700 ring-1 ring-blue-300 hover:bg-blue-200",
+    include: "bg-blue-600 text-white ring-1 ring-blue-700",
+    exclude: "bg-blue-100 text-blue-700 ring-1 ring-blue-300",
   },
 } as const;
 

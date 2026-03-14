@@ -128,6 +128,9 @@ export async function syncComments(
         isThreadAuthor: c.isThreadAuthor,
         iParticipated: c.iParticipated,
         isRead: c.isRead,
+        assignedToMe: c.assignedToMe,
+        mentionedMe: mentionedInThread,
+        mentionedMeUnreplied: c.mentionedMeUnreplied,
         status,
         driveCreatedAt: c.driveCreatedAt,
         driveModifiedAt: c.driveModifiedAt,
@@ -157,10 +160,14 @@ export async function syncComments(
         // Only update isRead from Drive when driveModifiedAt changed (new activity)
         const modifiedChanged = !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
         const effectiveIsRead = modifiedChanged ? c.isRead : existing.isRead;
+        const mentionedInThreadMuted = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
         const changed =
           existing.resolved !== c.resolved ||
           existing.iParticipated !== c.iParticipated ||
           existing.isRead !== effectiveIsRead ||
+          existing.assignedToMe !== c.assignedToMe ||
+          existing.mentionedMe !== mentionedInThreadMuted ||
+          existing.mentionedMeUnreplied !== c.mentionedMeUnreplied ||
           !datesEqual(existing.driveCreatedAt, c.driveCreatedAt) ||
           modifiedChanged ||
           existing.replyCount !== c.replyCount;
@@ -171,6 +178,9 @@ export async function syncComments(
               resolved: c.resolved,
               iParticipated: c.iParticipated,
               isRead: effectiveIsRead,
+              assignedToMe: c.assignedToMe,
+              mentionedMe: mentionedInThreadMuted,
+              mentionedMeUnreplied: c.mentionedMeUnreplied,
               driveCreatedAt: c.driveCreatedAt,
               driveModifiedAt: c.driveModifiedAt,
               replyCount: c.replyCount,
@@ -253,10 +263,14 @@ export async function syncComments(
       // Only update isRead from Drive when driveModifiedAt changed (new activity)
       const modifiedChanged = !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
       const effectiveIsRead = modifiedChanged ? c.isRead : existing.isRead;
+      const mentionedInThreadUpdate = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
       const changed =
         existing.resolved !== c.resolved ||
         existing.iParticipated !== c.iParticipated ||
         existing.isRead !== effectiveIsRead ||
+        existing.assignedToMe !== c.assignedToMe ||
+        existing.mentionedMe !== mentionedInThreadUpdate ||
+        existing.mentionedMeUnreplied !== c.mentionedMeUnreplied ||
         existing.status !== status ||
         !datesEqual(existing.driveCreatedAt, c.driveCreatedAt) ||
         modifiedChanged ||
@@ -268,6 +282,9 @@ export async function syncComments(
             resolved: c.resolved,
             iParticipated: c.iParticipated,
             isRead: effectiveIsRead,
+            assignedToMe: c.assignedToMe,
+            mentionedMe: mentionedInThreadUpdate,
+            mentionedMeUnreplied: c.mentionedMeUnreplied,
             status,
             driveCreatedAt: c.driveCreatedAt,
             driveModifiedAt: c.driveModifiedAt,

@@ -11,6 +11,7 @@ import { LabelBadge } from "@/components/label-badge";
 import { EditDocDialog } from "@/components/edit-doc-dialog";
 import { DeleteReAddDialog } from "@/components/delete-readd-dialog";
 import { ROLE_COLORS } from "@/lib/role-colors";
+import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -213,12 +214,20 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   useCrossTabListener(handleCrossTab);
 
-  const [myThreadsFilter, setMyThreadsFilter] = useState(false);
-  const [myCommentsFilter, setMyCommentsFilter] = useState(false);
+  const hasAnyMine = comments.some((c) => c.isThreadAuthor);
+  const hasAnyReplied = comments.some((c) => c.iParticipated && !c.isThreadAuthor);
+  const hasAnyAssigned = comments.some((c) => c.assignedToMe);
+  const hasAnyMentioned = comments.some((c) => c.mentionedMe);
+
+  const [mineFilter, setMineFilter] = useState<TriState>("off");
+  const [repliedFilter, setRepliedFilter] = useState<TriState>("off");
+  const [assignedFilter, setAssignedFilter] = useState<TriState>("off");
+  const [mentionedFilter, setMentionedFilter] = useState<TriState>("off");
+  const [resolvedFilter, setResolvedFilter] = useState<TriState>("off");
   const [showMode, setShowMode] = useState<"inbox" | "open" | "resolved" | "all">("inbox");
-  const [suggestionsOnly, setSuggestionsOnly] = useState(false);
-  const [unrepliedFilter, setUnrepliedFilter] = useState(false);
-  const [isStarredFilter, setIsStarredFilter] = useState<"off" | "include" | "exclude">("off");
+  const [suggestionsFilter, setSuggestionsFilter] = useState<TriState>("off");
+  const [unreadFilter, setUnreadFilter] = useState<TriState>("off");
+  const [isStarredFilter, setIsStarredFilter] = useState<TriState>("off");
   const [searchFilter, setSearchFilter] = useState("");
   type SortCol = "driveCreatedAt" | "driveModifiedAt" | "replyCount" | "iParticipated" | "resolved";
   type SortDir = "asc" | "desc";
@@ -234,7 +243,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   // Re-enable sorting when any filter changes so the new view is properly sorted
   useEffect(() => {
     setSortActive(true);
-  }, [showMode, myThreadsFilter, myCommentsFilter, suggestionsOnly, isStarredFilter, searchFilter]);
+  }, [showMode, mineFilter, repliedFilter, assignedFilter, mentionedFilter, resolvedFilter, suggestionsFilter, isStarredFilter, searchFilter]);
 
   // IDs of comments animating out (slide collapse) before removal from the filtered list
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
@@ -244,13 +253,23 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
   const [collapseSignal, setCollapseSignal] = useState(0);
 
   function wouldBeFilteredOut(c: Comment): boolean {
-    if (suggestionsOnly && c.type !== "SUGGESTION") return true;
     if (showMode === "inbox" && (c.status === "ARCHIVED" || c.status === "MUTED")) return true;
     if (showMode === "open" && c.resolved) return true;
     if (showMode === "resolved" && !c.resolved) return true;
-    if (myThreadsFilter && !c.iParticipated) return true;
-    if (myCommentsFilter && !c.isThreadAuthor) return true;
-    if (unrepliedFilter && c.isRead) return true;
+    if (mineFilter === "include" && !c.isThreadAuthor) return true;
+    if (mineFilter === "exclude" && c.isThreadAuthor) return true;
+    if (repliedFilter === "include" && !c.iParticipated) return true;
+    if (repliedFilter === "exclude" && c.iParticipated) return true;
+    if (assignedFilter === "include" && !c.assignedToMe) return true;
+    if (assignedFilter === "exclude" && c.assignedToMe) return true;
+    if (mentionedFilter === "include" && !c.mentionedMe) return true;
+    if (mentionedFilter === "exclude" && c.mentionedMe) return true;
+    if (resolvedFilter === "include" && !c.resolved) return true;
+    if (resolvedFilter === "exclude" && c.resolved) return true;
+    if (suggestionsFilter === "include" && c.type !== "SUGGESTION") return true;
+    if (suggestionsFilter === "exclude" && c.type === "SUGGESTION") return true;
+    if (unreadFilter === "include" && c.isRead) return true;
+    if (unreadFilter === "exclude" && !c.isRead) return true;
     if (isStarredFilter === "include" && !c.isStarred) return true;
     if (isStarredFilter === "exclude" && c.isStarred) return true;
     return false;
@@ -779,19 +798,29 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
       {/* Filters */}
       <CommentFilterBar
-        myThreadsFilter={myThreadsFilter}
-        myCommentsFilter={myCommentsFilter}
+        mineFilter={mineFilter}
+        repliedFilter={repliedFilter}
+        assignedFilter={assignedFilter}
+        mentionedFilter={mentionedFilter}
+        showMine={hasAnyMine}
+        showReplied={hasAnyReplied}
+        showAssigned={hasAnyAssigned}
+        showMentioned={hasAnyMentioned}
+        resolvedFilter={resolvedFilter}
         showMode={showMode}
-        suggestionsOnly={suggestionsOnly}
+        suggestionsFilter={suggestionsFilter}
         isStarred={isStarredFilter}
-        unrepliedFilter={unrepliedFilter}
+        unreadFilter={unreadFilter}
         searchFilter={searchFilter}
-        onMyThreadsChange={setMyThreadsFilter}
-        onMyCommentsChange={setMyCommentsFilter}
+        onMineChange={setMineFilter}
+        onRepliedChange={setRepliedFilter}
+        onAssignedChange={setAssignedFilter}
+        onMentionedChange={setMentionedFilter}
+        onResolvedChange={setResolvedFilter}
         onShowModeChange={setShowMode}
-        onSuggestionsOnlyChange={setSuggestionsOnly}
+        onSuggestionsChange={setSuggestionsFilter}
         onIsStarredChange={setIsStarredFilter}
-        onUnrepliedChange={setUnrepliedFilter}
+        onUnreadChange={setUnreadFilter}
         onSearchFilterChange={setSearchFilter}
       />
 
