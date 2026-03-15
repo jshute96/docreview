@@ -46,7 +46,8 @@ Docreview uses three distinct Google APIs for syncing:
 
 Queries for Docs, Sheets, and Slides modified in a time window. Used by the Load dialog's
 scan phase (`POST /api/docs/scan`) and as a bootstrap fallback when no changes page token
-exists (Refresh with no prior sync).
+exists (Refresh with no prior sync). **Includes Shared Drives** when the `includeSharedDrives`
+option is selected (uses `corpora: "allDrives"` and `includeItemsFromAllDrives: true`).
 
 **Query:** `mimeType in (doc, sheet, slides) AND modifiedTime > cutoff AND trashed = false`
 **Fields:** `id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName)`
@@ -55,13 +56,14 @@ exists (Refresh with no prior sync).
 ### Drive API v3 — `files.get` (Load mode)
 
 Fetches metadata for specific docs by ID. Used by Load mode to get fresh metadata for the
-user's selected docs (both Drive and Gmail sources).
+user's selected docs (both Drive and Gmail sources). Always uses `supportsAllDrives: true`
+to ensure Shared Drive docs are accessible.
 
 ### Drive API v3 — `changes.list` (Refresh / Full Refresh)
 
 Returns all file-level mutations (edits, deletions, permission changes, renames, trashes)
 since a saved page token. Purpose-built for incremental sync — cheap to poll when nothing
-has changed.
+has changed. Always includes changes from **Shared Drives** (uses `includeItemsFromAllDrives: true`).
 
 **Fields:** `removed, fileId, file(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed)`
 **Pagination:** `pageSize: 1000`, follows `nextPageToken` until `newStartPageToken` is returned.

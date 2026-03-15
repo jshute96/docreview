@@ -103,6 +103,15 @@ for details.
 server independently verifies ownership and validates all inputs. The client
 never has access to Google tokens or other users' data.
 
+## Redirect Resolution
+
+When adding documents by URL, users may provide shortened redirect URLs (e.g., `go/my-doc`). Docreview employs a two-tier resolution strategy:
+
+1.  **Server-side Fallback:** The `/api/docs/validate` endpoint first attempts to follow redirects using a standard server-side `fetch` with `redirect: "follow"`. This works for public redirectors but fails for those requiring browser-based authentication.
+2.  **Extension-based Resolution:** If the server-side check fails and the Chrome extension is installed, the client initiates resolution via the extension bridge. The extension follows the redirect in a background tab, leveraging the user's active browser session and cookies to resolve auth-walled shorteners.
+
+Once a final Google Drive URL is obtained, it is re-validated against the Drive API to extract the canonical file ID and metadata.
+
 ## Data Sync
 
 Documents enter the system through three paths:
