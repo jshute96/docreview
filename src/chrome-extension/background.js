@@ -147,17 +147,145 @@ chrome.action.onClicked.addListener(async function(tab) {
   chrome.tabs.create({ url: baseUrl + '/open?doc=' + encodeURIComponent(tab.url), index: tab.index + 1 });
 });
 
-// Handle "Open in Docreview" link clicks from the content script's injected Gmail bar.
-// Uses the same logic as the toolbar click — finds the doc URL fresh at click time.
+// Handle messages from content scripts.
+// - openDocInDocreview: from Gmail content script, opens doc in Docreview
+// - ping: from docreview-bridge, returns extension status
+// - resolveUrl: from docreview-bridge, follows redirects to resolve shortened URLs
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   if (msg.type === 'openDocInDocreview' && sender.tab) {
     openDocFromGmailTab(sender.tab.id);
+    return;
+  }
+
+  if (msg.type === 'ping') {
+    chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl }, function(config) {
+      sendResponse({ version: 1, baseUrl: config.baseUrl });
+    });
+    return true; // async response
+  }
+
+  if (msg.type === 'resolveUrl') {
+    resolveUrlViaTab(msg.url, msg.pageId).then(function(result) {
+      sendResponse(result);
+    });
+    return true; // async response
+  }
+
+  if (msg.type === 'cancelResolve') {
+    cancelResolveTabs(msg.pageId);
+    return;
+  }
+});
+
+// Resolve a shortened URL by opening it in a background tab and watching
+// for a redirect to a Google Docs/Drive URL. This works for shorteners that
+// require browser authentication because the tab has access
+// to the user's cookies.
+function isGoogleDocUrl(url) {
+  return /docs\.google\.com\/(document|spreadsheets|presentation)\/d\//.test(url) ||
+    /drive\.google\.com\/file\/d\//.test(url) ||
+    /drive\.google\.com\/.*[?&]id=/.test(url);
+}
+
+// Track in-flight resolve tabs so they can be cancelled.
+// Keyed by tabId, each entry includes the pageId that requested it.
+var pendingResolveTabs = new Map(); // tabId -> { pageId, timeout, listener, resolve }
+
+function cancelResolveTabs(pageId) {
+  pendingResolveTabs.forEach(function(pending, tabId) {
+    if (pending.pageId !== pageId) return;
+    clearTimeout(pending.timeout);
+    chrome.tabs.onUpdated.removeListener(pending.listener);
+    pendingResolveTabs.delete(tabId);
+    try { chrome.tabs.remove(tabId); } catch (e) { /* tab may already be closed */ }
+    pending.resolve({ resolved: false, error: 'cancelled' });
+  });
+}
+
+function resolveUrlViaTab(url, pageId) {
+  return new Promise(function(resolve) {
+    chrome.tabs.create({ url: url, active: false }, function(tab) {
+      var tabId = tab.id;
+
+      function cleanup() {
+        clearTimeout(timeout);
+        chrome.tabs.onUpdated.removeListener(listener);
+        pendingResolveTabs.delete(tabId);
+        try { chrome.tabs.remove(tabId); } catch (e) { /* tab may already be closed */ }
+      }
+
+      var timeout = setTimeout(function() {
+        cleanup();
+        resolve({ resolved: false, error: 'timeout' });
+      }, 5000);
+
+      function listener(updatedTabId, changeInfo) {
+        if (updatedTabId !== tabId) return;
+
+        // changeInfo.url fires when the tab URL changes (including redirects)
+        var newUrl = changeInfo.url;
+        if (newUrl && isGoogleDocUrl(newUrl)) {
+          cleanup();
+          resolve({ resolved: true, url: newUrl });
+          return;
+        }
+
+        // If the page finished loading and it's not a Google Doc, give up.
+        // This handles errors (DNS failure, connection refused), pages that
+        // aren't redirects, and redirects to non-Google destinations.
+        if (changeInfo.status === 'complete') {
+          chrome.tabs.get(tabId, function(t) {
+            if (t && t.url && !isGoogleDocUrl(t.url)) {
+              cleanup();
+              resolve({ resolved: false });
+            }
+          });
+        }
+      }
+
+      chrome.tabs.onUpdated.addListener(listener);
+      pendingResolveTabs.set(tabId, { pageId: pageId, timeout: timeout, listener: listener, resolve: resolve });
+    });
+  });
+}
+
+// Dynamically register the docreview-bridge content script for the configured
+// baseUrl. This lets the web app detect the extension and send it messages
+// (e.g. to resolve shortened URLs). Re-registers whenever baseUrl changes.
+var BRIDGE_SCRIPT_ID = 'docreview-bridge';
+
+async function registerBridgeScript() {
+  var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
+  var origin = baseUrl.replace(/\/+$/, '');
+  var pattern = origin + '/*';
+
+  // Unregister first (may not exist yet, ignore errors)
+  try { await chrome.scripting.unregisterContentScripts({ ids: [BRIDGE_SCRIPT_ID] }); }
+  catch (e) { /* not registered yet */ }
+
+  try {
+    await chrome.scripting.registerContentScripts([{
+      id: BRIDGE_SCRIPT_ID,
+      matches: [pattern],
+      js: ['defaults.js', 'docreview-bridge.js'],
+      runAt: 'document_idle'
+    }]);
+  } catch (e) {
+    console.error('[background] Failed to register bridge script for', pattern, e);
+  }
+}
+
+// Re-register when settings change
+chrome.storage.onChanged.addListener(function(changes, area) {
+  if (area === 'sync' && changes.baseUrl) {
+    registerBridgeScript();
   }
 });
 
 // Context menu items on the toolbar icon (right-click).
 // Chrome automatically adds an "Options" item from the manifest's options_ui declaration.
 chrome.runtime.onInstalled.addListener(function() {
+  registerBridgeScript();
   chrome.contextMenus.create({
     id: 'open-docreview',
     title: 'Open Docreview',

@@ -20,6 +20,7 @@ import { useLabelSync } from "@/hooks/use-label-sync";
 import { useLabels } from "@/contexts/label-context";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StarButton } from "@/components/star-button";
+import { getExtensionStatus, pingExtension, resolveUrl, cancelResolve } from "@/lib/extension-bridge";
 
 type ValidationState = "idle" | "validating" | "valid" | "invalid";
 
@@ -36,6 +37,19 @@ function errorMessageForCode(code: string): string {
     default:
       return "Validation failed";
   }
+}
+
+/** Could this input be a shortened redirect URL (e.g. "go/my-doc", "http://go/my-doc")? */
+function looksLikeRedirectUrl(input: string): boolean {
+  const trimmed = input.trim();
+  // Must look like hostname/something (with a non-empty path)
+  // Matches "go/foo", "link.corp/bar", "http://go/foo", etc.
+  const match = trimmed.match(/^(?:https?:\/\/)?([^\/\s]+)\/(.+)/);
+  if (!match) return false;
+  const hostname = match[1];
+  // If it's already a Google URL, no need to resolve
+  if (hostname.endsWith("google.com")) return false;
+  return true;
 }
 
 export interface DocFormHandle {
@@ -94,14 +108,23 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
     const [processing, setProcessing] = useState(false);
     const [permissionDenied, setPermissionDenied] = useState(false);
     const [validDriveUrl, setValidDriveUrl] = useState<string | null>(null);
+    const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const abortRef = useRef<AbortController | null>(null);
     const notesRef = useRef<HTMLTextAreaElement>(null);
     const initialUrlTriggered = useRef(false);
+    const resolveInFlight = useRef(false);
 
     useLabelSync(allLabels, setSelectedLabelIds);
     useAutoResize(notesRef, notes);
+
+    // Ping the extension on mount so the cached status is ready when needed.
+    // This is async — the result will be available by the time the user types.
+    const extensionReady = useRef<Promise<void> | null>(null);
+    useEffect(() => {
+      extensionReady.current = pingExtension().then(() => {});
+    }, []);
 
     useEffect(() => {
       onExistingChange?.(isExisting);
@@ -122,6 +145,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
       setProcessing(false);
       setPermissionDenied(false);
       setValidDriveUrl(null);
+      setResolvedUrl(null);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (abortRef.current) abortRef.current.abort();
     }
@@ -134,53 +158,126 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
       );
     }
 
+    /** Apply validation response data to form state. */
+    function applyValidationResult(data: Record<string, unknown>, ok: boolean) {
+      if (ok) {
+        setValidDriveUrl((data.driveUrl as string) ?? null);
+        if (data.permissionDenied) {
+          setPermissionDenied(true);
+          setValidTitle((data.title as string) ?? "Unknown title");
+          setValidMimeType((data.mimeType as string) ?? null);
+          setValidationState("valid");
+          setValidationError("Document not found or you don't have access");
+        } else {
+          setPermissionDenied(false);
+          setValidTitle((data.title as string) ?? null);
+          setValidMimeType((data.mimeType as string) ?? null);
+          setValidationState("valid");
+          setValidationError(null);
+        }
+        if (data.existing) {
+          setIsExisting(true);
+          setExistingDocId((data.docId as string) ?? null);
+          setSelectedLabelIds((data.labels as string[]) ?? []);
+          setIsStarred((data.isStarred as boolean) ?? false);
+          setNotes((data.notes as string) ?? "");
+          setAddAsActive(data.status === "INBOX");
+        } else {
+          setIsExisting(false);
+          setExistingDocId(null);
+        }
+      } else {
+        if (data.title) setValidTitle(data.title as string);
+        if (data.mimeType) setValidMimeType(data.mimeType as string);
+        setValidationState("invalid");
+        setValidationError(errorMessageForCode(data.error as string));
+      }
+    }
+
+    /** Validate a URL against the server. Returns true if the URL was valid. */
+    async function serverValidate(
+      urlToValidate: string,
+      signal: AbortSignal
+    ): Promise<boolean> {
+      const res = await apiFetch(
+        `/api/docs/validate?url=${encodeURIComponent(urlToValidate)}`,
+        { signal }
+      );
+      const data = await res.json();
+      if (signal.aborted) return false;
+      applyValidationResult(data, res.ok);
+      return res.ok;
+    }
+
     async function validateUrl(urlToValidate: string) {
       const controller = new AbortController();
       abortRef.current = controller;
       setValidationState("validating");
 
+      const isRedirect = looksLikeRedirectUrl(urlToValidate);
+
+      // Wait for the extension ping to complete if it hasn't yet
+      if (extensionReady.current) {
+        await extensionReady.current;
+        if (controller.signal.aborted) return;
+      }
+      const extension = getExtensionStatus();
+
+      // Run server validation immediately for fast feedback.
+      // For redirect URLs, also try extension resolution after —
+      // if it resolves, re-validate with the resolved URL.
       try {
-        const res = await apiFetch(
-          `/api/docs/validate?url=${encodeURIComponent(urlToValidate)}`,
-          { signal: controller.signal }
-        );
-        const data = await res.json();
-        if (res.ok) {
-          setValidDriveUrl(data.driveUrl ?? null);
-          if (data.permissionDenied) {
-            setPermissionDenied(true);
-            setValidTitle(data.title ?? "Unknown title");
-            setValidMimeType(data.mimeType ?? null);
-            setValidationState("valid");
-            setValidationError("Document not found or you don't have access");
-          } else {
-            setPermissionDenied(false);
-            setValidTitle(data.title ?? null);
-            setValidMimeType(data.mimeType ?? null);
-            setValidationState("valid");
-          }
-          if (data.existing) {
-            setIsExisting(true);
-            setExistingDocId(data.docId ?? null);
-            setSelectedLabelIds(data.labels ?? []);
-            setIsStarred(data.isStarred ?? false);
-            setNotes(data.notes ?? "");
-            setAddAsActive(data.status === "INBOX");
-          } else {
-            setIsExisting(false);
-            setExistingDocId(null);
-          }
-        } else {
-          if (data.title) setValidTitle(data.title);
-          if (data.mimeType) setValidMimeType(data.mimeType);
-          setValidationState("invalid");
-          setValidationError(errorMessageForCode(data.error));
-        }
+        const serverOk = await serverValidate(urlToValidate, controller.signal);
+        if (controller.signal.aborted) return;
+
+        // If server already accepted it, no need for extension resolution
+        if (serverOk) return;
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
+        if (controller.signal.aborted) return;
         if (!isAuthError(err)) {
           setValidationState("invalid");
           setValidationError("Validation failed");
+        }
+        // If server validation errored, still try extension below
+      }
+
+      // Server rejected the URL — if it looks like a redirect, try the extension
+      if (isRedirect && extension) {
+        try {
+          setValidationState("validating");
+          resolveInFlight.current = true;
+          console.log("[extension] Resolving:", urlToValidate);
+          const result = await resolveUrl(urlToValidate);
+          resolveInFlight.current = false;
+          if (result.resolved) {
+            console.log("[extension] Resolved to:", result.url);
+          } else {
+            console.log("[extension] Resolution failed:", result.error ?? "not a Google Doc");
+          }
+          if (controller.signal.aborted) return;
+          if (result.resolved && result.url) {
+            setResolvedUrl(result.url);
+            // Re-validate with the resolved URL
+            try {
+              await serverValidate(result.url, controller.signal);
+            } catch (err) {
+              if (err instanceof Error && err.name === "AbortError") return;
+              if (!isAuthError(err)) {
+                setValidationState("invalid");
+                setValidationError("Validation failed");
+              }
+            }
+          } else {
+            // Extension couldn't resolve — restore the server's invalid result
+            setValidationState("invalid");
+            setValidationError(errorMessageForCode("invalid_url"));
+          }
+        } catch (err) {
+          resolveInFlight.current = false;
+          // Restore the server's invalid result
+          setValidationState("invalid");
+          setValidationError(errorMessageForCode("invalid_url"));
         }
       }
     }
@@ -195,6 +292,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
       setIsExisting(false);
       setPermissionDenied(false);
       setValidDriveUrl(null);
+      setResolvedUrl(null);
       onUrlChange?.();
 
       if (abortRef.current) {
@@ -204,6 +302,11 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
+      }
+      // Cancel any in-flight extension URL resolution
+      if (resolveInFlight.current) {
+        cancelResolve();
+        resolveInFlight.current = false;
       }
 
       if (!newUrl.trim()) return;
@@ -228,7 +331,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            url: fixedDocId ? undefined : url,
+            url: fixedDocId ? undefined : (resolvedUrl ?? url),
             labelIds: selectedLabelIds,
             isStarred,
             notes,
@@ -253,6 +356,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
       return () => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
         if (abortRef.current) abortRef.current.abort();
+        if (resolveInFlight.current) cancelResolve();
       };
     }, []);
 

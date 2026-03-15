@@ -22,6 +22,14 @@ Click the Docreview icon in Chrome's toolbar to open the current page in Docrevi
 - On Google Docs/Sheets/Slides, opens the current document directly.
 - On Gmail, finds the document link in the current email and opens it. Shows an alert if no document is found or if multiple different documents are linked.
 
+### Shortened URL resolution
+When adding a document via a shortened link (e.g. `go/my-doc`), the extension resolves the redirect by opening the URL in a background tab (which has the user's cookies for authentication). If the redirect lands on a Google Docs URL, it's captured and used for validation. The background tab is closed automatically once the redirect completes or fails.
+
+### Docreview app integration
+The extension is automatically detected by the Docreview web app via a ping/response handshake over `window.postMessage`. The `docreview-bridge.js` content script is dynamically registered for the configured `baseUrl` and relays messages between the web page and the background worker. Each page instance gets a unique `pageId` so that cancellation of in-flight resolves is scoped per tab.
+
+**Note:** The `http://localhost/*` entry in `host_permissions` is required for the dynamic content script registration to work in development. For non-localhost deployments, add the production URL to `host_permissions` in `manifest.json`.
+
 ### Right-click menu
 Right-click the toolbar icon for:
 - **Open Docreview** — opens the Docreview home page
@@ -54,11 +62,13 @@ After changing the URL, refresh any open Google Docs/Drive/Gmail tabs.
 
 The extension has four parts:
 
-**`manifest.json`** — Manifest V3 configuration. Declares permissions (`storage`, `activeTab`, `contextMenus`, `scripting`), host permissions for the three Google domains, and registers the content script and service worker.
+**`manifest.json`** — Manifest V3 configuration. Declares permissions (`storage`, `activeTab`, `contextMenus`, `scripting`, `tabs`), host permissions for Google domains and localhost, and registers the content script and service worker.
 
 **`content.js`** — Runs on Google Docs, Drive, and Gmail pages. Injects Docreview icons by manipulating the DOM. Uses MutationObservers to handle dynamically loaded content (Google Workspace apps load UI elements after the initial page load). Adapted from the bookmarklet in `src/bookmarklet/bookmarklet-source.js` with two key changes: the base URL comes from `chrome.storage.sync`, and the Gmail link resolves its target URL at click time rather than injection time (to handle Gmail's SPA navigation correctly).
 
-**`background.js`** — Service worker that handles toolbar clicks, context menu actions, and messages from the content script. For Gmail, it uses `chrome.scripting.executeScript` with `allFrames: true` to search all frames (including sandboxed AMP iframes that content scripts can't access) for document URLs. Deduplicates by document ID since notification emails contain multiple links to the same document.
+**`background.js`** — Service worker that handles toolbar clicks, context menu actions, and messages from content scripts. For Gmail, it uses `chrome.scripting.executeScript` with `allFrames: true` to search all frames (including sandboxed AMP iframes that content scripts can't access) for document URLs. Also handles `ping` (returns extension status), `resolveUrl` (opens a background tab to follow redirects), and `cancelResolve` (closes in-flight resolve tabs). Dynamically registers the `docreview-bridge.js` content script for the configured `baseUrl`.
+
+**`docreview-bridge.js`** — Content script dynamically registered for Docreview app pages. Relays `window.postMessage` calls from the web app to the background worker via `chrome.runtime.sendMessage`, and posts responses back. Each page instance generates a unique `pageId` to scope cancellation. Runs in the content script's isolated world; communication with the page is via `postMessage` only.
 
 **`options.html` + `options.js`** — Simple settings page for configuring the Docreview server URL, stored in `chrome.storage.sync`.
 
@@ -70,3 +80,23 @@ for size in 16 48 128; do
   convert -background none -resize ${size}x${size} public/docreview.svg src/chrome-extension/icons/icon${size}.png
 done
 ```
+
+## Design notes
+
+### Content script ↔ page communication
+
+Chrome extension content scripts run in an **isolated JavaScript world** — they share the DOM with the page but have a separate `window` object. This means:
+
+- Setting `window` properties in the content script is invisible to page JavaScript.
+- Injecting inline `<script>` tags to run in the page's context is blocked by CSP.
+- Setting DOM attributes on `<html>` works but causes React hydration errors (server-rendered HTML won't have the attribute).
+
+The solution is `window.postMessage`, which crosses the isolation boundary. The bridge content script relays messages between the page and the background worker using postMessage in both directions. The web app detects the extension by sending a `ping` message and waiting for a response, rather than passively checking for a signal.
+
+### Dynamic content script registration
+
+The bridge content script is registered dynamically (via `chrome.scripting.registerContentScripts`) for the configured `baseUrl`, rather than being hardcoded in the manifest. This requires:
+
+1. The target URL must be covered by `host_permissions` in `manifest.json`. Without this, registration appears to succeed but the script never injects. Currently `http://localhost/*` is hardcoded; non-localhost deployments need their URL added.
+2. Dynamically registered scripts only inject into pages loaded **after** registration. After reloading the extension, refresh the Docreview page.
+3. The content script runs at `document_idle`, so it may not be ready when React components mount. The web app handles this by sending a ping on mount and awaiting the response (with a 2s timeout) before checking extension status.
