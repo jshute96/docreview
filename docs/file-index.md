@@ -2,6 +2,14 @@
 
 One-line descriptions of every source file, grouped by layer.
 
+## Root Files
+
+| File | Description |
+|------|-------------|
+| `README.md` | Primary project documentation — setup, stack, features, and commands |
+| `AGENTS.md` | Guidance for AI agents working in this repository |
+| `TODO.md` | Project roadmap and task list |
+
 ## Core (`src/`)
 
 | File | Description |

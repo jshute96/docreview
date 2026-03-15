@@ -71,10 +71,17 @@ function findDocUrlsInFramesFunc() {
 
 // Run findDocUrlsInFramesFunc across all frames in a tab, then merge results by doc ID.
 async function findDocUrlsInTab(tabId) {
-  var results = await chrome.scripting.executeScript({
-    target: { tabId: tabId, allFrames: true },
-    func: findDocUrlsInFramesFunc
-  });
+  var results = [];
+  try {
+    results = await chrome.scripting.executeScript({
+      target: { tabId: tabId, allFrames: true },
+      func: findDocUrlsInFramesFunc
+    });
+  } catch (err) {
+    console.warn('[background] Failed to execute script in tab', tabId, err);
+    return [];
+  }
+
   var seenIds = {};
   var urls = [];
   for (var i = 0; i < results.length; i++) {
@@ -100,11 +107,15 @@ async function openDocFromGmailTab(tabId) {
     chrome.scripting.executeScript({
       target: { tabId: tabId },
       func: function() { alert('Multiple document links found on this page'); }
+    }).catch(function(err) {
+      console.warn('[background] Failed to show alert on', tab.url, err);
     });
   } else {
     chrome.scripting.executeScript({
       target: { tabId: tabId },
       func: function() { alert('Page is not a document supported in Docreview'); }
+    }).catch(function(err) {
+      console.warn('[background] Failed to show alert on', tab.url, err);
     });
   }
 }
@@ -115,15 +126,13 @@ async function openDocFromGmailTab(tabId) {
 // Drive pages show file lists, not single documents, so the toolbar doesn't apply there.
 chrome.action.onClicked.addListener(async function(tab) {
   if (!tab.url || !isSupportedUrl(tab.url)) {
-    if (!tab.url || tab.url === 'chrome://newtab/' || tab.url === 'about:blank') {
-      var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
-      chrome.tabs.update(tab.id, { url: baseUrl });
-    } else {
-      chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: function() { alert('Page is not a document supported in Docreview'); }
-      });
-    }
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: function() { alert('Page is not a document supported in Docreview'); }
+    }).catch(function(err) {
+      // Script injection fails on protected pages (chrome://, etc.)
+      console.warn('[background] Failed to show alert on', tab.url, err);
+    });
     return;
   }
 
@@ -139,6 +148,8 @@ chrome.action.onClicked.addListener(async function(tab) {
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: function() { alert('Page is not a document supported in Docreview'); }
+    }).catch(function(err) {
+      console.warn('[background] Failed to show alert on', tab.url, err);
     });
     return;
   }
