@@ -193,6 +193,7 @@ Shadcn/ui components:
 
 | File | Description |
 |------|-------------|
+| `architecture.md` | High-level system architecture — tech stack, data model, API layer, client/server split, security |
 | `auth.md` | Authentication — NextAuth v5 + Google OAuth, session handling, token refresh |
 | `bulk-edit.md` | Bulk editing logic — tri-state UI, context-aware cycling, no-op protection |
 | `comment-tracking.md` | Comment status logic, unarchive rules, filter behavior |
