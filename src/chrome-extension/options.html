@@ -5,7 +5,7 @@
     body {
       font-family: system-ui, -apple-system, sans-serif;
       padding: 16px;
-      min-width: 300px;
+      min-width: 400px;
     }
     label {
       display: block;
@@ -57,6 +57,16 @@
       width: auto;
       margin: 0;
     }
+    .checkbox-group ul {
+      margin: 2px 0 8px 22px;
+      padding-left: 16px;
+      font-size: 12px;
+      color: #666;
+      line-height: 1.4;
+    }
+    .checkbox-group li {
+      margin-bottom: 1px;
+    }
   </style>
 </head>
 <body>
@@ -64,8 +74,23 @@
   <input type="url" id="baseUrl" placeholder="http://localhost:3000">
   <div class="checkbox-group">
     <label><input type="checkbox" id="enableDocs" checked> Enable on Google Docs</label>
+    <ul>
+      <li>Adds a Docreview icon to the document titlebar</li>
+      <li>On access-denied pages, adds an "Add in Docreview" link</li>
+    </ul>
     <label><input type="checkbox" id="enableDrive" checked> Enable on Google Drive</label>
+    <ul>
+      <li>Adds a Docreview icon next to each document title</li>
+      <li>On access-denied pages, adds an "Add in Docreview" link</li>
+    </ul>
     <label><input type="checkbox" id="enableGmail" checked> Enable on Gmail</label>
+    <ul>
+      <li>Adds an "Open in Docreview" link in Docs notification emails</li>
+    </ul>
+    <label><input type="checkbox" id="enableResolve"> Enable redirect-link resolver</label>
+    <ul>
+      <li>Resolves shortened URLs by following redirects in a background tab using your browser cookies</li>
+    </ul>
   </div>
   <div style="margin-top:12px;display:flex;gap:8px;">
     <button id="save">Save</button>

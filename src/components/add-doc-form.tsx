@@ -21,6 +21,7 @@ import { useLabels } from "@/contexts/label-context";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StarButton } from "@/components/star-button";
 import { getExtensionStatus, pingExtension, resolveUrl, cancelResolve } from "@/lib/extension-bridge";
+import { looksLikeRedirectUrl } from "@/lib/url-utils";
 
 type ValidationState = "idle" | "validating" | "valid" | "invalid";
 
@@ -37,19 +38,6 @@ function errorMessageForCode(code: string): string {
     default:
       return "Validation failed";
   }
-}
-
-/** Could this input be a shortened redirect URL (e.g. "go/my-doc", "http://go/my-doc")? */
-function looksLikeRedirectUrl(input: string): boolean {
-  const trimmed = input.trim();
-  // Must look like hostname/something (with a non-empty path)
-  // Matches "go/foo", "link.corp/bar", "http://go/foo", etc.
-  const match = trimmed.match(/^(?:https?:\/\/)?([^\/\s]+)\/(.+)/);
-  if (!match) return false;
-  const hostname = match[1];
-  // If it's already a Google URL, no need to resolve
-  if (hostname.endsWith("google.com")) return false;
-  return true;
 }
 
 export interface DocFormHandle {
@@ -115,6 +103,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
     const notesRef = useRef<HTMLTextAreaElement>(null);
     const initialUrlTriggered = useRef(false);
     const resolveInFlight = useRef(false);
+    const pastedRef = useRef(false);
 
     useLabelSync(allLabels, setSelectedLabelIds);
     useAutoResize(notesRef, notes);
@@ -243,7 +232,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
       }
 
       // Server rejected the URL — if it looks like a redirect, try the extension
-      if (isRedirect && extension) {
+      if (isRedirect && extension?.enableResolve) {
         try {
           setValidationState("validating");
           resolveInFlight.current = true;
@@ -283,6 +272,8 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
     }
 
     function handleUrlChange(newUrl: string) {
+      const immediate = pastedRef.current;
+      pastedRef.current = false;
       setUrl(newUrl);
       setValidationState("idle");
       setValidationError(null);
@@ -311,9 +302,13 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
 
       if (!newUrl.trim()) return;
 
-      debounceRef.current = setTimeout(() => {
+      if (immediate) {
         validateUrl(newUrl);
-      }, 250);
+      } else {
+        debounceRef.current = setTimeout(() => {
+          validateUrl(newUrl);
+        }, 250);
+      }
     }
 
     // Auto-validate initialUrl on mount
@@ -390,6 +385,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
                 placeholder="URL or doc ID"
                 value={url}
                 onChange={(e) => handleUrlChange(e.target.value)}
+                onPaste={() => { pastedRef.current = true; }} // skip debounce on paste
                 onFocus={(e) => e.target.select()}
                 className="flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
               />

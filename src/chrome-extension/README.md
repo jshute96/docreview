@@ -23,7 +23,7 @@ Click the Docreview icon in Chrome's toolbar to open the current page in Docrevi
 - On Gmail, finds the document link in the current email and opens it. Shows an alert if no document is found or if multiple different documents are linked.
 
 ### Shortened URL resolution
-When adding a document via a shortened link (e.g. `go/my-doc`), the extension resolves the redirect by opening the URL in a background tab (which has the user's cookies for authentication). If the redirect lands on a Google Docs URL, it's captured and used for validation. The background tab is closed automatically once the redirect completes or fails.
+When adding a document via a shortened link (e.g. `go/my-doc`), the server first attempts to follow the redirect itself. If the server can't resolve it (e.g. the shortener requires browser cookies for authentication), and the extension's redirect-link resolver is enabled, the extension resolves the redirect by opening the URL in a background tab (which has the user's cookies). If the redirect lands on a Google Docs URL, it's captured and used for validation. The background tab is closed automatically once the redirect completes or fails. This feature is disabled by default in the extension settings.
 
 ### Docreview app integration
 The extension is automatically detected by the Docreview web app via a ping/response handshake over `window.postMessage`. The `docreview-bridge.js` content script is dynamically registered for the configured `baseUrl` and relays messages between the web page and the background worker. Each page instance gets a unique `pageId` so that cancellation of in-flight resolves is scoped per tab.
@@ -70,9 +70,9 @@ The extension has four parts:
 
 **`docreview-bridge.js`** — Content script dynamically registered for Docreview app pages. Relays `window.postMessage` calls from the web app to the background worker via `chrome.runtime.sendMessage`, and posts responses back. Each page instance generates a unique `pageId` to scope cancellation. Runs in the content script's isolated world; communication with the page is via `postMessage` only.
 
-**`options.html` + `options.js`** — Simple settings page for configuring the Docreview server URL, stored in `chrome.storage.sync`.
+**`options.html` + `options.js`** — Settings page for configuring the Docreview server URL and feature toggles (Google Docs/Drive/Gmail integration, redirect-link resolver), stored in `chrome.storage.sync`.
 
-**`defaults.js`** — Shared default configuration (base URL) loaded by all other scripts.
+**`defaults.js`** — Shared default configuration (base URL, feature toggles) loaded by all other scripts.
 
 **`icons/`** — 16/48/128px PNGs converted from `public/docreview.svg`. If the source SVG changes, regenerate with:
 ```bash

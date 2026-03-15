@@ -3,5 +3,6 @@ var DEFAULTS = {
   baseUrl: 'http://localhost:3000',
   enableDocs: true,
   enableDrive: true,
-  enableGmail: true
+  enableGmail: true,
+  enableResolve: false
 };

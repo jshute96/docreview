@@ -158,15 +158,21 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   }
 
   if (msg.type === 'ping') {
-    chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl }, function(config) {
-      sendResponse({ version: 1, baseUrl: config.baseUrl });
+    chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl, enableResolve: DEFAULTS.enableResolve }, function(config) {
+      sendResponse({ version: 1, baseUrl: config.baseUrl, enableResolve: config.enableResolve });
     });
     return true; // async response
   }
 
   if (msg.type === 'resolveUrl') {
-    resolveUrlViaTab(msg.url, msg.pageId).then(function(result) {
-      sendResponse(result);
+    chrome.storage.sync.get({ enableResolve: DEFAULTS.enableResolve }, function(config) {
+      if (!config.enableResolve) {
+        sendResponse({ resolved: false, error: 'disabled' });
+        return;
+      }
+      resolveUrlViaTab(msg.url, msg.pageId).then(function(result) {
+        sendResponse(result);
+      });
     });
     return true; // async response
   }

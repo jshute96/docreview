@@ -4,6 +4,7 @@ var baseUrlInput = document.getElementById('baseUrl');
 var enableDocsInput = document.getElementById('enableDocs');
 var enableDriveInput = document.getElementById('enableDrive');
 var enableGmailInput = document.getElementById('enableGmail');
+var enableResolveInput = document.getElementById('enableResolve');
 var saveButton = document.getElementById('save');
 var cancelButton = document.getElementById('cancel');
 
@@ -12,12 +13,14 @@ chrome.storage.sync.get({
   baseUrl: DEFAULTS.baseUrl,
   enableDocs: DEFAULTS.enableDocs,
   enableDrive: DEFAULTS.enableDrive,
-  enableGmail: DEFAULTS.enableGmail
+  enableGmail: DEFAULTS.enableGmail,
+  enableResolve: DEFAULTS.enableResolve
 }, function(data) {
   baseUrlInput.value = data.baseUrl;
   enableDocsInput.checked = data.enableDocs;
   enableDriveInput.checked = data.enableDrive;
   enableGmailInput.checked = data.enableGmail;
+  enableResolveInput.checked = data.enableResolve;
 });
 
 // Save and close
@@ -27,7 +30,8 @@ saveButton.addEventListener('click', function() {
     baseUrl: url,
     enableDocs: enableDocsInput.checked,
     enableDrive: enableDriveInput.checked,
-    enableGmail: enableGmailInput.checked
+    enableGmail: enableGmailInput.checked,
+    enableResolve: enableResolveInput.checked
   }, function() {
     window.close();
   });
