@@ -98,6 +98,7 @@ One-line descriptions of every source file, grouped by layer.
 |------|-------------|
 | `doc-table.tsx` | Main doc list view (client) — filter state, sort state, renders FilterBar + DocRows |
 | `auto-signin.tsx` | Client component for seamless offline authentication |
+| `google-signin-button.tsx` | Google OAuth sign-in button with branded styling |
 | `doc-row.tsx` | Single doc row in the table — star, title, comment counts, labels, archive/edit/open buttons |
 | `doc-detail.tsx` | Single doc detail view (client) — metadata panel, comment filters, comment table; pre-fetches all threads on load for instant expand |
 | `filter-bar.tsx` | Doc list filter bar — tri-state buttons for type/author/starred/labels/active/comments + title regex |
@@ -122,6 +123,7 @@ One-line descriptions of every source file, grouped by layer.
 | `dialog-buttons.tsx` | Reusable Save/Cancel button pair for dialogs |
 | `friendly-date.tsx` | `<FriendlyDate>` — renders relative timestamps: time-only (today), weekday + time (<6d), date (older); full timestamp on hover |
 | `doc-type-icon.tsx` | SVG icons for Google Docs/Sheets/Slides by mime type |
+| `x-icon.tsx` | Small X (close) icon used in badges and buttons |
 
 ### UI primitives (`src/components/ui/`)
 

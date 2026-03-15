@@ -126,13 +126,18 @@ async function openDocFromGmailTab(tabId) {
 // Drive pages show file lists, not single documents, so the toolbar doesn't apply there.
 chrome.action.onClicked.addListener(async function(tab) {
   if (!tab.url || !isSupportedUrl(tab.url)) {
-    chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: function() { alert('Page is not a document supported in Docreview'); }
-    }).catch(function(err) {
-      // Script injection fails on protected pages (chrome://, etc.)
-      console.warn('[background] Failed to show alert on', tab.url, err);
-    });
+    if (!tab.url || tab.url === 'chrome://newtab/' || tab.url === 'about:blank') {
+      var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
+      chrome.tabs.update(tab.id, { url: baseUrl });
+    } else {
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: function() { alert('Page is not a document supported in Docreview'); }
+      }).catch(function(err) {
+        // Script injection fails on protected pages (chrome://, etc.)
+        console.warn('[background] Failed to show alert on', tab.url, err);
+      });
+    }
     return;
   }
 
