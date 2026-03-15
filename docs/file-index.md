@@ -114,7 +114,6 @@ Shadcn/ui components:
 | File | Description |
 |------|-------------|
 | `alert-dialog.tsx` | Alert dialog for confirmations (Radix) |
-| `badge.tsx` | Badge component |
 | `button.tsx` | Button component with variant/size props |
 | `checkbox.tsx` | Checkbox input |
 | `dialog.tsx` | Modal dialog (Radix) |
