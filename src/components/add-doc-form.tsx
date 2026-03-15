@@ -21,7 +21,6 @@ import { useLabels } from "@/contexts/label-context";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StarButton } from "@/components/star-button";
 import { getExtensionStatus, pingExtension, resolveUrl, cancelResolve } from "@/lib/extension-bridge";
-import { looksLikeRedirectUrl } from "@/lib/url-utils";
 
 type ValidationState = "idle" | "validating" | "valid" | "invalid";
 
@@ -38,6 +37,15 @@ function errorMessageForCode(code: string): string {
     default:
       return "Validation failed";
   }
+}
+
+/** Check if a URL's hostname is in the extension's resolve hosts list. */
+function matchesResolveHosts(input: string, hosts: string[]): boolean {
+  if (!hosts.length) return false;
+  const trimmed = input.trim();
+  const match = trimmed.match(/^(?:https?:\/\/)?([^\/\s]+)\/(.+)/);
+  if (!match) return false;
+  return hosts.includes(match[1].toLowerCase());
 }
 
 export interface DocFormHandle {
@@ -203,8 +211,6 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
       abortRef.current = controller;
       setValidationState("validating");
 
-      const isRedirect = looksLikeRedirectUrl(urlToValidate);
-
       // Wait for the extension ping to complete if it hasn't yet
       if (extensionReady.current) {
         await extensionReady.current;
@@ -231,8 +237,8 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
         // If server validation errored, still try extension below
       }
 
-      // Server rejected the URL — if it looks like a redirect, try the extension
-      if (isRedirect && extension?.enableResolve) {
+      // Server rejected the URL — if the extension can resolve it, try that
+      if (extension?.enableResolve && matchesResolveHosts(urlToValidate, extension.resolveHosts)) {
         try {
           setValidationState("validating");
           resolveInFlight.current = true;

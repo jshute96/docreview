@@ -7,6 +7,7 @@ export interface ExtensionStatus {
   version: number;
   baseUrl: string;
   enableResolve: boolean;
+  resolveHosts: string[];
 }
 
 // Cached result of the extension ping. null = not yet checked,

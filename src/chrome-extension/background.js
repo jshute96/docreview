@@ -174,8 +174,8 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   }
 
   if (msg.type === 'ping') {
-    chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl, enableResolve: DEFAULTS.enableResolve }, function(config) {
-      sendResponse({ version: 1, baseUrl: config.baseUrl, enableResolve: config.enableResolve });
+    chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl, enableResolve: DEFAULTS.enableResolve, resolveHosts: DEFAULTS.resolveHosts }, function(config) {
+      sendResponse({ version: 1, baseUrl: config.baseUrl, enableResolve: config.enableResolve, resolveHosts: config.resolveHosts });
     });
     return true; // async response
   }

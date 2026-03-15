@@ -4,5 +4,6 @@ var DEFAULTS = {
   enableDocs: true,
   enableDrive: true,
   enableGmail: true,
-  enableResolve: false
+  enableResolve: false,
+  resolveHosts: []
 };
