@@ -185,7 +185,7 @@ Shadcn/ui components:
 | `textarea-styles.ts` | Shared Tailwind classes for consistent textarea styling |
 | `tooltips.ts` | Shared tooltip text constants for UI components |
 | `tri-state.ts` | `TriState` type (`off`/`include`/`exclude`), cycle function, partition helper |
-| `url-utils.ts` | `looksLikeRedirectUrl()` — helper to identify shortened redirect URLs that may need extension-based resolution |
+| `url-utils.ts` | `looksLikeRedirectUrl()` for client-side redirect detection, `isPublicShortenerUrl()` for server-side whitelist (bit.ly, tinyurl.com, t.co) |
 | `utils.ts` | `cn()` (clsx+twMerge), `contrastText()` for label colors, `formatDate()` (full timestamp for logging), `formatDateFriendly()` (relative display format), `appendNotes()` (append text to existing notes with newline separator) |
 | `__mocks__/prisma.ts` | Vitest mock of PrismaClient for unit tests |
 

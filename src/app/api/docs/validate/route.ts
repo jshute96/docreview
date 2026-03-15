@@ -10,7 +10,7 @@ import {
 } from "@/lib/google-drive";
 import { runWithRequestId } from "@/lib/request-context";
 import { logInfo } from "@/lib/log";
-import { looksLikeRedirectUrl } from "@/lib/url-utils";
+import { isPublicShortenerUrl } from "@/lib/url-utils";
 
 /**
  * Try to resolve a shortened URL by following redirects server-side.
@@ -19,7 +19,7 @@ import { looksLikeRedirectUrl } from "@/lib/url-utils";
  * that require browser cookies/auth — those need the Chrome extension.
  */
 async function tryResolveRedirect(url: string): Promise<string | null> {
-  if (!looksLikeRedirectUrl(url)) return null;
+  if (!isPublicShortenerUrl(url)) return null;
 
   let fullUrl = url.trim();
   if (!/^https?:\/\//i.test(fullUrl)) {
@@ -49,6 +49,13 @@ async function tryResolveRedirect(url: string): Promise<string | null> {
           if (cont) resolved = cont;
         }
       } catch { /* use resolved as-is */ }
+
+      // Only accept if it resolved to a Google Doc URL (mitigates SSRF)
+      if (!parseGoogleDocId(resolved)) {
+        logInfo("[redirect-resolve]", `${fullUrl} → ${resolved} (not a Google Doc, ignoring)`);
+        return null;
+      }
+
       logInfo("[redirect-resolve]", `${fullUrl} → ${resolved}`);
       return resolved;
     }
