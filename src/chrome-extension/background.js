@@ -274,7 +274,7 @@ async function registerBridgeScript() {
       id: BRIDGE_SCRIPT_ID,
       matches: [pattern],
       js: ['defaults.js', 'docreview-bridge.js'],
-      runAt: 'document_idle'
+      runAt: 'document_start'
     }]);
   } catch (e) {
     console.error('[background] Failed to register bridge script for', pattern, e);
