@@ -2,6 +2,13 @@
 
 One-line descriptions of every source file, grouped by layer.
 
+## Core (`src/`)
+
+| File | Description |
+|------|-------------|
+| `auth.ts` | NextAuth v5 configuration — handles Google OAuth and Offline mode providers, session strategy, and token persistence |
+| `test-utils.ts` | `suppressingErrors()` — wraps test blocks to suppress expected console.error output |
+
 ## Pages (`src/app/`)
 
 | File | Description |
@@ -39,6 +46,7 @@ One-line descriptions of every source file, grouped by layer.
 | `defaults.js` | Shared default config (base URL) loaded by all other scripts |
 | `options.html` | Settings page HTML — single URL input with Save/Cancel |
 | `options.js` | Settings page logic — reads/writes `chrome.storage.sync` |
+| `docreview-bridge.js` | Content script for Docreview app pages — relays messages between the web page and background worker via `window.postMessage` |
 | `icons/` | Extension icons (16/48/128px PNGs converted from `public/docreview.svg`) |
 | `README.md` | User-facing docs — features, installation, configuration, architecture overview |
 
@@ -156,6 +164,7 @@ Shadcn/ui components:
 | `refresh.ts` | Combined refresh engine — `executeRefresh(userId, email, sources)` runs parallel Drive+Gmail discovery; `executeFullRefresh(userId, email)` and `refreshSelectedDocs(userId, email, docIds)` run exhaustive syncs via shared `refreshGoogleDocIds` helper |
 | `auth-utils.ts` | Centralized authentication helpers for Server Components and API routes |
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates/deletes DB records, computes unarchive signals |
+| `extension-bridge.ts` | Client-side bridge for communicating with the Chrome extension — handles pinging and URL resolution requests |
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
 | `doc-filters.ts` | Client-side doc filtering (tri-state logic for inbox/comments/author/starred/mimeType/labels/title regex) and sorting |
 | `doc-queries.ts` | Shared Prisma include constants (`labelInclude`, `docWithCountsInclude`, `docWithCommentsInclude`) + `withCommentCounts` transform |
@@ -166,21 +175,25 @@ Shadcn/ui components:
 | `role-colors.ts` | Tailwind class maps for Author (blue) and Reviewer (violet) role badges/filters |
 | `load-options.ts` | `parseLoadOptions()` — shared validation for scan/load request body (daysBack, ownership, includeSharedDrives, source) |
 | `log.ts` | `logError()`, `logWarning()`, and `logInfo()` — centralized logging helpers; console output (colored) + daily file output to `logs/` with timestamps and request IDs |
+| `parse-gmail-notification.ts` | Gmail notification parser — extracts structured data from raw `.eml` content for comment and sharing notifications |
 | `progress-events.ts` | Shared progress event types (`ProgressEvent`, `OnProgress`) used by SSE server (sse.ts) and client (stream-progress.ts) |
+| `promise-utils.ts` | `withProgressLogging()` — wraps promises with periodic log messages for long-running operations |
 | `request-context.ts` | `runWithRequestId(method, req, fn)` and `getRequestId()` — AsyncLocalStorage-based request ID context for correlating log lines across a single API request; extracts URL and client context ID from request; logs `[API] METHOD /path` silently on entry |
 | `sse.ts` | Server-side SSE (Server-Sent Events) streaming — `createProgressStream()` wraps long-running API operations, sends progress/result/error events over a ReadableStream |
 | `status.ts` | Read/write `Status` table — tracks `driveChangesPageToken` and `lastGmailUpdateTimestamp` per user for incremental sync |
 | `stream-progress.ts` | Client-side SSE reader + toast handlers — `fetchWithProgress()` reads SSE streams, `handleRefreshProgress()` maps events to Sonner toasts, `formatResultParts()` formats result summaries |
+| `textarea-styles.ts` | Shared Tailwind classes for consistent textarea styling |
+| `tooltips.ts` | Shared tooltip text constants for UI components |
 | `tri-state.ts` | `TriState` type (`off`/`include`/`exclude`), cycle function, partition helper |
+| `url-utils.ts` | `looksLikeRedirectUrl()` — helper to identify shortened redirect URLs that may need extension-based resolution |
 | `utils.ts` | `cn()` (clsx+twMerge), `contrastText()` for label colors, `formatDate()` (full timestamp for logging), `formatDateFriendly()` (relative display format), `appendNotes()` (append text to existing notes with newline separator) |
 | `__mocks__/prisma.ts` | Vitest mock of PrismaClient for unit tests |
 
-## Types & Test Utilities
+## Types (`src/types/`)
 
 | File | Description |
 |------|-------------|
-| `types/index.ts` | `DocWithLabels`, `DocWithComments`, `LabelWithCount` types + NextAuth session augmentation |
-| `test-utils.ts` | `suppressingErrors()` — wraps test blocks to suppress expected console.error output |
+| `index.ts` | `DocWithLabels`, `DocWithComments`, `LabelWithCount` types + NextAuth session augmentation |
 
 ## Schema & Config
 
