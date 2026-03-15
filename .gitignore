@@ -51,7 +51,9 @@ scripts/data-export.json
 # claude code - actually, include config and commands
 # .claude/
 
-.gemini/
+# .gemini/
+.gemini/settings.json
+.gemini/policies/
 
 .playwright-mcp/
 

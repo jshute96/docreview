@@ -1,0 +1,9 @@
+prompt = """
+Read the most recent log file from the `logs/` directory (the one with today's date, format `docreview-YYYY-MM-DD.log`). Use `tail -50` to get the last 50 lines.
+
+Show the log output to the user. If the user provided additional instructions after the command, follow those instructions in the context of the log output (e.g., "look at the error", "what happened with sync", etc.).
+If no instructions follow, we are probably trying to debug an error from the log.
+**If the user asked you** to look at something and you don't see it, you might need to look back further using a longer `tail` window.
+
+{{args}}
+"""
