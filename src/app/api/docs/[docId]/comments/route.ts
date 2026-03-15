@@ -40,6 +40,7 @@ export async function GET(
       drive.files.get({
         fileId: doc.googleDocId,
         fields: "viewedByMeTime",
+        supportsAllDrives: true,
       }),
     ]);
 

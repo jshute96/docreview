@@ -99,8 +99,10 @@ The user can optionally assign star, labels, notes, and document status:
 
 Clicking **Add** calls `POST /api/docs?mode=load` with the visible (non-removed) doc
 IDs, source, labels, and notes. The backend fetches metadata for the selected docs by
-ID via `files.get` (both Drive and Gmail sources). After the sync completes, the doc
-list refreshes and a toast summarizes results.
+ID via `files.get` (both Drive and Gmail sources). These individual fetches always
+support **Shared Drives**, regardless of whether the scan options had the Shared Drives
+checkbox enabled. After the sync completes, the doc list refreshes and a toast summarizes
+results.
 
 Clicking **Rescan** re-runs the scan with current options (useful after changing the
 time window or ownership filter).

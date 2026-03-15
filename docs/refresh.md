@@ -103,15 +103,17 @@ is saved for future refreshes.
 
 **Normal refresh (saved token):** Calls `changes.list` with the saved token. Drive returns
 all mutations since that token was issued. The response includes a `newStartPageToken` which
-is saved for the next refresh.
+is saved for the next refresh. This includes changes from **Shared Drives** automatically.
 
 **Expired token:** If `changes.list` returns a 404 (token too old or invalidated), the
 handler falls back to bootstrap behavior: gets a fresh token and does a 7-day `listRecentDocs`
 scan. A warning is logged.
 
-**After Load:** Load mode fetches docs by ID (not the changes feed), but after a successful
-Load, `getStartPageToken` is called and saved. This means subsequent Refresh operations
-use `changes.list` even if the user's first sync was a Load.
+**After Load / Add:** Load mode fetches docs by ID (not the changes feed). Direct URL/ID
+additions also work this way. After a successful sync, `getStartPageToken` is called and saved.
+This means subsequent Refresh operations use `changes.list` even if the user's first sync
+was manual. Individual metadata fetches (`files.get`) always support Shared Drives
+automatically.
 
 **Transient errors:** If any comment sync has a transient error, the token is **not** updated.
 This preserves the old token so the next Refresh re-processes any changes that may have been

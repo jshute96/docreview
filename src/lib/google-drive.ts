@@ -128,7 +128,7 @@ export async function findDeletedOrDeniedDocIds(
     googleDocIds.map(async (id) => {
       const t0 = Date.now();
       try {
-        const res = await drive.files.get({ fileId: id, fields: "trashed" });
+        const res = await drive.files.get({ fileId: id, fields: "trashed", supportsAllDrives: true });
         const trashed = res.data.trashed === true;
         logInfo(`[Drive] files.get ${id} → ${trashed ? "trashed" : "ok"} (${Date.now() - t0}ms)`);
         return { id, status: trashed ? "trashed" as const : "ok" as const };
@@ -709,6 +709,8 @@ export async function listChanges(
         fields: "nextPageToken, newStartPageToken, changes(removed, fileId, file(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed))",
         pageSize: 1000,
         includeRemoved: true,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
       }),
       `[Drive] changes.list${currentToken ? " (page)" : ""}`
     );

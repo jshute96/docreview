@@ -55,7 +55,11 @@ export async function POST(
 
     // Pin viewedByMeTime: read before, do the action, restore after
     const getViewed = async () => {
-      const r = await drive.files.get({ fileId: doc.googleDocId, fields: "viewedByMeTime" });
+      const r = await drive.files.get({
+        fileId: doc.googleDocId,
+        fields: "viewedByMeTime",
+        supportsAllDrives: true,
+      });
       return r.data.viewedByMeTime ?? null;
     };
 

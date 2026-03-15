@@ -42,6 +42,7 @@ export async function POST(
     const fileRes = await drive.files.get({
       fileId: doc.googleDocId,
       fields: "id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed",
+      supportsAllDrives: true,
     });
     const f = fileRes.data;
     const isOwner = f.owners?.some((o) => o.me === true) ?? false;

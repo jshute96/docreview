@@ -74,6 +74,7 @@ export async function POST(
       const res = await drive.files.get({
         fileId: googleDocId,
         fields: "name,mimeType,webViewLink,modifiedTime,createdTime,owners(me,displayName),trashed",
+        supportsAllDrives: true,
       });
       f = res.data;
     } catch (err) {
