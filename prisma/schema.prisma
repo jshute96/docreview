@@ -85,6 +85,7 @@ model Status {
   userId                   String    @id @map("user_id")
   lastGmailUpdateTimestamp  DateTime? @map("last_gmail_update_timestamp")
   driveChangesPageToken    String?   @map("drive_changes_page_token")
+  hasSeenHelp              Boolean   @default(false) @map("has_seen_help")
   user                     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("statuses")

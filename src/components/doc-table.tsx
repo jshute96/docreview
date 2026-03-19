@@ -13,7 +13,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { LoadDialog } from "@/components/load-dialog";
 import { BulkEditDialog } from "@/components/bulk-edit-dialog";
 import { signOut } from "next-auth/react";
-import { Menu, RefreshCw, LogOut, HardDriveDownload, Mail, FileText } from "lucide-react";
+import { Menu, RefreshCw, LogOut, HardDriveDownload, Mail, FileText, CircleHelp } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +26,8 @@ import {
 import { filterDocs, sortDocs } from "@/lib/doc-filters";
 import type { SortCol, SortDir } from "@/lib/doc-filters";
 import { LabelProvider } from "@/contexts/label-context";
+import { HelpDialog } from "@/components/help-dialog";
+import { WelcomeDialog } from "@/components/welcome-dialog";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import {
   fetchWithProgress,
@@ -39,11 +41,14 @@ interface DocTableProps {
   initialDocs: DocWithLabels[];
   initialLabels: Label[];
   isOffline?: boolean;
+  hasSeenHelp?: boolean;
 }
 
-export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProps) {
+export function DocTable({ initialDocs, initialLabels, isOffline, hasSeenHelp }: DocTableProps) {
   const [docs, setDocs] = useState<DocWithLabels[]>(initialDocs);
   const [labels, setLabelsRaw] = useState<Label[]>(initialLabels);
+  const [showHelp, setShowHelp] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(hasSeenHelp === false);
 
   // When labels change (e.g. color update), propagate into docs state too
   function setLabels(newLabels: Label[]) {
@@ -313,6 +318,8 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
           />
           <LoadDialog onRefresh={(newDocs) => setDocs(newDocs)} />
           <ManageLabelsDialog />
+          <HelpDialog open={showHelp} onOpenChange={setShowHelp} />
+          <WelcomeDialog open={showWelcome} onOpenChange={setShowWelcome} />
           <Button
             variant="outline"
             size="sm"
@@ -338,6 +345,14 @@ export function DocTable({ initialDocs, initialLabels, isOffline }: DocTableProp
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={() => setShowHelp(true)}
+                title="Open the help guide"
+              >
+                <CircleHelp className="h-4 w-4 mr-2" />
+                Help
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={() => handleSourceRefresh(["drive"])}
                 disabled={refreshing !== null}

@@ -141,8 +141,8 @@ export function FilterBar({
           type="text"
           value={titleFilter}
           onChange={(e) => onTitleFilterChange(e.target.value)}
-          title="Filter by regular expression"
-          placeholder="regex filter…"
+          title="Filter by regex or substring"
+          placeholder="regex or substring…"
           className="rounded border border-zinc-200 bg-white pl-2 pr-5 py-0.5 text-xs text-zinc-700 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none w-90"
         />
         {titleFilter && (

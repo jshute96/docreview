@@ -9,7 +9,7 @@ export default async function DocsPage() {
   const session = await requireAuth();
   const userId = session.user.id;
 
-  const [rawDocs, labels] = await Promise.all([
+  const [rawDocs, labels, status] = await Promise.all([
     prisma.doc.findMany({
       where: { userId },
       include: docWithCountsInclude,
@@ -18,6 +18,10 @@ export default async function DocsPage() {
     prisma.label.findMany({
       where: { userId },
       orderBy: { position: "asc" },
+    }),
+    prisma.status.findUnique({
+      where: { userId },
+      select: { hasSeenHelp: true },
     }),
   ]);
 
@@ -30,6 +34,7 @@ export default async function DocsPage() {
           initialDocs={docs as DocWithLabels[]}
           initialLabels={labels}
           isOffline={OFFLINE_MODE}
+          hasSeenHelp={status?.hasSeenHelp ?? false}
         />
       </div>
     </div>

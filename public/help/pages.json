@@ -1,0 +1,10 @@
+[
+  { "slug": "quick-start", "title": "Quick Start" },
+  { "slug": "concepts", "title": "Concepts" },
+  { "slug": "document-list", "title": "Document List" },
+  { "slug": "document-details", "title": "Document Details" },
+  { "slug": "loading-documents", "title": "Loading Documents" },
+  { "slug": "labels-and-notes", "title": "Labels & Notes" },
+  { "slug": "chrome-extension", "title": "Chrome Extension" },
+  { "slug": "privacy-policy", "title": "Privacy Policy" }
+]

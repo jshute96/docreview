@@ -32,6 +32,10 @@ export function BookmarkletClient() {
         Bookmarklets
       </h1>
 
+      <p className="mb-4 rounded-md bg-amber-50 border border-amber-200 px-4 py-2 text-amber-800">
+        The <b>bookmarklets are deprecated</b>. This functionality is now provided by the Docreview Chrome extension.
+      </p>
+
       <p className="mb-6 text-muted-foreground">
         Drag the links below to your bookmarks bar to quickly access
         Docreview from Google Docs, Sheets, Slides, Drive and Gmail.

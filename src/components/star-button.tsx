@@ -12,13 +12,14 @@ interface StarButtonProps {
   starred: boolean;
   onToggle: () => void;
   className?: string;
+  title?: string;
 }
 
-export function StarButton({ starred, onToggle, className = "" }: StarButtonProps) {
+export function StarButton({ starred, onToggle, className = "", title }: StarButtonProps) {
   return (
     <button
       onClick={onToggle}
-      title={starred ? "Starred" : "Not starred"}
+      title={title ?? (starred ? "Starred" : "Not starred")}
       className={`inline-flex items-center justify-center transition-colors ${className}`}
     >
       <Star

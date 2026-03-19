@@ -130,7 +130,7 @@ export function EditDocDialog({
                 <div className="flex gap-2">
                   <button
                     onClick={() => setRole(role === "AUTHOR" ? "REVIEWER" : "AUTHOR")}
-                    title="You are an author of this document"
+                    title={"Toggle Author vs Reviewer state.\nIn Author state, all new comments go to your Inbox."}
                     className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                       role === "AUTHOR"
                         ? ROLE_COLORS.AUTHOR.activeFilter
@@ -149,7 +149,7 @@ export function EditDocDialog({
                 <div className="flex gap-2">
                   <button
                     onClick={() => setStatus(status === "INBOX" ? "ARCHIVED" : "INBOX")}
-                    title={status === "INBOX" ? "This document is in inbox" : "This document is archived"}
+                    title="Toggle Inbox vs Archived state"
                     className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                       status === "INBOX"
                         ? STATUS_COLORS.INBOX.activeFilter
@@ -166,7 +166,7 @@ export function EditDocDialog({
                   Star
                 </label>
                 <div className="flex items-center py-1.5">
-                  <StarButton starred={isStarred} onToggle={() => setIsStarred(!isStarred)} className="scale-150" />
+                  <StarButton starred={isStarred} onToggle={() => setIsStarred(!isStarred)} className="scale-150" title="Toggle starred state" />
                 </div>
               </div>
             </div>

@@ -31,6 +31,7 @@ dropped `url = env(...)` support in schema.prisma).
 - **Documentation**:
     - Keep `docs/*.md` design documents in sync with behavioral changes.
     - Update `docs/file-index.md` when adding, renaming, or removing source files.
+    - When adding or changing user-facing functionality, review and update the help pages in `public/help/*.md` to keep them accurate. See `public/help/pages.json` for the page list.
 - **Database Safety**:
     - Ask for human review before making database schema changes or manual data updates.
     - Never run DDL or DML (updates/alters) directly on PostgreSQL; use Prisma migrations or ask for permission to run these.

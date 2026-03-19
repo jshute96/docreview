@@ -265,7 +265,7 @@ export function BulkEditDialog({
                   <button
                     type="button"
                     onClick={cycleRole}
-                    title="Toggle author role for all selected documents"
+                    title={"Set Author vs Reviewer state.\nIn Author state, all new comments go to your Inbox."}
                     className={`relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                       roleState === "set" || roleState === "clear" || (roleState === "as-is" && role.all)
                         ? ROLE_COLORS.AUTHOR.activeFilter
@@ -286,7 +286,7 @@ export function BulkEditDialog({
                   <button
                     type="button"
                     onClick={cycleStatus}
-                    title="Toggle active/archived state for all selected documents"
+                    title="Set Inbox vs Archived state"
                     className={`relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                       statusState === "set" || statusState === "clear" || (statusState === "as-is" && status.all)
                         ? STATUS_COLORS.INBOX.activeFilter
@@ -307,7 +307,7 @@ export function BulkEditDialog({
                   <button
                     type="button"
                     onClick={cycleStar}
-                    title="Toggle star for all selected documents"
+                    title="Set starred state"
                     className="relative"
                   >
                     <Star

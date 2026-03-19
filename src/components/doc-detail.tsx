@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { RefreshCw, Menu, Trash2, Pencil } from "lucide-react";
+import { RefreshCw, Menu, Trash2, Pencil, CircleHelp } from "lucide-react";
 import type { Comment, Label } from "@prisma/client";
 import type { DocWithComments, DocWithLabels } from "@/types";
 import type { CommentThread, SuggestionContent } from "@/lib/google-drive";
@@ -29,6 +29,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FriendlyDate } from "@/components/friendly-date";
@@ -43,6 +44,7 @@ import { formatDate } from "@/lib/utils";
 import { createMatcher } from "@/lib/highlight";
 import { broadcastChange, useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
+import { HelpDialog } from "@/components/help-dialog";
 import { StarButton } from "@/components/star-button";
 import { LabelProvider } from "@/contexts/label-context";
 
@@ -79,6 +81,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
 
   const [comments, setComments] = useState<Comment[]>(initialDoc.comments);
   const [archiving, setArchiving] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [bulkArchiving, setBulkArchiving] = useState(false);
   const [bulkArchivingResolved, setBulkArchivingResolved] = useState(false);
   const [bulkUnarchiving, setBulkUnarchiving] = useState(false);
@@ -687,6 +690,13 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setShowHelp(true)} title="Open the help guide">
+                <span className="absolute left-2 flex h-4 w-4 items-center justify-center">
+                  <CircleHelp className="h-4 w-4" />
+                </span>
+                <span className="pl-6">Help</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => setShowUntrackDialog(true)} title="Remove this document from the database">
                 <span className="absolute left-2 flex h-4 w-4 items-center justify-center">
                   <Trash2 className="h-4 w-4" />
@@ -970,6 +980,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
       mimeType={doc.mimeType}
       onSuccess={handleReAddSuccess}
     />
+
+    <HelpDialog open={showHelp} onOpenChange={setShowHelp} />
 
     <AlertDialog open={showUntrackDialog} onOpenChange={setShowUntrackDialog}>
       <AlertDialogContent>

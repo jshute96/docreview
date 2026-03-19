@@ -73,7 +73,9 @@
       "Bash(./scripts/query_database.sh:*)",
       "Bash(scripts/query_database.sh:*)",
       "Bash(./scripts/parse-gmail-notification.ts:*)",
-      "Bash(./scripts/extract-email-body.ts:*)"
+      "Bash(./scripts/extract-email-body.ts:*)",
+      "Bash(npm ls:*)",
+      "Bash(identify:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

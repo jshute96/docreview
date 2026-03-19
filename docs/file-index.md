@@ -58,6 +58,21 @@ One-line descriptions of every source file, grouped by layer.
 | `icons/` | Extension icons (16/48/128px PNGs converted from `public/docreview.svg`) |
 | `README.md` | User-facing docs — features, installation, configuration, architecture overview |
 
+## Help System (`public/help/`)
+
+| File | Description |
+|------|-------------|
+| `viewer.html` | Standalone markdown renderer loaded in iframe — fetches `.md` by `?page=` param, renders with marked.js CDN, forwards navigation keys to parent via postMessage |
+| `pages.json` | Ordered page index for help dialog navigation (slug + title pairs) |
+| `quick-start.md` | Quick Start guide — adding documents, document list, comments view, Chrome extension |
+| `concepts.md` | Core concepts — documents, comments/suggestions, statuses, smart unarchive, labels, tri-state filtering |
+| `document-list.md` | Document list page — row layout, counts, highlighting, access states, sorting, filters |
+| `document-details.md` | Document details page — header, show modes, filters, search, threads, suggestions, bulk actions |
+| `loading-documents.md` | Loading documents — Refresh, Load dialog two-phase flow, Add doc page |
+| `labels-and-notes.md` | Labels & notes — managing labels, applying them, filtering, notes, edit/bulk edit dialogs |
+| `chrome-extension.md` | Chrome extension — installation, injected icons, toolbar, context menu, configuration |
+| `privacy-policy.md` | Privacy policy — permissions, data storage, authentication, data sharing |
+
 ## Assets (`public/`)
 
 | File | Description |
@@ -91,6 +106,7 @@ One-line descriptions of every source file, grouped by layer.
 | `labels/route.ts` | `GET` list labels with document counts; `POST` create label |
 | `labels/[labelId]/route.ts` | `GET` single label with document count; `PATCH` update label color; `DELETE` delete label |
 | `labels/reorder/route.ts` | `PATCH` reorder labels by position |
+| `help-seen/route.ts` | `POST` mark help as seen — upserts `hasSeenHelp: true` on Status table |
 
 ## Components (`src/components/`)
 
@@ -124,6 +140,8 @@ One-line descriptions of every source file, grouped by layer.
 | `friendly-date.tsx` | `<FriendlyDate>` — renders relative timestamps: time-only (today), weekday + time (<6d), date (older); full timestamp on hover |
 | `doc-type-icon.tsx` | SVG icons for Google Docs/Sheets/Slides by mime type |
 | `x-icon.tsx` | Small X (close) icon used in badges and buttons |
+| `help-dialog.tsx` | Multi-page help viewer dialog — iframe + pages.json navigation, keyboard shortcuts, page dropdown |
+| `welcome-dialog.tsx` | First-login welcome dialog — single Quick Start page in iframe, marks `hasSeenHelp` on close |
 
 ### UI primitives (`src/components/ui/`)
 
