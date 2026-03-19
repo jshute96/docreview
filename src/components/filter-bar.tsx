@@ -136,14 +136,14 @@ export function FilterBar({
       </div>
 
       <div className="flex items-center gap-1.5">
-        <span className="text-xs text-zinc-400">Search</span>
+        <span className="text-xs text-zinc-500">Search</span>
         <input
           type="text"
           value={titleFilter}
           onChange={(e) => onTitleFilterChange(e.target.value)}
           title="Filter by regex or substring"
           placeholder="regex or substring…"
-          className="rounded border border-zinc-200 bg-white pl-2 pr-5 py-0.5 text-xs text-zinc-700 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none w-90"
+          className="rounded border border-zinc-200 bg-white pl-2 pr-5 py-0.5 text-xs text-zinc-700 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none w-90"
         />
         {titleFilter && (
           <button
