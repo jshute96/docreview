@@ -187,7 +187,7 @@ async function executeLoad(opts: {
     // Load mode with selection: skip docs not selected by user
     const isSelected = !selectedSet || selectedSet.has(doc.googleDocId);
     if (!isSelected) {
-      logInfo(`[Sync]   SKIP "${doc.title}" — not selected by user`);
+      logInfo(`[Sync]   SKIP ${doc.googleDocId} — not selected by user`);
       continue;
     }
 
@@ -241,10 +241,10 @@ async function executeLoad(opts: {
     }
 
     if (isExisting) {
-      logInfo(`[Sync]   UPDATE "${doc.title}" — already tracked, metadata updated`);
+      logInfo(`[Sync]   UPDATE ${doc.googleDocId} — already tracked, metadata updated`);
       updated++;
     } else {
-      logInfo(`[Sync]   ADD "${doc.title}" — new ${doc.role} doc (owner: ${doc.owner ?? "unknown"})`);
+      logInfo(`[Sync]   ADD ${doc.googleDocId} — new ${doc.role} doc`);
       added++;
     }
   }

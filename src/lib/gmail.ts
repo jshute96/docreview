@@ -135,7 +135,7 @@ export async function scanGmailForDocIds(
         const docId = body ? extractDocId(body) : null;
 
         if (docId) {
-          logInfo(`[Gmail] ${messageId}: "${subject}" → doc ${docId} (${Date.now() - t0}ms)`);
+          logInfo(`[Gmail] ${messageId} → doc ${docId} (${Date.now() - t0}ms)`);
           docIdSet.add(docId);
 
           // Capture parsed email for use if Drive API fails
@@ -157,7 +157,7 @@ export async function scanGmailForDocIds(
             shareNotes.set(docId, shareNote);
           }
         } else {
-          logError(`[Gmail] ${messageId}: "${subject}" → no doc link found in body (${Date.now() - t0}ms)`);
+          logError(`[Gmail] ${messageId}: no doc link found in body (${Date.now() - t0}ms)`);
           errorCount++;
         }
       } catch (err) {
@@ -225,7 +225,7 @@ export function buildInaccessibleDocs(
 
       const emailDate = date && !isNaN(date.getTime()) ? date : new Date();
       results.push({ googleDocId: docId, title, accessState, notes, emailDate });
-      logInfo(`[Gmail] Created inaccessible doc entry for ${docId}: "${title}" (${accessState})`);
+      logInfo(`[Gmail] Created inaccessible doc entry for ${docId} (${accessState})`);
     } catch (parseErr) {
       logWarning(`[Gmail] Failed to parse email metadata for inaccessible doc ${docId}:`, parseErr);
     }
@@ -286,7 +286,7 @@ export async function scanGmailNotifications(
           role: isOwner ? "AUTHOR" : "REVIEWER",
         });
 
-        logInfo(`[Gmail] Drive metadata for ${docId}: "${file.name}" (${Date.now() - t0}ms)`);
+        logInfo(`[Gmail] Drive metadata for ${docId} (${Date.now() - t0}ms)`);
       } catch (err: any) {
         const code = err.code;
         if (code === 404 || code === 403) {

@@ -137,11 +137,11 @@ export async function upsertDocsAndSyncComments(
 
     if (isExisting) {
       if (mode !== "selected") {
-        logInfo(`[Refresh]   UPDATE "${doc.title}"`);
+        logInfo(`[Refresh]   UPDATE ${doc.googleDocId}`);
       }
       updated++;
     } else {
-      logInfo(`[Refresh]   ADD "${doc.title}" — ${doc.role} (owner: ${doc.owner ?? "unknown"})${fromGmail ? " [Gmail]" : ""}`);
+      logInfo(`[Refresh]   ADD ${doc.googleDocId} — ${doc.role}${fromGmail ? " [Gmail]" : ""}`);
       added++;
     }
   }
@@ -310,7 +310,7 @@ export async function insertInaccessibleDocs(
       });
 
       count++;
-      logInfo(`[Sync] Added inaccessible doc ${doc.googleDocId}: "${doc.title}" (${doc.accessState})`);
+      logInfo(`[Sync] Added inaccessible doc ${doc.googleDocId} (${doc.accessState})`);
     } catch (err) {
       logWarning(`[Sync] Failed to insert inaccessible doc ${doc.googleDocId}:`, err);
     }
@@ -444,7 +444,7 @@ export async function executeRefresh(
       logInfo(`[Refresh] Found ${rows.length} docs with stale comments to catch up`);
       for (const r of rows) {
         const reason = r.comments_last_synced_at === null ? "never synced" : "synced before last modification";
-        logInfo(`[Refresh]   STALE "${r.title}" (${r.google_doc_id}) — ${reason}`);
+        logInfo(`[Refresh]   STALE ${r.google_doc_id} — ${reason}`);
       }
     }
   })());

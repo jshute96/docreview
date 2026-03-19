@@ -807,7 +807,7 @@ export async function fetchDocsByIds(
         });
         const file = res.data;
         const isOwner = file.owners?.some((o) => o.me === true) ?? false;
-        logInfo(`[Drive] files.get ${id} → "${file.name}" (${Date.now() - t0}ms)`);
+        logInfo(`[Drive] files.get ${id} (${Date.now() - t0}ms)`);
         return {
           googleDocId: id,
           title: file.name ?? id,

@@ -84,6 +84,7 @@ dropped `url = env(...)` support in schema.prisma).
 - **Never** use raw `console.log()`, `console.error()`, or `console.warn()` in application code; always use the helpers in `log.ts`.
 - **Prefix** every log message with a bracketed tag: `[Drive]`, `[Gmail]`, `[Sync]`, `[Comments]`, `[Suggestions]`, `[Scan]`, `[Refresh]`, `[Prisma]`, `[Auth]`, `[API]`, `[GmailRefresh]`, `[Docs]`.
 - **Include timing** for external API calls: `(${Date.now() - t0}ms)`.
+- **No PII in logs**: Never log document titles, user/owner names, email subjects, or comment content. Use Google Doc IDs instead of titles. The logged-in user's own email is the only exception (e.g., auth denial logs).
 - Client-side toasts don't need corresponding `console.log` — the server-side API route already logs the operation or error.
 - **File logging:** All log calls also write to `logs/docreview-YYYY-MM-DD.log` (PST dates). Each line has format: `TIMESTAMP REQUEST_ID LEVEL MESSAGE args`. Log files auto-rotate daily and are cleaned up after 14 days. `logSilent(message, ...args)` writes to the file only (no console output).
 - **Request IDs:** Every API route handler must be wrapped in `runWithRequestId("METHOD", req, async () => { ... })` from `src/lib/request-context.ts`. This extracts the URL and client context ID from the request, assigns an 8-char hex ID that tags all log lines within that request. When adding a new route handler, always add this wrapper.

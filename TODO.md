@@ -1,7 +1,6 @@
 required cleanup:
 * decide whether to keep last-view-time pinning on Reply/Resolve
     * clean up UI for edit-last-viwed-timestamp
-* strip personal data from logs
 * remove redirect-resolve logging
 
 P0:
