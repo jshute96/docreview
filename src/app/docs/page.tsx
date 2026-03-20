@@ -31,6 +31,9 @@ export default async function DocsPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50">
+      {/* Hide page until useCachedTitles populates titles from localStorage, preventing a flash of untitled docs */}
+      <style id="hide-until-titles" dangerouslySetInnerHTML={{ __html: `body{visibility:hidden}` }} />
+      <script dangerouslySetInnerHTML={{ __html: `setTimeout(function(){var s=document.getElementById("hide-until-titles");if(s)s.remove()},2000)` }} />
       {/* Pre-read cached titles from localStorage for these doc IDs (runs before React hydrates) */}
       <script dangerouslySetInnerHTML={{ __html: `try{var ids=${JSON.stringify(googleDocIds)};var u=${JSON.stringify(userId)};var c={};for(var i=0;i<ids.length;i++){var k="docr:"+u+":title:"+ids[i];try{var e=JSON.parse(localStorage.getItem(k));if(e&&e.value)c[ids[i]]=e}catch(x){}}window.__docrTitleCache=c}catch(x){}` }} />
       <div className="mx-auto max-w-6xl px-4 py-8">

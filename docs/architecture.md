@@ -160,9 +160,10 @@ to re-fetch. See [`docs/cross-tab.md`](./cross-tab.md).
 
 **Browser-side caching:** Document titles are not stored in the database for
 privacy. Instead, they're cached in `localStorage` and fetched on demand from
-Google Drive. To avoid a flash of "Unknown title" during SSR hydration, the root
-layout hides the page body (`visibility:hidden`) and each page component
-includes an inline `<script>` that pre-reads cached titles for its doc IDs into
+Google Drive. To avoid a flash of "Unknown title" during SSR hydration, the two
+pages that display titles (`docs/page.tsx` and `comments/[docId]/page.tsx`) hide
+the page body (`visibility:hidden`) and include inline `<script>` tags that
+pre-read cached titles for their doc IDs into
 `window.__docrTitleCache`. After React hydrates, a `useLayoutEffect` in
 `useCachedTitles` populates title state and removes the hiding style — so the
 page appears with titles already in place. A 2-second fallback removes the

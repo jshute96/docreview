@@ -23,6 +23,7 @@ One-line descriptions of every source file, grouped by layer.
 |------|-------------|
 | `page.tsx` | Root redirect — sends authed users to `/docs`, others to `/login` |
 | `layout.tsx` | Root layout — Geist fonts, global CSS, Sonner toaster |
+| `not-found.tsx` | Global 404 page — centered message with link back to docs list |
 | `login/page.tsx` | Login page — Google OAuth button, or offline-mode button |
 | `docs/page.tsx` | Doc list page (server) — fetches docs+labels, renders `DocTable` |
 | `add/page.tsx` | Add document page (server) — standalone add-doc form, accepts optional `?doc=` and `?notes=` query params |

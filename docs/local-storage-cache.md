@@ -53,8 +53,9 @@ We use `lastModifiedInDrive` rather than `commentsLastSyncedAt` because `comment
 ```
 Page load
   │
-  ├─ Inline <style> in layout.tsx <head> hides body (visibility:hidden)
-  ├─ Inline <script> in layout.tsx <head> sets 2s fallback to remove hiding style
+  ├─ Inline <style> in page component hides body (visibility:hidden)
+  ├─ Inline <script> in page component sets 2s fallback to remove hiding style
+  │    (only docs/page.tsx and comments/[docId]/page.tsx include these)
   │
   ├─ Server returns docs WITHOUT titles (stripped via stripTitle())
   ├─ Inline <script> in page component reads only needed doc IDs
