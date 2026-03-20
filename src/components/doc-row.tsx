@@ -103,7 +103,7 @@ export function DocRow({
             }`}
           >
             <DocTypeIcon mimeType={doc.mimeType} />
-            <span className={!cachedTitle && !doc.title ? "italic text-zinc-400" : undefined}>
+            <span suppressHydrationWarning className={!cachedTitle && !doc.title ? "italic text-zinc-400" : undefined}>
               {highlightText(cachedTitle || doc.title || "Unknown title", searchFilter)}
             </span>
           </a>

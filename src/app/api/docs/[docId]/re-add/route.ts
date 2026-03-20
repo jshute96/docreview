@@ -8,7 +8,7 @@ import {
   invalidGrantResponse,
 } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
-import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
+import { docWithCountsInclude, withCommentCounts, stripTitle } from "@/lib/doc-queries";
 import { runWithRequestId } from "@/lib/request-context";
 
 export async function POST(
@@ -128,6 +128,6 @@ export async function POST(
       include: docWithCountsInclude,
     });
 
-    return NextResponse.json(result ? withCommentCounts(result) : result, { status: 201 });
+    return NextResponse.json(result ? stripTitle(withCommentCounts(result)) : result, { status: 201 });
   });
 }

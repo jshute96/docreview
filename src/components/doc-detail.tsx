@@ -607,8 +607,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   }
 
   useEffect(() => {
-    document.title = `Docreview: ${doc.title}`;
-  }, [doc.title]);
+    document.title = `Docreview: ${displayTitle}`;
+  }, [displayTitle]);
 
   if (notFound) {
     return (
@@ -655,7 +655,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
             className={`hover:underline hover:text-blue-600 ${
               doc.accessState !== "OK" ? "line-through text-zinc-400" : "text-zinc-900"
             }`}
-          >{displayTitle}</a>
+          ><span suppressHydrationWarning>{displayTitle}</span></a>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <Button

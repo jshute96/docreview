@@ -69,7 +69,7 @@ describe("GET /api/docs/[docId]", () => {
     const res = await GET(req, makeParams("d1"));
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.title).toBe("Test");
+    expect(data.title).toBe(""); // stripTitle() clears titles from API responses
   });
 });
 

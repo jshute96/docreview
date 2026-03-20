@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { DocRole, DocStatus } from "@prisma/client";
-import { docWithCountsInclude, docWithCommentsInclude, withCommentCounts } from "@/lib/doc-queries";
+import { docWithCountsInclude, docWithCommentsInclude, withCommentCounts, stripTitle } from "@/lib/doc-queries";
 import { runWithRequestId } from "@/lib/request-context";
 
 const VALID_ROLES: string[] = Object.values(DocRole);
@@ -29,7 +29,7 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json(doc);
+  return NextResponse.json(stripTitle(doc));
   });
 }
 
@@ -106,7 +106,7 @@ export async function PATCH(
     include: docWithCountsInclude,
   });
 
-  return NextResponse.json(withCommentCounts(updated));
+  return NextResponse.json(stripTitle(withCommentCounts(updated)));
   });
 }
 

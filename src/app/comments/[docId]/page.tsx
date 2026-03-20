@@ -3,19 +3,13 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { DocDetail } from "@/components/doc-detail";
 import { requireAuth } from "@/lib/auth-utils";
-import { docWithCommentsInclude } from "@/lib/doc-queries";
+import { docWithCommentsInclude, stripTitle } from "@/lib/doc-queries";
 import type { DocWithComments } from "@/types";
 
 type PageProps = { params: Promise<{ docId: string }> };
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { docId } = await params;
-  const session = await requireAuth();
-  const doc = await prisma.doc.findUnique({
-    where: { docId, userId: session.user.id },
-    select: { title: true },
-  });
-  return { title: doc ? `${doc.title} - Docreview` : "Unknown doc - Docreview" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: "Doc - Docreview" };
 }
 
 export default async function DocDetailPage({ params }: PageProps) {
@@ -38,8 +32,10 @@ export default async function DocDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-zinc-50">
+      {/* Pre-read cached title from localStorage for this doc (runs before React hydrates) */}
+      <script dangerouslySetInnerHTML={{ __html: `try{var k="docr:"+${JSON.stringify(userId)}+":title:"+${JSON.stringify(doc.googleDocId)};var e=JSON.parse(localStorage.getItem(k));window.__docrTitleCache=e&&e.value?{${JSON.stringify(doc.googleDocId)}:e}:{}}catch(x){}` }} />
       <div className="px-4 py-8">
-        <DocDetail doc={doc as DocWithComments} allLabels={allLabels} userId={userId} />
+        <DocDetail doc={stripTitle(doc) as DocWithComments} allLabels={allLabels} userId={userId} />
       </div>
     </div>
   );

@@ -28,6 +28,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Hide body until useCachedTitles hook removes this style after populating titles */}
+        <style id="hide-until-titles" dangerouslySetInnerHTML={{ __html: `body{visibility:hidden}` }} />
+        {/* Fallback: reveal body after 2s if the hook never runs (e.g. JS error) */}
+        <script dangerouslySetInnerHTML={{ __html: `setTimeout(function(){var s=document.getElementById("hide-until-titles");if(s)s.remove()},2000)` }} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

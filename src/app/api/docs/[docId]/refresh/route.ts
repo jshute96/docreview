@@ -3,7 +3,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getDriveClient, createDriveService, invalidGrantResponse } from "@/lib/google-drive";
 import { upsertDocsAndSyncComments } from "@/lib/refresh";
-import { docWithCommentsInclude } from "@/lib/doc-queries";
+import { docWithCommentsInclude, stripTitle } from "@/lib/doc-queries";
 import { logError, logWarning } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 
@@ -94,6 +94,6 @@ export async function POST(
     include: docWithCommentsInclude,
   });
 
-  return NextResponse.json(updated);
+  return NextResponse.json(updated ? stripTitle(updated) : updated);
   });
 }

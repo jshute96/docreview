@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { DocRole, DocStatus, Prisma } from "@prisma/client";
-import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
+import { docWithCountsInclude, withCommentCounts, stripTitle } from "@/lib/doc-queries";
 import type { BulkEditState } from "@/lib/bulk-edit";
 import { appendNotes as appendToNotes } from "@/lib/utils";
 import { runWithRequestId } from "@/lib/request-context";
@@ -154,6 +154,6 @@ export async function PATCH(req: NextRequest) {
     return withCommentCounts(updated ?? d);
   });
 
-  return NextResponse.json({ docs: allDocs, skipped });
+  return NextResponse.json({ docs: allDocs.map(stripTitle), skipped });
   });
 }

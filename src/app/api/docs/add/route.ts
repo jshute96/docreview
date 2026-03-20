@@ -9,7 +9,7 @@ import {
   invalidGrantResponse,
 } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
-import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
+import { docWithCountsInclude, withCommentCounts, stripTitle } from "@/lib/doc-queries";
 import { runWithRequestId } from "@/lib/request-context";
 
 export async function POST(req: NextRequest) {
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       include: docWithCountsInclude,
     });
 
-    return NextResponse.json(result ? withCommentCounts(result) : result);
+    return NextResponse.json(result ? stripTitle(withCommentCounts(result)) : result);
   }
 
   let f;
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
       include: docWithCountsInclude,
     });
 
-    return NextResponse.json(result ? withCommentCounts(result) : result, { status: 201 });
+    return NextResponse.json(result ? stripTitle(withCommentCounts(result)) : result, { status: 201 });
   }
 
   if (f!.trashed) {
@@ -204,6 +204,6 @@ export async function POST(req: NextRequest) {
     include: docWithCountsInclude,
   });
 
-  return NextResponse.json(result ? withCommentCounts(result) : result, { status: 201 });
+  return NextResponse.json(result ? stripTitle(withCommentCounts(result)) : result, { status: 201 });
   });
 }

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { DocTable } from "@/components/doc-table";
-import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
+import { docWithCountsInclude, withCommentCounts, stripTitle } from "@/lib/doc-queries";
 import { OFFLINE_MODE } from "@/lib/offline";
 import { requireAuth } from "@/lib/auth-utils";
 import type { DocWithLabels } from "@/types";
@@ -25,10 +25,14 @@ export default async function DocsPage() {
     }),
   ]);
 
-  const docs = rawDocs.map(withCommentCounts);
+  const docs = rawDocs.map(withCommentCounts).map(stripTitle);
+
+  const googleDocIds = rawDocs.map((d) => d.googleDocId);
 
   return (
     <div className="min-h-screen bg-zinc-50">
+      {/* Pre-read cached titles from localStorage for these doc IDs (runs before React hydrates) */}
+      <script dangerouslySetInnerHTML={{ __html: `try{var ids=${JSON.stringify(googleDocIds)};var u=${JSON.stringify(userId)};var c={};for(var i=0;i<ids.length;i++){var k="docr:"+u+":title:"+ids[i];try{var e=JSON.parse(localStorage.getItem(k));if(e&&e.value)c[ids[i]]=e}catch(x){}}window.__docrTitleCache=c}catch(x){}` }} />
       <div className="mx-auto max-w-6xl px-4 py-8">
         <DocTable
           initialDocs={docs as DocWithLabels[]}

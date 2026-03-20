@@ -7,7 +7,7 @@ import { appendNotes, pluralize } from "@/lib/utils";
 import { executeRefresh, insertInaccessibleDocs } from "@/lib/refresh";
 import type { GmailInaccessibleDoc } from "@/lib/gmail";
 import { updateDriveChangesToken } from "@/lib/status";
-import { docWithCountsInclude, withCommentCounts } from "@/lib/doc-queries";
+import { docWithCountsInclude, withCommentCounts, stripTitle } from "@/lib/doc-queries";
 import { parseLoadOptions } from "@/lib/load-options";
 import { logWarning, logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     orderBy: { lastModifiedInDrive: "desc" },
   });
 
-  return NextResponse.json(rawDocs.map(withCommentCounts));
+  return NextResponse.json(rawDocs.map(withCommentCounts).map(stripTitle));
   });
 }
 

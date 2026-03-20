@@ -53,20 +53,27 @@ We use `lastModifiedInDrive` rather than `commentsLastSyncedAt` because `comment
 ```
 Page load
   │
-  ├─ Server returns docs with titles (from DB, for now)
+  ├─ Inline <style> in layout.tsx <head> hides body (visibility:hidden)
+  ├─ Inline <script> in layout.tsx <head> sets 2s fallback to remove hiding style
   │
-  ├─ useLayoutEffect fires (before browser paints)
-  │    ├─ Read cached titles from localStorage
+  ├─ Server returns docs WITHOUT titles (stripped via stripTitle())
+  ├─ Inline <script> in page component reads only needed doc IDs
+  │    from localStorage into window.__docrTitleCache
+  │
+  ├─ React hydrates → useLayoutEffect fires (before next paint)
+  │    ├─ Read cached titles from window.__docrTitleCache (or localStorage fallback)
   │    ├─ For each doc:
-  │    │    ├─ Server provided title? → use it, update cache
-  │    │    ├─ Cache fresh (syncedAt matches)? → use cached value
+  │    │    ├─ Cache fresh (syncedAt matches)? → use cached value, touch cachedAt
   │    │    └─ Cache stale or missing? → add to stale list
-  │    └─ Set title state (shown immediately)
+  │    ├─ Set title state
+  │    └─ Remove body-hiding <style> → page appears with titles in place
   │
   └─ Async: fetch fresh titles for stale docs
-       GET /api/docs/titles?googleDocIds=id1,id2,...
+       POST /api/docs/titles { googleDocIds: [id1, id2, ...] }
        └─ Update state + cache when response arrives
 ```
+
+The fallback timeout ensures the page is never permanently hidden if the hook doesn't run (e.g. JS error).
 
 ### Staleness Detection
 
@@ -99,8 +106,9 @@ All operations are wrapped in try/catch — cache failures are silent since the 
 ### use-cached-titles.ts
 
 React hook used by `DocTable` and `DocDetail`. Handles:
-- Synchronous cache read in `useLayoutEffect` (before paint, avoids flash)
-- Merging server-provided titles with cached titles
+- Cache read from `window.__docrTitleCache` (pre-populated by page-level inline script) in `useLayoutEffect`
+- Removing the body-hiding `<style>` element after populating title state
+- Staleness detection and cache maintenance
 - Async fetch for stale/missing titles via `/api/docs/titles`
 - Deduplication — tracks which docs have already been fetched to avoid redundant API calls
 - Batching — splits large requests into chunks of 100
@@ -109,9 +117,9 @@ The hook depends on a stable `docsKey` string (derived from doc IDs + modificati
 
 ### /api/docs/titles
 
-`GET /api/docs/titles?googleDocIds=id1,id2,...`
+`POST /api/docs/titles { googleDocIds: [id1, id2, ...] }`
 
-Fetches current titles directly from Google Drive (`files.get` with `fields: "id, name"`). Returns `{ [googleDocId]: title }`. Docs that are inaccessible are silently omitted. Capped at 100 IDs per request, with 10-way parallelism.
+Fetches current titles directly from Google Drive (`files.get` with `fields: "id, name"`). Returns `{ [googleDocId]: title }`. For docs that fail to fetch from Drive (e.g. inaccessible), falls back to the title stored in the database. Capped at 100 IDs per request, with 10-way parallelism.
 
 ## Capacity
 
@@ -129,16 +137,17 @@ docr:{userId}:thread:{googleCommentId}
 
 The `browser-cache.ts` utilities are namespace-agnostic, so adding comment caching requires only a new hook (similar to `useCachedTitles`) and wiring it into the comment display components.
 
+## Current State: Titles Stripped from API Responses
+
+Server responses no longer include doc titles — `stripTitle()` in `doc-queries.ts` clears the `title` field before sending docs to the client. This applies to all doc-returning endpoints (`GET /api/docs`, `GET /api/docs/[docId]`, `PATCH /api/docs/[docId]`, `PATCH /api/docs/bulk-update`, `POST /api/docs/add`, `POST /api/docs/[docId]/re-add`) and server components (docs listing page, comments page).
+
+Titles are still stored in the database (used during sync and for inaccessible docs), but the client relies entirely on the localStorage cache and `/api/docs/titles` for display. On first visit with an empty cache, titles show "Unknown title" briefly until fetched from Google Drive.
+
+The `filterDocs` and `sortDocs` functions in `doc-filters.ts` accept an optional `titles` map for filtering/sorting by title when `doc.title` is empty.
+
 ## Future: Removing Titles from the Database
 
-The current implementation sends titles from the server (read from the DB) and caches them client-side. When titles are eventually removed from the database:
-
-1. Server responses will have empty `title` fields
-2. The hook will show cached titles instantly from localStorage
-3. For stale/missing entries, the hook fetches from `/api/docs/titles`
-4. First visit (empty cache) will show a brief loading state until the API responds
-
-The `filterDocs` and `sortDocs` functions in `doc-filters.ts` already accept an optional `titles` map for filtering/sorting by title when `doc.title` is empty.
+The title column can eventually be removed from the database entirely, with one exception: inaccessible docs (see below).
 
 ### Inaccessible docs
 
