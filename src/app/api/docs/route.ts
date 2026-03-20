@@ -11,6 +11,7 @@ import { docWithCountsInclude, withCommentCounts, stripTitle } from "@/lib/doc-q
 import { parseLoadOptions } from "@/lib/load-options";
 import { logWarning, logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
+import { validateLabelOwnership } from "@/lib/add-doc";
 import { createProgressStream } from "@/lib/sse";
 import type { OnProgress } from "@/lib/progress-events";
 import pLimit from "p-limit";
@@ -80,15 +81,8 @@ export async function POST(req: NextRequest) {
     : [];
 
   // Validate label ownership before proceeding
-  if (loadLabelIds.length > 0) {
-    const ownedLabels = await prisma.label.findMany({
-      where: { labelId: { in: loadLabelIds }, userId },
-      select: { labelId: true },
-    });
-    if (ownedLabels.length !== loadLabelIds.length) {
-      return NextResponse.json({ error: "Invalid label" }, { status: 400 });
-    }
-  }
+  const labelError = await validateLabelOwnership(userId, loadLabelIds);
+  if (labelError) return labelError;
 
   logInfo(`[Sync] Starting ${mode} sync`);
 

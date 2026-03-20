@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import {
-  getDriveClient,
-  createDriveService,
-  SUPPORTED_MIME_TYPES,
-  invalidGrantResponse,
-} from "@/lib/google-drive";
-import { syncComments } from "@/lib/sync-comments";
-import { docWithCountsInclude, withCommentCounts, stripTitle } from "@/lib/doc-queries";
+import { addDoc } from "@/lib/add-doc";
 import { runWithRequestId } from "@/lib/request-context";
-import { logWarning } from "@/lib/log";
 
 export async function POST(
   req: NextRequest,
@@ -38,13 +30,6 @@ export async function POST(
       status?: "INBOX" | "ARCHIVED";
     };
 
-    if (status !== undefined && status !== "INBOX" && status !== "ARCHIVED") {
-      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
-    }
-    if (isStarred !== undefined && typeof isStarred !== "boolean") {
-      return NextResponse.json({ error: "Invalid isStarred" }, { status: 400 });
-    }
-
     // Find old doc
     const oldDoc = await prisma.doc.findUnique({
       where: { docId: oldDocId },
@@ -54,83 +39,24 @@ export async function POST(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const googleDocId = oldDoc.googleDocId;
-
-    if (labelIds.length > 0) {
-      const ownedLabels = await prisma.label.findMany({
-        where: { labelId: { in: labelIds }, userId },
-        select: { labelId: true },
-      });
-      if (ownedLabels.length !== labelIds.length) {
-        return NextResponse.json({ error: "Invalid label" }, { status: 400 });
-      }
-    }
-
-    // Verify access and get fresh metadata
-    let f;
-    let driveAuth;
-    try {
-      driveAuth = await getDriveClient(userId);
-      const drive = createDriveService(driveAuth);
-      const res = await drive.files.get({
-        fileId: googleDocId,
-        fields: "name,mimeType,webViewLink,modifiedTime,createdTime,owners(me,displayName),trashed",
-        supportsAllDrives: true,
-      });
-      f = res.data;
-    } catch (err) {
-      const reauth = invalidGrantResponse(err);
-      if (reauth) return reauth;
-      const status = (err as { status?: number }).status;
-      logWarning(`[re-add] No access to ${googleDocId} (status ${status ?? "?"})`);
-      return NextResponse.json({ error: "no_access" }, { status: 404 });
-    }
-
-    if (f.trashed) {
-      return NextResponse.json({ error: "trashed" }, { status: 400 });
-    }
-
-    if (!f.mimeType || !SUPPORTED_MIME_TYPES.has(f.mimeType)) {
-      return NextResponse.json({ error: "invalid_mime_type" }, { status: 400 });
-    }
-
-    const isOwner = f.owners?.some((o) => o.me === true) ?? false;
-
-    // Transactional delete and create
-    const newDoc = await prisma.$transaction(async (tx) => {
-      // 1. Delete old doc (cascades to comments, doc_labels, etc.)
-      await tx.doc.delete({ where: { docId: oldDocId } });
-
-      // 2. Create new doc
-      return await tx.doc.create({
-        data: {
-          userId,
-          googleDocId,
-          title: f.name ?? "",
-          driveUrl: f.webViewLink ?? `https://docs.google.com/document/d/${googleDocId}/edit`,
-          mimeType: f.mimeType,
-          role: isOwner ? "AUTHOR" : "REVIEWER",
-          status: status ?? "INBOX",
-          owner: f.owners?.[0]?.displayName ?? null,
-          lastModifiedInDrive: f.modifiedTime ? new Date(f.modifiedTime) : null,
-          createdTimeInDrive: f.createdTime ? new Date(f.createdTime) : null,
-          notes: notes || null,
-          isStarred: isStarred ?? false,
-          labels: {
-            create: labelIds.map((labelId: string) => ({ labelId })),
-          },
-        },
-      });
+    return addDoc({
+      userId,
+      userEmail,
+      googleDocId: oldDoc.googleDocId,
+      labelIds,
+      isStarred,
+      notes,
+      status,
+      deleteDocId: oldDocId,
+      fallback: {
+        title: oldDoc.title || "Unknown title",
+        driveUrl: oldDoc.driveUrl,
+        mimeType: oldDoc.mimeType ?? "application/vnd.google-apps.document",
+        role: oldDoc.role as "AUTHOR" | "REVIEWER",
+        owner: oldDoc.owner,
+        lastModifiedInDrive: oldDoc.lastModifiedInDrive,
+        createdTimeInDrive: oldDoc.createdTimeInDrive,
+      },
     });
-
-    // syncComments (after transaction)
-    await syncComments(newDoc, driveAuth, userEmail);
-
-    const result = await prisma.doc.findUnique({
-      where: { docId: newDoc.docId },
-      include: docWithCountsInclude,
-    });
-
-    return NextResponse.json(result ? stripTitle(withCommentCounts(result)) : result, { status: 201 });
   });
 }

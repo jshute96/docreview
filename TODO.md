@@ -15,8 +15,6 @@ P1:
   * requesting your review
 * testing
   * test scripts for playwright testing of all interactions
-* "delete all my data" menu item
-* Load dialog - load months, or load all
 * check: Can we get comment locations in the doc contents fetch? (to get current location and commented text.)
 * Rewrite help text content.  It's AI generated excepted the Getting Started page.
 * finish cleanup after taking titles out of the DB - rename column?
@@ -34,7 +32,6 @@ Easy:
 * Dialog boxes
   * dialog box moves on new vs add
 
-* Make refresh on a doc faster, and probably cheaper, by doing fewer API calls.
 * Mute state on docs
 * keyboard shortcuts
 * consider saving loaded comments

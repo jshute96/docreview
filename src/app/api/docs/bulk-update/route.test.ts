@@ -12,6 +12,9 @@ vi.mock("@/lib/prisma", () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
+    label: {
+      findMany: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
 }));
@@ -25,10 +28,15 @@ const mockDoc = prisma.doc as unknown as {
   findMany: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
 };
+const mockLabel = prisma.label as unknown as { findMany: ReturnType<typeof vi.fn> };
 const mockTransaction = prisma.$transaction as unknown as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.resetAllMocks();
+  // By default, label ownership validation passes (return whatever was requested)
+  mockLabel.findMany.mockImplementation(async ({ where }: { where: { labelId: { in: string[] } } }) =>
+    where.labelId.in.map((id: string) => ({ labelId: id }))
+  );
 });
 
 describe("PATCH /api/docs/bulk-update", () => {

@@ -103,10 +103,14 @@ from `TRASHED` (via 404, meaning permanently deleted from trash).
 - Updates labels, notes, status (existing behavior — not a re-add)
 
 ### Existing doc in non-OK state (NOT_FOUND, TRASHED, DENIED)
-- The validate route treats these as non-existing (allows re-add)
-- The add route uses upsert to revive the doc:
-  - If files.get succeeds: sets `OK` with fresh metadata
-  - If files.get fails: sets `DENIED` with user-provided or default title
+- The validate route treats these as existing — returns `existing: true` with current labels/notes/status so the form shows "This document already exists"
+- The add route updates labels, notes, status, and star in place (same as the OK case)
+- Note: the update-existing path does not change `accessState` — a subsequent refresh or delete & re-add is needed to restore access
+
+### Delete & re-add (from comments page menu)
+- Deletes the old doc and creates a new one (via `addDoc` with `deleteDocId`)
+- If files.get succeeds: creates with `OK`, fresh metadata, syncs comments
+- If files.get fails: creates with `DENIED` using old doc's metadata (title, driveUrl, mimeType, owner, timestamps), skips comment sync
 
 ## Inaccessible Docs from Gmail
 

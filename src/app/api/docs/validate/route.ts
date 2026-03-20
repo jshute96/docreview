@@ -104,7 +104,7 @@ export async function GET(req: NextRequest) {
       labels: { select: { labelId: true } },
     },
   });
-  const existing = existingRow?.accessState !== "OK" ? null : existingRow;
+  const existing = existingRow ?? null;
 
   let f;
   try {

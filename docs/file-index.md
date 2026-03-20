@@ -90,11 +90,11 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/refresh-selected/route.ts` | `POST` refresh metadata and comments for a specific set of documents (no Drive/Gmail scan) |
 | `docs/refresh/route.ts` | `POST` combined refresh — accepts `{ sources: ["drive", "gmail"] }`, runs parallel discovery, merges results, upserts, syncs comments via shared logic in `refresh.ts` |
 | `docs/scan/route.ts` | `POST` scan Drive or Gmail for documents without modifying DB — branches on `source` field, returns total, existing count, and new doc list |
-| `docs/add/route.ts` | `POST` add or update a doc by URL — validates via Drive; creates DB record + syncs comments for new docs, updates labels/notes/status/star for existing docs |
+| `docs/add/route.ts` | `POST` add or update a doc by URL — existing docs (any access state) get labels/notes/status/star updated; new docs delegate to shared `addDoc()` in `add-doc.ts` |
 | `docs/validate/route.ts` | `GET` validate a Google Drive URL — checks access, mime type, returns metadata; for existing docs returns `existing: true` with labels, notes, status, star |
 | `docs/bulk-update/route.ts` | `PATCH` bulk update multiple docs — optimized role/star/label/notes updates with no-op protection |
 | `docs/[docId]/route.ts` | `GET` single doc; `PATCH` update role/status/star/labels |
-| `docs/[docId]/re-add/route.ts` | `POST` transactional delete and re-add document |
+| `docs/[docId]/re-add/route.ts` | `POST` delete and re-add document — validates ownership, delegates to shared `addDoc()` with `deleteDocId`; handles permission-denied via fallback metadata |
 | `docs/[docId]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata and syncs comments via shared logic in `refresh.ts` |
 | `docs/[docId]/refresh/route.test.ts` | Tests for single-doc metadata refresh and comment sync |
 | `docs/[docId]/comments/route.ts` | `GET` fetch all comment threads from Drive + `viewedByMeTime` (fast path — Drive `comments.list` + `files.get` in parallel) |
@@ -187,6 +187,7 @@ Shadcn/ui components:
 
 | File | Description |
 |------|-------------|
+| `add-doc.ts` | Shared `addDoc()` for add and re-add routes — Drive metadata fetch with permission-denied fallback, transactional delete+create, comment sync; also exports `validateLabelOwnership()` and `validateDocInputs()` used across multiple routes |
 | `api-fetch.ts` | Client-side `apiFetch()` wrapper — intercepts 401 (expired Google token), shows deduplicated reauth toast, throws `ApiAuthError`; `isAuthError()` helper for catch blocks |
 | `google-drive.ts` | Google Drive/Docs API client — OAuth2 with token refresh, `invalidGrantResponse()` for API routes, changes feed (`changes.list`/`getStartPageToken`), file listing, `fetchDocsByIds` (batch metadata fetch by ID), comment fetching, `fetchAllThreads` (bulk thread fetch), `fetchDocContent` (combined document text + suggestion extraction in one Docs API call), thread detail, reply/resolve; OAuth2 client also used by Gmail scanner |
 | `gmail.ts` | Gmail notification scanner — `scanGmailForDocIds(userId, since)` queries Gmail for doc sharing/comment emails after a `Date`, extracts doc IDs and share notes from body (no Drive calls); `scanGmailNotifications` wraps it with Drive metadata fetch; filters by `internalDate` for timestamp-level precision |

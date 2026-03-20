@@ -6,6 +6,7 @@ import { docWithCountsInclude, withCommentCounts, stripTitle } from "@/lib/doc-q
 import type { BulkEditState } from "@/lib/bulk-edit";
 import { appendNotes as appendToNotes } from "@/lib/utils";
 import { runWithRequestId } from "@/lib/request-context";
+import { validateLabelOwnership } from "@/lib/add-doc";
 
 const VALID_BULK_STATES = new Set(["as-is", "set", "clear"]);
 
@@ -65,6 +66,13 @@ export async function PATCH(req: NextRequest) {
   if (appendNotes !== undefined && typeof appendNotes !== "string") {
     return NextResponse.json({ error: "Invalid appendNotes" }, { status: 400 });
   }
+
+  // Validate ownership of labels being added
+  const labelsToSet = Object.entries(labelUpdates as Record<string, string>)
+    .filter(([, state]) => state === "set")
+    .map(([id]) => id);
+  const labelError = await validateLabelOwnership(userId, labelsToSet);
+  if (labelError) return labelError;
 
   const typedRole = role as BulkEditState;
   const typedStatus = status as BulkEditState;

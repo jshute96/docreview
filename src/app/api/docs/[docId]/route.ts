@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { DocRole, DocStatus } from "@prisma/client";
 import { docWithCountsInclude, docWithCommentsInclude, withCommentCounts, stripTitle } from "@/lib/doc-queries";
 import { runWithRequestId } from "@/lib/request-context";
+import { validateLabelOwnership } from "@/lib/add-doc";
 
 const VALID_ROLES: string[] = Object.values(DocRole);
 const VALID_STATUSES: string[] = Object.values(DocStatus);
@@ -76,15 +77,8 @@ export async function PATCH(
     if (!Array.isArray(labelIds)) {
       return NextResponse.json({ error: "Invalid labelIds" }, { status: 400 });
     }
-    if (labelIds.length > 0) {
-      const ownedLabels = await prisma.label.findMany({
-        where: { labelId: { in: labelIds }, userId },
-        select: { labelId: true },
-      });
-      if (ownedLabels.length !== labelIds.length) {
-        return NextResponse.json({ error: "Invalid label" }, { status: 400 });
-      }
-    }
+    const labelError = await validateLabelOwnership(userId, labelIds);
+    if (labelError) return labelError;
   }
 
   const updated = await prisma.doc.update({

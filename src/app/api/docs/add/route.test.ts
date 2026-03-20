@@ -6,17 +6,24 @@ vi.mock("@/auth", () => ({
   auth: vi.fn(),
 }));
 
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    doc: {
-      findUnique: vi.fn(),
-      create: vi.fn(),
+vi.mock("@/lib/prisma", () => {
+  const doc = {
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    delete: vi.fn(),
+  };
+  return {
+    prisma: {
+      doc,
+      label: {
+        findMany: vi.fn(),
+      },
+      // $transaction receives an async callback — call it with a tx proxy that
+      // delegates to the same mock so existing assertions on prisma.doc.create work.
+      $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn({ doc })),
     },
-    label: {
-      findMany: vi.fn(),
-    },
-  },
-}));
+  };
+});
 
 vi.mock("@/lib/google-drive", () => ({
   getDriveClient: vi.fn(),
