@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { signOut } from "next-auth/react";
 import type { Label } from "@prisma/client";
 import { toast } from "sonner";
 import type { DocWithLabels } from "@/types";
@@ -45,6 +46,10 @@ export function AddDocPageClient({
   }
 
   const refetchLabels = useCallback(async (event?: CrossTabReceivedEvent) => {
+    if (event?.type === "signout") {
+      signOut({ callbackUrl: "/login" });
+      return;
+    }
     try {
       const reason = event ? crossTabReason(event, "add-doc") : undefined;
       const res = await apiFetch("/api/labels", { reason });

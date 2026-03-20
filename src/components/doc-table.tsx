@@ -28,6 +28,7 @@ import type { SortCol, SortDir } from "@/lib/doc-filters";
 import { useCachedTitles } from "@/hooks/use-cached-titles";
 import { LabelProvider } from "@/contexts/label-context";
 import { HelpDialog } from "@/components/help-dialog";
+import { DeleteAllDialog } from "@/components/delete-all-dialog";
 import { clearAll as clearBrowserCache } from "@/lib/browser-cache";
 import { WelcomeDialog } from "@/components/welcome-dialog";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
@@ -52,6 +53,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
   const [labels, setLabelsRaw] = useState<Label[]>(initialLabels);
   const cachedTitles = useCachedTitles(userId, docs);
   const [showHelp, setShowHelp] = useState(false);
+  const [showDeleteAll, setShowDeleteAll] = useState(false);
   const [showWelcome, setShowWelcome] = useState(hasSeenHelp === false);
 
   // When labels change (e.g. color update), propagate into docs state too
@@ -73,6 +75,10 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
 
   // Any cross-tab mutation warrants a full refresh since DocTable shows aggregate data
   const refetchAll = useCallback(async (event?: CrossTabReceivedEvent) => {
+    if (event?.type === "signout") {
+      signOut({ callbackUrl: "/login" });
+      return;
+    }
     try {
       const contextId = generateContextId();
       const reason = event ? crossTabReason(event, "doc-list") : undefined;
@@ -350,6 +356,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
           <LoadDialog onRefresh={(newDocs) => setDocs(newDocs)} />
           <ManageLabelsDialog />
           <HelpDialog open={showHelp} onOpenChange={setShowHelp} />
+          <DeleteAllDialog open={showDeleteAll} onOpenChange={setShowDeleteAll} />
           <WelcomeDialog open={showWelcome} onOpenChange={setShowWelcome} />
           <Button
             variant="outline"
@@ -449,9 +456,20 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
                 <Trash2 className="h-4 w-4 mr-2" />
                 Clear cache
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => setShowDeleteAll(true)}
+                disabled={isOffline}
+                title="Delete all your data from Docreview's database"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete all data
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onSelect={() => signOut({ callbackUrl: "/login" })}
+                onSelect={() => {
+                  broadcastChange({ type: "signout" });
+                  signOut({ callbackUrl: "/login" });
+                }}
                 disabled={isOffline}
                 title="Sign out of your account"
               >

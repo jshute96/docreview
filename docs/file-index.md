@@ -107,6 +107,7 @@ One-line descriptions of every source file, grouped by layer.
 | `labels/route.ts` | `GET` list labels with document counts; `POST` create label |
 | `labels/[labelId]/route.ts` | `GET` single label with document count; `PATCH` update label color; `DELETE` delete label |
 | `labels/reorder/route.ts` | `PATCH` reorder labels by position |
+| `user/delete-all-data/route.ts` | `DELETE` delete all user data — optionally deletes account (cascade) or just app data (docs, labels, status) |
 | `help-seen/route.ts` | `POST` mark help as seen — upserts `hasSeenHelp: true` on Status table |
 
 ## Components (`src/components/`)
@@ -128,6 +129,7 @@ One-line descriptions of every source file, grouped by layer.
 | `edit-doc-dialog.tsx` | Dialog to edit doc role, star, and labels |
 | `delete-readd-dialog.tsx` | Dialog to delete a document and re-add it as fresh |
 | `bulk-edit-dialog.tsx` | Dialog to edit role, star, labels, and notes for multiple documents simultaneously; supports multi-select highlighting to scope actions to a subset |
+| `delete-all-dialog.tsx` | Two-step confirmation dialog for deleting all user data — first confirms intent, then offers "Delete and log out" vs "Delete data only" |
 
 | `load-dialog.tsx` | Load from Drive/Gmail dialog — two-phase scan→add flow with source toggle (Drive/Gmail), options (days back, ownership, shared drives), doc selection with multi-select highlighting, labels, notes; shows error count for unresolved Gmail emails |
 | `refresh-button.tsx` | Combined Refresh button — calls POST `/api/docs/refresh` with both Drive+Gmail sources, then reloads list |

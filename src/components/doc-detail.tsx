@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 import { RefreshCw, Menu, Trash2, Pencil, CircleHelp } from "lucide-react";
 import type { Comment, Label } from "@prisma/client";
@@ -181,6 +182,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
 
   const [notFound, setNotFound] = useState(false);
   const handleCrossTab = useCallback(async (event: CrossTabReceivedEvent) => {
+    if (event.type === "signout") {
+      signOut({ callbackUrl: "/login" });
+      return;
+    }
     try {
       const contextId = generateContextId();
       const reason = crossTabReason(event, "doc-detail");
