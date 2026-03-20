@@ -340,12 +340,19 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
             ...(permissionDenied && validTitle ? { title: validTitle } : {}),
           }),
         });
-        if (!res.ok) throw new Error("Action failed");
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          const code = data?.error as string | undefined;
+          throw new Error(code ? errorMessageForCode(code) : "Operation failed");
+        }
         const newDoc: DocWithLabels = await res.json();
         onSuccess(newDoc);
         return newDoc;
       } catch (err) {
-        if (!isAuthError(err)) toast.error("Operation failed");
+        if (!isAuthError(err)) {
+          const msg = err instanceof Error ? err.message : "Operation failed";
+          toast.error(msg);
+        }
         return null;
       } finally {
         setProcessing(false);

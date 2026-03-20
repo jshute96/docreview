@@ -10,6 +10,7 @@ import {
 import { syncComments } from "@/lib/sync-comments";
 import { docWithCountsInclude, withCommentCounts, stripTitle } from "@/lib/doc-queries";
 import { runWithRequestId } from "@/lib/request-context";
+import { logWarning } from "@/lib/log";
 
 export async function POST(
   req: NextRequest,
@@ -80,6 +81,8 @@ export async function POST(
     } catch (err) {
       const reauth = invalidGrantResponse(err);
       if (reauth) return reauth;
+      const status = (err as { status?: number }).status;
+      logWarning(`[re-add] No access to ${googleDocId} (status ${status ?? "?"})`);
       return NextResponse.json({ error: "no_access" }, { status: 404 });
     }
 
