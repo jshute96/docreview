@@ -157,7 +157,7 @@ model Doc {
   docId                String     @id @default(cuid()) @map("doc_id")
   userId               String     @map("user_id")
   googleDocId          String     @map("google_doc_id")
-  title                String
+  title                String // Normally "" — titles are cached in browser localStorage, not the DB. Only populated for inaccessible docs (DENIED/NOT_FOUND) where Drive can't provide the title.
   driveUrl             String     @map("drive_url")
   mimeType             String?    @map("mime_type")
   role                 DocRole    @default(REVIEWER)

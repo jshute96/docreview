@@ -117,11 +117,11 @@ export default async function LoginPage({
                 <li><span className="font-medium text-zinc-500">Stored data:</span>
                   <ul className="list-disc list-outside ml-4 mt-0.5 space-y-0.5">
                     <li>Opaque IDs for documents and comments</li>
-                    <li><b>Document titles</b></li>
                     <li>All metadata entered in Docreview: labels, notes, etc.</li>
-                    <li>No user IDs, document contents, or comment text</li>
+                    <li>No user IDs, document titles, document contents, or comment text</li>
                   </ul>
                 </li>
+                <li><span className="font-medium text-zinc-500">Document titles are cached locally in your browser storage</span></li>
                 <li><span className="font-medium text-zinc-500">All other data is transient, in your browser only</span></li>
               </ul>
             </div>

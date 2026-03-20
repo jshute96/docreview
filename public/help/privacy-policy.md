@@ -10,13 +10,15 @@ Docreview requests the following Google account permissions when you first sign 
 
 **Stored in the database:**
 - Opaque IDs for documents and comments (not human-readable).
-- Document titles.
 - All metadata you enter in Docreview: labels, notes, role, status, star.
 
 **Not stored:**
 - User IDs or personal information beyond your Google display name and email.
-- Document contents or text.
+- Document titles or contents.
 - Comment text or reply contents.
+
+**Browser storage:**
+- Document titles are cached in your browser's local storage and fetched on demand from Google Drive.
 
 **Transient (browser only):**
 - All other data -- comment threads, document content, suggestion text -- is fetched on demand from Google's APIs and exists only in your browser while you're viewing it.

@@ -137,18 +137,20 @@ docr:{userId}:thread:{googleCommentId}
 
 The `browser-cache.ts` utilities are namespace-agnostic, so adding comment caching requires only a new hook (similar to `useCachedTitles`) and wiring it into the comment display components.
 
-## Current State: Titles Stripped from API Responses
+## Current State: Titles Not Stored in the Database
 
 Server responses no longer include doc titles — `stripTitle()` in `doc-queries.ts` clears the `title` field before sending docs to the client. This applies to all doc-returning endpoints (`GET /api/docs`, `GET /api/docs/[docId]`, `PATCH /api/docs/[docId]`, `PATCH /api/docs/bulk-update`, `POST /api/docs/add`, `POST /api/docs/[docId]/re-add`) and server components (docs listing page, comments page).
 
-Titles are still stored in the database (used during sync and for inaccessible docs), but the client relies entirely on the localStorage cache and `/api/docs/titles` for display. On first visit with an empty cache, titles show "Unknown title" briefly until fetched from Google Drive.
+Titles are **not stored** in the database for accessible docs — all DB write paths (upsert create/update in `refresh.ts`, `docs/route.ts` load mode, and `add/route.ts` normal create) write `title: ""`. The client relies entirely on the localStorage cache and `/api/docs/titles` for display. On first visit with an empty cache, titles show "Unknown title" briefly until fetched from Google Drive.
 
 The `filterDocs` and `sortDocs` functions in `doc-filters.ts` accept an optional `titles` map for filtering/sorting by title when `doc.title` is empty.
 
-## Future: Removing Titles from the Database
-
-The title column can eventually be removed from the database entirely, with one exception: inaccessible docs (see below).
-
 ### Inaccessible docs
 
-Docs with `accessState` of `DENIED`, `NOT_FOUND`, or `TRASHED` cannot have their titles fetched from Google Drive. Today, these docs retain a user-chosen or previously-fetched title in the database. When titles are removed from the DB, we'll need to keep storing titles for inaccessible docs specifically — either by retaining a `title` column only for these cases, or by treating the localStorage cache as the source of truth (with the risk that clearing the cache loses the title permanently).
+Docs with `accessState` of `DENIED` or `NOT_FOUND` cannot have their titles fetched from Google Drive. These docs retain a title in the database:
+- Docs added manually with a custom title (`add/route.ts` permission-denied path) store the user-provided title.
+- Docs discovered via Gmail notifications (`insertInaccessibleDocs` in `refresh.ts`) store the title parsed from the email.
+
+When an inaccessible doc later gains access, the next refresh writes `title: ""` via the upsert update path, and the client fetches the real title from Drive (the changed `lastModifiedInDrive` triggers a cache refresh).
+
+The `/api/docs/titles` endpoint falls back to DB titles when Drive returns an error, so inaccessible docs with stored titles will still display correctly even without a localStorage cache entry.

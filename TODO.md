@@ -15,12 +15,12 @@ P1:
   * requesting your review
 * testing
   * test scripts for playwright testing of all interactions
-* no user info the database - fetch doc titles live
-  * cache them in browser-local state?
 * "delete all my data" menu item
 * Load dialog - load months, or load all
 * check: Can we get comment locations in the doc contents fetch? (to get current location and commented text.)
 * Rewrite help text content.  It's AI generated excepted the Getting Started page.
+* finish cleanup after taking titles out of the DB - rename column?
+* cache comments in the local DB
 
 Easy:
 * scroll bars for lots of docs

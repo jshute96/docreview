@@ -89,7 +89,7 @@ export async function upsertDocsAndSyncComments(
       create: {
         userId,
         googleDocId: doc.googleDocId,
-        title: doc.title,
+        title: "", // Titles not stored — fetched on demand from Drive API, cached in browser
         driveUrl: doc.driveUrl,
         mimeType: doc.mimeType,
         role: doc.role,
@@ -104,7 +104,7 @@ export async function upsertDocsAndSyncComments(
         status: fromGmail ? "INBOX" : "ARCHIVED",
       },
       update: {
-        title: doc.title,
+        title: "", // Clear any previously stored title
         driveUrl: doc.driveUrl,
         mimeType: doc.mimeType,
         lastModifiedInDrive: doc.lastModifiedInDrive,

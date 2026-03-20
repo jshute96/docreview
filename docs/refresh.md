@@ -190,8 +190,10 @@ For each file Drive returns:
 - **New REVIEWER doc (not in DB, someone else owns it):** only added during **load** mode.
   Refresh and full-refresh skip these — reviewer docs must already be tracked in the DB or
   added manually via `/api/docs/add`. Default status is **ARCHIVED**.
-- **Existing doc:** `title`, `driveUrl`, `mimeType`, `lastModifiedInDrive`, `owner`,
-  `createdTimeInDrive`, and `accessState` are updated. `role` and `labels` are
+- **Existing doc:** `driveUrl`, `mimeType`, `lastModifiedInDrive`, `owner`,
+  `createdTimeInDrive`, and `accessState` are updated. `title` is cleared (titles
+  are not stored in the DB — they're fetched on demand from Drive and cached in the
+  browser; see `docs/local-storage-cache.md`). `role` and `labels` are
   never touched; they belong to the user. `status` is preserved (only updated
   via Gmail or Smart Unarchive triggers). Setting `accessState: "OK"` on upsert
   means a doc that re-appears in Drive (e.g., shared again) is automatically restored.
@@ -315,8 +317,8 @@ from the hamburger menu follow the same pattern via `handleSourceRefresh`.
 
 **Per-doc refresh:** The `POST /api/docs/[docId]/refresh` response includes the full updated doc
 with its comments array. `DocDetail` calls `setDoc(updated)` and `setComments(updated.comments)`
-directly, so the title, owner, and modified date in the header also reflect the latest Drive
-data without a page reload.
+directly, so the owner and modified date in the header reflect the latest Drive
+data without a page reload. Titles are fetched separately via the browser's title cache.
 
 The main POST response includes summary counts (`added`, `updated`, `deleted`, `unarchived`,
 `commentsCreated`, `commentsUpdated`, `suggestionsCreated`, `suggestionsUpdated`,

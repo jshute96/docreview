@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
     data: {
       userId,
       googleDocId: fileId,
-      title: f!.name ?? "",
+      title: "", // Titles not stored — fetched on demand from Drive API, cached in browser
       driveUrl: f!.webViewLink ?? `https://docs.google.com/document/d/${fileId}/edit`,
       mimeType: f!.mimeType,
       role: isOwner ? "AUTHOR" : "REVIEWER",

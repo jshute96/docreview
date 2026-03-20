@@ -51,7 +51,7 @@ The PostgreSQL database has eight tables managed by Prisma. See
 
 **Application tables:**
 - **Doc** — a tracked Google document or presentation. Key fields: `googleDocId`,
-  `title`, `role` (Author/Reviewer), `status` (Inbox/Archived), `accessState`
+  `role` (Author/Reviewer), `status` (Inbox/Archived), `accessState`
   (OK/Trashed/Not Found/Denied), comment sync timestamp, notes, starred flag.
 - **Comment** — a comment thread or suggestion synced from Google. Tracks
   `type` (Comment/Suggestion), `resolved` status, author flags (`isThreadAuthor`,
@@ -158,8 +158,16 @@ page load and after mutations.
 open tabs when shared data changes (doc adds, label edits, etc.), prompting them
 to re-fetch. See [`docs/cross-tab.md`](./cross-tab.md).
 
-**No persistent client storage.** No localStorage or sessionStorage for app
-data — only the session cookie.
+**Browser-side caching:** Document titles are not stored in the database for
+privacy. Instead, they're cached in `localStorage` and fetched on demand from
+Google Drive. To avoid a flash of "Unknown title" during SSR hydration, the root
+layout hides the page body (`visibility:hidden`) and each page component
+includes an inline `<script>` that pre-reads cached titles for its doc IDs into
+`window.__docrTitleCache`. After React hydrates, a `useLayoutEffect` in
+`useCachedTitles` populates title state and removes the hiding style — so the
+page appears with titles already in place. A 2-second fallback removes the
+hiding style if the hook never runs (e.g. JS error). See
+[`docs/local-storage-cache.md`](./local-storage-cache.md).
 
 ## Observability
 
@@ -189,3 +197,4 @@ requests also send a context ID header for cross-request correlation.
 | [`cross-tab.md`](./cross-tab.md) | Cross-tab sync via BroadcastChannel |
 | [`bulk-edit.md`](./bulk-edit.md) | Bulk editing logic and UI |
 | [`load-dialog.md`](./load-dialog.md) | Load dialog scan→add flow |
+| [`local-storage-cache.md`](./local-storage-cache.md) | Browser localStorage cache for titles — privacy model, SSR workarounds |
