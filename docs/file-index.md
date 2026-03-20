@@ -29,7 +29,7 @@ One-line descriptions of every source file, grouped by layer.
 | `open/page.tsx` | Open page (server) — redirects to `/comments/<docId>` if doc exists, otherwise to `/add?doc=...` |
 | `bookmarklet/page.tsx` | Bookmarklet install page (server) — metadata and wrapper for `BookmarkletClient` |
 | `bookmarklet/bookmarklet-client.tsx` | Bookmarklet install page (client) — "Drag to Install" UI for both bookmarklets |
-| `comments/[docId]/page.tsx` | Doc detail page (server) — fetches single doc with comments, renders `DocDetail`; `generateMetadata` sets page title |
+| `comments/[docId]/page.tsx` | Doc detail page (server) — fetches single doc with comments, renders `DocDetail`; page title set client-side via `DocDetail` |
 
 ## Bookmarklet (`src/bookmarklet/`)
 

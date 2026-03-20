@@ -606,9 +606,20 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
     window.location.href = `/comments/${newDoc.docId}`;
   }
 
+  const pageTitle = `${displayTitle} - Docreview`;
+
+  // Next.js metadata reconciliation can reset document.title after effects run.
+  // Use a MutationObserver to detect and override any external title changes.
   useEffect(() => {
-    document.title = `Docreview: ${displayTitle}`;
-  }, [displayTitle]);
+    document.title = pageTitle;
+    const titleEl = document.querySelector("title");
+    if (!titleEl) return;
+    const observer = new MutationObserver(() => {
+      if (document.title !== pageTitle) document.title = pageTitle;
+    });
+    observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
+    return () => observer.disconnect();
+  }, [pageTitle]);
 
   if (notFound) {
     return (

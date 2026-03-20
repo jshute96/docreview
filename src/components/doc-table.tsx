@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import { useCrossTabListener, crossTabReason, broadcastChange, type CrossTabReceivedEvent } from "@/lib/cross-tab";
@@ -97,8 +97,8 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
   const [sortCol, setSortCol] = useState<SortCol>("lastModifiedInDrive");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  // Update document title to reflect active filters
-  useEffect(() => {
+  // Compute page title from active filters
+  const pageTitle = useMemo(() => {
     const MIME_NAMES: Record<string, string> = {
       "application/vnd.google-apps.document": "Docs",
       "application/vnd.google-apps.spreadsheet": "Sheets",
@@ -140,8 +140,21 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
     // Inbox "include" is the default view — only show it when it's the sole filter
     if (isInbox === "include" && parts.length === 0) parts.push("Inbox");
 
-    document.title = "Docreview: " + parts.join(", ");
+    return "Docreview: " + parts.join(", ");
   }, [isInbox, hasComments, isAuthor, isStarred, mimeTypes, labelsFilter, titleFilter, labels]);
+
+  // Next.js metadata reconciliation can reset document.title after effects run.
+  // Use a MutationObserver to detect and override any external title changes.
+  useEffect(() => {
+    document.title = pageTitle;
+    const titleEl = document.querySelector("title");
+    if (!titleEl) return;
+    const observer = new MutationObserver(() => {
+      if (document.title !== pageTitle) document.title = pageTitle;
+    });
+    observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
+    return () => observer.disconnect();
+  }, [pageTitle]);
 
   function handleSort(col: SortCol) {
     if (sortCol === col) {

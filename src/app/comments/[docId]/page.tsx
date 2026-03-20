@@ -1,5 +1,4 @@
 import { redirect, notFound } from "next/navigation";
-import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { DocDetail } from "@/components/doc-detail";
 import { requireAuth } from "@/lib/auth-utils";
@@ -7,10 +6,6 @@ import { docWithCommentsInclude, stripTitle } from "@/lib/doc-queries";
 import type { DocWithComments } from "@/types";
 
 type PageProps = { params: Promise<{ docId: string }> };
-
-export async function generateMetadata(): Promise<Metadata> {
-  return { title: "Doc - Docreview" };
-}
 
 export default async function DocDetailPage({ params }: PageProps) {
   const { docId } = await params;
