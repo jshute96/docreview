@@ -25,12 +25,14 @@ import { XIcon } from "@/components/x-icon";
 
 interface EditDocDialogProps {
   doc: DocWithLabels;
+  cachedTitle?: string;
   onSave: (updated: DocWithLabels) => void;
   children: React.ReactNode;
 }
 
 export function EditDocDialog({
   doc,
+  cachedTitle,
   onSave,
   children,
 }: EditDocDialogProps) {
@@ -119,7 +121,7 @@ export function EditDocDialog({
               }`}
             >
               <DocTypeIcon mimeType={doc.mimeType} className="h-4 w-4 flex-shrink-0" />
-              {doc.title}
+              {cachedTitle || doc.title || "Unknown title"}
             </a>
 
             <div className="flex gap-8">

@@ -525,6 +525,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
                   <div className="flex items-center gap-2">
                     <BulkEditDialog
                       initialDocs={filteredDocs}
+                      cachedTitles={cachedTitles}
                       onSave={handleBulkUpdate}
                     >
                       <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit all currently displayed documents">

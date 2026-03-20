@@ -153,6 +153,7 @@ export function DocRow({
           </Button>
           <EditDocDialog
             doc={doc}
+            cachedTitle={cachedTitle}
             onSave={onUpdate}
           >
             <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Edit document labels and notes">

@@ -806,6 +806,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
           )}
           <EditDocDialog
             doc={doc as unknown as DocWithLabels}
+            cachedTitle={displayTitle}
             onSave={handleEditSave}
           >
             <Button variant="outline" size="sm" className="h-6 px-2 text-xs text-zinc-900" title="Edit document labels and notes">

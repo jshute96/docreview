@@ -27,6 +27,7 @@ import { useMultiSelect } from "@/hooks/use-multi-select";
 
 interface BulkEditDialogProps {
   initialDocs: DocWithLabels[];
+  cachedTitles?: Record<string, string>;
   onSave: (updatedDocs: DocWithLabels[]) => void;
   children: React.ReactNode;
 }
@@ -63,6 +64,7 @@ function StateIndicator({ state, isMixed }: { state: BulkEditState; isMixed: boo
 
 export function BulkEditDialog({
   initialDocs,
+  cachedTitles,
   onSave,
   children,
 }: BulkEditDialogProps) {
@@ -406,7 +408,7 @@ export function BulkEditDialog({
                       onClick={() => handleRemoveDoc(doc.docId)}
                       className="rounded p-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-600"
                       title="Remove from list"
-                      aria-label={`Remove ${doc.title}`}
+                      aria-label={`Remove ${cachedTitles?.[doc.googleDocId] || doc.title || "document"}`}
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -419,7 +421,7 @@ export function BulkEditDialog({
                     >
                       <DocTypeIcon mimeType={doc.mimeType} className={`h-3 w-3 flex-shrink-0 ${doc.accessState !== "OK" ? "text-zinc-300" : ""}`} />
                       <span className="whitespace-nowrap pr-4 text-xs font-medium">
-                        {doc.title}
+                        {cachedTitles?.[doc.googleDocId] || doc.title || "Unknown title"}
                       </span>
                     </span>
                   </div>
