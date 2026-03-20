@@ -13,7 +13,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { LoadDialog } from "@/components/load-dialog";
 import { BulkEditDialog } from "@/components/bulk-edit-dialog";
 import { signOut } from "next-auth/react";
-import { Menu, RefreshCw, LogOut, HardDriveDownload, Mail, FileText, CircleHelp } from "lucide-react";
+import { Menu, RefreshCw, LogOut, HardDriveDownload, Mail, FileText, CircleHelp, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +28,7 @@ import type { SortCol, SortDir } from "@/lib/doc-filters";
 import { useCachedTitles } from "@/hooks/use-cached-titles";
 import { LabelProvider } from "@/contexts/label-context";
 import { HelpDialog } from "@/components/help-dialog";
+import { clearAll as clearBrowserCache } from "@/lib/browser-cache";
 import { WelcomeDialog } from "@/components/welcome-dialog";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import {
@@ -417,6 +418,23 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
               >
                 <FileText className="h-4 w-4 mr-2" />
                 Bookmarklet page
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => {
+                  const { removed, found, error } = clearBrowserCache();
+                  if (error) {
+                    toast.error(`Cache clear failed: ${error} (${removed}/${found} removed)`);
+                  } else if (removed < found) {
+                    toast.error(`Cleared ${removed} of ${found} cached items`);
+                  } else {
+                    toast.success(`Cleared ${removed} cached ${removed === 1 ? "item" : "items"}`);
+                  }
+                }}
+                title="Delete all data cached in local browser storage"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear cache
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

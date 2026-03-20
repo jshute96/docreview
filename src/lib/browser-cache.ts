@@ -87,6 +87,27 @@ export function removeCached(userId: string, namespace: string, id: string): voi
   }
 }
 
+/** Remove all docr: cache entries from localStorage (all users/namespaces — not scoped by userId, but in practice only one user per browser). */
+export function clearAll(): { removed: number; found: number; error?: string } {
+  let found = 0;
+  let removed = 0;
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(`${PREFIX}:`)) keysToRemove.push(key);
+    }
+    found = keysToRemove.length;
+    for (const key of keysToRemove) {
+      localStorage.removeItem(key);
+      removed++;
+    }
+    return { removed, found };
+  } catch (e) {
+    return { removed, found, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 /**
  * Evict cache entries for a namespace that haven't been written since `cutoffMs` ago.
  * Uses `cachedAt` (when the entry was written), falling back to `syncedAt` for

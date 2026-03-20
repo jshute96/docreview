@@ -89,7 +89,7 @@ Stale titles are fetched from Google Drive via `/api/docs/titles` and the cache 
 
 | File | Purpose |
 |------|---------|
-| `src/lib/browser-cache.ts` | Generic localStorage cache utility — get/set/batch/evict |
+| `src/lib/browser-cache.ts` | Generic localStorage cache utility — get/set/batch/evict/clear |
 | `src/hooks/use-cached-titles.ts` | React hook managing title cache lifecycle |
 | `src/app/api/docs/titles/route.ts` | API endpoint fetching titles from Google Drive |
 
@@ -100,6 +100,7 @@ Provides generic cache operations, not title-specific:
 - `getCachedBatch(...)` / `setCachedBatch(...)` — multi-entry operations
 - `touchCached(userId, namespace, id)` — refresh `cachedAt` on a cache hit (at most once per 24h, to reduce write churn)
 - `evictStale(userId, namespace, cutoffMs)` — remove entries older than a cutoff
+- `clearAll()` — remove all `docr:` entries from localStorage (not scoped by userId, but in practice only one user per browser); used by the "Clear cache" menu item
 
 All operations are wrapped in try/catch — cache failures are silent since the cache is best-effort.
 
@@ -125,7 +126,7 @@ Fetches current titles directly from Google Drive (`files.get` with `fields: "id
 
 `localStorage` provides 5-10 MB per origin (varies by browser). A title entry is roughly 100-200 bytes. At 200 bytes, the cache can hold ~25,000-50,000 titles before hitting the limit — well beyond any realistic usage.
 
-The `useCachedTitles` hook calls `evictStale()` once per page load to remove entries not accessed in the last 30 days, preventing unbounded cache growth. Eviction is based on `cachedAt`, not `syncedAt`, so docs that haven't changed in Drive for a long time aren't incorrectly evicted. On cache hits (fresh entry used without re-fetching), `cachedAt` is refreshed via `touchCached()` — but at most once per 24 hours to avoid write churn. This keeps actively-viewed docs alive in the cache regardless of how old their `lastModifiedInDrive` timestamp is.
+The `useCachedTitles` hook calls `evictStale()` once per page load to remove entries not accessed in the last 30 days, preventing unbounded cache growth. Eviction is based on `cachedAt`, not `syncedAt`, so docs that haven't changed in Drive for a long time aren't incorrectly evicted. On cache hits (fresh entry used without re-fetching), `cachedAt` is refreshed via `touchCached()` — but at most once per 24 hours to avoid write churn. This keeps actively-viewed docs alive in the cache regardless of how old their `lastModifiedInDrive` timestamp is. Users can also manually clear all cached data via the "Clear cache" item in the main menu.
 
 ## Future: Comment Text Caching
 
