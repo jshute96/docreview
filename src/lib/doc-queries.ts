@@ -34,6 +34,11 @@ export const docWithCommentsInclude = {
   comments: { orderBy: { driveCreatedAt: "asc" as const } },
 };
 
+/** Strip titles from doc objects so they aren't sent to the client (privacy: titles come from browser cache or Google API) */
+export function stripTitle<T extends { title: string }>(doc: T): T {
+  return { ...doc, title: "" };
+}
+
 /** Add counts of comments in different states for the docs list page, and strip the raw comments array */
 export function withCommentCounts<
   T extends {

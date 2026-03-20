@@ -101,6 +101,7 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/[docId]/content/route.ts` | `GET` fetch document text and suggestion content (slow path — Docs API `documents.get` or Drive `files.export`); for Docs, uses a single `SUGGESTIONS_INLINE` call for both |
 | `docs/[docId]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (INBOX/ARCHIVED/MUTED), read state, or star |
 | `docs/[docId]/threads/route.ts` | `GET` fetch thread(s) from Drive; `POST` refresh a single thread (updates DB) |
+| `docs/titles/route.ts` | `GET` fetch current doc titles from Google Drive for given IDs — used by client-side title cache for stale/missing entries |
 | `docs/[docId]/threads/reply/route.ts` | `POST` reply to / resolve / reopen a comment thread via Drive API; pins `viewedByMeTime` around the action (debug logging) |
 | `docs/[docId]/viewed-time/route.ts` | `PUT` update `viewedByMeTime` on a Google Drive file |
 | `labels/route.ts` | `GET` list labels with document counts; `POST` create label |
@@ -164,6 +165,7 @@ Shadcn/ui components:
 |------|-------------|
 | `use-auto-resize.ts` | `useAutoResize()` hook — auto-grows a textarea to fit content up to a max height |
 | `use-label-sync.ts` | `useLabelSync()` hook — removes stale label IDs from selection when available labels change |
+| `use-cached-titles.ts` | `useCachedTitles()` hook — manages localStorage cache of doc titles with staleness detection via `lastModifiedInDrive`, async fetch for stale/missing entries |
 | `use-multi-select.ts` | `useMultiSelect()` hook — generic row multi-selection with click/Ctrl+click/Shift+click, highlight state, effective item filtering, and bulk removal helpers |
 
 ## Scripts (`scripts/`)
@@ -194,8 +196,9 @@ Shadcn/ui components:
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates/deletes DB records, computes unarchive signals |
 | `extension-bridge.ts` | Client-side bridge for communicating with the Chrome extension — handles pinging and URL resolution requests |
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
-| `doc-filters.ts` | Client-side doc filtering (tri-state logic for inbox/comments/author/starred/mimeType/labels/title regex) and sorting |
-| `doc-queries.ts` | Shared Prisma include constants (`labelInclude`, `docWithCountsInclude`, `docWithCommentsInclude`) + `withCommentCounts` transform |
+| `doc-filters.ts` | Client-side doc filtering (tri-state logic for inbox/comments/author/starred/mimeType/labels/title regex) and sorting; accepts optional cached titles map for when `doc.title` is empty |
+| `browser-cache.ts` | Generic localStorage cache — namespaced key-value store with JSON values, batch operations, and staleness-based eviction |
+| `doc-queries.ts` | Shared Prisma include constants (`labelInclude`, `docWithCountsInclude`, `docWithCommentsInclude`) + `withCommentCounts` transform + `stripTitle` (for future use) |
 | `highlight.tsx` | `highlightText()` — regex/substring highlighter for plain text; `highlightHtml()` — same for HTML strings (highlights text outside tags, returns null if no match); `matchesFilter()` — centralized dual regex/substring search; `createMatcher()` — compiled reusable matcher |
 | `prisma.ts` | Singleton PrismaClient with dev-mode write-op logging |
 | `bulk-edit.ts` | `BulkEditState` type and `cycleBulkEditState` helper for multi-doc editing |
@@ -242,6 +245,7 @@ Shadcn/ui components:
 | `file-index.md` | This file — one-line descriptions of every source file |
 | `gmail.md` | Gmail integration — scanner internals, combined refresh engine, timestamp lifecycle, Load vs Refresh comparison |
 | `inbox-states.md` | Describes Inbox/Archived/Muted states for docs and comments, and state changes between them |
+| `local-storage-cache.md` | Browser localStorage cache — motivation, privacy model, key/value format, staleness detection, eviction, future plans |
 | `load-dialog.md` | Load dialog — two-phase scan→add flow, Drive/Gmail source toggle, search options, dialog layout |
 | `refresh.md` | Full refresh flow — Drive sync modes, deletion detection, comment sync, UI update |
 | `suggestions.md` | Suggestion sync via Docs API, limitations |

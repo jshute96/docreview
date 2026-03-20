@@ -47,15 +47,19 @@ import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { HelpDialog } from "@/components/help-dialog";
 import { StarButton } from "@/components/star-button";
 import { LabelProvider } from "@/contexts/label-context";
+import { useCachedTitles } from "@/hooks/use-cached-titles";
 
 interface DocDetailProps {
   doc: DocWithComments;
   allLabels: Label[];
+  userId: string;
 }
 
-export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDetailProps) {
+export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }: DocDetailProps) {
   const [doc, setDoc] = useState(initialDoc);
   const [labels, setLabelsRaw] = useState<Label[]>(initialLabels);
+  const cachedTitles = useCachedTitles(userId, [doc]);
+  const displayTitle = cachedTitles[doc.googleDocId] || doc.title || "Unknown title";
 
   function setLabels(newLabels: Label[]) {
     setLabelsRaw(newLabels);
@@ -651,7 +655,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels }: DocDeta
             className={`hover:underline hover:text-blue-600 ${
               doc.accessState !== "OK" ? "line-through text-zinc-400" : "text-zinc-900"
             }`}
-          >{doc.title}</a>
+          >{displayTitle}</a>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <Button

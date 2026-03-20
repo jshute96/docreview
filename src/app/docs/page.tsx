@@ -34,6 +34,7 @@ export default async function DocsPage() {
           initialDocs={docs as DocWithLabels[]}
           initialLabels={labels}
           isOffline={OFFLINE_MODE}
+          userId={userId}
           hasSeenHelp={status?.hasSeenHelp ?? false}
         />
       </div>

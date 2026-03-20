@@ -50,6 +50,7 @@ scripts/data-export.json
 
 # claude code - actually, include config and commands
 # .claude/
+.claude/projects/
 
 # .gemini/
 .gemini/settings.json

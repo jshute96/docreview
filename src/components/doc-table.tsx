@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { filterDocs, sortDocs } from "@/lib/doc-filters";
 import type { SortCol, SortDir } from "@/lib/doc-filters";
+import { useCachedTitles } from "@/hooks/use-cached-titles";
 import { LabelProvider } from "@/contexts/label-context";
 import { HelpDialog } from "@/components/help-dialog";
 import { WelcomeDialog } from "@/components/welcome-dialog";
@@ -41,12 +42,14 @@ interface DocTableProps {
   initialDocs: DocWithLabels[];
   initialLabels: Label[];
   isOffline?: boolean;
+  userId: string;
   hasSeenHelp?: boolean;
 }
 
-export function DocTable({ initialDocs, initialLabels, isOffline, hasSeenHelp }: DocTableProps) {
+export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSeenHelp }: DocTableProps) {
   const [docs, setDocs] = useState<DocWithLabels[]>(initialDocs);
   const [labels, setLabelsRaw] = useState<Label[]>(initialLabels);
+  const cachedTitles = useCachedTitles(userId, docs);
   const [showHelp, setShowHelp] = useState(false);
   const [showWelcome, setShowWelcome] = useState(hasSeenHelp === false);
 
@@ -269,9 +272,11 @@ export function DocTable({ initialDocs, initialLabels, isOffline, hasSeenHelp }:
       mimeTypes,
       labels: labelsFilter,
       titleFilter,
+      titles: cachedTitles,
     }),
     sortCol,
-    sortDir
+    sortDir,
+    cachedTitles
   );
 
   function SortIcon({ col }: { col: SortCol }) {
@@ -476,6 +481,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline, hasSeenHelp }:
                   doc={doc}
                   onUpdate={handleDocUpdate}
                   searchFilter={titleFilter}
+                  cachedTitle={cachedTitles[doc.googleDocId]}
                 />
               ))}
             </tbody>

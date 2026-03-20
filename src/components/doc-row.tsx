@@ -19,12 +19,14 @@ interface DocRowProps {
   doc: DocWithLabels;
   onUpdate: (updated: DocWithLabels) => void;
   searchFilter?: string;
+  cachedTitle?: string;
 }
 
 export function DocRow({
   doc,
   onUpdate,
   searchFilter = "",
+  cachedTitle,
 }: DocRowProps) {
   const [archiving, setArchiving] = useState(false);
 
@@ -101,7 +103,9 @@ export function DocRow({
             }`}
           >
             <DocTypeIcon mimeType={doc.mimeType} />
-            <span>{highlightText(doc.title, searchFilter)}</span>
+            <span className={!cachedTitle && !doc.title ? "italic text-zinc-400" : undefined}>
+              {highlightText(cachedTitle || doc.title || "Unknown title", searchFilter)}
+            </span>
           </a>
           {doc.role === "AUTHOR" && (
             <span title="You are an author of this document" className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>

@@ -14,6 +14,8 @@ export interface FilterOptions {
   mimeTypes: Record<string, TriState>;
   labels: Record<string, TriState>;
   titleFilter: string;
+  /** Cached titles keyed by googleDocId — used for search when doc.title is empty */
+  titles?: Record<string, string>;
 }
 
 export function filterDocs(
@@ -62,7 +64,8 @@ export function filterDocs(
 
     // titleFilter: searches title and notes
     if (opts.titleFilter) {
-      const searchable = doc.title + (doc.notes ? " " + doc.notes : "");
+      const title = doc.title || opts.titles?.[doc.googleDocId] || "";
+      const searchable = title + (doc.notes ? " " + doc.notes : "");
       if (!matchesFilter(searchable, opts.titleFilter)) return false;
     }
     return true;
@@ -72,12 +75,15 @@ export function filterDocs(
 export function sortDocs(
   docs: DocWithLabels[],
   col: SortCol,
-  dir: SortDir
+  dir: SortDir,
+  titles?: Record<string, string>,
 ): DocWithLabels[] {
   return [...docs].sort((a, b) => {
     let cmp = 0;
     if (col === "title") {
-      cmp = a.title.localeCompare(b.title);
+      const aTitle = a.title || titles?.[a.googleDocId] || "";
+      const bTitle = b.title || titles?.[b.googleDocId] || "";
+      cmp = aTitle.localeCompare(bTitle);
     } else if (col === "unread") {
       cmp = a._count.unreadComments - b._count.unreadComments;
     } else if (col === "inbox") {
