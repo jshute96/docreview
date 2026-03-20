@@ -146,6 +146,10 @@ export async function upsertDocsAndSyncComments(
     }
   }
 
+  // Signal that doc rows are up-to-date so the client can refresh the list
+  // before the (potentially slow) comment/suggestion sync begins.
+  onProgress?.({ phase: "docs-updated" });
+
   // Sync comments for all docs we just upserted
   logInfo(`[Refresh] Syncing comments for ${processedDocs.length} docs`);
   let syncCompleted = 0;

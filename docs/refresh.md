@@ -135,7 +135,7 @@ to report progress to the UI in real time.
 
 ### Progress Phases
 
-Progress events track four distinct phases:
+Progress events track five distinct phases:
 
 1.  **`drive` (Discovery):** Scanning the Drive changes feed or recent files.
     - Reports raw **changes** read from the API (e.g., "Scanning changes from Drive (4449 found)...").
@@ -143,7 +143,11 @@ Progress events track four distinct phases:
     - Reports messages scanned out of the total found (e.g., "Reading notifications from Gmail (12 of 50)...").
 3.  **`metadata` (Processing):** Fetching Drive metadata for discovered or selected IDs.
     - Reports documents processed out of the total (e.g., "Fetching metadata for 5 of 1650 documents...").
-4.  **`sync` (Syncing):** Fetching and updating comments/suggestions from Drive/Docs APIs.
+4.  **`docs-updated` (Early UI refresh):** Emitted after all doc rows are upserted to the
+    database but before comment/suggestion sync begins. The client uses this signal to fetch
+    and display the updated docs list immediately, so the user sees metadata changes without
+    waiting for the (potentially slow) comment sync to finish. No toast is shown for this event.
+5.  **`sync` (Syncing):** Fetching and updating comments/suggestions from Drive/Docs APIs.
     - Reports documents synced out of the total (e.g., "Reading comments for 10 of 1650 documents...").
 
 Once the stream ends, the final result is sent as a `result` event, and the UI displays
@@ -308,12 +312,18 @@ See [Doc Unarchive Rules](./comment-tracking.md#doc-unarchive-rules) for the ful
 
 ## Phase 4 — UI Update (no page reload)
 
-**Main refresh:** After `POST /api/docs/refresh` returns, `RefreshButton` immediately calls
-`GET /api/docs?includeArchived=true` to fetch the full updated doc list (including archived
-docs, so the user's current filter state is respected by the client-side filter in `DocTable`
-rather than being silently dropped). The fresh list is passed to `DocTable` via the
-`onRefresh` callback, which calls `setDocs(newDocs)` directly. Source-specific refreshes
-from the hamburger menu follow the same pattern via `handleSourceRefresh`.
+**Early update (during comment sync):** When the server emits the `docs-updated` SSE event
+(after doc upserts, before comment sync), the client immediately fetches
+`GET /api/docs?includeArchived=true` and updates the table. This lets the user see new,
+updated, and deleted docs without waiting for comment/suggestion sync to finish. A sequence
+counter (`fetchSeq`) guards against race conditions — if the early fetch resolves after the
+final fetch, its result is discarded.
+
+**Final update:** After `POST /api/docs/refresh` returns, the client fetches the docs list
+again to pick up any changes from comment sync (e.g., Smart Unarchive moving docs from
+ARCHIVED to INBOX). Both fetches include `includeArchived=true` so the client-side filter
+in `DocTable` has the full set. Source-specific refreshes from the hamburger menu follow
+the same pattern via `handleSourceRefresh`.
 
 **Per-doc refresh:** The `POST /api/docs/[docId]/refresh` response includes the full updated doc
 with its comments array. `DocDetail` calls `setDoc(updated)` and `setComments(updated.comments)`

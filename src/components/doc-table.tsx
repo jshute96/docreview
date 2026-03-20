@@ -213,15 +213,27 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
     setRefreshing(spinnerKey);
     const contextId = generateContextId();
     try {
+      let fetchSeq = 0; // Guards against out-of-order doc fetches
       const data = await fetchWithProgress<Record<string, number>>(url, {
         method: "POST",
         contextId,
         ...fetchOpts,
-      }, handleRefreshProgress);
+      }, (event) => {
+        if (event.phase === "docs-updated") {
+          // Refresh the docs list early, before comment sync finishes
+          const seq = ++fetchSeq;
+          apiFetch("/api/docs?includeArchived=true", { contextId }).then(async (res) => {
+            if (res.ok && seq === fetchSeq) setDocs(await res.json());
+          }).catch(() => {});
+          return;
+        }
+        handleRefreshProgress(event);
+      });
 
       const docsRes = await apiFetch("/api/docs?includeArchived=true", { contextId });
       if (!docsRes.ok) throw new Error("Failed to reload docs");
       const newDocs: DocWithLabels[] = await docsRes.json();
+      fetchSeq++; // Invalidate any in-flight early fetch
 
       setDocs(newDocs);
       broadcastChange({ type: "docs" }, contextId);

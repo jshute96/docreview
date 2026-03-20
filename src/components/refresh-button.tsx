@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import type { DocWithLabels } from "@/types";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
+import type { ProgressEvent } from "@/lib/progress-events";
 import {
   fetchWithProgress,
   handleRefreshProgress,
@@ -28,16 +29,27 @@ export function RefreshButton({ onRefresh, disabled, onLoadingChange }: RefreshB
     onLoadingChange?.(true);
     const contextId = generateContextId();
     try {
+      let fetchSeq = 0;
       const data = await fetchWithProgress<Record<string, number>>("/api/docs/refresh", {
         method: "POST",
         contextId,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sources: ["drive", "gmail"] }),
-      }, handleRefreshProgress);
+      }, (event: ProgressEvent) => {
+        if (event.phase === "docs-updated") {
+          const seq = ++fetchSeq;
+          apiFetch("/api/docs?includeArchived=true", { contextId }).then(async (res) => {
+            if (res.ok && seq === fetchSeq) onRefresh(await res.json());
+          }).catch(() => {});
+          return;
+        }
+        handleRefreshProgress(event);
+      });
 
       const docsRes = await apiFetch("/api/docs?includeArchived=true", { contextId });
       if (!docsRes.ok) throw new Error("Failed to reload docs");
       const docs: DocWithLabels[] = await docsRes.json();
+      fetchSeq++;
 
       onRefresh(docs);
       broadcastChange({ type: "docs" }, contextId);
