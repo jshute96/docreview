@@ -323,7 +323,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     comment.driveModifiedAt &&
     new Date(comment.driveCreatedAt).getTime() === new Date(comment.driveModifiedAt).getTime();
 
-  const hasContentRow = isSuggestion ? (!!suggestionContent || comment.resolved) : !!content;
+  const hasContentRow = isSuggestion || !!content;
   const cellPy = hasContentRow ? "pt-1.5 pb-0" : "py-1.5";
   const { author, text } = content ? splitContent(content) : { author: null, text: "" };
   const isAssignedHighlight = comment.status === "INBOX" && comment.assignedToMe && !comment.resolved;
@@ -459,6 +459,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             <div className="overflow-hidden min-h-0 pt-0.5 pb-2 pl-4 pr-4">
           {isSuggestion && !suggestionContent && comment.resolved ? (
             <p className="truncate text-sm text-zinc-400 italic">Resolved suggestion</p>
+          ) : isSuggestion && !suggestionContent ? (
+            <p className="truncate text-sm text-zinc-400">
+              <span className="text-zinc-500">{suggestionLabel}</span>
+            </p>
           ) : isSuggestion && suggestionContent ? (
             <p className="truncate text-sm text-zinc-400">
               <span className="text-zinc-500">{suggestionLabel}: </span>
