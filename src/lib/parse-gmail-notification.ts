@@ -401,13 +401,16 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
       let oldText: string | undefined;
       let newText: string | undefined;
 
+      // Gmail wraps suggestion text in curly quotes: \u201c = left ", \u201d = right "
+      const stripQuotes = (s: string) => s.replace(/^["\u201c\u201d]/, "").replace(/["\u201c\u201d]$/, "");
+
       if (suggestionDiv) {
         suggestionAction = stripTags(suggestionDiv[1]).replace(/:$/, "");
-        text = stripTags(decodeHtmlEntities(suggestionDiv[2])).replace(/^"|"$/g, "");
+        text = stripQuotes(stripTags(decodeHtmlEntities(suggestionDiv[2])));
         if (suggestionDiv[3]) {
           // Replace: "old" with "new"
           oldText = text;
-          newText = stripTags(decodeHtmlEntities(suggestionDiv[3])).replace(/^"|"$/g, "");
+          newText = stripQuotes(stripTags(decodeHtmlEntities(suggestionDiv[3])));
           text = `${oldText} → ${newText}`;
         }
       }

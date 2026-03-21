@@ -458,7 +458,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
           <div className={cellWrap} style={cellWrapStyle}>
             <div className="overflow-hidden min-h-0 pt-0.5 pb-2 pl-4 pr-4">
           {isSuggestion && !suggestionContent && comment.resolved ? (
-            <p className="truncate text-sm text-zinc-400 italic">Resolved suggestion</p>
+            <p className="truncate text-sm text-zinc-400 italic">Resolved {suggestionLabel.toLowerCase()}</p>
           ) : isSuggestion && !suggestionContent ? (
             <p className="truncate text-sm text-zinc-400">
               <span className="text-zinc-500">{suggestionLabel}</span>
