@@ -48,7 +48,7 @@ import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { HelpDialog } from "@/components/help-dialog";
 import { StarButton } from "@/components/star-button";
 import { LabelProvider } from "@/contexts/label-context";
-import { useCachedTitles } from "@/hooks/use-cached-titles";
+import { useCachedMetadata } from "@/hooks/use-cached-metadata";
 
 interface DocDetailProps {
   doc: DocWithComments;
@@ -59,7 +59,7 @@ interface DocDetailProps {
 export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }: DocDetailProps) {
   const [doc, setDoc] = useState(initialDoc);
   const [labels, setLabelsRaw] = useState<Label[]>(initialLabels);
-  const cachedTitles = useCachedTitles(userId, [doc]);
+  const { titles: cachedTitles, owners: cachedOwners } = useCachedMetadata(userId, [doc]);
   const displayTitle = cachedTitles[doc.googleDocId] || doc.title || "Unknown title";
 
   function setLabels(newLabels: Label[]) {
@@ -736,7 +736,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-600">
           <span>
             <span className="font-medium text-zinc-400">Owner:</span>{" "}
-            {doc.owner ?? "—"}
+            {cachedOwners[doc.googleDocId] ?? "—"}
           </span>
           <span>
             <span className="font-medium text-zinc-400">Created:</span>{" "}

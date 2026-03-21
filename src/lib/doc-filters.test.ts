@@ -17,7 +17,6 @@ function makeDoc(overrides: Partial<DocWithLabels> & { title: string }): DocWith
     accessState: overrides.accessState ?? "OK",
     lastModifiedInDrive: "lastModifiedInDrive" in overrides ? overrides.lastModifiedInDrive! : new Date("2024-06-01"),
     createdTimeInDrive: overrides.createdTimeInDrive ?? null,
-    owner: overrides.owner ?? null,
     labels: overrides.labels ?? [],
     _count: overrides._count ?? { unreadComments: 0, inboxComments: 0, openComments: 0, assignedComments: 0, mentionedComments: 0 },
   } as DocWithLabels;

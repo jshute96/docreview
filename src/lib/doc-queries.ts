@@ -34,8 +34,16 @@ export const docWithCommentsInclude = {
   comments: { orderBy: { driveCreatedAt: "asc" as const } },
 };
 
-/** Strip titles from doc objects so they aren't sent to the client (privacy: titles come from browser cache or Google API) */
-export function stripTitle<T extends { title: string }>(doc: T): T {
+/**
+ * Clear titles from doc objects before returning them to the client.
+ * The client always gets titles and owners through a single path:
+ * localStorage cache backed by /api/docs/metadata. That endpoint resolves
+ * titles from Drive for accessible docs and from the DB for inaccessible
+ * ones (where we store a user-chosen or Gmail-captured title as fallback).
+ * Stripping here keeps that flow uniform regardless of source.
+ * See docs/local-storage-cache.md.
+ */
+export function stripServerOnly<T extends { title: string }>(doc: T): T {
   return { ...doc, title: "" };
 }
 

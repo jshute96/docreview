@@ -161,7 +161,6 @@ export async function GET(req: NextRequest) {
     mimeType: f.mimeType,
     driveUrl: f.webViewLink ?? `https://docs.google.com/document/d/${fileId}/edit`,
     role: isOwner ? "AUTHOR" : "REVIEWER",
-    owner: f.owners?.[0]?.displayName ?? null,
     lastModifiedInDrive: f.modifiedTime ?? null,
     createdTimeInDrive: f.createdTime ?? null,
     ...(existing ? {

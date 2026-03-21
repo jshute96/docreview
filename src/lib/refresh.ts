@@ -94,7 +94,6 @@ export async function upsertDocsAndSyncComments(
         mimeType: doc.mimeType,
         role: doc.role,
         lastModifiedInDrive: doc.lastModifiedInDrive,
-        owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
         notes: shareNotes?.get(doc.googleDocId) ?? null,
         // Mode-based status defaults:
@@ -108,7 +107,6 @@ export async function upsertDocsAndSyncComments(
         driveUrl: doc.driveUrl,
         mimeType: doc.mimeType,
         lastModifiedInDrive: doc.lastModifiedInDrive,
-        owner: doc.owner,
         createdTimeInDrive: doc.createdTimeInDrive,
         accessState: "OK",
       },

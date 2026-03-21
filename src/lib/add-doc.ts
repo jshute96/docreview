@@ -13,7 +13,7 @@ import {
   invalidGrantResponse,
 } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
-import { docWithCountsInclude, withCommentCounts, stripTitle } from "@/lib/doc-queries";
+import { docWithCountsInclude, withCommentCounts, stripServerOnly } from "@/lib/doc-queries";
 import { logWarning } from "@/lib/log";
 
 /** Fallback metadata used when Drive access is denied. */
@@ -22,7 +22,6 @@ export interface PermissionDeniedFallback {
   driveUrl: string;
   mimeType: string;
   role: "AUTHOR" | "REVIEWER";
-  owner: string | null;
   lastModifiedInDrive: Date | null;
   createdTimeInDrive: Date | null;
 }
@@ -121,7 +120,6 @@ export async function addDoc(params: AddDocParams): Promise<NextResponse> {
         driveUrl: fallback.driveUrl,
         mimeType: fallback.mimeType,
         role: fallback.role,
-        owner: fallback.owner,
         lastModifiedInDrive: fallback.lastModifiedInDrive,
         createdTimeInDrive: fallback.createdTimeInDrive,
         accessState: "DENIED" as const,
@@ -131,7 +129,6 @@ export async function addDoc(params: AddDocParams): Promise<NextResponse> {
         driveUrl: f!.webViewLink ?? `https://docs.google.com/document/d/${googleDocId}/edit`,
         mimeType: f!.mimeType!,
         role: (isOwner ? "AUTHOR" : "REVIEWER") as "AUTHOR" | "REVIEWER",
-        owner: f!.owners?.[0]?.displayName ?? null,
         lastModifiedInDrive: f!.modifiedTime ? new Date(f!.modifiedTime) : null,
         createdTimeInDrive: f!.createdTime ? new Date(f!.createdTime) : null,
         accessState: "OK" as const,
@@ -166,5 +163,5 @@ export async function addDoc(params: AddDocParams): Promise<NextResponse> {
     include: docWithCountsInclude,
   });
 
-  return NextResponse.json(result ? stripTitle(withCommentCounts(result)) : result, { status: 201 });
+  return NextResponse.json(result ? stripServerOnly(withCommentCounts(result)) : result, { status: 201 });
 }

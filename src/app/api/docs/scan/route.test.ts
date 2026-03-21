@@ -92,7 +92,7 @@ describe("POST /api/docs/scan", () => {
         role: "AUTHOR" as const,
         lastModifiedInDrive: new Date(),
         createdTimeInDrive: new Date(),
-        owner: "Owner",
+
 
       },
       {
@@ -103,7 +103,6 @@ describe("POST /api/docs/scan", () => {
         role: "REVIEWER" as const,
         lastModifiedInDrive: new Date(),
         createdTimeInDrive: new Date(),
-        owner: "Someone",
 
       },
     ]);
@@ -174,7 +173,6 @@ describe("POST /api/docs/scan", () => {
           title: "Shared Doc",
           mimeType: "application/vnd.google-apps.document",
           driveUrl: "https://docs.google.com/document/d/g1/edit",
-          owner: "Someone",
           role: "REVIEWER" as const,
         },
         {
@@ -182,7 +180,6 @@ describe("POST /api/docs/scan", () => {
           title: "Another Doc",
           mimeType: "application/vnd.google-apps.document",
           driveUrl: "https://docs.google.com/document/d/g2/edit",
-          owner: "Other",
           role: "REVIEWER" as const,
         },
       ],

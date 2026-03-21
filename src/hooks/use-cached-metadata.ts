@@ -4,52 +4,58 @@ import { useState, useLayoutEffect, useCallback, useRef, useMemo } from "react";
 import type { CacheEntry } from "@/lib/browser-cache";
 import { getCachedBatch, setCachedBatch, evictStale, touchCached } from "@/lib/browser-cache";
 import { apiFetch } from "@/lib/api-fetch";
+import type { DocMetadataEntry } from "@/app/api/docs/metadata/route";
 
-const NAMESPACE = "title";
+const NAMESPACE = "meta";
 const BATCH_SIZE = 100;
 const EVICT_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 declare global {
   interface Window {
-    __docrTitleCache?: Record<string, CacheEntry<string>>;
+    __docrMetaCache?: Record<string, CacheEntry<DocMetadataEntry>>;
   }
 }
 
-interface DocForTitleCache {
+interface DocForMetaCache {
   googleDocId: string;
   title?: string;
   lastModifiedInDrive?: Date | string | null;
 }
 
-function getModifiedAt(doc: DocForTitleCache): string | null {
+function getModifiedAt(doc: DocForMetaCache): string | null {
   if (!doc.lastModifiedInDrive) return null;
   return typeof doc.lastModifiedInDrive === "string"
     ? doc.lastModifiedInDrive
     : doc.lastModifiedInDrive.toISOString();
 }
 
+export interface CachedMetadata {
+  titles: Record<string, string>;
+  owners: Record<string, string>;
+}
+
 /**
- * Manages a localStorage cache of doc titles.
+ * Manages a localStorage cache of doc metadata (titles and owners).
  *
- * Each page component includes an inline script that reads cached titles for
- * its doc IDs from localStorage into window.__docrTitleCache before React
+ * Each page component includes an inline script that reads cached metadata for
+ * its doc IDs from localStorage into window.__docrMetaCache before React
  * hydrates. This hook reads from that global in useLayoutEffect (after
  * hydration, before the next paint), populates state, then removes the
  * body-hiding style (from layout.tsx) so the page appears with titles already
- * in place. Stale/missing titles are fetched from /api/docs/titles in the
+ * in place. Stale/missing entries are fetched from /api/docs/metadata in the
  * background.
  *
- * Returns a map of googleDocId → title string.
+ * Returns maps of googleDocId → title and googleDocId → owner.
  */
-export function useCachedTitles(userId: string, docs: DocForTitleCache[]): Record<string, string> {
-  const [titles, setTitles] = useState<Record<string, string>>({});
+export function useCachedMetadata(userId: string, docs: DocForMetaCache[]): CachedMetadata {
+  const [metadata, setMetadata] = useState<Record<string, DocMetadataEntry>>({});
   const fetchedForRef = useRef<Record<string, string | null>>({});
   const docsRef = useRef(docs);
   docsRef.current = docs;
   const hasEvicted = useRef(false);
 
   // Global cache populated by inline script in page component (reads localStorage before React hydrates)
-  const globalCache = typeof window !== "undefined" ? window.__docrTitleCache : undefined;
+  const globalCache = typeof window !== "undefined" ? window.__docrMetaCache : undefined;
 
   // Evict stale cache entries once per page load
   useLayoutEffect(() => {
@@ -64,28 +70,28 @@ export function useCachedTitles(userId: string, docs: DocForTitleCache[]): Recor
     [docs]
   );
 
-  const fetchTitles = useCallback(async (ids: string[]) => {
+  const fetchMetadata = useCallback(async (ids: string[]) => {
     for (let i = 0; i < ids.length; i += BATCH_SIZE) {
       const batch = ids.slice(i, i + BATCH_SIZE);
       try {
-        const res = await apiFetch("/api/docs/titles", {
+        const res = await apiFetch("/api/docs/metadata", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ googleDocIds: batch }),
         });
         if (!res.ok) continue;
-        const freshTitles: Record<string, string> = await res.json();
-        if (Object.keys(freshTitles).length === 0) continue;
+        const freshMetadata: Record<string, DocMetadataEntry> = await res.json();
+        if (Object.keys(freshMetadata).length === 0) continue;
 
-        setTitles((prev) => ({ ...prev, ...freshTitles }));
+        setMetadata((prev) => ({ ...prev, ...freshMetadata }));
 
         // Update cache
         const currentDocs = docsRef.current;
-        const cacheUpdates: Record<string, { value: string; syncedAt: string }> = {};
-        for (const [googleDocId, title] of Object.entries(freshTitles)) {
+        const cacheUpdates: Record<string, { value: DocMetadataEntry; syncedAt: string }> = {};
+        for (const [googleDocId, entry] of Object.entries(freshMetadata)) {
           const doc = currentDocs.find((d) => d.googleDocId === googleDocId);
           const syncedAt = doc ? getModifiedAt(doc) ?? new Date().toISOString() : new Date().toISOString();
-          cacheUpdates[googleDocId] = { value: title, syncedAt };
+          cacheUpdates[googleDocId] = { value: entry, syncedAt };
         }
         setCachedBatch(userId, NAMESPACE, cacheUpdates);
       } catch {
@@ -102,16 +108,16 @@ export function useCachedTitles(userId: string, docs: DocForTitleCache[]): Recor
     const googleDocIds = docs.map((d) => d.googleDocId);
     const cached = globalCache
       ? Object.fromEntries(googleDocIds.filter((id) => globalCache[id]).map((id) => [id, globalCache[id]]))
-      : getCachedBatch<string>(userId, NAMESPACE, googleDocIds);
+      : getCachedBatch<DocMetadataEntry>(userId, NAMESPACE, googleDocIds);
 
-    const titleMap: Record<string, string> = {};
+    const metaMap: Record<string, DocMetadataEntry> = {};
     const staleIds: string[] = [];
 
     for (const doc of docs) {
       const modifiedAt = getModifiedAt(doc);
       const entry = cached[doc.googleDocId];
       if (entry) {
-        titleMap[doc.googleDocId] = entry.value;
+        metaMap[doc.googleDocId] = entry.value;
         if (modifiedAt && entry.syncedAt === modifiedAt) {
           touchCached(userId, NAMESPACE, doc.googleDocId);
           continue; // cache is fresh
@@ -125,23 +131,32 @@ export function useCachedTitles(userId: string, docs: DocForTitleCache[]): Recor
       }
     }
 
-    // Only update state if titles actually changed
-    setTitles((prev) => {
+    // Only update state if metadata actually changed
+    setMetadata((prev) => {
       let changed = false;
-      for (const [id, title] of Object.entries(titleMap)) {
-        if (prev[id] !== title) { changed = true; break; }
+      for (const [id, entry] of Object.entries(metaMap)) {
+        if (prev[id]?.title !== entry.title || prev[id]?.owner !== entry.owner) { changed = true; break; }
       }
-      if (!changed && Object.keys(titleMap).length === Object.keys(prev).length) return prev;
-      return { ...prev, ...titleMap };
+      if (!changed && Object.keys(metaMap).length === Object.keys(prev).length) return prev;
+      return { ...prev, ...metaMap };
     });
 
     if (staleIds.length > 0) {
-      fetchTitles(staleIds);
+      fetchMetadata(staleIds);
     }
 
     document.getElementById("hide-until-titles")?.remove();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, docsKey, fetchTitles]);
+  }, [userId, docsKey, fetchMetadata]);
 
-  return titles;
+  // Derive separate title and owner maps for consumers
+  return useMemo(() => {
+    const titles: Record<string, string> = {};
+    const owners: Record<string, string> = {};
+    for (const [id, entry] of Object.entries(metadata)) {
+      if (entry.title) titles[id] = entry.title;
+      if (entry.owner) owners[id] = entry.owner;
+    }
+    return { titles, owners };
+  }, [metadata]);
 }

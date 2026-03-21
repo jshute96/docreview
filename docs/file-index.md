@@ -102,7 +102,7 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/[docId]/content/route.ts` | `GET` fetch document text and suggestion content (slow path — Docs API `documents.get` or Drive `files.export`); for Docs, uses a single `SUGGESTIONS_INLINE` call for both |
 | `docs/[docId]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (INBOX/ARCHIVED/MUTED), read state, or star |
 | `docs/[docId]/threads/route.ts` | `GET` fetch thread(s) from Drive; `POST` refresh a single thread (updates DB) |
-| `docs/titles/route.ts` | `POST` fetch current doc titles from Google Drive for given IDs — used by client-side title cache for stale/missing entries |
+| `docs/metadata/route.ts` | `POST` fetch current doc titles and owners from Google Drive for given IDs — used by client-side metadata cache for stale/missing entries |
 | `docs/[docId]/threads/reply/route.ts` | `POST` reply to / resolve / reopen a comment thread via Drive API; pins `viewedByMeTime` around the action (debug logging) |
 | `docs/[docId]/viewed-time/route.ts` | `PUT` update `viewedByMeTime` on a Google Drive file |
 | `labels/route.ts` | `GET` list labels with document counts; `POST` create label |
@@ -168,7 +168,7 @@ Shadcn/ui components:
 |------|-------------|
 | `use-auto-resize.ts` | `useAutoResize()` hook — auto-grows a textarea to fit content up to a max height |
 | `use-label-sync.ts` | `useLabelSync()` hook — removes stale label IDs from selection when available labels change |
-| `use-cached-titles.ts` | `useCachedTitles()` hook — manages localStorage cache of doc titles with staleness detection via `lastModifiedInDrive`, async fetch for stale/missing entries |
+| `use-cached-metadata.ts` | `useCachedMetadata()` hook — manages localStorage cache of doc metadata (titles + owners) with staleness detection via `lastModifiedInDrive`, async fetch for stale/missing entries |
 | `use-multi-select.ts` | `useMultiSelect()` hook — generic row multi-selection with click/Ctrl+click/Shift+click, highlight state, effective item filtering, and bulk removal helpers |
 
 ## Scripts (`scripts/`)
@@ -202,10 +202,10 @@ Shadcn/ui components:
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
 | `doc-filters.ts` | Client-side doc filtering (tri-state logic for inbox/comments/author/starred/mimeType/labels/title regex) and sorting; accepts optional cached titles map for when `doc.title` is empty |
 | `browser-cache.ts` | Generic localStorage cache — namespaced key-value store with JSON values, batch operations, and staleness-based eviction |
-| `doc-queries.ts` | Shared Prisma include constants (`labelInclude`, `docWithCountsInclude`, `docWithCommentsInclude`) + `withCommentCounts` transform + `stripTitle` (strips titles from API responses for privacy) |
+| `doc-queries.ts` | Shared Prisma include constants (`labelInclude`, `docWithCountsInclude`, `docWithCommentsInclude`) + `withCommentCounts` transform + `stripServerOnly` (strips titles from API responses for privacy) |
 | `highlight.tsx` | `highlightText()` — regex/substring highlighter for plain text; `highlightHtml()` — same for HTML strings (highlights text outside tags, returns null if no match); `matchesFilter()` — centralized dual regex/substring search; `createMatcher()` — compiled reusable matcher |
 | `prisma.ts` | Singleton PrismaClient with dev-mode write-op logging and base64 field obscuring |
-| `prisma-obscure.ts` | Prisma client extension that base64-encodes/decodes Doc.title, Doc.notes, Doc.owner, Label.name transparently |
+| `prisma-obscure.ts` | Prisma client extension that base64-encodes/decodes Doc.title, Doc.notes, Label.name transparently |
 | `bulk-edit.ts` | `BulkEditState` type and `cycleBulkEditState` helper for multi-doc editing |
 | `offline.ts` | Offline mode constants — `OFFLINE_MODE` flag, `OfflineModeError`, fallback user |
 | `role-colors.ts` | Tailwind class maps for Author (blue) and Reviewer (violet) role badges/filters |

@@ -50,7 +50,6 @@ function makeDoc(overrides: Partial<Doc> = {}): Doc {
     status: "INBOX",
     accessState: "OK",
     lastModifiedInDrive: new Date("2024-06-01"),
-    owner: "Someone",
     createdTimeInDrive: new Date("2024-01-01"),
     addedAt: new Date(),
     commentsLastSyncedAt: null,

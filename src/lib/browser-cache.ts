@@ -109,12 +109,14 @@ export function clearAll(): { removed: number; found: number; error?: string } {
 }
 
 /**
- * Evict cache entries for a namespace that haven't been written since `cutoffMs` ago.
+ * Evict cache entries that haven't been written since `cutoffMs` ago.
+ * Scans ALL docr: entries for the user (not just the given namespace) so that
+ * entries from retired namespaces (e.g. "title" → "meta") get cleaned up too.
  * Uses `cachedAt` (when the entry was written), falling back to `syncedAt` for
  * entries written before `cachedAt` was added.
  */
-export function evictStale(userId: string, namespace: string, cutoffMs: number): number {
-  const prefixStr = `${PREFIX}:${userId}:${namespace}:`;
+export function evictStale(userId: string, _namespace: string, cutoffMs: number): number {
+  const prefixStr = `${PREFIX}:${userId}:`;
   const cutoffDate = Date.now() - cutoffMs;
   let evicted = 0;
   try {

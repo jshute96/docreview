@@ -3,7 +3,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { parseGoogleDocId } from "@/lib/google-drive";
 import { addDoc, validateDocInputs } from "@/lib/add-doc";
-import { docWithCountsInclude, withCommentCounts, stripTitle } from "@/lib/doc-queries";
+import { docWithCountsInclude, withCommentCounts, stripServerOnly } from "@/lib/doc-queries";
 import { runWithRequestId } from "@/lib/request-context";
 
 export async function POST(req: NextRequest) {
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       include: docWithCountsInclude,
     });
 
-    return NextResponse.json(result ? stripTitle(withCommentCounts(result)) : result);
+    return NextResponse.json(result ? stripServerOnly(withCommentCounts(result)) : result);
   }
 
   const now = new Date();
@@ -83,7 +83,6 @@ export async function POST(req: NextRequest) {
       driveUrl: `https://docs.google.com/document/d/${fileId}/edit`,
       mimeType: "application/vnd.google-apps.document",
       role: "REVIEWER",
-      owner: null,
       lastModifiedInDrive: now,
       createdTimeInDrive: now,
     },

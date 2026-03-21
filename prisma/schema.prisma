@@ -166,7 +166,6 @@ model Doc {
   isStarred            Boolean    @default(false) @map("is_starred")
   lastModifiedInDrive  DateTime?  @map("last_modified_in_drive")    // Drive's modifiedTime (does NOT update when comments change)
   notes                String?    @map("notes")
-  owner                String?
   createdTimeInDrive   DateTime?  @map("created_time_in_drive")
   addedAt              DateTime   @default(now()) @map("added_at")  // when this doc was first added to docreview
   commentsLastSyncedAt DateTime?  @map("comments_last_synced_at")   // stamped with sync start time on full success (comments + suggestions); used by refresh to catch up stale docs

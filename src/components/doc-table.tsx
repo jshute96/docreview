@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { filterDocs, sortDocs } from "@/lib/doc-filters";
 import type { SortCol, SortDir } from "@/lib/doc-filters";
-import { useCachedTitles } from "@/hooks/use-cached-titles";
+import { useCachedMetadata } from "@/hooks/use-cached-metadata";
 import { LabelProvider } from "@/contexts/label-context";
 import { HelpDialog } from "@/components/help-dialog";
 import { DeleteAllDialog } from "@/components/delete-all-dialog";
@@ -51,7 +51,7 @@ interface DocTableProps {
 export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSeenHelp }: DocTableProps) {
   const [docs, setDocs] = useState<DocWithLabels[]>(initialDocs);
   const [labels, setLabelsRaw] = useState<Label[]>(initialLabels);
-  const cachedTitles = useCachedTitles(userId, docs);
+  const { titles: cachedTitles } = useCachedMetadata(userId, docs);
   const [showHelp, setShowHelp] = useState(false);
   const [showDeleteAll, setShowDeleteAll] = useState(false);
   const [showWelcome, setShowWelcome] = useState(hasSeenHelp === false);

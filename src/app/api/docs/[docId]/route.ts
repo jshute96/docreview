@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { DocRole, DocStatus } from "@prisma/client";
-import { docWithCountsInclude, docWithCommentsInclude, withCommentCounts, stripTitle } from "@/lib/doc-queries";
+import { docWithCountsInclude, docWithCommentsInclude, withCommentCounts, stripServerOnly } from "@/lib/doc-queries";
 import { runWithRequestId } from "@/lib/request-context";
 import { validateLabelOwnership } from "@/lib/add-doc";
 
@@ -30,7 +30,7 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json(stripTitle(doc));
+  return NextResponse.json(stripServerOnly(doc));
   });
 }
 
@@ -100,7 +100,7 @@ export async function PATCH(
     include: docWithCountsInclude,
   });
 
-  return NextResponse.json(stripTitle(withCommentCounts(updated)));
+  return NextResponse.json(stripServerOnly(withCommentCounts(updated)));
   });
 }
 

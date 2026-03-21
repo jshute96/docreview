@@ -6,13 +6,19 @@ import { logInfo, logWarning } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 import pLimit from "p-limit";
 
+export interface DocMetadataEntry {
+  title: string;
+  owner: string | null;
+}
+
 /**
- * POST /api/docs/titles
+ * POST /api/docs/metadata
  * Body: { googleDocIds: string[] }
  *
- * Fetches current titles from Google Drive for the given doc IDs.
- * Returns { [googleDocId]: title }. For docs that fail to fetch from Drive
- * (e.g. inaccessible), falls back to the title stored in the database.
+ * Fetches current titles and owners from Google Drive for the given doc IDs.
+ * Returns { [googleDocId]: { title, owner } }. For docs that fail to fetch
+ * from Drive (e.g. inaccessible), falls back to the title stored in the
+ * database (owner will be null since it's no longer stored in the DB).
  */
 export async function POST(req: NextRequest) {
   return runWithRequestId("POST", req, async () => {
@@ -42,13 +48,13 @@ export async function POST(req: NextRequest) {
     const idSummary = googleDocIds.length <= 1
       ? googleDocIds[0] ?? ""
       : `${googleDocIds[0]} (plus ${googleDocIds.length - 1} more)`;
-    logInfo(`[Titles] Fetching ${googleDocIds.length} titles: ${idSummary}`);
+    logInfo(`[Metadata] Fetching ${googleDocIds.length} doc metadata: ${idSummary}`);
 
     const auth = await getDriveClient(userId);
     const drive = createDriveService(auth);
     const limit = pLimit(10);
 
-    const titles: Record<string, string> = {};
+    const metadata: Record<string, DocMetadataEntry> = {};
     const failedIds: string[] = [];
 
     await Promise.all(
@@ -57,33 +63,37 @@ export async function POST(req: NextRequest) {
           try {
             const res = await drive.files.get({
               fileId: id,
-              fields: "id, name",
+              fields: "id, name, owners(displayName)",
               supportsAllDrives: true,
             });
             const name = res.data.name;
             if (name) {
-              titles[id] = name;
+              metadata[id] = {
+                title: name,
+                owner: res.data.owners?.[0]?.displayName ?? null,
+              };
             }
           } catch (err: unknown) {
             const code = (err as { code?: number | string })?.code;
-            logWarning(`[Titles] ${id} → error ${code ?? "unknown"}`);
+            logWarning(`[Metadata] ${id} → error ${code ?? "unknown"}`);
             failedIds.push(id);
           }
         })
       )
     );
 
-    // Fall back to DB titles for docs we couldn't fetch from Drive (e.g. inaccessible)
+    // Fall back to DB titles for docs we couldn't fetch from Drive (e.g. inaccessible).
+    // Owner is not stored in DB, so fallback entries have owner: null.
     if (failedIds.length > 0) {
       const dbDocs = await prisma.doc.findMany({
         where: { userId, googleDocId: { in: failedIds }, title: { not: "" } },
         select: { googleDocId: true, title: true },
       });
       for (const doc of dbDocs) {
-        titles[doc.googleDocId] = doc.title;
+        metadata[doc.googleDocId] = { title: doc.title, owner: null };
       }
     }
 
-    return NextResponse.json(titles);
+    return NextResponse.json(metadata);
   });
 }

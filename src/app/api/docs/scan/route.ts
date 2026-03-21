@@ -42,14 +42,13 @@ export async function POST(req: NextRequest) {
 
           const docs: Array<{
             googleDocId: string; title: string; mimeType: string; driveUrl: string;
-            owner: string | null; role: string; isNew: boolean;
+            role: string; isNew: boolean;
             accessState?: string; notes?: string; emailDate?: string;
           }> = gmailDocs.map(d => ({
             googleDocId: d.googleDocId,
             title: d.title,
             mimeType: d.mimeType,
             driveUrl: d.driveUrl,
-            owner: d.owner,
             role: d.role,
             isNew: !existingDocIds.has(d.googleDocId),
           }));
@@ -62,7 +61,6 @@ export async function POST(req: NextRequest) {
                 title: d.title,
                 mimeType: "",
                 driveUrl: `https://docs.google.com/document/d/${d.googleDocId}/edit`,
-                owner: null,
                 role: "REVIEWER",
                 isNew: true,
                 accessState: d.accessState,
@@ -105,7 +103,6 @@ export async function POST(req: NextRequest) {
           title: d.title,
           mimeType: d.mimeType,
           driveUrl: d.driveUrl,
-          owner: d.owner,
           role: d.role,
           isNew: !existingDocIds.has(d.googleDocId),
         }));

@@ -48,7 +48,7 @@ title and notes extracted from the email.
    share invitations ("Shared by") from access requests ("Requested to share by")
    based on the Subject header.
 7. For messages with a doc ID, calls Drive `files.get` to fetch real title,
-   mimeType, webViewLink, and owner
+   mimeType, webViewLink, and role
 8. Messages with no doc link are logged as errors and counted
 9. Docs that fail Drive fetch (404/403) are collected as `inaccessibleDocs` with
    best-effort metadata from the email

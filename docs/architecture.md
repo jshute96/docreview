@@ -158,16 +158,16 @@ page load and after mutations.
 open tabs when shared data changes (doc adds, label edits, etc.), prompting them
 to re-fetch. See [`docs/cross-tab.md`](./cross-tab.md).
 
-**Browser-side caching:** Document titles are not stored in the database for
-privacy. Instead, they're cached in `localStorage` and fetched on demand from
-Google Drive. To avoid a flash of "Unknown title" during SSR hydration, the two
-pages that display titles (`docs/page.tsx` and `comments/[docId]/page.tsx`) hide
-the page body (`visibility:hidden`) and include inline `<script>` tags that
-pre-read cached titles for their doc IDs into
-`window.__docrTitleCache`. After React hydrates, a `useLayoutEffect` in
-`useCachedTitles` populates title state and removes the hiding style — so the
-page appears with titles already in place. A 2-second fallback removes the
-hiding style if the hook never runs (e.g. JS error). See
+**Browser-side caching:** Document titles and owners are not stored in the
+database for privacy. Instead, they're cached in `localStorage` and fetched on
+demand from Google Drive. To avoid a flash of "Unknown title" during SSR
+hydration, the two pages that display titles (`docs/page.tsx` and
+`comments/[docId]/page.tsx`) hide the page body (`visibility:hidden`) and
+include inline `<script>` tags that pre-read cached metadata for their doc IDs
+into `window.__docrMetaCache`. After React hydrates, a `useLayoutEffect` in
+`useCachedMetadata` populates title and owner state and removes the hiding
+style — so the page appears with titles already in place. A 2-second fallback
+removes the hiding style if the hook never runs (e.g. JS error). See
 [`docs/local-storage-cache.md`](./local-storage-cache.md).
 
 ## Observability

@@ -37,7 +37,7 @@ describe("base64 encode/decode", () => {
 
 // Test the recursive decode logic by reimplementing the same algorithm
 // (since the module doesn't export it) and verifying the shape handling.
-const ALL_OBSCURED = new Set(["title", "notes", "owner", "name"]);
+const ALL_OBSCURED = new Set(["title", "notes", "name"]);
 
 function decodeResult(result: unknown): void {
   if (result == null || typeof result !== "object") return;
@@ -79,21 +79,20 @@ describe("decodeResult", () => {
   });
 
   it("handles null and undefined obscured fields", () => {
-    const doc = { title: encode("T"), notes: null, owner: undefined };
+    const doc = { title: encode("T"), notes: null as string | null };
     decodeResult(doc);
     expect(doc.title).toBe("T");
     expect(doc.notes).toBeNull();
-    expect(doc.owner).toBeUndefined();
   });
 
   it("handles arrays of results", () => {
     const docs = [
-      { title: encode("A"), owner: encode("Alice") },
-      { title: encode("B"), owner: encode("Bob") },
+      { title: encode("A"), notes: encode("Note A") },
+      { title: encode("B"), notes: encode("Note B") },
     ];
     decodeResult(docs);
     expect(docs[0].title).toBe("A");
-    expect(docs[1].owner).toBe("Bob");
+    expect(docs[1].notes).toBe("Note B");
   });
 
   it("handles null/undefined input without throwing", () => {
@@ -132,7 +131,7 @@ describe("obscured field name uniqueness", () => {
 
   // Obscured table→fields, matching OBSCURED_FIELDS in prisma-obscure.ts.
   const OBSCURED: Record<string, string[]> = {
-    docs: ["title", "notes", "owner"],
+    docs: ["title", "notes"],
     labels: ["name"],
   };
 

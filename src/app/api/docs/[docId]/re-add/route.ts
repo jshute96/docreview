@@ -53,7 +53,6 @@ export async function POST(
         driveUrl: oldDoc.driveUrl,
         mimeType: oldDoc.mimeType ?? "application/vnd.google-apps.document",
         role: oldDoc.role as "AUTHOR" | "REVIEWER",
-        owner: oldDoc.owner,
         lastModifiedInDrive: oldDoc.lastModifiedInDrive,
         createdTimeInDrive: oldDoc.createdTimeInDrive,
       },

@@ -19,7 +19,6 @@ export interface GmailScanDoc {
   title: string;
   mimeType: string;
   driveUrl: string;
-  owner: string | null;
   role: "AUTHOR" | "REVIEWER";
 }
 
@@ -282,7 +281,6 @@ export async function scanGmailNotifications(
           title: file.name ?? docId,
           mimeType: file.mimeType ?? "",
           driveUrl: file.webViewLink ?? "",
-          owner: file.owners?.[0]?.displayName ?? null,
           role: isOwner ? "AUTHOR" : "REVIEWER",
         });
 

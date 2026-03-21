@@ -3,7 +3,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getDriveClient, createDriveService, invalidGrantResponse } from "@/lib/google-drive";
 import { upsertDocsAndSyncComments } from "@/lib/refresh";
-import { docWithCommentsInclude, stripTitle } from "@/lib/doc-queries";
+import { docWithCommentsInclude, stripServerOnly } from "@/lib/doc-queries";
 import { logError, logWarning } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 
@@ -54,7 +54,6 @@ export async function POST(
       role: isOwner ? "AUTHOR" : "REVIEWER",
       lastModifiedInDrive: f.modifiedTime ? new Date(f.modifiedTime) : null,
       createdTimeInDrive: f.createdTime ? new Date(f.createdTime) : null,
-      owner: f.owners?.[0]?.displayName ?? null,
       trashed: f.trashed === true,
     } as any;
   } catch (err: unknown) {
@@ -94,6 +93,6 @@ export async function POST(
     include: docWithCommentsInclude,
   });
 
-  return NextResponse.json(updated ? stripTitle(updated) : updated);
+  return NextResponse.json(updated ? stripServerOnly(updated) : updated);
   });
 }

@@ -16,7 +16,7 @@ import { Prisma } from "@prisma/client";
  * exclude User from recursive decoding or rename the overlap.
  */
 const OBSCURED_FIELDS: Record<string, string[]> = {
-  doc: ["title", "notes", "owner"],
+  doc: ["title", "notes"],
   label: ["name"],
 };
 

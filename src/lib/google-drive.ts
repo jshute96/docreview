@@ -109,7 +109,6 @@ export interface DriveDoc {
   role: "AUTHOR" | "REVIEWER";
   lastModifiedInDrive: Date | null;
   createdTimeInDrive: Date | null;
-  owner: string | null;
 }
 
 // Returns the subset of googleDocIds that are deleted (trashed, permanently deleted)
@@ -774,7 +773,6 @@ export async function listChanges(
       role: isOwner ? "AUTHOR" : "REVIEWER",
       lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,
       createdTimeInDrive: file.createdTime ? new Date(file.createdTime) : null,
-      owner: file.owners?.[0]?.displayName ?? null,
     });
   }
 
@@ -816,7 +814,6 @@ export async function fetchDocsByIds(
           role: (isOwner ? "AUTHOR" : "REVIEWER") as "AUTHOR" | "REVIEWER",
           lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,
           createdTimeInDrive: file.createdTime ? new Date(file.createdTime) : null,
-          owner: file.owners?.[0]?.displayName ?? null,
         };
       } catch (err: unknown) {
         const code = (err as { code?: number | string })?.code;
@@ -905,7 +902,6 @@ export async function listRecentDocs(
         role: isOwner ? "AUTHOR" : "REVIEWER",
         lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,
         createdTimeInDrive: file.createdTime ? new Date(file.createdTime) : null,
-        owner: file.owners?.[0]?.displayName ?? null,
       });
     }
 

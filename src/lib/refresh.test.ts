@@ -36,7 +36,7 @@ describe("upsertDocsAndSyncComments", () => {
         mimeType: "doc",
         role: "AUTHOR",
         lastModifiedInDrive: new Date(),
-        owner: "Me",
+
         createdTimeInDrive: new Date(),
       },
     ];
@@ -71,7 +71,7 @@ describe("upsertDocsAndSyncComments", () => {
         mimeType: "doc",
         role: "AUTHOR",
         lastModifiedInDrive: new Date(),
-        owner: "Me",
+
         createdTimeInDrive: new Date(),
       },
     ];

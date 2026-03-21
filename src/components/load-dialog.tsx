@@ -51,7 +51,6 @@ interface ScanDoc {
   title: string;
   mimeType: string;
   driveUrl: string;
-  owner: string | null;
   role: "AUTHOR" | "REVIEWER";
   isNew: boolean;
   accessState?: "NOT_FOUND" | "DENIED";

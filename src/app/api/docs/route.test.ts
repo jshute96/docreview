@@ -183,7 +183,7 @@ describe("POST /api/docs", () => {
         role: "AUTHOR" as const,
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
+
 
       },
     ]);
@@ -225,7 +225,6 @@ describe("POST /api/docs", () => {
         role: "REVIEWER" as const,
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: null,
-        owner: null,
 
       },
     ]);
@@ -286,7 +285,7 @@ describe("POST /api/docs", () => {
         role: "AUTHOR" as const,
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
+
       },
       {
         googleDocId: "g2",
@@ -296,7 +295,7 @@ describe("POST /api/docs", () => {
         role: "AUTHOR" as const,
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
+
       },
     ]);
 
@@ -348,7 +347,7 @@ describe("POST /api/docs", () => {
         role: "AUTHOR" as const,
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
+
 
       },
     ]);
@@ -390,7 +389,7 @@ describe("POST /api/docs", () => {
         role: "AUTHOR" as const,
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
+
 
       },
     ]);
@@ -432,7 +431,7 @@ describe("POST /api/docs", () => {
         role: "AUTHOR" as const,
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
+
 
       },
     ]);
@@ -483,7 +482,7 @@ describe("POST /api/docs", () => {
         role: "AUTHOR" as const,
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
+
 
       },
     ]);
@@ -526,7 +525,7 @@ describe("POST /api/docs", () => {
         role: "AUTHOR" as const,
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
+
 
       },
     ]);
@@ -565,7 +564,7 @@ describe("POST /api/docs", () => {
         role: "AUTHOR" as const,
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
+
 
       },
     ]);
@@ -607,7 +606,7 @@ describe("POST /api/docs", () => {
         role: "AUTHOR" as const,
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
+
 
       },
     ]);
@@ -649,7 +648,7 @@ describe("POST /api/docs", () => {
         role: "AUTHOR" as const,
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
+
 
       },
     ]);
@@ -691,7 +690,6 @@ describe("POST /api/docs", () => {
         role: "REVIEWER" as const,
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Someone",
 
       },
     ]);
@@ -729,7 +727,7 @@ describe("POST /api/docs", () => {
         role: "AUTHOR" as const,
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: new Date("2024-05-01"),
-        owner: "Owner",
+
 
       },
     ]);
