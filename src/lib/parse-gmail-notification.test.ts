@@ -6,7 +6,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { parseGmailNotification, parseCommentTime, headerDateToISO } from "./parse-gmail-notification";
+import { parseGmailNotification, parseCommentTime, headerDateToISO, decodeHtmlEntities } from "./parse-gmail-notification";
 import type { CommentNotification, SharingNotification } from "./parse-gmail-notification";
 
 const EXAMPLES_DIR = join(__dirname, "../../testing/gmail_notifications");
@@ -267,5 +267,40 @@ describe("headerDateToISO", () => {
 
   it("returns undefined for unparseable date", () => {
     expect(headerDateToISO("not a date")).toBeUndefined();
+  });
+});
+
+describe("decodeHtmlEntities", () => {
+  it("decodes named entities", () => {
+    expect(decodeHtmlEntities("&amp;&lt;&gt;&quot;&apos;&nbsp;")).toBe('&<>"\' ');
+  });
+
+  it("decodes decimal entities", () => {
+    expect(decodeHtmlEntities("&#8212;")).toBe("\u2014"); // em-dash
+    expect(decodeHtmlEntities("&#8217;")).toBe("\u2019"); // right single quote
+    expect(decodeHtmlEntities("&#39;")).toBe("'");        // apostrophe
+    expect(decodeHtmlEntities("&#8230;")).toBe("\u2026"); // ellipsis
+  });
+
+  it("decodes hex entities", () => {
+    expect(decodeHtmlEntities("&#x2019;")).toBe("\u2019"); // right single quote
+    expect(decodeHtmlEntities("&#x2014;")).toBe("\u2014"); // em-dash
+    expect(decodeHtmlEntities("&#xA0;")).toBe("\u00a0");   // nbsp (as char, not space)
+  });
+
+  it("fixes mangled UTF-8 bytes (latin1 interpretation)", () => {
+    expect(decodeHtmlEntities("\u00e2\u0080\u009c")).toBe("\u201c"); // left smart quote
+    expect(decodeHtmlEntities("\u00e2\u0080\u009d")).toBe("\u201d"); // right smart quote
+    expect(decodeHtmlEntities("\u00e2\u0080\u00a2")).toBe("•");      // bullet
+    expect(decodeHtmlEntities("\u00e2\u0080\u00af")).toBe("\u202f"); // narrow no-break space
+  });
+
+  it("passes through unknown named entities unchanged", () => {
+    expect(decodeHtmlEntities("&unknown;")).toBe("&unknown;");
+  });
+
+  it("handles mixed content", () => {
+    expect(decodeHtmlEntities("hello &amp; goodbye &#8212; world"))
+      .toBe("hello & goodbye \u2014 world");
   });
 });

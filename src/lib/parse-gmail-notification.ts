@@ -177,18 +177,23 @@ function extractDiscoId(url: string): string {
   return match ? match[1] : "";
 }
 
-function decodeHtmlEntities(text: string): string {
+const namedEntities: Record<string, string> = {
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
+};
+
+export function decodeHtmlEntities(text: string): string {
   return text
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\u00e2\u0080\u00a2/g, "•") // UTF-8 bullet mangled as latin1
-    .replace(/\u00e2\u0080\u009c/g, "\u201c") // left smart quote
-    .replace(/\u00e2\u0080\u009d/g, "\u201d") // right smart quote
-    .replace(/\u00e2\u0080\u00af/g, "\u202f"); // narrow no-break space
+    // Fix UTF-8 bytes mangled as latin1 (common in Gmail quoted-printable)
+    .replace(/\u00e2\u0080\u00a2/g, "•")      // bullet
+    .replace(/\u00e2\u0080\u009c/g, "\u201c")  // left smart quote
+    .replace(/\u00e2\u0080\u009d/g, "\u201d")  // right smart quote
+    .replace(/\u00e2\u0080\u00af/g, "\u202f")  // narrow no-break space
+    // Decode all HTML entities: named (&amp;), decimal (&#8212;), hex (&#x2019;)
+    .replace(/&(#x([0-9a-fA-F]+)|#(\d+)|(\w+));/g, (_match, _full, hex, dec, named) => {
+      if (hex) return String.fromCodePoint(parseInt(hex, 16));
+      if (dec) return String.fromCodePoint(parseInt(dec, 10));
+      return namedEntities[named] ?? _match; // pass through unknown named entities
+    });
 }
 
 function stripTags(html: string): string {
