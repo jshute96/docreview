@@ -351,10 +351,32 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
 
   const suggestionLabel =
     comment.suggestionType === "INSERT"
-      ? "Suggested add"
+      ? "suggested add"
       : comment.suggestionType === "DELETE"
-      ? "Suggested delete"
-      : "Suggested edit";
+      ? "suggested delete"
+      : "suggested edit";
+  const SuggestionLabel = suggestionLabel.charAt(0).toUpperCase() + suggestionLabel.slice(1);
+
+  const suggestionSummary = isSuggestion ? (
+    !suggestionContent && comment.resolved ? (
+      <span className="text-zinc-400 italic">Resolved {suggestionLabel}</span>
+    ) : !suggestionContent ? (
+      <span className="text-zinc-500">{SuggestionLabel}</span>
+    ) : (
+      <span>
+        <span className="text-zinc-500">{SuggestionLabel}: </span>
+        {(comment.suggestionType === "EDIT" || comment.suggestionType === "DELETE") && (
+          <span className="line-through text-red-400">{highlightText(suggestionContent.deletedText, searchFilter ?? "")}</span>
+        )}
+        {comment.suggestionType === "EDIT" && (
+          <span className="text-zinc-400"> → </span>
+        )}
+        {(comment.suggestionType === "EDIT" || comment.suggestionType === "INSERT") && (
+          <span className="text-zinc-600">{highlightText(suggestionContent.insertedText, searchFilter ?? "")}</span>
+        )}
+      </span>
+    )
+  ) : null;
 
   return (
     <>
@@ -457,25 +479,8 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         <td colSpan={5} className="max-w-0 overflow-hidden">
           <div className={cellWrap} style={cellWrapStyle}>
             <div className="overflow-hidden min-h-0 pt-0.5 pb-2 pl-4 pr-4">
-          {isSuggestion && !suggestionContent && comment.resolved ? (
-            <p className="truncate text-sm text-zinc-400 italic">Resolved {suggestionLabel.toLowerCase()}</p>
-          ) : isSuggestion && !suggestionContent ? (
-            <p className="truncate text-sm text-zinc-400">
-              <span className="text-zinc-500">{suggestionLabel}</span>
-            </p>
-          ) : isSuggestion && suggestionContent ? (
-            <p className="truncate text-sm text-zinc-400">
-              <span className="text-zinc-500">{suggestionLabel}: </span>
-              {(comment.suggestionType === "EDIT" || comment.suggestionType === "DELETE") && (
-                <span className="line-through text-red-400">{highlightText(suggestionContent.deletedText, searchFilter ?? "")}</span>
-              )}
-              {comment.suggestionType === "EDIT" && (
-                <span className="text-zinc-400"> → </span>
-              )}
-              {(comment.suggestionType === "EDIT" || comment.suggestionType === "INSERT") && (
-                <span className="text-zinc-600">{highlightText(suggestionContent.insertedText, searchFilter ?? "")}</span>
-              )}
-            </p>
+          {isSuggestion ? (
+            <p className="truncate text-sm text-zinc-400">{suggestionSummary}</p>
           ) : (
             <p className="truncate text-sm text-zinc-400">
               <span>
@@ -506,20 +511,9 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                       </a>
                     </Button>
                   </div>
-                  {suggestionContent && (
-                    <div className="mb-3 text-sm whitespace-pre-wrap">
-                      <span className="text-zinc-500">{suggestionLabel}: </span>
-                      {(comment.suggestionType === "EDIT" || comment.suggestionType === "DELETE") && (
-                        <span className="line-through text-red-400">{highlightText(suggestionContent.deletedText, searchFilter ?? "")}</span>
-                      )}
-                      {comment.suggestionType === "EDIT" && (
-                        <span className="text-zinc-400"> → </span>
-                      )}
-                      {(comment.suggestionType === "EDIT" || comment.suggestionType === "INSERT") && (
-                        <span className="text-zinc-600">{highlightText(suggestionContent.insertedText, searchFilter ?? "")}</span>
-                      )}
-                    </div>
-                  )}
+                  <div className={`mb-3 text-sm${suggestionContent ? " whitespace-pre-wrap" : ""}`}>
+                    {suggestionSummary}
+                  </div>
                   <p className="text-sm text-zinc-400">
                     Cannot accept or reject suggestions, or show reply threads. Process suggestions in the doc.
                   </p>
