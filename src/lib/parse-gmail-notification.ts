@@ -20,7 +20,8 @@
 
 export interface CommentReply {
   author: string;
-  time: string;
+  time_str: string;      // original formatted string from email, e.g. "6:34 PM, Mar 7 (UTC)"
+  time?: string;          // ISO 8601 if we could parse time_str; undefined otherwise
   text: string;
   isNew: boolean;
   avatarUrl?: string;
@@ -37,7 +38,8 @@ export interface CommentThread {
 
 export interface Suggestion {
   author: string;
-  time: string;
+  time_str: string;      // original formatted string from email
+  time?: string;          // ISO 8601 if parseable
   action: string; // "Delete", "Add", "Replace"
   text: string;
   oldText?: string; // for Replace
@@ -54,7 +56,8 @@ export interface CommentNotification {
   subject: string;
   from: string;
   to: string;
-  date: string;
+  date_str: string;       // original Date header, e.g. "Sat, 07 Mar 2026 10:42:27 -0800"
+  date?: string;           // ISO 8601 if parseable
   documentId: string;
   documentTitle: string;
   documentUrl: string;
@@ -70,7 +73,8 @@ export interface SharingNotification {
   subject: string;
   from: string;
   to: string;
-  date: string;
+  date_str: string;       // original Date header
+  date?: string;           // ISO 8601 if parseable
   sharerName: string;
   sharerEmail: string;
   permission: string; // "edit", "view", "comment", "writer"
@@ -198,6 +202,72 @@ function stripTags(html: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Time parsing helpers
+// ---------------------------------------------------------------------------
+
+const MONTH_MAP: Record<string, number> = {
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+};
+
+/**
+ * Parse a Google-formatted comment time string like "6:34 PM, Mar 7 (UTC)"
+ * into an ISO 8601 timestamp. The year is inferred from the email's Date header.
+ *
+ * NOTE: This format is what Google uses for English-locale emails. Other locales
+ * will likely produce different formats (24-hour time, localized month names,
+ * different ordering) that won't match this regex — in which case we return
+ * undefined and the caller falls back to time_str only.
+ *
+ * The seconds are always :00 because Google only shows minute-level precision
+ * in the email.
+ */
+export function parseCommentTime(timeStr: string, emailDateStr: string): string | undefined {
+  // English-locale format: "H:MM AM/PM, Mon DD (TZ)"
+  // The \s in the regex also matches \u202f (narrow no-break space) that Google
+  // uses between the time and AM/PM in the email HTML.
+  const m = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM),\s*(\w{3})\s+(\d{1,2})\s*\(([^)]+)\)$/);
+  if (!m) return undefined;
+
+  let hours = parseInt(m[1], 10);
+  const minutes = parseInt(m[2], 10);
+  const ampm = m[3];
+  const monthAbbr = m[4];
+  const day = parseInt(m[5], 10);
+  const tz = m[6];
+
+  // We can only reliably convert UTC times — if Google shows a different
+  // timezone, we'd need an offset table to convert correctly.
+  if (tz !== "UTC") return undefined;
+
+  // Convert 12-hour to 24-hour
+  if (ampm === "AM" && hours === 12) hours = 0;
+  else if (ampm === "PM" && hours !== 12) hours += 12;
+
+  const month = MONTH_MAP[monthAbbr];
+  if (month === undefined) return undefined;
+
+  // Get year from email Date header
+  const emailDate = new Date(emailDateStr);
+  if (isNaN(emailDate.getTime())) return undefined;
+  const year = emailDate.getUTCFullYear();
+
+  // Build the date in UTC (Google shows comment times in UTC)
+  const dt = new Date(Date.UTC(year, month, day, hours, minutes, 0));
+  if (isNaN(dt.getTime())) return undefined;
+
+  return dt.toISOString();
+}
+
+/** Convert an RFC 2822 date string to ISO 8601, or undefined on failure. */
+export function headerDateToISO(dateStr: string): string | undefined {
+  if (!dateStr) return undefined;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return undefined;
+  return d.toISOString();
+}
+
+// ---------------------------------------------------------------------------
 // Comment notification parser
 // ---------------------------------------------------------------------------
 
@@ -215,6 +285,9 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
   // Recipient user ID from the "Change what Google sends you" link
   const ouidMatch = html.match(/ouid=(\d+)/);
   const recipientUserId = ouidMatch ? ouidMatch[1] : undefined;
+
+  const dateStr = headers.get("date") || "";
+  const dateISO = headerDateToISO(dateStr);
 
   // Parse comment sections — each is in a card with "N comment(s)" heading
   const comments: CommentThread[] = [];
@@ -247,7 +320,7 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
     const openUrl = openMatch ? decodeHtmlEntities(openMatch[1]) : action.url;
 
     // Parse posts (author + text blocks)
-    const posts = parsePostsInSection(section);
+    const posts = parsePostsInSection(section, dateStr);
 
     if (isComment) {
       // Quoted text is in the .document-content-snippet
@@ -290,7 +363,8 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
       const replies = posts.slice(1);
       suggestions.push({
         author: post?.author || "",
-        time: post?.time || "",
+        time_str: post?.time_str || "",
+        ...(post?.time ? { time: post.time } : {}),
         action: suggestionAction,
         text,
         oldText,
@@ -309,7 +383,8 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
     subject: headers.get("subject") || "",
     from: headers.get("from") || "",
     to: headers.get("to") || "",
-    date: headers.get("date") || "",
+    date_str: dateStr,
+    ...(dateISO ? { date: dateISO } : {}),
     documentId,
     documentTitle,
     documentUrl,
@@ -321,7 +396,7 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
   };
 }
 
-function parsePostsInSection(section: string): CommentReply[] {
+function parsePostsInSection(section: string, emailDateStr: string): CommentReply[] {
   const posts: CommentReply[] = [];
 
   // Find all <h3> author headings followed by timestamp and text
@@ -330,7 +405,8 @@ function parsePostsInSection(section: string): CommentReply[] {
   while ((match = authorPattern.exec(section)) !== null) {
     const author = stripTags(match[1]).trim();
     const timeRaw = stripTags(match[2]).trim();
-    const time = timeRaw.replace(/^[•\s]+/, "").trim();
+    const time_str = timeRaw.replace(/^[•\s]+/, "").trim();
+    const time = parseCommentTime(time_str, emailDateStr);
     const rest = match[3];
 
     const isNew = rest.includes(">New<");
@@ -345,7 +421,7 @@ function parsePostsInSection(section: string): CommentReply[] {
     const avatarUrl = avatarMatch ? avatarMatch[1] : undefined;
 
     if (author && (text || rest.includes("font-weight:bold"))) {
-      posts.push({ author, time, text, isNew, avatarUrl });
+      posts.push({ author, time_str, ...(time ? { time } : {}), text, isNew, avatarUrl });
     }
   }
 
@@ -384,12 +460,16 @@ function parseSharingNotification(email: ParsedEmail): SharingNotification {
   const documentUrl = urlMatch ? decodeHtmlEntities(urlMatch[1]) : "";
   const documentId = extractDocIdFromUrl(documentUrl);
 
+  const sharingDateStr = headers.get("date") || "";
+  const sharingDateISO = headerDateToISO(sharingDateStr);
+
   return {
     type: "sharing",
     subject: headers.get("subject") || "",
     from: headers.get("from") || "",
     to: headers.get("to") || "",
-    date: headers.get("date") || "",
+    date_str: sharingDateStr,
+    ...(sharingDateISO ? { date: sharingDateISO } : {}),
     sharerName,
     sharerEmail,
     permission,

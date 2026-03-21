@@ -3,7 +3,8 @@
   "subject": "another doc",
   "from": "\"Jeff Shute (Google Docs)\" <comments-noreply@docs.google.com>",
   "to": "docreview.dave@gmail.com",
-  "date": "Tue, 10 Mar 2026 21:58:01 -0700",
+  "date_str": "Tue, 10 Mar 2026 21:58:01 -0700",
+  "date": "2026-03-11T04:58:01.000Z",
   "documentId": "117IKIeDuaMax6SGuwCp6cOtidbmXfT-GsCzJCNtf5xk",
   "documentTitle": "another doc",
   "documentUrl": "https://docs.google.com/document/d/117IKIeDuaMax6SGuwCp6cOtidbmXfT-GsCzJCNtf5xk/edit?disco=AAAB1mvjHho&usp=comment_email_document&ts=69b0f659&tab=t.0",
@@ -19,7 +20,8 @@
       "replies": [
         {
           "author": "Jeff Shute",
-          "time": "4:52 AM, Mar 11 (UTC)",
+          "time_str": "4:52 AM, Mar 11 (UTC)",
+          "time": "2026-03-11T04:52:00.000Z",
           "text": "assigning to you @docreview.dave@gmail.com can you see it?",
           "isNew": true,
           "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"

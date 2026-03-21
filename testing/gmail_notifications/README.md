@@ -21,7 +21,10 @@ Each example has two files:
 Current examples:
 - `comment_notification` — comment replies and suggestions on a shared doc
 - `comment_notification2` — multiple comment threads, @mentions, assigned comments, suggestion replies
+- `assigned_to_me_in_unshared_doc` — assigned comment on an unshared doc
+- `mentioned_me_in_unshared_doc` — @mention comment on an unshared doc
 - `invitation_to_edit` — sharing invitation with edit permission
+- `share_request` — access request from another user
 
 ## Adding a new example
 

@@ -3,7 +3,8 @@
   "subject": "shared doc from dave",
   "from": "\"Jeff Shute (Google Docs)\" <comments-noreply@docs.google.com>",
   "to": "docreview.dave@gmail.com",
-  "date": "Sat, 07 Mar 2026 10:42:27 -0800",
+  "date_str": "Sat, 07 Mar 2026 10:42:27 -0800",
+  "date": "2026-03-07T18:42:27.000Z",
   "documentId": "1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk",
   "documentTitle": "shared doc from dave",
   "documentUrl": "https://docs.google.com/document/d/1Ah8scE1myNXdXIJKHTAULZueEZrqjZ527sjvvJiKQvk/edit?usp=comment_email_document&ts=69ac7193&tab=t.0",
@@ -19,21 +20,24 @@
       "replies": [
         {
           "author": "Jeff Shute",
-          "time": "6:34 PM, Mar 7 (UTC)",
+          "time_str": "6:34 PM, Mar 7 (UTC)",
+          "time": "2026-03-07T18:34:00.000Z",
           "text": "hello",
           "isNew": false,
           "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
         },
         {
           "author": "Dave",
-          "time": "6:36 PM, Mar 7 (UTC)",
+          "time_str": "6:36 PM, Mar 7 (UTC)",
+          "time": "2026-03-07T18:36:00.000Z",
           "text": "abc",
           "isNew": false,
           "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocIqvyihLhlu7EAe6OmyCV7RO2oyNqECfq3phRYNw2oiTFJqEw=s50-c-k-no"
         },
         {
           "author": "Jeff Shute",
-          "time": "6:37 PM, Mar 7 (UTC)",
+          "time_str": "6:37 PM, Mar 7 (UTC)",
+          "time": "2026-03-07T18:37:00.000Z",
           "text": "def",
           "isNew": true,
           "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
@@ -44,7 +48,8 @@
   "suggestions": [
     {
       "author": "Jeff Shute",
-      "time": "6:35 PM, Mar 7 (UTC)",
+      "time_str": "6:35 PM, Mar 7 (UTC)",
+      "time": "2026-03-07T18:35:00.000Z",
       "action": "Delete",
       "text": "“Aewg”",
       "isNew": true,
@@ -55,7 +60,8 @@
     },
     {
       "author": "Jeff Shute",
-      "time": "6:36 PM, Mar 7 (UTC)",
+      "time_str": "6:36 PM, Mar 7 (UTC)",
+      "time": "2026-03-07T18:36:00.000Z",
       "action": "Add",
       "text": "“ddd”",
       "isNew": true,
@@ -66,7 +72,8 @@
     },
     {
       "author": "Jeff Shute",
-      "time": "6:36 PM, Mar 7 (UTC)",
+      "time_str": "6:36 PM, Mar 7 (UTC)",
+      "time": "2026-03-07T18:36:00.000Z",
       "action": "Replace",
       "text": "“Ga” → “gew”",
       "oldText": "“Ga”",

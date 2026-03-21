@@ -232,4 +232,5 @@ The parser (`src/lib/parse-gmail-notification.ts`) works as follows:
 
 - `CommentNotification` — has `comments: CommentThread[]` and `suggestions: Suggestion[]`
 - `SharingNotification` — has `sharerName`, `sharerEmail`, `permission`
-- Both share common fields: `subject`, `from`, `to`, `date`, `documentTitle`, `documentUrl`, `documentId`
+- Both share common fields: `subject`, `from`, `to`, `date_str`, `date` (ISO 8601, optional), `documentTitle`, `documentUrl`, `documentId`
+- `CommentReply` and `Suggestion` have `time_str` (original formatted string) and `time` (ISO 8601, optional — only set when the English-locale format can be parsed)

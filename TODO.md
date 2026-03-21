@@ -107,6 +107,7 @@ Easy:
   * should be able to get current doc text (it only gives the original text)
   * should give current anchor location or unanchored state (it only has original location)
   * should have a way to get emoji reactions on comments
+  * should have a way to set assigneeEmailAddress from the API
 
 ## Possible V2 features
 * build doc veiwer and diff viewer, take over from doc's lame differ
@@ -114,3 +115,4 @@ Easy:
 * plugin model so we can support other doc&comments backends
   * code reviews too?
 * support other non-docs documents - any readable URL?  other drive files with comments?
+* handle other locales / languages - some parsing code for emails, times and dates, etc, won't work right

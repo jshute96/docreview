@@ -3,7 +3,8 @@
   "subject": "agweewg",
   "from": "\"Jeff Shute (Google Docs)\" <comments-noreply@docs.google.com>",
   "to": "docreview.dave@gmail.com",
-  "date": "Tue, 10 Mar 2026 21:57:23 -0700",
+  "date_str": "Tue, 10 Mar 2026 21:57:23 -0700",
+  "date": "2026-03-11T04:57:23.000Z",
   "documentId": "1boLt1XKXiT6VxBUvx4hFn0xtWmCSUHepd_R7t494Il4",
   "documentTitle": "agweewg",
   "documentUrl": "https://docs.google.com/document/d/1boLt1XKXiT6VxBUvx4hFn0xtWmCSUHepd_R7t494Il4/edit?disco=AAAB1m1i3x8&usp=comment_email_document&ts=69b0f633&tab=t.0",
@@ -18,7 +19,8 @@
       "replies": [
         {
           "author": "Jeff Shute",
-          "time": "4:52 AM, Mar 11 (UTC)",
+          "time_str": "4:52 AM, Mar 11 (UTC)",
+          "time": "2026-03-11T04:52:00.000Z",
           "text": "hey @docreview.dave@gmail.com can you see this?",
           "isNew": true,
           "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"

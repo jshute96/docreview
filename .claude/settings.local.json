@@ -76,7 +76,8 @@
       "Bash(./scripts/extract-email-body.ts:*)",
       "Bash(npm ls:*)",
       "Bash(identify:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(gws schema:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
