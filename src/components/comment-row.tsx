@@ -448,7 +448,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         </div>
       )}
     </tr>
-    {hasContentRow && (
+    {hasContentRow && !expanded && !isExiting && (
       <tr
         className={`${rowBg}${expanded || isExiting ? "" : " border-b border-zinc-100"} ${rowCls}`}
         onClick={handleRowClick}
