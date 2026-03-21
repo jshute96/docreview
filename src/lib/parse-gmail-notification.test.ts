@@ -205,8 +205,28 @@ describe("parseCommentTime", () => {
     expect(parseCommentTime("12:30 PM, Mar 7 (UTC)", emailDate)).toBe("2026-03-07T12:30:00.000Z");
   });
 
-  it("returns undefined for non-UTC timezone", () => {
-    expect(parseCommentTime("6:34 PM, Mar 7 (PST)", emailDate)).toBeUndefined();
+  it("converts PST timezone to UTC", () => {
+    // 6:34 PM PST = 6:34 PM + 8 hours = 2:34 AM next day UTC
+    expect(parseCommentTime("6:34 PM, Mar 7 (PST)", emailDate)).toBe("2026-03-08T02:34:00.000Z");
+  });
+
+  it("converts EDT timezone to UTC", () => {
+    // 6:34 PM EDT = 6:34 PM + 4 hours = 10:34 PM UTC
+    expect(parseCommentTime("6:34 PM, Mar 7 (EDT)", emailDate)).toBe("2026-03-07T22:34:00.000Z");
+  });
+
+  it("converts GMT+5:30 timezone to UTC", () => {
+    // 6:34 PM GMT+5:30 = 6:34 PM - 5:30 = 1:04 PM UTC
+    expect(parseCommentTime("6:34 PM, Mar 7 (GMT+5:30)", emailDate)).toBe("2026-03-07T13:04:00.000Z");
+  });
+
+  it("converts GMT-8 timezone to UTC", () => {
+    // 6:34 PM GMT-8 = 6:34 PM + 8 = 2:34 AM next day UTC
+    expect(parseCommentTime("6:34 PM, Mar 7 (GMT-8)", emailDate)).toBe("2026-03-08T02:34:00.000Z");
+  });
+
+  it("returns undefined for unknown timezone abbreviation", () => {
+    expect(parseCommentTime("6:34 PM, Mar 7 (XYZ)", emailDate)).toBeUndefined();
   });
 
   it("returns undefined for non-English locale format", () => {

@@ -83,10 +83,10 @@ export async function syncComments(
         err.code === 403 &&
         err.message?.includes("permission to access the document suggestions")
       ) {
-        logWarning(`[Suggestions] permission denied for ${doc.googleDocId}`);
+        logWarning(`[Suggestions:Docs] permission denied for ${doc.googleDocId}`);
         suggestionPermissionDenied = true;
       } else {
-        logError(`[Suggestions] fetch failed for ${doc.googleDocId}:`, err);
+        logError(`[Suggestions:Docs] fetch failed for ${doc.googleDocId}:`, err);
         suggestionFetchFailed = true;
       }
     }
@@ -371,12 +371,26 @@ export async function syncComments(
   }
 
   // Docs API sync: ensures ALL pending suggestions are tracked.
-  const existingSuggestions = new Map(
-    (await prisma.comment.findMany({
-      where: { docId: doc.docId, type: "SUGGESTION" },
-      select: { commentId: true, googleSuggestionId: true, suggestionType: true, suggestionContentHash: true },
-    })).map((r) => [r.googleSuggestionId, r])
+  // Build lookup maps: by googleSuggestionId (primary) and by content hash (fallback
+  // for Gmail-first rows that don't have a googleSuggestionId yet).
+  const allExistingSuggestions = await prisma.comment.findMany({
+    where: { docId: doc.docId, type: "SUGGESTION" },
+    select: { commentId: true, googleSuggestionId: true, suggestionType: true, suggestionContentHash: true },
+  });
+  const byGoogleSuggestionId = new Map(
+    allExistingSuggestions
+      .filter((r) => r.googleSuggestionId)
+      .map((r) => [r.googleSuggestionId!, r])
   );
+  // Hash map: only include rows without a googleSuggestionId (Gmail-first rows).
+  // Rows with a googleSuggestionId are already found by the primary lookup.
+  const byContentHash = new Map<string, typeof allExistingSuggestions>();
+  for (const r of allExistingSuggestions) {
+    if (r.googleSuggestionId || !r.suggestionContentHash) continue;
+    const list = byContentHash.get(r.suggestionContentHash) ?? [];
+    list.push(r);
+    byContentHash.set(r.suggestionContentHash, list);
+  }
 
   const liveDocsIds = new Set<string>();
   const suggestionsToCreate: typeof toCreate = [];
@@ -384,7 +398,18 @@ export async function syncComments(
   for (const s of docsSuggestionsForSync) {
     liveDocsIds.add(s.id);
     const contentHash = computeSuggestionHash(s.suggestionType, s.deletedText, s.insertedText);
-    const existing = existingSuggestions.get(s.id);
+
+    // Primary lookup by suggestion ID, then fallback to unique content hash match
+    let existing = byGoogleSuggestionId.get(s.id) ?? null;
+    if (!existing) {
+      const hashCandidates = byContentHash.get(contentHash);
+      if (hashCandidates?.length === 1) {
+        existing = hashCandidates[0];
+      } else if (hashCandidates && hashCandidates.length > 1) {
+        logWarning(`[Suggestions:Docs] ${doc.googleDocId}: multiple hash matches for ${s.id} — inserting new row`);
+      }
+    }
+
     if (!existing) {
       suggestionsToCreate.push({
         docId: doc.docId,
@@ -401,13 +426,19 @@ export async function syncComments(
       if (doc.role === "AUTHOR") shouldUnarchive = true;
       hasNonResolveActivity = true;
     } else {
-      // Update suggestionType and/or hash if changed
+      // Update fields that may have changed or been missing (e.g., Gmail-first row
+      // that needs googleSuggestionId filled in by Drive sync)
+      const needsSuggestionId = !existing.googleSuggestionId;
       const typeChanged = existing.suggestionType !== s.suggestionType;
       const hashChanged = existing.suggestionContentHash !== contentHash;
-      if (typeChanged || hashChanged) {
+      if (needsSuggestionId) {
+        logInfo(`[Suggestions:Docs] ${doc.googleDocId}: adopted Gmail-first row ${existing.commentId} → ${s.id}`);
+      }
+      if (needsSuggestionId || typeChanged || hashChanged) {
         await prisma.comment.update({
           where: { commentId: existing.commentId },
           data: {
+            ...(needsSuggestionId ? { googleSuggestionId: s.id } : {}),
             ...(typeChanged ? { suggestionType: s.suggestionType } : {}),
             ...(hashChanged ? { suggestionContentHash: contentHash } : {}),
           },

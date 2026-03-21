@@ -191,6 +191,7 @@ This is how to verify the parser captures everything from an email:
    - Missing or mangled text (word boundaries lost at HTML tags)
    - Missing fields (assignments, mentions not preserved)
    - Missing reply threads (especially on suggestions)
+   - **Parsed dates/times**: Dates and times should be captured in raw and parsed form, like `date_str` and `date`.  If a raw `_str` field exists but the parsed form doesn't, that means parsing that input failed, and the parser needs to be updated.  Also verify the parsed value is correct (e.g., "8:47 AM, Feb 23 (PST)" → "2026-02-23T16:47:00.000Z").
 
 ---
 

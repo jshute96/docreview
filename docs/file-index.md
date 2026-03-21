@@ -197,8 +197,9 @@ Shadcn/ui components:
 | `gmail-parse.ts` | Gmail message parsing helpers — `parseShareNote` extracts sharer name/email/date/message from share notification emails; `extractShareMessage` structurally parses plaintext body (language-independent); `extractBodyText` decodes MIME payload; `extractDocId` finds doc IDs in email text |
 | `refresh.ts` | Combined refresh engine — `executeRefresh(userId, email, sources)` runs parallel Drive+Gmail discovery; `executeFullRefresh(userId, email)` and `refreshSelectedDocs(userId, email, docIds)` run exhaustive syncs via shared `refreshGoogleDocIds` helper |
 | `auth-utils.ts` | Centralized authentication helpers for Server Components and API routes |
-| `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates/deletes DB records, computes unarchive signals, stores suggestion content hashes |
+| `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates/deletes DB records, computes unarchive signals, stores suggestion content hashes; falls back to content hash lookup for Gmail-first suggestion rows |
 | `suggestion-hash.ts` | Content hash for suggestions — SHA-256 of normalized action type + deleted/inserted text, used for cross-source matching (Docs API ↔ Gmail) |
+| `suggestion-merge.ts` | Merges suggestion data from Gmail notifications into DB — matches by content hash, fills in `googleCommentId` and `replyCount`, or inserts new rows if Gmail arrives first |
 | `extension-bridge.ts` | Client-side bridge for communicating with the Chrome extension — handles pinging and URL resolution requests |
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
 | `doc-filters.ts` | Client-side doc filtering (tri-state logic for inbox/comments/author/starred/mimeType/labels/title regex) and sorting; accepts optional cached titles map for when `doc.title` is empty |

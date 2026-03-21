@@ -10,7 +10,7 @@ import type { OnProgress } from "./progress-events";
 export interface GmailDocIdResult {
   docIds: string[];
   shareNotes: Map<string, string>;
-  emailMeta: Map<string, ParsedEmail>;
+  emailMeta: Map<string, ParsedEmail[]>;
   errorCount: number;
 }
 
@@ -82,7 +82,7 @@ export async function scanGmailForDocIds(
 
   if (messageIds.length === 0) {
     logInfo("[Gmail] No notification emails found");
-    return { docIds: [], shareNotes: new Map(), emailMeta: new Map(), errorCount: 0 };
+    return { docIds: [], shareNotes: new Map(), emailMeta: new Map<string, ParsedEmail[]>(), errorCount: 0 };
   }
 
   const total = messageIds.length;
@@ -92,7 +92,7 @@ export async function scanGmailForDocIds(
   let errorCount = 0;
   const docIdSet = new Set<string>();
   const shareNotes = new Map<string, string>();
-  const emailMeta = new Map<string, ParsedEmail>();
+  const emailMeta = new Map<string, ParsedEmail[]>();
 
   let processedCount = 0;
   onProgress?.(0, total);
@@ -137,17 +137,21 @@ export async function scanGmailForDocIds(
           logInfo(`[Gmail] ${messageId} → doc ${docId} (${Date.now() - t0}ms)`);
           docIdSet.add(docId);
 
-          // Capture parsed email for use if Drive API fails
-          if (!emailMeta.has(docId)) {
-            const headerMap = new Map<string, string>();
-            for (const h of headers) {
-              if (h.name && h.value) headerMap.set(h.name.toLowerCase(), h.value);
-            }
-            emailMeta.set(docId, {
-              headers: headerMap,
-              textBody: body ?? "",
-              htmlBody: extractHtmlBody(res.data.payload) ?? "",
-            });
+          // Capture parsed email for inaccessible doc fallback and suggestion merging
+          const headerMap = new Map<string, string>();
+          for (const h of headers) {
+            if (h.name && h.value) headerMap.set(h.name.toLowerCase(), h.value);
+          }
+          const parsed: ParsedEmail = {
+            headers: headerMap,
+            textBody: body ?? "",
+            htmlBody: extractHtmlBody(res.data.payload) ?? "",
+          };
+          const existing = emailMeta.get(docId);
+          if (existing) {
+            existing.push(parsed);
+          } else {
+            emailMeta.set(docId, [parsed]);
           }
 
           // Extract share note from sharing emails (not comment notifications)
@@ -183,12 +187,13 @@ export async function scanGmailForDocIds(
  */
 export function buildInaccessibleDocs(
   failedDocIds: string[],
-  emailMeta: Map<string, ParsedEmail>,
+  emailMeta: Map<string, ParsedEmail[]>,
   accessState: "NOT_FOUND" | "DENIED" = "NOT_FOUND",
 ): GmailInaccessibleDoc[] {
   const results: GmailInaccessibleDoc[] = [];
   for (const docId of failedDocIds) {
-    const email = emailMeta.get(docId);
+    const emails = emailMeta.get(docId);
+    const email = emails?.[0];
     if (!email) continue;
     try {
       const stateLabel = accessState === "DENIED" ? "permission denied" : "not found";

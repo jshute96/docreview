@@ -211,6 +211,59 @@ const MONTH_MAP: Record<string, number> = {
 };
 
 /**
+ * Build a timezone abbreviation → UTC offset (minutes) map from the Intl API.
+ * We sample all IANA timezones at two dates (winter and summer) to capture both
+ * standard and daylight-saving abbreviations. For ambiguous abbreviations (e.g.
+ * CST = US Central vs China), the first one wins — but since Google Docs uses
+ * en-US locale formatting, US interpretations naturally come first.
+ */
+function buildTzOffsetMap(): Record<string, number> {
+  const map: Record<string, number> = { UTC: 0 };
+  const sampleDates = [
+    new Date("2026-01-15T12:00:00Z"), // northern winter
+    new Date("2026-07-15T12:00:00Z"), // northern summer
+  ];
+  for (const date of sampleDates) {
+    const utcStr = date.toLocaleString("en-US", { timeZone: "UTC" });
+    const utcMs = new Date(utcStr).getTime();
+    for (const tz of Intl.supportedValuesOf("timeZone")) {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        timeZoneName: "short",
+      }).formatToParts(date);
+      const abbr = parts.find((p) => p.type === "timeZoneName")?.value;
+      if (!abbr || abbr in map) continue;
+      const localStr = date.toLocaleString("en-US", { timeZone: tz });
+      const localMs = new Date(localStr).getTime();
+      map[abbr] = (localMs - utcMs) / 60000;
+    }
+  }
+  return map;
+}
+
+const TZ_OFFSETS = buildTzOffsetMap();
+
+/**
+ * Parse a timezone string into a UTC offset in minutes.
+ * Handles both abbreviations (PST, EDT) via the Intl-derived map and
+ * GMT±N / GMT±N:MM format strings that Intl produces for most non-US zones.
+ */
+export function parseTzOffset(tz: string): number | undefined {
+  if (tz in TZ_OFFSETS) return TZ_OFFSETS[tz];
+
+  // Handle "GMT+5:30", "GMT-8", "GMT+10", etc.
+  const gmtMatch = tz.match(/^GMT([+-])(\d{1,2})(?::(\d{2}))?$/);
+  if (gmtMatch) {
+    const sign = gmtMatch[1] === "+" ? 1 : -1;
+    const hrs = parseInt(gmtMatch[2], 10);
+    const mins = gmtMatch[3] ? parseInt(gmtMatch[3], 10) : 0;
+    return sign * (hrs * 60 + mins);
+  }
+
+  return undefined;
+}
+
+/**
  * Parse a Google-formatted comment time string like "6:34 PM, Mar 7 (UTC)"
  * into an ISO 8601 timestamp. The year is inferred from the email's Date header.
  *
@@ -236,9 +289,8 @@ export function parseCommentTime(timeStr: string, emailDateStr: string): string 
   const day = parseInt(m[5], 10);
   const tz = m[6];
 
-  // We can only reliably convert UTC times — if Google shows a different
-  // timezone, we'd need an offset table to convert correctly.
-  if (tz !== "UTC") return undefined;
+  const offsetMinutes = parseTzOffset(tz);
+  if (offsetMinutes === undefined) return undefined;
 
   // Convert 12-hour to 24-hour
   if (ampm === "AM" && hours === 12) hours = 0;
@@ -252,8 +304,10 @@ export function parseCommentTime(timeStr: string, emailDateStr: string): string 
   if (isNaN(emailDate.getTime())) return undefined;
   const year = emailDate.getUTCFullYear();
 
-  // Build the date in UTC (Google shows comment times in UTC)
+  // Build the date in the given timezone, then convert to UTC
   const dt = new Date(Date.UTC(year, month, day, hours, minutes, 0));
+  // Subtract the offset to convert local time → UTC
+  dt.setUTCMinutes(dt.getUTCMinutes() - offsetMinutes);
   if (isNaN(dt.getTime())) return undefined;
 
   return dt.toISOString();

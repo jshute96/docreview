@@ -11,6 +11,7 @@ import {
 import { scanGmailForDocIds, buildInaccessibleDocs, type GmailInaccessibleDoc } from "@/lib/gmail";
 import type { ParsedEmail } from "@/lib/parse-gmail-notification";
 import { syncComments } from "@/lib/sync-comments";
+import { mergeSuggestionsFromGmail } from "@/lib/suggestion-merge";
 import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "@/lib/status";
 import { logWarning, logInfo } from "@/lib/log";
 import { appendNotes, formatDate, pluralize } from "@/lib/utils";
@@ -54,12 +55,13 @@ export async function upsertDocsAndSyncComments(
     existingDocIds: Set<string>;
     fromGmailDocIdSet?: Set<string>;
     shareNotes?: Map<string, string>;
+    gmailEmailMeta?: Map<string, ParsedEmail[]>;
     mode?: "refresh" | "full-refresh" | "selected" | "load";
     docId?: string; // Optional: restrict upsert to a specific docId (for single-doc refresh)
   },
   onProgress?: OnProgress,
 ): Promise<RefreshResult> {
-  const { existingDocIds, fromGmailDocIdSet = new Set(), shareNotes, mode = "refresh", docId } = options;
+  const { existingDocIds, fromGmailDocIdSet = new Set(), shareNotes, gmailEmailMeta, mode = "refresh", docId } = options;
   const driveAuth = await getDriveClient(userId);
 
   let added = 0;
@@ -158,6 +160,18 @@ export async function upsertDocsAndSyncComments(
   const syncResults = await Promise.all(
     processedDocs.map((doc) => parallelismLimit(async () => {
       const result = await syncComments(doc, driveAuth, userEmail);
+      // Merge suggestion data from Gmail notifications (if available for this doc).
+      // Runs after syncComments so Drive-created suggestions with content hashes
+      // are in the DB for hash matching. If Gmail arrived first, inserts new rows.
+      // Process all emails for this doc (there may be multiple notifications).
+      const emails = gmailEmailMeta?.get(doc.googleDocId);
+      if (emails) {
+        for (const email of emails) {
+          const mergeResult = await mergeSuggestionsFromGmail(doc.docId, doc.googleDocId, email);
+          result.suggestionsCreated += mergeResult.inserted;
+          result.suggestionsUpdated += mergeResult.merged;
+        }
+      }
       // Apply DB updates immediately so partial progress is visible on page reload
       if (result.isDeleted) {
         await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "NOT_FOUND" } });
@@ -421,7 +435,7 @@ export async function executeRefresh(
 
   let gmailDocIds: string[] = [];
   let gmailShareNotes = new Map<string, string>();
-  let gmailEmailMeta = new Map<string, ParsedEmail>();
+  let gmailEmailMeta = new Map<string, ParsedEmail[]>();
   let gmailErrorCount = 0;
   let gmailSucceeded = false;
 
@@ -564,7 +578,7 @@ export async function executeRefresh(
     userId,
     userEmail,
     allDiscoveryDocs,
-    { existingDocIds, fromGmailDocIdSet: gmailDocIdSet, shareNotes: gmailShareNotes, mode: "refresh" },
+    { existingDocIds, fromGmailDocIdSet: gmailDocIdSet, shareNotes: gmailShareNotes, gmailEmailMeta, mode: "refresh" },
     onProgress,
   );
 

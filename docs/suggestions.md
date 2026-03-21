@@ -65,6 +65,97 @@ Comments use only `googleCommentId` (Drive comment ID). Both fields have unique 
 with `docId`. PostgreSQL treats NULLs as distinct in unique constraints, so NULL values
 in either field don't conflict.
 
+## Cross-Source Merge (Docs API + Gmail)
+
+Suggestion data comes from two sources with different strengths. A content hash
+(`suggestionContentHash`) enables matching across them.
+
+### Column sources and merge rules
+
+| Column | Docs API (Drive sync) | Gmail notification | Merge rule |
+|--------|----------------------|-------------------|------------|
+| `googleSuggestionId` | `suggest.xxx` | — | Drive only |
+| `googleCommentId` | — | `discussionId` (AAA*) | Gmail only |
+| `suggestionContentHash` | computed from text | computed from text | Either (should match) |
+| `type` | SUGGESTION | SUGGESTION | Either |
+| `suggestionType` | INSERT/DELETE/EDIT | mappable from Add/Delete/Replace | Either |
+| `resolved` | lifecycle (false→true) | — | Drive authoritative |
+| `driveCreatedAt` | `doc.lastModifiedInDrive` (approx) | `time` (minute precision) | Gmail preferred (more accurate) |
+| `driveModifiedAt` | null | — | null |
+| `replyCount` | 0 (always) | `replies.length` | Gmail (Drive has no data) |
+| `isThreadAuthor` | false | — | false |
+| `isReplyAuthor` | false | — | false |
+| `mentionedMe` | false | — | false |
+
+**Future:** `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, and `resolved` could
+potentially be derived from parsed Gmail notifications but are left for later.
+
+### Merge scenarios
+
+**Drive syncs first (typical):** Creates row with `googleSuggestionId` + content hash.
+Gmail merge later finds by content hash, fills in `googleCommentId`, `replyCount`, and
+overwrites `driveCreatedAt` with the Gmail notification timestamp (more accurate than
+Drive's `doc.lastModifiedInDrive` approximation).
+
+**Gmail arrives first:** Inserts row with `googleCommentId`, content hash, `suggestionType`,
+`driveCreatedAt` from Gmail time, and `replyCount`. Drive sync later finds by content hash
+and fills in `googleSuggestionId`. The Gmail timestamp is preserved as `driveCreatedAt`.
+
+**No unique hash match:** If content hash matches zero or multiple rows, Drive sync inserts
+a new record. This may create duplicates for the same suggestion — see below.
+
+### Resolution and cleanup
+
+When the Docs API is scanned, only pending (unresolved) suggestions appear in the document
+body. After upserting live suggestions, any suggestion row in the DB that is not in the
+live set is marked `resolved: true` and archived. The resolution check uses two criteria:
+
+- Rows with a `googleSuggestionId`: resolved if not in the live set (normal case)
+- Rows without a `googleSuggestionId` (Gmail-first rows): always resolved, since Drive
+  couldn't match them to a live suggestion
+
+This means Gmail-first rows that Drive can't correlate are self-correcting — they get
+resolved on the next Drive refresh.
+
+### Event ordering
+
+The merge is designed to reach a clean final state regardless of the order that Drive
+syncs and Gmail notifications arrive.
+
+**Drive first → resolved → Gmail arrives:** Drive creates the row. Next refresh resolves
+it (gone from doc). Gmail merge finds the resolved row by hash (hash lookup doesn't filter
+by resolved), merges in the comment ID. Final state: one resolved row with both IDs.
+
+**Gmail first → Drive matches:** Gmail inserts a row. Drive sync finds it by hash fallback,
+fills in `googleSuggestionId`. Resolution check sees the ID in the live set — not resolved.
+When the suggestion is later accepted, the next refresh resolves it normally. Clean.
+
+**Gmail first → suggestion already resolved before Drive syncs:** Gmail inserts a row
+with `resolved: false`. Drive sync doesn't find the suggestion in the doc, so the hash
+lookup is never attempted. Resolution check: no `googleSuggestionId` → resolved. Clean
+after one refresh.
+
+### Hash mismatch scenarios
+
+If text normalization differences prevent a hash match, duplicate rows can occur.
+All cases self-correct:
+
+**Drive first, Gmail can't match:** Drive row A has `googleSuggestionId`. Gmail inserts
+row B with `googleCommentId` and a different hash. Next refresh: row B has no
+`googleSuggestionId` → resolved and archived. Row A remains the live record. If the
+suggestion is later accepted, row A is also resolved. Both rows end up resolved.
+
+**Gmail first, Drive can't match:** Gmail inserts row B. Drive creates row A with
+`googleSuggestionId`. Resolution check resolves row B (no `googleSuggestionId`). Same
+outcome as above.
+
+**Consequence of hash mismatch:** The Drive row never gets a `googleCommentId`, so it
+won't have a `?disco=` deep link. This is inherent — we can't merge what we can't
+correlate. The user may briefly see a duplicate suggestion in INBOX, but it disappears
+after the next refresh when the unmatched row is resolved.
+
+---
+
 ## Disco URLs (Jumping to a Suggestion)
 
 Google Docs supports `?disco={id}` to open the doc and jump directly to a comment or

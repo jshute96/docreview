@@ -65,6 +65,9 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
 
   // The thread/suggestion API identifier — googleCommentId for comments, googleSuggestionId for suggestions
   const threadId = (isSuggestion ? comment.googleSuggestionId : comment.googleCommentId) ?? "";
+  const hasDiscoLink = !!comment.googleCommentId;
+  const openLabel = hasDiscoLink ? "Open" : "Open doc";
+  const openTitle = hasDiscoLink ? "Open the document at this comment" : "Open the document";
 
   function commentUrl() {
     const url = new URL(driveUrl);
@@ -145,23 +148,6 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       }
     } catch {
       // Silent — background check
-    }
-  }
-
-  async function refreshSuggestion() {
-    setRefreshingThread(true);
-    try {
-      const res = await apiFetch(
-        `/api/docs/${docId}/threads?commentId=${threadId}`,
-        { method: "POST" }
-      );
-      if (!res.ok) throw new Error("Failed");
-      const data = await res.json();
-      onUpdate(data.comment);
-    } catch (err) {
-      if (!isAuthError(err)) toast.error("Failed to refresh suggestion");
-    } finally {
-      setRefreshingThread(false);
     }
   }
 
@@ -422,7 +408,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             variant="outline"
             size="sm"
             className="h-6 px-2 text-xs"
-            title="Open the document at this comment"
+            title={openTitle}
             asChild
           >
             <a href={commentUrl()} target="docreview-doc">
@@ -510,21 +496,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
               {isSuggestion ? (
                 <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
                   <div className="float-right relative z-10 flex gap-1 ml-2 mb-1">
-                    <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Open the document at this comment" asChild>
+                    <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title={openTitle} asChild>
                       <a href={commentUrl()} target="docreview-doc">
-                        Open
+                        {openLabel}
                       </a>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-6 px-2 text-xs"
-                      title="Refresh this thread"
-                      onClick={refreshSuggestion}
-                      disabled={refreshingThread}
-                    >
-                      <RefreshCw className={`h-3 w-3 mr-1 ${refreshingThread ? "animate-spin" : ""}`} />
-                      Refresh
                     </Button>
                   </div>
                   {suggestionContent && (

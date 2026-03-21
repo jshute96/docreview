@@ -1,0 +1,33 @@
+{
+  "type": "comment",
+  "subject": "Shared from home 1 - added comment from work",
+  "from": "\"Jeff Shute (Google Docs)\" <comments-noreply@docs.google.com>",
+  "to": "jshute@gmail.com",
+  "date_str": "Mon, 23 Feb 2026 08:57:42 -0800",
+  "date": "2026-02-23T16:57:42.000Z",
+  "documentId": "1xMvTIcXaNHyf2HQlKU8lBYhmZ-RJMh7Db-rWgVsgUZk",
+  "documentTitle": "Shared from home 1",
+  "documentUrl": "https://docs.google.com/document/d/1xMvTIcXaNHyf2HQlKU8lBYhmZ-RJMh7Db-rWgVsgUZk/edit?disco=AAABzm2gN3U&usp=comment_email_document&ts=699c8706&tab=t.0",
+  "xDocumentId": "xDgAAACeXFbFAKkfYES60nz3DMy3j43FTKeTohQ",
+  "feedbackId": "MailTypeComment:EditorsNotification",
+  "recipientUserId": "109150937150093658149",
+  "comments": [
+    {
+      "quotedText": "Test",
+      "discussionId": "AAABzm2gN3U",
+      "openUrl": "https://docs.google.com/document/d/1xMvTIcXaNHyf2HQlKU8lBYhmZ-RJMh7Db-rWgVsgUZk/edit?disco=AAABzm2gN3U&usp=comment_email_discussion&ts=699c8706&usp_dm=false",
+      "replyTo": "",
+      "replies": [
+        {
+          "author": "Jeff Shute",
+          "time_str": "8:47 AM, Feb 23 (PST)",
+          "time": "2026-02-23T16:47:00.000Z",
+          "text": "added comment from work",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjXaJwPby7coKCGOD7JVqaxWTkdajIbsukHGacPuCCeA3OkJAzw=s50-c-k-no"
+        }
+      ]
+    }
+  ],
+  "suggestions": []
+}
