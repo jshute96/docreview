@@ -293,7 +293,7 @@ describe("POST /api/docs/[docId]/threads", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
-      commentId: "cr1", docId: "d1", googleCommentId: "suggest.abc",
+      commentId: "cr1", docId: "d1", googleSuggestionId: "suggest.abc",
       type: "SUGGESTION", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
@@ -317,13 +317,13 @@ describe("POST /api/docs/[docId]/threads", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
-      commentId: "cr1", docId: "d1", googleCommentId: "suggest.abc",
+      commentId: "cr1", docId: "d1", googleSuggestionId: "suggest.abc",
       type: "SUGGESTION", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
     mockFetchSuggestions.mockResolvedValue([
-      { id: "suggest.abc", suggestionType: "EDIT" },
+      { id: "suggest.abc", suggestionType: "EDIT", insertedText: "new", deletedText: "old" },
     ]);
 
     const req = new NextRequest(
@@ -340,7 +340,7 @@ describe("POST /api/docs/[docId]/threads", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
-      commentId: "cr1", docId: "d1", googleCommentId: "suggest.abc",
+      commentId: "cr1", docId: "d1", googleSuggestionId: "suggest.abc",
       type: "SUGGESTION", status: "MUTED", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
@@ -366,7 +366,7 @@ describe("POST /api/docs/[docId]/threads", () => {
       mimeType: "application/vnd.google-apps.spreadsheet",
     });
     const commentRecord = {
-      commentId: "cr1", docId: "d1", googleCommentId: "suggest.abc",
+      commentId: "cr1", docId: "d1", googleSuggestionId: "suggest.abc",
       type: "SUGGESTION", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);

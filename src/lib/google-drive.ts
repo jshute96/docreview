@@ -292,6 +292,8 @@ export async function fetchComments(
 export interface DriveSuggestion {
   id: string;
   suggestionType: "INSERT" | "DELETE" | "EDIT";
+  insertedText: string;
+  deletedText: string;
 }
 
 export interface SuggestionContent {
@@ -299,8 +301,14 @@ export interface SuggestionContent {
   deletedText: string;
 }
 
-// Walks a Docs document body and extracts all pending suggestions.
-// Returns metadata only (no text content) — use fetchDocContent for display text.
+// Walks a Docs document body and extracts all pending suggestions with their text.
+// With SUGGESTIONS_INLINE, the Docs API returns the document body with suggestion
+// edits inlined as annotated text runs. Each text run can carry suggestedInsertionIds
+// (text this suggestion would add) and/or suggestedDeletionIds (text it would remove).
+// A suggestion that replaces text appears as two runs: one deletion + one insertion
+// with the same suggest.xxx ID. We walk all runs, accumulate inserted/deleted text
+// per suggestion ID, then classify each as INSERT, DELETE, or EDIT based on which
+// sets it appears in.
 export async function fetchSuggestions(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string
@@ -312,26 +320,37 @@ export async function fetchSuggestions(
     docs.documents.get({
       documentId: googleDocId,
       suggestionsViewMode: "SUGGESTIONS_INLINE",
-      fields: "body(content(paragraph(elements(textRun(suggestedInsertionIds,suggestedDeletionIds)))))",
+      fields: "body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds)))))",
     }),
     `[Docs] documents.get ${googleDocId} (suggestions)`
   );
   const elapsed = Date.now() - t0;
 
+  // Track which suggestion IDs appear as insertions vs deletions, and accumulate
+  // the text content for each. A single suggestion may span multiple text runs
+  // (e.g., a multi-word edit), so we concatenate text across runs for each ID.
   const insertionIds = new Set<string>();
   const deletionIds = new Set<string>();
+  const insertions: Record<string, string> = {};
+  const deletions: Record<string, string> = {};
 
   for (const el of res.data.body?.content ?? []) {
     for (const pe of el.paragraph?.elements ?? []) {
-      for (const id of pe.textRun?.suggestedInsertionIds ?? []) {
+      const run = pe.textRun;
+      const text = run?.content?.replace(/\n$/, "") ?? "";
+      for (const id of run?.suggestedInsertionIds ?? []) {
         insertionIds.add(id);
+        if (text) insertions[id] = (insertions[id] ?? "") + text;
       }
-      for (const id of pe.textRun?.suggestedDeletionIds ?? []) {
+      for (const id of run?.suggestedDeletionIds ?? []) {
         deletionIds.add(id);
+        if (text) deletions[id] = (deletions[id] ?? "") + text;
       }
     }
   }
 
+  // Classify each suggestion: present in both sets = EDIT (replace),
+  // insertion only = INSERT, deletion only = DELETE.
   const allIds = new Set([...insertionIds, ...deletionIds]);
   const suggestions: DriveSuggestion[] = [];
 
@@ -341,6 +360,8 @@ export async function fetchSuggestions(
     suggestions.push({
       id,
       suggestionType: hasInsert && hasDelete ? "EDIT" : hasInsert ? "INSERT" : "DELETE",
+      insertedText: insertions[id] ?? "",
+      deletedText: deletions[id] ?? "",
     });
   }
 

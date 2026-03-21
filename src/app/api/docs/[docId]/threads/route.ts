@@ -81,8 +81,15 @@ export async function POST(
     return NextResponse.json({ error: "commentId required" }, { status: 400 });
   }
 
+  // Look up by googleCommentId (comments) or googleSuggestionId (suggestions)
   const commentRecord = await prisma.comment.findFirst({
-    where: { docId, googleCommentId: commentId },
+    where: {
+      docId,
+      OR: [
+        { googleCommentId: commentId },
+        { googleSuggestionId: commentId },
+      ],
+    },
   });
   if (!commentRecord) {
     return NextResponse.json({ error: "Comment not found" }, { status: 404 });
@@ -97,7 +104,7 @@ export async function POST(
         return NextResponse.json({ comment: commentRecord, threads: [] });
       }
       const liveSuggestions = await fetchSuggestions(driveAuth, doc.googleDocId);
-      const stillLive = liveSuggestions.some((s) => s.id === commentRecord.googleCommentId);
+      const stillLive = liveSuggestions.some((s) => s.id === commentRecord.googleSuggestionId);
 
       if (!stillLive && !commentRecord.resolved) {
         const updated = await prisma.comment.update({

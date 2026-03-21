@@ -40,8 +40,15 @@ export async function POST(
     return NextResponse.json({ error: "commentId required" }, { status: 400 });
   }
 
+  // Look up by googleCommentId (comments) or googleSuggestionId (suggestions)
   const commentRecord = await prisma.comment.findFirst({
-    where: { docId, googleCommentId: commentId },
+    where: {
+      docId,
+      OR: [
+        { googleCommentId: commentId },
+        { googleSuggestionId: commentId },
+      ],
+    },
   });
   if (!commentRecord) {
     return NextResponse.json({ error: "Comment not found" }, { status: 404 });

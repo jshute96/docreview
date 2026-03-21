@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { fetchComments, fetchSuggestions, getDriveClient } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
+import { computeSuggestionHash } from "@/lib/suggestion-hash";
 import type { Doc, Prisma } from "@prisma/client";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
@@ -305,7 +306,7 @@ export async function syncComments(
   // We don't store comment text, so there's nothing useful left to show.
   const driveCommentIds = new Set(comments.map((c) => c.id));
   const deletedIds = [...existingComments.values()]
-    .filter((c) => !driveCommentIds.has(c.googleCommentId))
+    .filter((c) => !c.googleCommentId || !driveCommentIds.has(c.googleCommentId))
     .map((c) => c.commentId);
   let deleted = 0;
   if (deletedIds.length > 0) {
@@ -373,8 +374,8 @@ export async function syncComments(
   const existingSuggestions = new Map(
     (await prisma.comment.findMany({
       where: { docId: doc.docId, type: "SUGGESTION" },
-      select: { commentId: true, googleCommentId: true, suggestionType: true },
-    })).map((r) => [r.googleCommentId, r])
+      select: { commentId: true, googleSuggestionId: true, suggestionType: true, suggestionContentHash: true },
+    })).map((r) => [r.googleSuggestionId, r])
   );
 
   const liveDocsIds = new Set<string>();
@@ -382,13 +383,15 @@ export async function syncComments(
   let suggestionsUpdated = 0;
   for (const s of docsSuggestionsForSync) {
     liveDocsIds.add(s.id);
+    const contentHash = computeSuggestionHash(s.suggestionType, s.deletedText, s.insertedText);
     const existing = existingSuggestions.get(s.id);
     if (!existing) {
       suggestionsToCreate.push({
         docId: doc.docId,
-        googleCommentId: s.id,
+        googleSuggestionId: s.id,
         type: "SUGGESTION",
         suggestionType: s.suggestionType,
+        suggestionContentHash: contentHash,
         resolved: false,
         status: "INBOX",
         driveCreatedAt: doc.lastModifiedInDrive ?? new Date(),
@@ -397,28 +400,33 @@ export async function syncComments(
       // isThreadAuthor=false and isReplyAuthor=false)
       if (doc.role === "AUTHOR") shouldUnarchive = true;
       hasNonResolveActivity = true;
-    } else if (existing.suggestionType !== s.suggestionType) {
-      await prisma.comment.update({
-        where: { commentId: existing.commentId },
-        data: { suggestionType: s.suggestionType },
-      });
-      suggestionsUpdated++;
+    } else {
+      // Update suggestionType and/or hash if changed
+      const typeChanged = existing.suggestionType !== s.suggestionType;
+      const hashChanged = existing.suggestionContentHash !== contentHash;
+      if (typeChanged || hashChanged) {
+        await prisma.comment.update({
+          where: { commentId: existing.commentId },
+          data: {
+            ...(typeChanged ? { suggestionType: s.suggestionType } : {}),
+            ...(hashChanged ? { suggestionContentHash: contentHash } : {}),
+          },
+        });
+        suggestionsUpdated++;
+      }
     }
   }
   if (suggestionsToCreate.length > 0) {
     await prisma.comment.createMany({ data: suggestionsToCreate });
   }
 
-  // Mark suggest.xxx suggestions no longer in the document as resolved.
+  // Mark suggestions no longer in the document as resolved.
   let suggestionsResolved = 0;
   const activeSuggestions = await prisma.comment.findMany({
     where: { docId: doc.docId, type: "SUGGESTION", resolved: false },
   });
   for (const s of activeSuggestions) {
-    // Drive API comment IDs starting with "AAAB" are system-generated anchors
-    // (e.g. bookmark or heading references), not user suggestions — skip them.
-    if (s.googleCommentId.startsWith("AAAB")) continue;
-    if (!liveDocsIds.has(s.googleCommentId)) {
+    if (!s.googleSuggestionId || !liveDocsIds.has(s.googleSuggestionId)) {
       await prisma.comment.update({
         where: { commentId: s.commentId },
         data: { resolved: true, status: s.status === "INBOX" ? "ARCHIVED" : s.status },

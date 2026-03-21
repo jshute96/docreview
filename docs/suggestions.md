@@ -41,8 +41,9 @@ Every Refresh calls `fetchSuggestions`, which calls `documents.get` with
 `suggestionsViewMode: "SUGGESTIONS_INLINE"` and walks the document body to collect all
 pending suggestion IDs (`suggest.xxx`). Each is upserted into the Comment table:
 
-- **Create** (new): `type: "SUGGESTION"`, `suggestionType` set, `resolved: false`,
-  `status: "INBOX"`. No timestamps — Docs API doesn't provide them.
+- **Create** (new): `type: "SUGGESTION"`, `googleSuggestionId` set to the `suggest.xxx` ID,
+  `suggestionType` set, `resolved: false`, `status: "INBOX"`. No timestamps — Docs API
+  doesn't provide them.
 - **Update** (existing): only `suggestionType` is updated (preserves user-set status).
 
 After upserting, any `suggest.xxx` records **no longer in the Docs API response** are
@@ -51,15 +52,27 @@ Docs API returns zero suggestions, so the last remaining suggestion is correctly
 
 ---
 
+## ID Split: googleSuggestionId vs googleCommentId
+
+Suggestions are stored with two separate ID fields:
+
+- **`googleSuggestionId`** — the Docs API ID (`suggest.xxx`), always set for suggestions.
+  Used for Docs API lookups and as the key for suggestion content maps.
+- **`googleCommentId`** — the Drive comment ID (`AAAB0xxx`), set when available (e.g.,
+  from Gmail notification merge). Used for `?disco=` deep links.
+
+Comments use only `googleCommentId` (Drive comment ID). Both fields have unique indexes
+with `docId`. PostgreSQL treats NULLs as distinct in unique constraints, so NULL values
+in either field don't conflict.
+
 ## Disco URLs (Jumping to a Suggestion)
 
 Google Docs supports `?disco={id}` to open the doc and jump directly to a comment or
 suggestion thread. The ID must be a Drive comment ID (`AAAB0xxx`).
 
-Since Docreview stores suggestions with their Docs API IDs (`suggest.xxx`), there is no
-working disco URL for them. Clicking a suggestion row opens the document but does not jump
-to the specific suggestion thread. The `?disco=suggest.xxx` parameter is silently ignored
-by Google Docs.
+When a suggestion has `googleCommentId` set (from Gmail notification merge), the Open
+button uses `?disco=` to jump directly to it. When only `googleSuggestionId` is available,
+the doc opens without `?disco=` — the user must scroll to find the suggestion.
 
 Clicking a row always opens the doc using `window.open` with a named window
 (`"docreview-comment-window"`) so repeated clicks reuse the same tab.
@@ -68,11 +81,11 @@ Clicking a row always opens the doc using `window.open` with a named window
 
 ## Limitations
 
-### No navigation to specific suggestion
+### Limited navigation to specific suggestion
 
-All suggestions are stored with `suggest.xxx` IDs (Docs API format). There is no
-`AAAB0xxx` Drive comment ID available, so `?disco=` navigation does not work. Clicking a
-suggestion row opens the doc but does not scroll to the suggestion.
+Suggestions only get `?disco=` navigation when `googleCommentId` is set (from Gmail
+notification merge). Without it, clicking a suggestion row opens the doc without scrolling
+to the suggestion.
 
 ### Approximate created timestamp
 
@@ -92,8 +105,8 @@ filters have no effect on suggestions.
 
 Suggestion text (inserted and deleted strings) is fetched on page load via `fetchDocContent`,
 which makes a single `documents.get` call with `SUGGESTIONS_INLINE` to extract both suggestion
-content and document body text. Results are keyed by `suggest.xxx` and display correctly for
-all suggestion records.
+content and document body text. Results are keyed by `suggest.xxx` (`googleSuggestionId`) and
+display correctly for all suggestion records.
 
 ### Permissions and View-Only Access
 

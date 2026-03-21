@@ -50,6 +50,12 @@ import { StarButton } from "@/components/star-button";
 import { LabelProvider } from "@/contexts/label-context";
 import { useCachedMetadata } from "@/hooks/use-cached-metadata";
 
+// Key for looking up thread/content/suggestion data — suggestions use googleSuggestionId,
+// comments use googleCommentId.
+function commentKey(c: Comment): string {
+  return (c.type === "SUGGESTION" ? c.googleSuggestionId : c.googleCommentId) ?? "";
+}
+
 interface DocDetailProps {
   doc: DocWithComments;
   allLabels: Label[];
@@ -147,8 +153,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
     return result;
   }, [threadMap]);
 
-  const handleThreadUpdate = useCallback((googleCommentId: string, thread: CommentThread) => {
-    setThreadMap((prev) => ({ ...prev, [googleCommentId]: thread }));
+  const handleThreadUpdate = useCallback((id: string, thread: CommentThread) => {
+    setThreadMap((prev) => ({ ...prev, [id]: thread }));
   }, []);
 
   async function fetchThreads(contextId?: string) {
@@ -540,10 +546,11 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
       if (!searchFilter) return true;
       // commentContent and threadText both derive from threadMap so the initial
       // comment text appears twice in the search string — harmless for matching.
-      const text = commentContent[c.googleCommentId] ?? "";
-      const sug = suggestionContent[c.googleCommentId];
+      const key = commentKey(c);
+      const text = commentContent[key] ?? "";
+      const sug = suggestionContent[key];
       const sugText = sug ? `${sug.deletedText} ${sug.insertedText}` : "";
-      const threads = threadText[c.googleCommentId] ?? "";
+      const threads = threadText[key] ?? "";
       const combined = `${text} ${sugText} ${threads}`;
       return matcher(combined);
     })
@@ -974,9 +981,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
                   comment={comment}
                   docId={doc.docId}
                   driveUrl={doc.driveUrl}
-                  content={comment.type === "COMMENT" ? commentContent[comment.googleCommentId] : undefined}
-                  suggestionContent={comment.type === "SUGGESTION" ? suggestionContent[comment.googleCommentId] : undefined}
-                  initialThread={comment.type === "COMMENT" ? threadMap[comment.googleCommentId] : undefined}
+                  content={comment.type === "COMMENT" ? commentContent[commentKey(comment)] : undefined}
+                  suggestionContent={comment.type === "SUGGESTION" ? suggestionContent[commentKey(comment)] : undefined}
+                  initialThread={comment.type === "COMMENT" ? threadMap[commentKey(comment)] : undefined}
                   onUpdate={handleCommentUpdate}
                   onThreadUpdate={handleThreadUpdate}
                   isExiting={exitingIds.has(comment.commentId)}

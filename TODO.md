@@ -8,17 +8,12 @@ P0:
 P1:
 * handle gmail notifications
   * share request emails - from me, to me
-  * suggestions - what can we capture?
-    * links with proper ID inside the doc?
-    * accept/reject links
-    * thread contents? (maybe)
   * requesting your review
 * testing
   * test scripts for playwright testing of all interactions
-* check: Can we get comment locations in the doc contents fetch? (to get current location and commented text.)
 * Rewrite help text content.  It's AI generated excepted the Getting Started page.
-* finish cleanup after taking titles out of the DB - rename column?
 * cache comments in the local DB
+* cache suggestion thread contents from gmail in the local DB
 
 Easy:
 * scroll bars for lots of docs
@@ -82,6 +77,7 @@ Easy:
     * nothing for images. for tables, seems to just give the top row.
     * we don't get clickable links in the view
 * *the quoted text we display for comments is always a snapshot from creation time*
+* other locales / languages - some parsing code for emails, times and dates, etc, won't work right
 
 ## consider later
 * we fetch all comments with full reply text when opening the comments page
@@ -90,6 +86,7 @@ Easy:
 * add a screen for labeling new docs that appeared during a refresh?
 * check and refine rules for detecting hasNewActivity on comment threads - reply count, change timestamp, etc.
 * embedded pgvector index for semantic search on docs, titles, comments
+* gmail notificaitons include a reply-to for adding replies to a suggestion by email. we could use that to allow adding replies (but not accept/reject).
 
 ## low priority
 * rename a label
@@ -115,4 +112,3 @@ Easy:
 * plugin model so we can support other doc&comments backends
   * code reviews too?
 * support other non-docs documents - any readable URL?  other drive files with comments?
-* handle other locales / languages - some parsing code for emails, times and dates, etc, won't work right

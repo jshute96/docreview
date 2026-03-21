@@ -63,16 +63,23 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     fetchedModifiedMs.current = modMs;
   }, [initialThread]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The thread/suggestion API identifier — googleCommentId for comments, googleSuggestionId for suggestions
+  const threadId = (isSuggestion ? comment.googleSuggestionId : comment.googleCommentId) ?? "";
+
   function commentUrl() {
     const url = new URL(driveUrl);
-    url.searchParams.set("disco", comment.googleCommentId);
+    // Only add disco= when we have a real Drive comment ID (AAA* format).
+    // Suggestion IDs (suggest.*) don't work with disco=.
+    if (comment.googleCommentId) {
+      url.searchParams.set("disco", comment.googleCommentId);
+    }
     return url.toString();
   }
 
   function applyThreadUpdate(data: { threads: CommentThread[]; comment: Comment }) {
     setThreads(data.threads);
     if (onThreadUpdate && data.threads.length > 0) {
-      onThreadUpdate(comment.googleCommentId, data.threads[0]);
+      onThreadUpdate(threadId, data.threads[0]);
     }
     onUpdate(data.comment);
     fetchedModifiedMs.current = data.comment.driveModifiedAt
@@ -84,12 +91,12 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   async function fetchThread() {
     setLoadingThreads(true);
     try {
-      const res = await apiFetch(`/api/docs/${docId}/threads?commentId=${comment.googleCommentId}`);
+      const res = await apiFetch(`/api/docs/${docId}/threads?commentId=${threadId}`);
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       setThreads(data.threads);
       if (onThreadUpdate && data.threads.length > 0) {
-        onThreadUpdate(comment.googleCommentId, data.threads[0]);
+        onThreadUpdate(threadId, data.threads[0]);
       }
       fetchedModifiedMs.current = currentModifiedMs;
     } catch (err) {
@@ -103,7 +110,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     setRefreshingThread(true);
     try {
       const res = await apiFetch(
-        `/api/docs/${docId}/threads?commentId=${comment.googleCommentId}`,
+        `/api/docs/${docId}/threads?commentId=${threadId}`,
         { method: "POST" }
       );
       if (!res.ok) throw new Error("Failed");
@@ -115,12 +122,13 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     }
   }
 
-  // Cheap background check: ask Drive for modifiedTime only, full refresh if changed
+  // Cheap background check: ask Drive for modifiedTime only, full refresh if changed.
+  // Only called for comments (not suggestions) — threadId is always a googleCommentId here.
   async function backgroundCheck() {
     const contextId = generateContextId();
     try {
       const res = await apiFetch(
-        `/api/docs/${docId}/threads?commentId=${comment.googleCommentId}&checkOnly=true`,
+        `/api/docs/${docId}/threads?commentId=${threadId}&checkOnly=true`,
         { contextId }
       );
       if (!res.ok) return;
@@ -129,7 +137,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       if (driveMs !== fetchedModifiedMs.current) {
         // Drive has newer data — do a full silent refresh
         const refreshRes = await apiFetch(
-          `/api/docs/${docId}/threads?commentId=${comment.googleCommentId}`,
+          `/api/docs/${docId}/threads?commentId=${threadId}`,
           { method: "POST", contextId }
         );
         if (!refreshRes.ok) return;
@@ -144,7 +152,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     setRefreshingThread(true);
     try {
       const res = await apiFetch(
-        `/api/docs/${docId}/threads?commentId=${comment.googleCommentId}`,
+        `/api/docs/${docId}/threads?commentId=${threadId}`,
         { method: "POST" }
       );
       if (!res.ok) throw new Error("Failed");
@@ -229,7 +237,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
 
   async function handleReply(content: string) {
     await postReply(
-      { commentId: comment.googleCommentId, content },
+      { commentId: threadId, content },
       "Failed to post reply",
       "Reply posted",
     );
@@ -237,7 +245,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
 
   async function handleResolve(content: string) {
     await postReply(
-      { commentId: comment.googleCommentId, content: content || undefined, resolve: true },
+      { commentId: threadId, content: content || undefined, resolve: true },
       "Failed to resolve comment",
       content ? "Replied and resolved" : "Comment resolved",
     );
@@ -245,7 +253,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
 
   async function handleReopen(content: string) {
     await postReply(
-      { commentId: comment.googleCommentId, content: content || "" },
+      { commentId: threadId, content: content || "" },
       "Failed to reopen comment",
       content ? "Replied and reopened" : "Comment reopened",
     );
@@ -253,7 +261,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
 
   async function handleReplyAndArchive(content: string) {
     await postReply(
-      { commentId: comment.googleCommentId, content },
+      { commentId: threadId, content },
       "Failed to post reply",
       "Reply posted",
     );

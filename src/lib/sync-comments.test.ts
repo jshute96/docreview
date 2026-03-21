@@ -281,7 +281,7 @@ describe("syncComments isInteresting logic", () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockFetchComments.mockResolvedValue([]);
     mockFetchSuggestions.mockResolvedValue([
-      { id: "suggest.abc", suggestionType: "EDIT" },
+      { id: "suggest.abc", suggestionType: "EDIT", insertedText: "new", deletedText: "old" },
     ]);
 
     const { shouldUnarchive, suggestionsCreated } = await syncComments(doc, driveAuth);
@@ -293,7 +293,7 @@ describe("syncComments isInteresting logic", () => {
     const doc = makeDoc({ role: "REVIEWER" });
     mockFetchComments.mockResolvedValue([]);
     mockFetchSuggestions.mockResolvedValue([
-      { id: "suggest.abc", suggestionType: "INSERT" },
+      { id: "suggest.abc", suggestionType: "INSERT", insertedText: "added text", deletedText: "" },
     ]);
 
     const { shouldUnarchive } = await syncComments(doc, driveAuth);
@@ -304,11 +304,11 @@ describe("syncComments isInteresting logic", () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockFetchComments.mockResolvedValue([]);
     mockFetchSuggestions.mockResolvedValue([
-      { id: "suggest.abc", suggestionType: "DELETE" },
+      { id: "suggest.abc", suggestionType: "DELETE", insertedText: "", deletedText: "removed text" },
     ]);
     mockComment.findMany
       .mockResolvedValueOnce([])  // batch fetch comments
-      .mockResolvedValueOnce([{ commentId: "cr1", googleCommentId: "suggest.abc", suggestionType: "DELETE" }]);
+      .mockResolvedValueOnce([{ commentId: "cr1", googleSuggestionId: "suggest.abc", suggestionType: "DELETE", suggestionContentHash: null }]);
 
     const { shouldUnarchive, suggestionsCreated } = await syncComments(doc, driveAuth);
     expect(suggestionsCreated).toBe(0);
@@ -742,7 +742,7 @@ describe("syncComments hasNonResolveActivity", () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockFetchComments.mockResolvedValue([]);
     mockFetchSuggestions.mockResolvedValue([
-      { id: "suggest.abc", suggestionType: "EDIT" },
+      { id: "suggest.abc", suggestionType: "EDIT", insertedText: "new", deletedText: "old" },
     ]);
 
     const { hasNonResolveActivity } = await syncComments(doc, driveAuth);
@@ -850,9 +850,9 @@ describe("syncComments suggestion resolution", () => {
     mockFetchSuggestions.mockResolvedValue([]); // suggestion disappeared
     mockComment.findMany
       .mockResolvedValueOnce([])                                                            // batch fetch comments
-      .mockResolvedValueOnce([{ commentId: "cr1", googleCommentId: "suggest.abc", suggestionType: "EDIT" }]) // existingSuggestions
+      .mockResolvedValueOnce([{ commentId: "cr1", googleSuggestionId: "suggest.abc", suggestionType: "EDIT", suggestionContentHash: null }]) // existingSuggestions
       .mockResolvedValueOnce([{                                                             // activeSuggestions
-        commentId: "cr1", googleCommentId: "suggest.abc", resolved: false, status: "INBOX",
+        commentId: "cr1", googleSuggestionId: "suggest.abc", resolved: false, status: "INBOX",
       }]);
 
     await syncComments(doc, driveAuth);
@@ -868,9 +868,9 @@ describe("syncComments suggestion resolution", () => {
     mockFetchSuggestions.mockResolvedValue([]);
     mockComment.findMany
       .mockResolvedValueOnce([])                                                            // batch fetch comments
-      .mockResolvedValueOnce([{ commentId: "cr1", googleCommentId: "suggest.abc", suggestionType: "EDIT" }])
+      .mockResolvedValueOnce([{ commentId: "cr1", googleSuggestionId: "suggest.abc", suggestionType: "EDIT", suggestionContentHash: null }])
       .mockResolvedValueOnce([{
-        commentId: "cr1", googleCommentId: "suggest.abc", resolved: false, status: "MUTED",
+        commentId: "cr1", googleSuggestionId: "suggest.abc", resolved: false, status: "MUTED",
       }]);
 
     await syncComments(doc, driveAuth);
@@ -889,7 +889,7 @@ describe("syncComments suggestion resolution", () => {
     expect(mockFetchSuggestions).not.toHaveBeenCalled();
   });
 
-  it("skips AAAB-prefixed IDs during suggestion resolution check", async () => {
+  it("resolves suggestion with null googleSuggestionId (legacy data)", async () => {
     const doc = makeDoc();
     mockFetchComments.mockResolvedValue([]);
     mockFetchSuggestions.mockResolvedValue([]);
@@ -897,13 +897,15 @@ describe("syncComments suggestion resolution", () => {
       .mockResolvedValueOnce([])  // batch fetch comments
       .mockResolvedValueOnce([])  // existingSuggestions
       .mockResolvedValueOnce([{
-        commentId: "cr1", googleCommentId: "AAAB0xyz", resolved: false, status: "INBOX",
+        commentId: "cr1", googleSuggestionId: null, resolved: false, status: "INBOX",
       }]);
 
     await syncComments(doc, driveAuth);
 
-    // The AAAB entry should be skipped — no update call
-    expect(mockComment.update).not.toHaveBeenCalled();
+    // Suggestion without googleSuggestionId should be resolved
+    const updateCall = mockComment.update.mock.calls[0][0];
+    expect(updateCall.data.resolved).toBe(true);
+    expect(updateCall.data.status).toBe("ARCHIVED");
   });
 });
 
