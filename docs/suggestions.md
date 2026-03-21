@@ -70,6 +70,17 @@ in either field don't conflict.
 Suggestion data comes from two sources with different strengths. A content hash
 (`suggestionContentHash`) enables matching across them.
 
+**Text Normalization:** To ensure the Docs API and Gmail hashes match, both strings are
+normalized before hashing: trimmed, converted to lowercase, and all whitespace sequences
+(including newlines) replaced by a single space.
+
+**Assembly Logic:** When collecting suggestion fragments from the Docs API, Docreview
+preserves structural newlines between fragments (e.g., when a suggestion spans multiple
+paragraphs). This ensures that normalized whitespace exists between these fragments in the
+final hash. Only the final trailing newline of the fully concatenated suggestion is
+stripped before storage.
+
+
 ### Column sources and merge rules
 
 | Column | Docs API (Drive sync) | Gmail notification | Merge rule |

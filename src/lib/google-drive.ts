@@ -337,7 +337,7 @@ export async function fetchSuggestions(
   for (const el of res.data.body?.content ?? []) {
     for (const pe of el.paragraph?.elements ?? []) {
       const run = pe.textRun;
-      const text = run?.content?.replace(/\n$/, "") ?? "";
+      const text = run?.content ?? "";
       for (const id of run?.suggestedInsertionIds ?? []) {
         insertionIds.add(id);
         if (text) insertions[id] = (insertions[id] ?? "") + text;
@@ -348,6 +348,9 @@ export async function fetchSuggestions(
       }
     }
   }
+
+  for (const id in insertions) insertions[id] = insertions[id].replace(/\n$/, "");
+  for (const id in deletions) deletions[id] = deletions[id].replace(/\n$/, "");
 
   // Classify each suggestion: present in both sets = EDIT (replace),
   // insertion only = INSERT, deletion only = DELETE.
@@ -440,9 +443,8 @@ export async function fetchDocContent(
       const run = pe.textRun;
       if (!run?.content) continue;
       textParts.push(run.content);
-      // Strip trailing newline that Docs API appends to paragraph-ending runs
-      const text = run.content.replace(/\n$/, "");
-      if (!text) continue;
+      const text = run.content;
+
       for (const id of run.suggestedInsertionIds ?? []) {
         insertions[id] = (insertions[id] ?? "") + text;
       }
@@ -453,6 +455,9 @@ export async function fetchDocContent(
   }
 
   const documentText = textParts.join("");
+  for (const id in insertions) insertions[id] = insertions[id].replace(/\n$/, "");
+  for (const id in deletions) deletions[id] = deletions[id].replace(/\n$/, "");
+
   const allIds = new Set([...Object.keys(insertions), ...Object.keys(deletions)]);
   const suggestions: Record<string, SuggestionContent> = {};
   for (const id of allIds) {
