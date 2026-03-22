@@ -7,12 +7,12 @@ import { contrastText } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // useTriStateCycle — slow-click-to-reset behavior
-// If >500ms has elapsed since the last click and the filter is active (include
+// If >1000ms has elapsed since the last click and the filter is active (include
 // or exclude), reset straight to "off" instead of cycling to the next state.
 // This prevents accidental cycling when the user just wants to turn it off.
 // ---------------------------------------------------------------------------
 
-const SLOW_CLICK_MS = 500;
+const SLOW_CLICK_MS = 1000;
 
 export function useTriStateCycle(value: TriState, onChange: (v: TriState) => void) {
   const lastClickRef = useRef(0);
