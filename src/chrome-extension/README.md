@@ -25,6 +25,13 @@ Click the Docreview icon in Chrome's toolbar to open the current page in Docrevi
 ### Shortened URL resolution
 When adding a document via a shortened link (e.g. `go/my-doc`), the server first attempts to follow the redirect itself. If the server can't resolve it (e.g. the shortener requires browser cookies for authentication), and the extension's redirect-link resolver is enabled, the extension resolves the redirect by opening the URL in a background tab (which has the user's cookies). If the redirect lands on a Google Docs URL, it's captured and used for validation. The background tab is closed automatically once the redirect completes or fails. This feature is disabled by default in the extension settings.
 
+### In-page comment navigation
+When viewing a document's comments in Docreview, clicking "Open" on a comment navigates to that comment in the Google Docs tab without reloading the page. The extension tracks which Chrome tab has each document open — the first click opens a new tab, and subsequent clicks reuse it. This works for both open and resolved comments:
+- **Open comments**: The extension injects a script that finds the comment in Google Docs' internal component tree by its disco ID and clicks it to scroll and highlight. The comments pane is closed for a clean view.
+- **Resolved comments**: The extension first opens the comments pane (to load resolved comments into the DOM), then navigates to the comment. The pane stays open so the resolved comment is visible.
+- **Suggestions without a disco ID**: The extension focuses the existing tab without scrolling.
+- **Fallback**: If the comment can't be found in the component tree (e.g. Google changed their code), falls back to a page reload with `?disco=` in the URL.
+
 ### Docreview app integration
 The extension is automatically detected by the Docreview web app via a ping/response handshake over `window.postMessage`. The `docreview-bridge.js` content script is dynamically registered for the configured `baseUrl` and relays messages between the web page and the background worker. Each page instance gets a unique `pageId` so that cancellation of in-flight resolves is scoped per tab.
 
@@ -66,7 +73,7 @@ The extension has four parts:
 
 **`content.js`** — Runs on Google Docs, Drive, and Gmail pages. Injects Docreview icons by manipulating the DOM. Uses MutationObservers to handle dynamically loaded content (Google Workspace apps load UI elements after the initial page load). Adapted from the bookmarklet in `src/bookmarklet/bookmarklet-source.js` with two key changes: the base URL comes from `chrome.storage.sync`, and the Gmail link resolves its target URL at click time rather than injection time (to handle Gmail's SPA navigation correctly).
 
-**`background.js`** — Service worker that handles toolbar clicks, context menu actions, and messages from content scripts. For Gmail, it uses `chrome.scripting.executeScript` with `allFrames: true` to search all frames (including sandboxed AMP iframes that content scripts can't access) for document URLs. Also handles `ping` (returns extension status), `resolveUrl` (opens a background tab to follow redirects), and `cancelResolve` (closes in-flight resolve tabs). Dynamically registers the `docreview-bridge.js` content script for the configured `baseUrl`.
+**`background.js`** — Service worker that handles toolbar clicks, context menu actions, and messages from content scripts. For Gmail, it uses `chrome.scripting.executeScript` with `allFrames: true` to search all frames (including sandboxed AMP iframes that content scripts can't access) for document URLs. Handles `ping` (returns extension status/version), `resolveUrl` (opens a background tab to follow redirects), `cancelResolve` (closes in-flight resolve tabs), and `navigateToComment` (tracks Google Docs tabs per document and injects navigation scripts via `executeScript` in MAIN world). Tab tracking is persisted in `chrome.storage.session` to survive MV3 service worker restarts. Dynamically registers the `docreview-bridge.js` content script for the configured `baseUrl`.
 
 **`docreview-bridge.js`** — Content script dynamically registered for Docreview app pages. Relays `window.postMessage` calls from the web app to the background worker via `chrome.runtime.sendMessage`, and posts responses back. Each page instance generates a unique `pageId` to scope cancellation. Runs in the content script's isolated world; communication with the page is via `postMessage` only.
 

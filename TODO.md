@@ -44,7 +44,7 @@ Easy:
 
 * chrome plugin
   * capture linked-from notes when requesting permission
-  * scroll to comments in the doc window without reloading
+  * scroll to comments in the doc window without reloading: done, but needs more testing and robustness against docs changes
 
 * sandbox test environment
 * snapshot database and simulated or recorded google APIs

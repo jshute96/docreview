@@ -92,3 +92,38 @@ export function resolveUrl(url: string): Promise<ResolveResult> {
 export function cancelResolve(): void {
   window.postMessage({ source: "docreview-page", id: ++messageId, type: "cancelResolve", fireAndForget: true }, "*");
 }
+
+interface NavigateResult {
+  success: boolean;
+  opened?: boolean;
+  fallback?: boolean;
+  error?: string;
+}
+
+/**
+ * Ask the extension to navigate to a specific comment in an already-open
+ * Google Docs tab. If the tab isn't open yet, the extension opens one with
+ * a disco= URL. Subsequent navigations inject a script that scrolls to the
+ * comment without reloading.
+ *
+ * Requires extension version >= 2.
+ */
+export function navigateToComment(
+  docId: string,
+  discoId: string,
+  docUrl: string,
+  resolved: boolean
+): Promise<NavigateResult> {
+  return sendExtensionMessage<NavigateResult>({
+    type: "navigateToComment",
+    docId,
+    discoId,
+    docUrl,
+    resolved,
+  });
+}
+
+/** Check if the extension supports in-page comment navigation (version >= 2). */
+export function supportsCommentNavigation(): boolean {
+  return (cachedExtensionStatus?.version ?? 0) >= 2;
+}

@@ -15,6 +15,7 @@ import { ROLE_COLORS } from "@/lib/role-colors";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
+import { pingExtension, navigateToComment, supportsCommentNavigation } from "@/lib/extension-bridge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -67,6 +68,14 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   const [labels, setLabelsRaw] = useState<Label[]>(initialLabels);
   const { titles: cachedTitles, owners: cachedOwners } = useCachedMetadata(userId, [doc]);
   const displayTitle = cachedTitles[doc.googleDocId] || doc.title || "Unknown title";
+  const googleDocId = doc.driveUrl.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1] ?? doc.googleDocId;
+
+  // Open the doc tab via the extension (reuses the same tab as comment Open buttons)
+  function handleOpenDoc(e: React.MouseEvent<HTMLAnchorElement>) {
+    if (!supportsCommentNavigation()) return;
+    e.preventDefault();
+    navigateToComment(googleDocId, "", doc.driveUrl, false);
+  }
 
   function setLabels(newLabels: Label[]) {
     setLabelsRaw(newLabels);
@@ -185,6 +194,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   }
 
   useEffect(() => { void fetchContent(generateContextId()); }, [doc.docId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ping extension on mount so supportsCommentNavigation() has cached status
+  // before the user clicks "Open" on a comment.
+  useEffect(() => { void pingExtension(); }, []);
 
   const [notFound, setNotFound] = useState(false);
   const handleCrossTab = useCallback(async (event: CrossTabReceivedEvent) => {
@@ -675,6 +688,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
             href={doc.driveUrl}
             target="docreview-doc"
             title="Open document"
+            onClick={handleOpenDoc}
             className={`hover:underline hover:text-blue-600 ${
               doc.accessState !== "OK" ? "line-through text-zinc-400" : "text-zinc-900"
             }`}
@@ -692,7 +706,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
             {doc.status === "INBOX" ? "Archive" : "Unarchive"}
           </Button>
           <Button variant="outline" size="sm" title="Open the document" className="text-zinc-900" asChild>
-            <a href={doc.driveUrl} target="docreview-doc">Open</a>
+            <a href={doc.driveUrl} target="docreview-doc" onClick={handleOpenDoc}>Open</a>
           </Button>
           <Button
             variant="outline"

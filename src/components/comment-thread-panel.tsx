@@ -34,6 +34,7 @@ interface CommentThreadPanelProps {
   loading: boolean;
   resolved?: boolean;
   commentUrl?: string;
+  onOpenClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
   onRefresh?: () => void;
   refreshing?: boolean;
   onReply?: (content: string) => Promise<void>;
@@ -56,6 +57,7 @@ export function CommentThreadPanel({
   loading,
   resolved,
   commentUrl,
+  onOpenClick,
   onRefresh,
   refreshing,
   onReply,
@@ -291,7 +293,7 @@ export function CommentThreadPanel({
         <span className="text-zinc-300 mx-1">|</span>
         {commentUrl && (
           <Button variant="outline" size="sm" className="h-7 px-3 text-xs" title="Open the document at this comment" asChild>
-            <a href={commentUrl} target="docreview-doc">
+            <a href={commentUrl} target="docreview-doc" onClick={onOpenClick}>
               Open
             </a>
           </Button>

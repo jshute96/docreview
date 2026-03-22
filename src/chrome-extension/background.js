@@ -167,6 +167,7 @@ chrome.action.onClicked.addListener(async function(tab) {
 // - openDocInDocreview: from Gmail content script, opens doc in Docreview
 // - ping: from docreview-bridge, returns extension status
 // - resolveUrl: from docreview-bridge, follows redirects to resolve shortened URLs
+// - navigateToComment: from docreview-bridge, navigates to a comment in an open Google Docs tab
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   if (msg.type === 'openDocInDocreview' && sender.tab) {
     openDocFromGmailTab(sender.tab.id);
@@ -174,13 +175,15 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   }
 
   if (msg.type === 'ping') {
+    console.log('[background] ping received');
     chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl, enableResolve: DEFAULTS.enableResolve, resolveHosts: DEFAULTS.resolveHosts }, function(config) {
-      sendResponse({ version: 1, baseUrl: config.baseUrl, enableResolve: config.enableResolve, resolveHosts: config.resolveHosts });
+      sendResponse({ version: 2, baseUrl: config.baseUrl, enableResolve: config.enableResolve, resolveHosts: config.resolveHosts });
     });
     return true; // async response
   }
 
   if (msg.type === 'resolveUrl') {
+    console.log('[background] resolveUrl:', msg.url);
     chrome.storage.sync.get({ enableResolve: DEFAULTS.enableResolve }, function(config) {
       if (!config.enableResolve) {
         sendResponse({ resolved: false, error: 'disabled' });
@@ -197,7 +200,357 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     cancelResolveTabs(msg.pageId);
     return;
   }
+
+  if (msg.type === 'navigateToComment') {
+    navigateToComment(msg.docId, msg.discoId, msg.docUrl, msg.resolved, sender.tab).then(function(result) {
+      console.log('[background] navigateToComment result:', result);
+      sendResponse(result);
+    }).catch(function(err) {
+      console.error('[background] navigateToComment error:', err);
+      sendResponse({ success: false, error: err.message });
+    });
+    return true; // async response
+  }
 });
+
+// --- In-page comment navigation ---
+//
+// Tracks Google Docs tabs opened by Docreview so we can navigate to comments
+// without reloading the page. The first click opens the doc normally (with
+// ?disco= for initial scroll); subsequent clicks inject a script that finds
+// the comment in the Closure component tree and clicks it.
+
+// docId -> tabId mapping for docs opened by Docreview.
+// Persisted in chrome.storage.session so it survives service worker restarts
+// (Manifest V3 service workers can be terminated between messages).
+
+async function getDocTabs() {
+  var data = await chrome.storage.session.get({ docTabs: {} });
+  return data.docTabs || {};
+}
+
+async function setDocTab(docId, tabId) {
+  var tabs = await getDocTabs();
+  tabs[docId] = tabId;
+  await chrome.storage.session.set({ docTabs: tabs });
+}
+
+async function removeDocTab(docId) {
+  var tabs = await getDocTabs();
+  delete tabs[docId];
+  await chrome.storage.session.set({ docTabs: tabs });
+}
+
+// Clean up when tabs are closed
+chrome.tabs.onRemoved.addListener(async function(tabId) {
+  var tabs = await getDocTabs();
+  var changed = false;
+  for (var docId in tabs) {
+    if (tabs[docId] === tabId) {
+      delete tabs[docId];
+      changed = true;
+    }
+  }
+  if (changed) await chrome.storage.session.set({ docTabs: tabs });
+});
+
+// Clean up when a tracked tab navigates away from the doc
+chrome.tabs.onUpdated.addListener(async function(tabId, changeInfo) {
+  if (!changeInfo.url) return;
+  var tabs = await getDocTabs();
+  for (var docId in tabs) {
+    if (tabs[docId] !== tabId) continue;
+    // If the tab navigated to a different doc or a non-Docs page, remove tracking
+    if (!changeInfo.url.includes(docId)) {
+      delete tabs[docId];
+      await chrome.storage.session.set({ docTabs: tabs });
+    }
+  }
+});
+
+// The script injected into Google Docs to navigate to a comment by disco ID.
+// Runs in the MAIN world so it can access the Closure component tree.
+// Arguments are passed via the args parameter of chrome.scripting.executeScript.
+// When discoId is empty, just deselects the active comment.
+function navigateToCommentInPage(discoId, resolved, fallbackUrl) {
+  // Find the closure_lm key and extract disco ID from a listitem
+  var loggedFallback = false;
+  function getDiscoId(item) {
+    var lk = Object.keys(item).find(function(k) { return k.startsWith('closure_lm'); });
+    if (!lk) return null;
+    try {
+      // Known path (may change when Google updates their code)
+      var id = item[lk].listeners.click[0].Yd.Ai;
+      if (typeof id === 'string' && id.match(/^AAAB/)) return id;
+    } catch(e) {}
+
+    // Fallback: deep search for AAAB-pattern strings in the click listener.
+    // This handles cases where Google updates their minified property names.
+    if (!loggedFallback) {
+      console.log('[docreview-nav] fast path failed, using deep search fallback');
+      loggedFallback = true;
+    }
+    try {
+      var lm = item[lk];
+      var clickHandlers = lm.listeners && lm.listeners.click;
+      if (!clickHandlers) return null;
+      var seen = new WeakSet();
+      function findId(obj, depth) {
+        if (depth > 12 || !obj) return null;
+        if (typeof obj === 'object') {
+          if (seen.has(obj)) return null;
+          seen.add(obj);
+        }
+        var keys = Object.keys(obj);
+        for (var i = 0; i < keys.length && i < 200; i++) {
+          try {
+            var v = obj[keys[i]];
+            if (typeof v === 'string' && v.match(/^AAAB[A-Za-z0-9_-]{5,}$/) && v.length < 20) return v;
+            if (typeof v === 'object' && v !== null && !(v instanceof HTMLElement) && !(v instanceof Window)) {
+              var found = findId(v, depth + 1);
+              if (found) return found;
+            }
+          } catch(e) {}
+        }
+        return null;
+      }
+      for (var h = 0; h < clickHandlers.length; h++) {
+        var found = findId(clickHandlers[h], 0);
+        if (found) return found;
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  // Google Docs buttons require a full mousedown+mouseup+click sequence;
+  // a bare .click() is ignored by the Closure event system.
+  function fullClick(el) {
+    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  }
+
+  // The comments pane has class docs-docos-activity-sidebar. There are multiple
+  // [role="complementary"] elements on the page — we must use the specific class.
+  function isCommentsPaneOpen() {
+    var panel = document.querySelector('.docs-docos-activity-sidebar');
+    return panel && panel.offsetParent !== null;
+  }
+
+  // Open the comments pane (needed for resolved comments to be visible)
+  function openCommentsPane() {
+    if (isCommentsPaneOpen()) {
+      console.log('[docreview-nav] comments pane already open');
+      return Promise.resolve();
+    }
+    console.log('[docreview-nav] opening comments pane');
+    var btn = document.querySelector('[aria-label*="Show all comments"]');
+    if (!btn) { console.log('[docreview-nav] Show all comments button not found'); return Promise.resolve(); }
+    fullClick(btn);
+    // Wait for the pane to appear
+    return new Promise(function(resolve) {
+      var attempts = 0;
+      var check = setInterval(function() {
+        if (isCommentsPaneOpen() || ++attempts > 15) {
+          clearInterval(check);
+          console.log('[docreview-nav] comments pane open:', isCommentsPaneOpen());
+          resolve();
+        }
+      }, 100);
+    });
+  }
+
+  // Close the comments pane
+  function closeCommentsPane() {
+    if (!isCommentsPaneOpen()) return;
+    console.log('[docreview-nav] closing comments pane');
+    var panel = document.querySelector('.docs-docos-activity-sidebar');
+    var closeBtn = panel ? panel.querySelector('[aria-label="Close"]') : null;
+    if (closeBtn) fullClick(closeBtn);
+  }
+
+  // Ensure resolved comments are loaded in the DOM
+  function ensureResolvedLoaded() {
+    return new Promise(function(resolve) {
+      if (!resolved) { resolve(); return; }
+
+      // Check if resolved comments are already cached
+      var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].textContent.indexOf('Resolved') !== -1) { resolve(); return; }
+      }
+
+      // Open the comments pane to load resolved comments
+      console.log('[docreview-nav] loading resolved comments');
+      openCommentsPane().then(function() {
+        // Wait for resolved comments to appear in the DOM
+        var attempts = 0;
+        var check = setInterval(function() {
+          var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
+          for (var i = 0; i < items.length; i++) {
+            if (items[i].textContent.indexOf('Resolved') !== -1) {
+              clearInterval(check);
+              resolve();
+              return;
+            }
+          }
+          if (++attempts > 25) { clearInterval(check); resolve(); }
+        }, 200);
+      });
+    });
+  }
+
+  // Find the comment listitem by disco ID
+  function findItem() {
+    var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
+
+    // First pass: prefer the right type (non-resolved for open, resolved for resolved)
+    for (var i = 0; i < items.length; i++) {
+      var id = getDiscoId(items[i]);
+      if (id !== discoId) continue;
+      var isResolvedEntry = items[i].textContent.indexOf('Resolved') !== -1;
+      if (!resolved && isResolvedEntry) continue;
+      return items[i];
+    }
+
+    // Second pass: accept any entry with the right ID
+    for (var i = 0; i < items.length; i++) {
+      if (getDiscoId(items[i]) === discoId) return items[i];
+    }
+    return null;
+  }
+
+  // Click the item. If the reply input isn't visible after 300ms, retry once.
+  // Google Docs can process a click (setting the active class) without visually
+  // expanding the comment during tab transitions.
+  function clickWithRetry(item) {
+    item.click();
+    return new Promise(function(resolve) {
+      setTimeout(function() {
+        var replyInput = item.querySelector('.docos-input-textarea, [role="combobox"]');
+        if (replyInput && replyInput.offsetParent !== null) {
+          resolve(true);
+          return;
+        }
+        console.log('[docreview-nav] comment not visually active, retrying click');
+        item.click();
+        resolve(true);
+      }, 300);
+    });
+  }
+
+  // Use an async wrapper so chrome.scripting.executeScript can await the result
+  return (async function() {
+    // No disco ID — nothing to navigate to
+    if (!discoId) {
+      return { success: true };
+    }
+
+    await ensureResolvedLoaded();
+
+    if (resolved) {
+      // For resolved comments, open the comments pane so the comment is visible
+      await openCommentsPane();
+    }
+
+    var item = findItem();
+    if (item) {
+      await clickWithRetry(item);
+      console.log('[docreview-nav] navigated to comment:', discoId);
+      if (!resolved) {
+        // For open comments, close the comments pane for a cleaner view
+        closeCommentsPane();
+      }
+      return { success: true };
+    }
+
+    // Comment not found in the Closure tree
+    console.log('[docreview-nav] comment not found:', discoId, '(searched', document.querySelectorAll('#docos-stream-view [role="listitem"]').length, 'items)');
+    if (fallbackUrl) {
+      console.log('[docreview-nav] falling back to page reload');
+      location.href = fallbackUrl;
+      return { success: true, fallback: true };
+    }
+    return { success: false, error: 'comment not found' };
+  })();
+}
+
+// Handle a navigateToComment request from the Docreview web app.
+// If we have a tracked tab for this doc, inject the navigation script.
+// Otherwise, open a new tab with the disco= URL.
+async function navigateToComment(docId, discoId, docUrl, resolved, senderTab) {
+  var allTabs = await getDocTabs();
+  var tabId = allTabs[docId];
+  console.log('[background] navigateToComment:', { docId, discoId, resolved, trackedTabId: tabId, allTracked: allTabs });
+
+  // Verify the tracked tab still exists and is on the right doc
+  if (tabId) {
+    try {
+      var tab = await chrome.tabs.get(tabId);
+      if (!tab || !tab.url || !tab.url.includes(docId)) {
+        console.log('[background] tracked tab invalid, clearing:', { tabUrl: tab && tab.url, docId });
+        await removeDocTab(docId);
+        tabId = null;
+      }
+    } catch(e) {
+      console.log('[background] tracked tab gone:', e.message);
+      await removeDocTab(docId);
+      tabId = null;
+    }
+  }
+
+  // Build the disco= fallback URL
+  var fallbackUrl = docUrl;
+  if (discoId) {
+    var u = new URL(docUrl);
+    u.searchParams.set('disco', discoId);
+    fallbackUrl = u.toString();
+  }
+
+  if (!tabId) {
+    // No tracked tab — open a new one. Use disco= URL if we have an ID,
+    // otherwise just open the doc at the top.
+    console.log('[background] opening new tab:', { hasDisco: !!discoId });
+    var newTabIndex = senderTab ? senderTab.index + 1 : undefined;
+    var newTab = await chrome.tabs.create({ url: fallbackUrl, index: newTabIndex });
+    await setDocTab(docId, newTab.id);
+    console.log('[background] new tab opened, tracking:', { docId, tabId: newTab.id });
+    return { success: true, opened: true };
+  }
+
+  // Focus the existing tab. The delay lets the tab fully render before we
+  // inject — without it, Google Docs sometimes processes the click internally
+  // (setting docos-docoview-active) without visually expanding the comment.
+  // TODO: find a better signal than a fixed delay (e.g., tab 'activated' event)
+  console.log('[background] focusing existing tab:', tabId);
+  await chrome.tabs.update(tabId, { active: true });
+  var windowId = (await chrome.tabs.get(tabId)).windowId;
+  await chrome.windows.update(windowId, { focused: true });
+  await new Promise(function(r) { setTimeout(r, 300); });
+
+  // If no disco ID, just focus the tab
+  if (!discoId) {
+    console.log('[background] no discoId, focusing tab only');
+    return { success: true, focused: true };
+  }
+
+  // Inject the navigation script
+  console.log('[background] injecting navigation script for:', discoId);
+  try {
+    var results = await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: navigateToCommentInPage,
+      args: [discoId, !!resolved, fallbackUrl],
+      world: 'MAIN'
+    });
+    var result = results && results[0] && results[0].result;
+    return result || { success: false, error: 'no result from injected script' };
+  } catch(err) {
+    // Script injection failed — fall back to opening with disco= URL
+    await chrome.tabs.update(tabId, { url: fallbackUrl });
+    return { success: true, fallback: true };
+  }
+}
 
 // Resolve a shortened URL by opening it in a background tab and watching
 // for a redirect to a Google Docs/Drive URL. This works for shorteners that

@@ -12,6 +12,7 @@ import { FriendlyDate } from "@/components/friendly-date";
 import { StarButton } from "@/components/star-button";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
+import { navigateToComment, supportsCommentNavigation } from "@/lib/extension-bridge";
 
 interface CommentRowProps {
   comment: Comment;
@@ -77,6 +78,21 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       url.searchParams.set("disco", comment.googleCommentId);
     }
     return url.toString();
+  }
+
+  // Extract the Google Doc ID from the Drive URL for tab tracking.
+  // The internal docId (Prisma) isn't in the Google Docs URL, but the
+  // Google Doc ID (from the /d/XXXXX/ path segment) is.
+  const googleDocId = driveUrl.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1] ?? docId;
+
+  // If the extension supports in-page navigation, intercept "Open" clicks
+  // to navigate without reloading the Google Docs tab. When there's no disco
+  // ID (some suggestions), we still use the extension to reuse the same tab
+  // rather than opening a new one.
+  function handleOpenClick(e: React.MouseEvent<HTMLAnchorElement>) {
+    if (!supportsCommentNavigation()) return;
+    e.preventDefault();
+    navigateToComment(googleDocId, comment.googleCommentId ?? "", driveUrl, comment.resolved);
   }
 
   function applyThreadUpdate(data: { threads: CommentThread[]; comment: Comment }) {
@@ -433,7 +449,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             title={openTitle}
             asChild
           >
-            <a href={commentUrl()} target="docreview-doc">
+            <a href={commentUrl()} target="docreview-doc" onClick={handleOpenClick}>
               Open
             </a>
           </Button>
@@ -506,7 +522,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                 <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
                   <div className="float-right relative z-10 flex gap-1 ml-2 mb-1">
                     <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title={openTitle} asChild>
-                      <a href={commentUrl()} target="docreview-doc">
+                      <a href={commentUrl()} target="docreview-doc" onClick={handleOpenClick}>
                         {openLabel}
                       </a>
                     </Button>
@@ -524,6 +540,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   loading={loadingThreads}
                   resolved={comment.resolved}
                   commentUrl={commentUrl()}
+                  onOpenClick={handleOpenClick}
                   onRefresh={refreshThread}
                   refreshing={refreshingThread}
                   onReply={handleReply}
