@@ -159,18 +159,30 @@ chrome.action.onClicked.addListener(async function(tab) {
     return;
   }
 
+  // Track this tab so comment navigation can reuse it instead of opening a new one
+  var docMatch = tab.url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (docMatch) {
+    await setDocTab(docMatch[1], tab.id);
+  }
+
   var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
   chrome.tabs.create({ url: baseUrl + '/open?doc=' + encodeURIComponent(tab.url), index: tab.index + 1 });
 });
 
 // Handle messages from content scripts.
 // - openDocInDocreview: from Gmail content script, opens doc in Docreview
+// - trackDocTab: from Docs content script, tracks the tab for comment navigation reuse
 // - ping: from docreview-bridge, returns extension status
 // - resolveUrl: from docreview-bridge, follows redirects to resolve shortened URLs
 // - navigateToComment: from docreview-bridge, navigates to a comment in an open Google Docs tab
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   if (msg.type === 'openDocInDocreview' && sender.tab) {
     openDocFromGmailTab(sender.tab.id);
+    return;
+  }
+
+  if (msg.type === 'trackDocTab' && sender.tab) {
+    setDocTab(msg.docId, sender.tab.id);
     return;
   }
 

@@ -61,6 +61,11 @@
     btn.addEventListener('mouseout', suppress, true);
     btn.addEventListener('click', function(e) {
       suppress(e);
+      // On Google Docs pages, track this tab so comment navigation can reuse it
+      // instead of opening a new one when the user clicks Open in Docreview
+      if (isDocs && docId) {
+        chrome.runtime.sendMessage({ type: 'trackDocTab', docId: docId });
+      }
       window.open(openUrl, '_blank');
     }, true);
 
