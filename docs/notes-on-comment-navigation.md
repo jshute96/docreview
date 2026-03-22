@@ -110,26 +110,49 @@ The 3-dots menu → "Get link to this comment" copies a URL with the `AAAB...` d
 - Clicking accept/reject sends the mutation through a **pre-existing persistent connection** (WebSocket or long-poll channel opened at page load), not through fetch or XHR
 - The comment ID is resolved in-memory from the Closure component tree — not passed as a visible parameter
 
-### DOM caching behavior
+### DOM behavior and complications
 
-Google Docs **caches all loaded comment DOM elements** in `#docos-stream-view` and never removes them:
+The stream view (`#docos-stream-view`) contains comment listitems in two forms:
+- **Anchored** (`docos-anchoreddocoview`): Open comments with a highlight in the document margin. Visible without the comments pane.
+- **Non-anchored / Stream** (`docos-streamdocoview`): Resolved comments, unanchored comments, and comments loaded by the comments pane. Only visible when the pane is open.
 
-- **On initial page load**: Only open (unresolved) comments are in the DOM. The `t3b.qq` model array contains only open comments.
-- **After opening the comments pane** (clicking "Show all comments"): Resolved comments are loaded and appended as additional listitems. They persist in the DOM even after closing the pane.
-- **Hidden elements**: Off-screen and resolved comments have `offsetParent === null` (hidden) but remain fully functional — `.click()` still navigates to them.
-- **After resolving a comment**: The comment is removed from the `t3b.qq` model array but stays in the DOM as a hidden element with "Resolved" in its text content.
-- **Duplicate entries**: Some comments appear twice in the DOM — once as an open entry and once as a resolved entry (after being resolved during the session). Both have the same disco ID and both respond to `.click()`.
+**DOM rebuilding:** The stream view DOM is rebuilt when:
+- The comments pane is opened or closed (item count changes, e.g. 31 → 44)
+- A document tab switch occurs (clicking a comment on a different tab)
+- A comment is resolved or accepted/rejected
 
-To ensure all comments (including resolved) are available for navigation:
-1. Open the comments pane once after page load (click "Show all comments" button)
-2. Close the pane — the cached resolved comment elements persist
-3. All listitems remain navigable via `.click()`
+This means **item references become stale** after any of these events. Code must re-query the DOM after triggering any action that might rebuild it.
+
+**Duplicate entries:** The same disco ID can appear in both an anchored and a non-anchored entry simultaneously. When searching, prefer the anchored entry (it provides the best visual experience — margin highlight without the pane).
+
+**Lazy loading:** On initial page load, only open anchored comments are in the DOM. Resolved and unanchored comments are loaded when the comments pane is opened. Once loaded, they persist as hidden DOM elements even after the pane is closed.
+
+**What we learned about reliable navigation:**
+- A single `.click()` on a listitem may not reliably select the comment, especially if the click triggers a document tab switch that rebuilds the DOM
+- The solution is click-then-refind-then-click: click once to navigate/switch tabs, wait for the DOM to settle (300ms), re-query to get a fresh item reference, then click again to ensure selection
+- Pane state should be determined from the final DOM state (anchored vs non-anchored), not from Docreview's resolved flag, since the DB may be stale
+
+**What doesn't work for comment interaction:**
+- `element.click()` (bare) doesn't work for Google Docs UI buttons — they need `fullClick` (mousedown+mouseup+click sequence)
+- `.click()` *does* work for comment listitems (they respond to bare click)
+- Deselecting comments via synthetic events is unreliable — Google Docs uses canvas rendering and doesn't respond to synthetic mouse events on the content area
+
+### Anchored vs non-anchored detection
+
+```javascript
+// Anchored: has margin highlight, visible without comments pane
+item.classList.contains('docos-anchoreddocoview')
+
+// Non-anchored: resolved, unanchored, or stream-only — needs pane to be visible
+item.classList.contains('docos-streamdocoview')
+```
 
 ### Resolved comment detection
 
 Resolved comments can be identified by:
 - `aria-label` contains `"Resolved comment"` (vs `"Open comment"`)
 - `textContent` starts with `"Resolved"`
+- They are always non-anchored (`docos-streamdocoview`)
 - The `t3b.qq` model array does **not** include resolved comments — only the DOM elements remain
 
 ### ID systems
@@ -204,19 +227,27 @@ The Docreview Chrome extension (version 2+) implements in-page comment navigatio
 - Subsequent clicks reuse the tracked tab
 - Cleaned up on tab close or navigation away from the doc
 
-### Finding the right listitem
+### Navigation flow (injected script)
 
-The Closure component tree extraction (`closure_lm → click[0].Yd.Ai`) provides a reliable mapping from disco ID to DOM element. A deep-search fallback handles cases where Google updates their minified property names.
+```
+1. Find the comment listitem by disco ID in the stream view
+   - Prefer anchored entries (docos-anchoreddocoview) over non-anchored
+2. If not found, open the comments pane (loads resolved/unanchored) and retry
+3. If still not found, fall back to page reload with ?disco= URL
+4. Click the item to navigate (may trigger a document tab switch)
+5. Wait 300ms for DOM to settle after potential tab switch
+6. Re-find and click again to ensure selection with fresh DOM
+7. Set pane state: close for anchored comments, open for non-anchored
+```
 
-### Resolved comments
+The click-then-refind-then-click pattern is necessary because clicking a comment can switch document tabs, which rebuilds the entire stream view DOM. The initial click navigates but may not select; the second click with a fresh DOM reference ensures selection.
 
-For resolved comments, the extension:
-1. Opens the comments pane (`fullClick` on "Show all comments") to load resolved comments into the DOM
-2. Finds the resolved comment's listitem by disco ID
-3. Clicks it — scrolls the document AND focuses the comment in the side panel
-4. Keeps the pane open (best UX for resolved comments)
+### Pane management
 
-For open (unresolved) comments, the extension closes the comments pane after navigation for a cleaner view.
+The comments pane state is determined from the doc's DOM (anchored vs non-anchored), not from Docreview's `resolved` flag in the database. This handles cases where the resolved state is stale.
+
+- **Anchored comments** (`docos-anchoreddocoview`): Have margin highlights. Pane is closed after navigation for a clean view.
+- **Non-anchored comments** (`docos-streamdocoview`): Resolved, unanchored, or comments on other document tabs. Pane is opened/kept open so the comment is visible.
 
 ### Suggestions without disco IDs
 

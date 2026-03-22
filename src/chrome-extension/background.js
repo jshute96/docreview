@@ -271,28 +271,48 @@ chrome.tabs.onUpdated.addListener(async function(tabId, changeInfo) {
 // The script injected into Google Docs to navigate to a comment by disco ID.
 // Runs in the MAIN world so it can access the Closure component tree.
 // Arguments are passed via the args parameter of chrome.scripting.executeScript.
-// When discoId is empty, just deselects the active comment.
-function navigateToCommentInPage(discoId, resolved, fallbackUrl) {
-  // Find the closure_lm key and extract disco ID from a listitem
+//
+// Navigation flow:
+//   1. Find the comment listitem by disco ID in the stream view
+//   2. If not found, open the comments pane (loads resolved/unanchored) and retry
+//   3. If still not found, fall back to page reload with ?disco= URL
+//   4. Click the item to navigate (may trigger a document tab switch)
+//   5. Wait 300ms for DOM to settle after potential tab switch
+//   6. Re-find and click again to ensure selection with fresh DOM
+//   7. Set pane state: close for anchored comments, open for non-anchored
+//
+// Key complications this handles:
+//   - Same disco ID can appear twice (anchored + stream entry); prefer anchored
+//   - Clicking a comment can switch document tabs, rebuilding the entire DOM
+//   - Resolved/unanchored comments only load when the comments pane is opened
+//   - Pane state is determined from the doc, not from Docreview's resolved flag
+//   - Google Docs buttons need full mousedown+mouseup+click (bare .click() ignored)
+//   - Multiple [role="complementary"] elements; use .docs-docos-activity-sidebar
+function navigateToCommentInPage(discoId, _resolvedHint, fallbackUrl) {
+
+  // --- ID extraction from Closure component tree ---
+
+  // Extract the disco ID from a listitem's Closure listener map.
+  // Fast path uses known minified property names; fallback does a deep search.
   var loggedFallback = false;
   function getDiscoId(item) {
     var lk = Object.keys(item).find(function(k) { return k.startsWith('closure_lm'); });
     if (!lk) return null;
     try {
-      // Known path (may change when Google updates their code)
       var id = item[lk].listeners.click[0].Yd.Ai;
       if (typeof id === 'string' && id.match(/^AAAB/)) return id;
     } catch(e) {}
 
     // Fallback: deep search for AAAB-pattern strings in the click listener.
     // This handles cases where Google updates their minified property names.
+    // Note: the shared comment model array (t3b.qq) contains all IDs, so the
+    // deep search may return a wrong ID. The fast path above is authoritative.
     if (!loggedFallback) {
       console.log('[docreview-nav] fast path failed, using deep search fallback');
       loggedFallback = true;
     }
     try {
-      var lm = item[lk];
-      var clickHandlers = lm.listeners && lm.listeners.click;
+      var clickHandlers = item[lk].listeners && item[lk].listeners.click;
       if (!clickHandlers) return null;
       var seen = new WeakSet();
       function findId(obj, depth) {
@@ -322,6 +342,8 @@ function navigateToCommentInPage(discoId, resolved, fallbackUrl) {
     return null;
   }
 
+  // --- DOM helpers ---
+
   // Google Docs buttons require a full mousedown+mouseup+click sequence;
   // a bare .click() is ignored by the Closure event system.
   function fullClick(el) {
@@ -330,37 +352,32 @@ function navigateToCommentInPage(discoId, resolved, fallbackUrl) {
     el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
   }
 
-  // The comments pane has class docs-docos-activity-sidebar. There are multiple
-  // [role="complementary"] elements on the page — we must use the specific class.
+  // --- Comments pane management ---
+  // The pane has class docs-docos-activity-sidebar. There are multiple
+  // [role="complementary"] elements on the page; must use the specific class.
+
   function isCommentsPaneOpen() {
     var panel = document.querySelector('.docs-docos-activity-sidebar');
-    return panel && panel.offsetParent !== null;
+    return !!(panel && panel.offsetParent !== null);
   }
 
-  // Open the comments pane (needed for resolved comments to be visible)
   function openCommentsPane() {
-    if (isCommentsPaneOpen()) {
-      console.log('[docreview-nav] comments pane already open');
-      return Promise.resolve();
-    }
+    if (isCommentsPaneOpen()) return Promise.resolve();
     console.log('[docreview-nav] opening comments pane');
     var btn = document.querySelector('[aria-label*="Show all comments"]');
-    if (!btn) { console.log('[docreview-nav] Show all comments button not found'); return Promise.resolve(); }
+    if (!btn) return Promise.resolve();
     fullClick(btn);
-    // Wait for the pane to appear
     return new Promise(function(resolve) {
       var attempts = 0;
       var check = setInterval(function() {
         if (isCommentsPaneOpen() || ++attempts > 15) {
           clearInterval(check);
-          console.log('[docreview-nav] comments pane open:', isCommentsPaneOpen());
           resolve();
         }
       }, 100);
     });
   }
 
-  // Close the comments pane
   function closeCommentsPane() {
     if (!isCommentsPaneOpen()) return;
     console.log('[docreview-nav] closing comments pane');
@@ -369,109 +386,87 @@ function navigateToCommentInPage(discoId, resolved, fallbackUrl) {
     if (closeBtn) fullClick(closeBtn);
   }
 
-  // Ensure resolved comments are loaded in the DOM
-  function ensureResolvedLoaded() {
-    return new Promise(function(resolve) {
-      if (!resolved) { resolve(); return; }
+  // --- Comment finding ---
 
-      // Check if resolved comments are already cached
-      var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
-      for (var i = 0; i < items.length; i++) {
-        if (items[i].textContent.indexOf('Resolved') !== -1) { resolve(); return; }
-      }
-
-      // Open the comments pane to load resolved comments
-      console.log('[docreview-nav] loading resolved comments');
-      openCommentsPane().then(function() {
-        // Wait for resolved comments to appear in the DOM
-        var attempts = 0;
-        var check = setInterval(function() {
-          var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
-          for (var i = 0; i < items.length; i++) {
-            if (items[i].textContent.indexOf('Resolved') !== -1) {
-              clearInterval(check);
-              resolve();
-              return;
-            }
-          }
-          if (++attempts > 25) { clearInterval(check); resolve(); }
-        }, 200);
-      });
-    });
-  }
-
-  // Find the comment listitem by disco ID
+  // Find the comment listitem by disco ID. Returns { item, anchored } or null.
+  // Prefers anchored entries (docos-anchoreddocoview) which have margin
+  // highlights and don't need the comments pane. Non-anchored entries
+  // (docos-streamdocoview) include resolved and unanchored comments.
+  // The same ID can appear in both an anchored and non-anchored entry.
   function findItem() {
     var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
-
-    // First pass: prefer the right type (non-resolved for open, resolved for resolved)
+    var nonAnchoredMatch = null;
     for (var i = 0; i < items.length; i++) {
       var id = getDiscoId(items[i]);
       if (id !== discoId) continue;
-      var isResolvedEntry = items[i].textContent.indexOf('Resolved') !== -1;
-      if (!resolved && isResolvedEntry) continue;
-      return items[i];
+      if (items[i].classList.contains('docos-anchoreddocoview')) {
+        return { item: items[i], anchored: true };
+      }
+      if (!nonAnchoredMatch) nonAnchoredMatch = items[i];
     }
-
-    // Second pass: accept any entry with the right ID
-    for (var i = 0; i < items.length; i++) {
-      if (getDiscoId(items[i]) === discoId) return items[i];
-    }
-    return null;
+    return nonAnchoredMatch ? { item: nonAnchoredMatch, anchored: false } : null;
   }
 
-  // Click the item. If the reply input isn't visible after 300ms, retry once.
-  // Google Docs can process a click (setting the active class) without visually
-  // expanding the comment during tab transitions.
-  function clickWithRetry(item) {
-    item.click();
+  // Wait for resolved comments to appear after opening the pane
+  function waitForResolvedComments() {
     return new Promise(function(resolve) {
-      setTimeout(function() {
-        var replyInput = item.querySelector('.docos-input-textarea, [role="combobox"]');
-        if (replyInput && replyInput.offsetParent !== null) {
-          resolve(true);
-          return;
+      var attempts = 0;
+      var check = setInterval(function() {
+        var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
+        for (var i = 0; i < items.length; i++) {
+          if (items[i].textContent.indexOf('Resolved') !== -1) {
+            clearInterval(check);
+            resolve();
+            return;
+          }
         }
-        console.log('[docreview-nav] comment not visually active, retrying click');
-        item.click();
-        resolve(true);
-      }, 300);
+        if (++attempts > 25) { clearInterval(check); resolve(); }
+      }, 200);
     });
   }
 
-  // Use an async wrapper so chrome.scripting.executeScript can await the result
+  // --- Main navigation logic ---
+
   return (async function() {
-    // No disco ID — nothing to navigate to
-    if (!discoId) {
-      return { success: true };
-    }
+    if (!discoId) return { success: true };
 
-    await ensureResolvedLoaded();
-
-    if (resolved) {
-      // For resolved comments, open the comments pane so the comment is visible
+    // Step 1-2: Find the comment, opening pane if needed to load more
+    var match = findItem();
+    if (!match) {
+      console.log('[docreview-nav] not in stream view, opening pane to load more');
       await openCommentsPane();
+      await waitForResolvedComments();
+      match = findItem();
     }
-
-    var item = findItem();
-    if (item) {
-      await clickWithRetry(item);
-      console.log('[docreview-nav] navigated to comment:', discoId);
-      if (!resolved) {
-        // For open comments, close the comments pane for a cleaner view
-        closeCommentsPane();
+    if (!match) {
+      console.log('[docreview-nav] comment not found:', discoId);
+      if (fallbackUrl) {
+        location.href = fallbackUrl;
+        return { success: true, fallback: true };
       }
-      return { success: true };
+      return { success: false, error: 'comment not found' };
     }
 
-    // Comment not found in the Closure tree
-    console.log('[docreview-nav] comment not found:', discoId, '(searched', document.querySelectorAll('#docos-stream-view [role="listitem"]').length, 'items)');
-    if (fallbackUrl) {
-      console.log('[docreview-nav] falling back to page reload');
-      location.href = fallbackUrl;
-      return { success: true, fallback: true };
+    // Step 4: Click to navigate (may switch document tabs)
+    console.log('[docreview-nav] navigating to:', discoId, match.anchored ? '(anchored)' : '(non-anchored)');
+    match.item.click();
+
+    // Steps 5-7: Wait for DOM to settle, re-find and click for reliable
+    // selection, then set pane state based on final anchored/non-anchored.
+    await new Promise(function(r) { setTimeout(r, 300); });
+    var final = findItem();
+    if (final) {
+      final.item.click();
+      if (final.anchored) {
+        closeCommentsPane();
+      } else {
+        await openCommentsPane();
+      }
+      console.log('[docreview-nav] done:', final.anchored ? 'anchored' : 'non-anchored');
+    } else {
+      console.log('[docreview-nav] re-find failed after DOM settle, first click may have navigated');
     }
-    return { success: false, error: 'comment not found' };
+    return { success: true };
   })();
 }
 
