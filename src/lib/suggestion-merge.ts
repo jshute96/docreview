@@ -64,12 +64,16 @@ export async function mergeSuggestionsFromGmail(
       // Drive's doc.lastModifiedInDrive approximation, so overwrite it.
       const gmailTime = suggestion.time ? new Date(suggestion.time) : emailDate;
       logInfo(`[Suggestions:Gmail] ${googleDocId}: merged ${suggestion.discussionId} into ${candidates[0].commentId} by hash`);
+      // Gmail notification = interesting activity → promote ARCHIVED to INBOX
+      // but respect MUTED (user explicitly silenced this thread).
+      const promoteStatus = candidates[0].status === "ARCHIVED" ? "INBOX" : undefined;
       await prisma.comment.update({
         where: { commentId: candidates[0].commentId },
         data: {
           googleCommentId: suggestion.discussionId || null,
           replyCount: Math.max(suggestion.replies.length, candidates[0].replyCount),
           ...(gmailTime ? { driveCreatedAt: gmailTime } : {}),
+          ...(promoteStatus ? { status: promoteStatus } : {}),
         },
       });
       merged++;

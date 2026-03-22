@@ -174,7 +174,10 @@ Tracks whether there's substantive activity beyond comment resolutions:
 - Comment resolved with exactly 1 new reply (the resolve itself) → no
 
 **New suggestion** (not previously in DB):
-- Unarchive only when `doc.role === "AUTHOR"` (new suggestions on my docs).
+- Created with `status: "INBOX"` only when `doc.role === "AUTHOR"`; otherwise `"ARCHIVED"`.
+- Gmail-first inserts always use `"INBOX"` (notification = interesting activity).
+- Gmail merge promotes `ARCHIVED` suggestions to `INBOX`; `MUTED` stays `MUTED`.
+- Unarchive (doc level) only when `doc.role === "AUTHOR"` (new suggestions on my docs).
 - Always counts as non-resolve activity.
 
 **MUTED threads**: never trigger unarchive, unless an @-mention breaks the thread out of

@@ -42,8 +42,8 @@ Every Refresh calls `fetchSuggestions`, which calls `documents.get` with
 pending suggestion IDs (`suggest.xxx`). Each is upserted into the Comment table:
 
 - **Create** (new): `type: "SUGGESTION"`, `googleSuggestionId` set to the `suggest.xxx` ID,
-  `suggestionType` set, `resolved: false`, `status: "INBOX"`. No timestamps — Docs API
-  doesn't provide them.
+  `suggestionType` set, `resolved: false`, `status: "INBOX"` if `doc.role === "AUTHOR"`,
+  otherwise `"ARCHIVED"`. No timestamps — Docs API doesn't provide them.
 - **Update** (existing): only `suggestionType` is updated (preserves user-set status).
 
 After upserting, any `suggest.xxx` records **no longer in the Docs API response** are
@@ -106,10 +106,12 @@ potentially be derived from parsed Gmail notifications but are left for later.
 **Drive syncs first (typical):** Creates row with `googleSuggestionId` + content hash.
 Gmail merge later finds by content hash, fills in `googleCommentId`, `replyCount`, and
 overwrites `driveCreatedAt` with the Gmail notification timestamp (more accurate than
-Drive's `doc.lastModifiedInDrive` approximation).
+Drive's `doc.lastModifiedInDrive` approximation). If the suggestion is `ARCHIVED`, Gmail
+merge promotes it to `INBOX` (a notification means interesting activity). `MUTED`
+suggestions are left alone.
 
 **Gmail arrives first:** Inserts row with `googleCommentId`, content hash, `suggestionType`,
-`driveCreatedAt` from Gmail time, and `replyCount`. Drive sync later finds by content hash
+`driveCreatedAt` from Gmail time, `replyCount`, and `status: "INBOX"`. Drive sync later finds by content hash
 and fills in `googleSuggestionId`. The Gmail timestamp is preserved as `driveCreatedAt`.
 
 **No unique hash match:** If content hash matches zero or multiple rows, Drive sync inserts

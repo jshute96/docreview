@@ -543,7 +543,7 @@ async function syncDocsSuggestions(
         suggestionType: s.suggestionType,
         suggestionContentHash: contentHash,
         resolved: false,
-        status: "INBOX",
+        status: doc.role === "AUTHOR" ? "INBOX" : "ARCHIVED",
         driveCreatedAt: doc.lastModifiedInDrive ?? new Date(),
       });
       if (doc.role === "AUTHOR") shouldUnarchive = true;

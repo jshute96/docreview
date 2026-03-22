@@ -203,6 +203,44 @@ describe("mergeSuggestionsFromGmail", () => {
     expect(createCall.data.suggestionContentHash).toBe(expectedHash);
   });
 
+  it("promotes ARCHIVED suggestion to INBOX on merge", async () => {
+    mockParse.mockReturnValue({
+      type: "comment",
+      subject: "", from: "", to: "", date_str: "",
+      documentId: "gdoc1", documentTitle: "Test", documentUrl: "https://docs.google.com/document/d/gdoc1/edit",
+      comments: [],
+      suggestions: [makeSuggestion()],
+    });
+    mockComment.findFirst.mockResolvedValue(null);
+    mockComment.findMany.mockResolvedValue([{
+      commentId: "cr1", googleCommentId: null, replyCount: 0, status: "ARCHIVED",
+    }]);
+
+    const result = await mergeSuggestionsFromGmail("d1", "gdoc1", email);
+    expect(result).toEqual({ merged: 1, inserted: 0 });
+    const updateCall = mockComment.update.mock.calls[0][0];
+    expect(updateCall.data.status).toBe("INBOX");
+  });
+
+  it("does not promote MUTED suggestion on merge", async () => {
+    mockParse.mockReturnValue({
+      type: "comment",
+      subject: "", from: "", to: "", date_str: "",
+      documentId: "gdoc1", documentTitle: "Test", documentUrl: "https://docs.google.com/document/d/gdoc1/edit",
+      comments: [],
+      suggestions: [makeSuggestion()],
+    });
+    mockComment.findFirst.mockResolvedValue(null);
+    mockComment.findMany.mockResolvedValue([{
+      commentId: "cr1", googleCommentId: null, replyCount: 0, status: "MUTED",
+    }]);
+
+    const result = await mergeSuggestionsFromGmail("d1", "gdoc1", email);
+    expect(result).toEqual({ merged: 1, inserted: 0 });
+    const updateCall = mockComment.update.mock.calls[0][0];
+    expect(updateCall.data.status).toBeUndefined();
+  });
+
   it("handles Delete action correctly", async () => {
     mockParse.mockReturnValue({
       type: "comment",
