@@ -27,6 +27,12 @@ I am not longer interested in acting like the author.
      * This avoids noise from the Drive changes feed resurfacing old documents with no new activity.
      * The subsequent comment sync in the same refresh may move it to Inbox if it has relevant unresolved activity (see "Smart Unarchive" below).
 
+* For new suggestions:
+  1. If I am Author on the doc, new suggestions go to Inbox.
+  2. Otherwise (Reviewer), new suggestions start as Archived.
+  3. Exception: if a Gmail notification arrives for the suggestion, it goes to Inbox
+     (notification = interesting activity), unless it was Muted.
+
 * For new comments, and new replies on a comment (First matching rule wins):
   1. If I resolved a comment that was in Inbox, it goes to Archived.
   2. If a new comment or reply includes an @-mention of me, it goes to Inbox. 

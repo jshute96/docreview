@@ -117,6 +117,7 @@ describe("mergeSuggestionsFromGmail", () => {
     expect(createCall.data.googleCommentId).toBe("AAAB0abc");
     expect(createCall.data.type).toBe("SUGGESTION");
     expect(createCall.data.suggestionType).toBe("INSERT");
+    expect(createCall.data.status).toBe("INBOX");
     expect(createCall.data.driveCreatedAt).toEqual(new Date("2026-03-20T15:00:00Z"));
   });
 
