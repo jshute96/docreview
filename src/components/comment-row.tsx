@@ -410,8 +410,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       {cell(`${cellPy} pr-4 text-sm text-zinc-500 tabular-nums`,
         comment.replyCount > 0 ? comment.replyCount : ""
       )}
-      {cell(`${cellPy} pr-4`,
-        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+      {cell(`${cellPy} flex`,
+        // stopPropagation + self-stretch: non-clickable buffer around star/badges
+        // so near-miss clicks don't accidentally expand/collapse the row
+        <div className="flex items-center gap-1 self-stretch pl-0 pr-1" onClick={(e) => e.stopPropagation()}>
           <StarButton starred={comment.isStarred} onToggle={toggleStar} />
           {!isSuggestion && comment.isThreadAuthor && (
             <span title="You started this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
@@ -440,8 +442,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
           )}
         </div>
       )}
-      {cell(`${cellPy} pr-4`,
-        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+      {cell(`${cellPy} flex`,
+        // stopPropagation + self-stretch: non-clickable buffer around buttons
+        // so near-miss clicks don't accidentally expand/collapse the row
+        <div className="flex items-center gap-1 self-stretch pl-1 pr-1" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="outline"
             size="sm"
