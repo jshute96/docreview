@@ -15,6 +15,7 @@ import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId } from "@/lib/api-fetch";
 import { UNREAD_COMMENTS_TOOLTIP, INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 import { commentsTarget, docTarget } from "@/lib/tab-targets";
+import { handleOpenDocClick } from "@/lib/extension-bridge";
 
 interface DocRowProps {
   doc: DocWithLabels;
@@ -70,6 +71,10 @@ export function DocRow({
     } catch {
       toast.error("Failed to update star");
     }
+  }
+
+  function handleOpenDoc(e: React.MouseEvent<HTMLAnchorElement>) {
+    handleOpenDocClick(e, doc.googleDocId, doc.driveUrl, docTarget(doc.googleDocId));
   }
 
   const hasNotes = !!doc.notes?.trim();
@@ -149,7 +154,7 @@ export function DocRow({
       <td className="py-1.5 pr-4">
         <div className="flex items-center gap-1">
           <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Open this document" asChild>
-            <a href={doc.driveUrl} target={docTarget(doc.googleDocId)}>Open</a>
+            <a href={doc.driveUrl} target={docTarget(doc.googleDocId)} onClick={handleOpenDoc}>Open</a>
           </Button>
           <EditDocDialog
             doc={doc}

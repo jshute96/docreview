@@ -94,6 +94,20 @@ export function cancelResolve(): void {
   window.postMessage({ source: "docreview-page", id: ++messageId, type: "cancelResolve", fireAndForget: true }, "*");
 }
 
+/**
+ * Ask the extension to focus an existing Google Docs tab for this document.
+ * Returns true if a tab was found and focused, false if no tab exists.
+ * Does NOT open a new tab — caller should fall through to normal link behavior.
+ */
+export async function focusDocTab(docId: string): Promise<boolean> {
+  try {
+    const result = await sendExtensionMessage<{ found: boolean }>({ type: "focusDocTab", docId }, 2000);
+    return result.found;
+  } catch {
+    return false;
+  }
+}
+
 interface NavigateResult {
   success: boolean;
   opened?: boolean;
@@ -127,4 +141,26 @@ export function navigateToComment(
 /** Check if the extension supports in-page comment navigation (version >= 2, Docs enabled). */
 export function supportsCommentNavigation(): boolean {
   return (cachedExtensionStatus?.version ?? 0) >= 2 && (cachedExtensionStatus?.enableDocs ?? false);
+}
+
+/**
+ * Open a Google Doc, reusing an existing tab when possible.
+ * When the extension is available, asks it to focus an existing tab (tracked by
+ * docTabMap or found by URL). Falls back to window.open with a named target.
+ *
+ * Use as an onClick handler on <a target={docTarget(id)}> links — prevents
+ * default when the extension handles the focus, lets the link work normally
+ * when it doesn't.
+ */
+export function handleOpenDocClick(
+  e: { preventDefault: () => void },
+  googleDocId: string,
+  driveUrl: string,
+  targetName: string,
+): void {
+  if (!supportsCommentNavigation()) return;
+  e.preventDefault();
+  focusDocTab(googleDocId).then((found) => {
+    if (!found) window.open(driveUrl, targetName);
+  });
 }

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import { useCrossTabListener, crossTabReason, broadcastChange, type CrossTabReceivedEvent } from "@/lib/cross-tab";
+import { pingExtension } from "@/lib/extension-bridge";
 import type { TriState } from "@/lib/tri-state";
 import { DocRow } from "@/components/doc-row";
 import { FilterBar } from "@/components/filter-bar";
@@ -149,6 +150,9 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
 
     return "Docreview: " + parts.join(", ");
   }, [isInbox, hasComments, isAuthor, isStarred, mimeTypes, labelsFilter, titleFilter, labels]);
+
+  // Ping extension on mount so focusDocTab() has cached status for doc-row
+  useEffect(() => { void pingExtension(); }, []);
 
   // Next.js metadata reconciliation can reset document.title after effects run.
   // Use a MutationObserver to detect and override any external title changes.

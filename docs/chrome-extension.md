@@ -8,7 +8,7 @@ See `src/chrome-extension/README.md` for user-facing documentation.
 
 **`content.js`** — Runs on Google Docs, Drive, and Gmail pages. Injects Docreview icons by manipulating the DOM. Uses MutationObservers to handle dynamically loaded content (Google Workspace apps load UI elements after the initial page load). The base URL comes from `chrome.storage.sync`, and the Gmail link resolves its target URL at click time rather than injection time (to handle Gmail's SPA navigation correctly).
 
-**`background.js`** — Service worker that handles toolbar clicks, context menu actions, and messages from content scripts. For Gmail, it uses `chrome.scripting.executeScript` with `allFrames: true` to search all frames (including sandboxed AMP iframes that content scripts can't access) for document URLs. Handles `ping` (returns extension status/version), `resolveUrl` (opens a background tab to follow redirects), `cancelResolve` (closes in-flight resolve tabs), and `navigateToComment` (tracks Google Docs tabs per document and injects navigation scripts via `executeScript` in MAIN world). Tab tracking is persisted in `chrome.storage.session` to survive MV3 service worker restarts. Dynamically registers the `docreview-bridge.js` content script for the configured `baseUrl`.
+**`background.js`** — Service worker that handles toolbar clicks, context menu actions, and messages from content scripts. For Gmail, it uses `chrome.scripting.executeScript` with `allFrames: true` to search all frames (including sandboxed AMP iframes that content scripts can't access) for document URLs. Handles `ping` (returns extension status/version), `resolveUrl` (opens a background tab to follow redirects), `cancelResolve` (closes in-flight resolve tabs), `focusDocTab` (focuses an existing Google Docs tab without creating one), and `navigateToComment` (tracks Google Docs tabs per document and injects navigation scripts via `executeScript` in MAIN world). Tab tracking is persisted in `chrome.storage.session` to survive MV3 service worker restarts. Dynamically registers the `docreview-bridge.js` content script for the configured `baseUrl`.
 
 **`docreview-bridge.js`** — Content script dynamically registered for Docreview app pages. Relays `window.postMessage` calls from the web app to the background worker via `chrome.runtime.sendMessage`, and posts responses back. Each page instance generates a unique `pageId` to scope cancellation. Runs in the content script's isolated world; communication with the page is via `postMessage` only.
 
@@ -28,6 +28,48 @@ done
 The extension is automatically detected by the Docreview web app via a ping/response handshake over `window.postMessage`. The `docreview-bridge.js` content script is dynamically registered for the configured `baseUrl` and relays messages between the web page and the background worker. Each page instance gets a unique `pageId` so that cancellation of in-flight resolves is scoped per tab.
 
 **Note:** The `http://localhost/*` entry in `host_permissions` is required for the dynamic content script registration to work in development. For non-localhost deployments, add the production URL to `host_permissions` in `manifest.json`.
+
+## Tab reuse
+
+When navigating between Docreview and Google Docs, links reuse existing tabs instead of opening new ones. This keeps the user to one Docreview comments tab and one Google Docs tab per document, while still allowing middle-click to force a new tab.
+
+### Two tab-tracking systems
+
+Tab reuse relies on two independent mechanisms that cooperate:
+
+1. **Named window targets** (`src/lib/tab-targets.ts`): The web app uses `<a target="dr-{googleDocId}">` for Docreview comments links and `<a target="doc-{googleDocId}">` for Google Docs links. The browser reuses an existing tab with the same `window.name`. This works for Docreview-to-Docreview links (same origin) and for Google Docs tabs that the web app originally opened (same browsing context group).
+
+2. **Extension tab tracking** (`background.js`): The extension maintains a `docTabMap` (docId -> tabId) in `chrome.storage.session`, and also searches open `docs.google.com` tabs by URL. This is needed because `chrome.tabs.create()` opens tabs outside the web app's browsing context group, so named targets from the web app can't find them.
+
+### Why both are needed
+
+Named targets only find tabs within the same **browsing context group** — windows that have an opener/opened relationship. When the web app opens a Google Doc via `<a target="doc-{id}">`, it's in the group and can be found later by name. But when the extension opens a Google Doc via `chrome.tabs.create()` (e.g., from clicking "Open" on a comment), that tab is outside the group. The web app's `<a target="doc-{id}">` won't find it and would open a duplicate.
+
+The extension bridges this gap via `focusDocTab`: the web app asks the extension "do you know about a tab for this doc?" before falling through to the named target link. The shared helper `findDocTab()` in background.js checks both `docTabMap` and a URL-based search across all `docs.google.com` tabs.
+
+### How it works by scenario
+
+**Docreview comments links** (doc list title, add dialog, bulk edit): Use `commentsTarget(googleDocId)` -> `dr-{id}`. Pure named targets, no extension involvement. Clicking the same doc from different pages reuses the same comments tab.
+
+**Opening Google Docs (no extension)**: Use `docTarget(googleDocId)` -> `doc-{id}`. The `<a target>` link handles tab reuse natively.
+
+**Opening Google Docs (extension available)**: The `handleOpenDocClick()` helper in `extension-bridge.ts` intercepts the click, asks the extension to `focusDocTab`, and only falls through to `window.open` with the named target if no tab was found. This handles both directions:
+- Doc list opens first, then comments page "Open" -> extension's `findDocTab` finds the tab by URL
+- Comments page opens first (via extension), then doc list "Open" -> extension's `focusDocTab` finds it in `docTabMap`
+
+**Comment navigation** (clicking "Open" on a specific comment): The extension's `navigateToComment` finds the tab via `findDocTab`, focuses it, and injects a script to scroll to the comment without reloading. If no tab exists, it creates one with a `?disco=` URL for initial scroll.
+
+### window.name synchronization
+
+The extension sets `window.name = 'doc-{id}'` on Google Docs tabs it tracks (via `setDocTabName`), so that future named-target links from the web app can find them. This is called from `focusDocTab`, `trackDocTab`, `navigateToComment` (new tabs), and the toolbar click handler. The `if (!window.name)` guard avoids overwriting names set by the web app's `<a target>`.
+
+### Key files
+
+| File | Role |
+|------|------|
+| `src/lib/tab-targets.ts` | Named target helpers: `commentsTarget()`, `docTarget()`, `openCommentsPage()`, `openDocPage()` |
+| `src/lib/extension-bridge.ts` | `focusDocTab()`, `handleOpenDocClick()`, `navigateToComment()` |
+| `src/chrome-extension/background.js` | `findDocTab()`, `setDocTabName()`, `focusDocTab` handler, `navigateToComment()` |
 
 ## Comment navigation implementation
 

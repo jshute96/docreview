@@ -163,6 +163,7 @@ chrome.action.onClicked.addListener(async function(tab) {
   var docMatch = tab.url.match(/\/d\/([a-zA-Z0-9_-]+)/);
   if (docMatch) {
     await setDocTab(docMatch[1], tab.id);
+    setDocTabName(tab.id, docMatch[1]);
   }
 
   var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
@@ -174,6 +175,7 @@ chrome.action.onClicked.addListener(async function(tab) {
 // - trackDocTab: from Docs content script, tracks the tab for comment navigation reuse
 // - ping: from docreview-bridge, returns extension status
 // - resolveUrl: from docreview-bridge, follows redirects to resolve shortened URLs
+// - focusDocTab: from docreview-bridge, focuses an existing Google Docs tab without creating one
 // - navigateToComment: from docreview-bridge, navigates to a comment in an open Google Docs tab
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   if (msg.type === 'openDocInDocreview' && sender.tab) {
@@ -183,7 +185,9 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
 
   if (msg.type === 'trackDocTab' && sender.tab) {
     chrome.storage.sync.get({ enableDocs: DEFAULTS.enableDocs }, function(config) {
-      if (config.enableDocs) setDocTab(msg.docId, sender.tab.id);
+      if (!config.enableDocs) return;
+      setDocTab(msg.docId, sender.tab.id);
+      setDocTabName(sender.tab.id, msg.docId);
     });
     return;
   }
@@ -213,6 +217,27 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   if (msg.type === 'cancelResolve') {
     cancelResolveTabs(msg.pageId);
     return;
+  }
+
+  if (msg.type === 'focusDocTab') {
+    // Try to focus an existing Google Docs tab for this doc. Returns { found: true }
+    // if successful, { found: false } if no tab exists. Does NOT create a new tab.
+    // Gated on enableDocs for consistency (caller also checks via supportsCommentNavigation).
+    (async function() {
+      var config = await chrome.storage.sync.get({ enableDocs: DEFAULTS.enableDocs });
+      if (!config.enableDocs) { sendResponse({ found: false }); return; }
+      var tabId = await findDocTab(msg.docId);
+      if (tabId) {
+        await chrome.tabs.update(tabId, { active: true });
+        var windowId = (await chrome.tabs.get(tabId)).windowId;
+        await chrome.windows.update(windowId, { focused: true });
+        setDocTabName(tabId, msg.docId);
+        sendResponse({ found: true });
+      } else {
+        sendResponse({ found: false });
+      }
+    })();
+    return true; // async response
   }
 
   if (msg.type === 'navigateToComment') {
@@ -259,6 +284,57 @@ async function removeDocTab(docId) {
   var tabs = await getDocTabs();
   delete tabs[docId];
   await chrome.storage.session.set({ docTabs: tabs });
+}
+
+// Find an existing Google Docs tab for the given doc ID.
+// Checks docTabMap first, then searches open tabs by URL.
+// Returns the tab ID if found (and updates docTabMap), or null.
+async function findDocTab(docId) {
+  var allTabs = await getDocTabs();
+  var tabId = allTabs[docId] || null;
+
+  // Verify tracked tab still exists and is on the right doc
+  if (tabId) {
+    try {
+      var tab = await chrome.tabs.get(tabId);
+      if (!tab || !tab.url || !tab.url.includes(docId)) {
+        await removeDocTab(docId);
+        tabId = null;
+      }
+    } catch(e) {
+      await removeDocTab(docId);
+      tabId = null;
+    }
+  }
+
+  // Search by URL if not tracked
+  if (!tabId) {
+    try {
+      var candidates = await chrome.tabs.query({ url: 'https://docs.google.com/*' });
+      for (var i = 0; i < candidates.length; i++) {
+        if (candidates[i].url && candidates[i].url.includes('/d/' + docId + '/')) {
+          tabId = candidates[i].id;
+          await setDocTab(docId, tabId);
+          console.log('[background] found existing doc tab by URL:', { docId, tabId });
+          break;
+        }
+      }
+    } catch (e) {
+      // Query failed, fall through
+    }
+  }
+
+  return tabId;
+}
+
+// Set window.name on a Google Docs tab so the web app's <a target="doc-{id}">
+// can find it. No-op if window.name is already set.
+function setDocTabName(tabId, docId) {
+  chrome.scripting.executeScript({
+    target: { tabId: tabId },
+    func: function(name) { if (!window.name) window.name = name; },
+    args: ['doc-' + docId]
+  }).catch(function() {});
 }
 
 // Clean up when tabs are closed
@@ -565,25 +641,8 @@ function navigateToCommentInPage(discoId, _resolvedHint, fallbackUrl) {
 // If we have a tracked tab for this doc, inject the navigation script.
 // Otherwise, open a new tab with the disco= URL.
 async function navigateToComment(docId, discoId, docUrl, resolved, senderTab) {
-  var allTabs = await getDocTabs();
-  var tabId = allTabs[docId];
-  console.log('[background] navigateToComment:', { docId, discoId, resolved, trackedTabId: tabId, allTracked: allTabs });
-
-  // Verify the tracked tab still exists and is on the right doc
-  if (tabId) {
-    try {
-      var tab = await chrome.tabs.get(tabId);
-      if (!tab || !tab.url || !tab.url.includes(docId)) {
-        console.log('[background] tracked tab invalid, clearing:', { tabUrl: tab && tab.url, docId });
-        await removeDocTab(docId);
-        tabId = null;
-      }
-    } catch(e) {
-      console.log('[background] tracked tab gone:', e.message);
-      await removeDocTab(docId);
-      tabId = null;
-    }
-  }
+  var tabId = await findDocTab(docId);
+  console.log('[background] navigateToComment:', { docId, discoId, resolved, tabId });
 
   // Build the disco= fallback URL
   var fallbackUrl = docUrl;
@@ -594,12 +653,15 @@ async function navigateToComment(docId, discoId, docUrl, resolved, senderTab) {
   }
 
   if (!tabId) {
-    // No tracked tab — open a new one. Use disco= URL if we have an ID,
+    // No existing tab — open a new one. Use disco= URL if we have an ID,
     // otherwise just open the doc at the top.
     console.log('[background] opening new tab:', { hasDisco: !!discoId });
     var newTabIndex = senderTab ? senderTab.index + 1 : undefined;
     var newTab = await chrome.tabs.create({ url: fallbackUrl, index: newTabIndex });
     await setDocTab(docId, newTab.id);
+    // Set window.name so the web app's <a target="doc-{id}"> can find this tab.
+    // Also set on subsequent interactions via focusDocTab and trackDocTab.
+    setDocTabName(newTab.id, docId);
     console.log('[background] new tab opened, tracking:', { docId, tabId: newTab.id });
     return { success: true, opened: true };
   }

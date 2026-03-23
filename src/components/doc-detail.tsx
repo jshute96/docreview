@@ -15,7 +15,7 @@ import { ROLE_COLORS } from "@/lib/role-colors";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
-import { pingExtension, navigateToComment, supportsCommentNavigation } from "@/lib/extension-bridge";
+import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation } from "@/lib/extension-bridge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -71,11 +71,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   const displayTitle = cachedTitles[doc.googleDocId] || doc.title || "Unknown title";
   const googleDocId = doc.driveUrl.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1] ?? doc.googleDocId;
 
-  // Open the doc tab via the extension (reuses the same tab as comment Open buttons)
   function handleOpenDoc(e: React.MouseEvent<HTMLAnchorElement>) {
-    if (!supportsCommentNavigation()) return;
-    e.preventDefault();
-    navigateToComment(googleDocId, "", doc.driveUrl, false);
+    handleOpenDocClick(e, googleDocId, doc.driveUrl, docTarget(googleDocId));
   }
 
   function setLabels(newLabels: Label[]) {
