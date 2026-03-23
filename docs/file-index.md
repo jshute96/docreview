@@ -240,5 +240,13 @@ Shadcn/ui components:
 | `inbox-states.md` | Describes Inbox/Archived/Muted states for docs and comments, and state changes between them |
 | `local-storage-cache.md` | Browser localStorage cache — motivation, privacy model, key/value format, staleness detection, eviction, future plans |
 | `load-dialog.md` | Load dialog — two-phase scan→add flow, Drive/Gmail source toggle, search options, dialog layout |
+| `notes-on-dom-snapshot-testing.md` | DOM snapshot testing for content script development — saving/loading snapshots, known issues, next steps |
 | `refresh.md` | Full refresh flow — Drive sync modes, deletion detection, comment sync, UI update |
 | `suggestions.md` | Suggestion sync via Docs API, limitations |
+
+## Testing (`testing/`)
+
+| File | Description |
+|------|-------------|
+| `chrome-extension.md` | Chrome extension test cases — content script injection, idempotency, toolbar button, adapted from former bookmarklet tests |
+| `gmail_notifications/` | `.eml` + `.json` pairs for testing `parse-gmail-notification.ts` — comment notifications, sharing invitations, suggestions, edge cases |
