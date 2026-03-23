@@ -2,6 +2,85 @@
 
 Working notes on navigating between comments in an already-open Google Docs page, without triggering a full page reload.
 
+## Google Docs DOM structure snapshot (as of March 2026)
+
+This section documents the Google Docs DOM structure and internal APIs that
+the Docreview extension depends on. If comment navigation breaks after a
+Google Docs update, compare the current DOM against this snapshot to identify
+what changed.
+
+### Selectors we depend on
+
+| Selector | What it matches | Used for |
+|----------|----------------|----------|
+| `#docos-stream-view` | The comments list container (`<div role="list">`) | Finding comment items |
+| `#docos-stream-view [role="listitem"]` | Individual comment/suggestion entries | Iterating comments, clicking to navigate |
+| `.docos-anchoreddocoview` | Class on listitems for open comments with margin highlights | Detecting anchored vs non-anchored |
+| `.docos-streamdocoview` | Class on listitems for resolved/unanchored comments | Detecting anchored vs non-anchored |
+| `.docs-docos-activity-sidebar` | The comments side panel | Detecting if pane is open |
+| `[aria-label*="Show all comments"]` | Toolbar button to toggle comments pane | Opening the pane programmatically |
+| `[aria-label="Close"]` inside sidebar | Close button in comments pane | Closing the pane programmatically |
+| `[role="listitem"]` `aria-label` attribute | Labels like `"Comments dialog. Open comment. Author ..."` or `"Resolved comment..."` | Identifying comment type |
+
+These are ARIA/accessibility selectors and established Google class names.
+They have been stable across observed releases but could change.
+
+### Closure component tree structure
+
+Each `[role="listitem"]` DOM element has a dynamically-named property starting
+with `closure_lm` (e.g., `closure_lm_501193` — the numeric suffix varies per
+page load). This is Google's Closure Library attaching its component model to
+the DOM.
+
+**Path to the click handler root:**
+```
+element[closure_lm_*].listeners.click[0]
+```
+
+**Stable structural pattern** (property names are minified and WILL change):
+```
+click[0]
+  ├── <per-item-prop>              // e.g., "Yd" — the per-listitem model
+  │   ├── <id-prop>               // e.g., "Ai" — this item's AAAB disco ID ★
+  │   ├── <redundant-id-prop>     // e.g., "Aa.Ai" — same ID, redundant path
+  │   ├── <replies-prop>          // e.g., "qq" — array of reply objects
+  │   │   └── [n].<parent-prop>   // e.g., "W" — parent comment ID
+  │   └── <shared-model-prop>     // e.g., "t3b"
+  │       └── <all-comments-prop> // e.g., "qq" — array of ALL comment models
+  │           └── [n].<id-prop>   // same id-prop as above, for each comment
+  └── ...
+```
+
+**Key observations (as of March 2026, minified names `Yd`, `Ai`, `t3b`, `qq`):**
+- The per-item disco ID is at a **short path** (depth 2) from the click handler root: `click[0].Yd.Ai`
+- The same ID appears redundantly at `click[0].Yd.Aa.Ai`
+- The shared array of ALL comment models is at `click[0].Yd.t3b.qq` — this is the same object reference from every listitem
+- The shared array does NOT include resolved comments (only their DOM elements persist)
+- Array paths go through numeric indices; the per-item path does not
+
+**What the discovery algorithm relies on:**
+1. `closure_lm` prefix exists on listitem elements (to find the Closure component)
+2. The Closure component has a `.listeners.click` array (to find click handlers)
+3. The per-item disco ID is an `AAAB`-prefixed string at a short, non-array path from the click handler
+4. The shared model array is reachable through numeric array indices (distinguishing it from per-item paths)
+
+If any of these structural assumptions break, the discovery algorithm will fail
+and navigation will fall back to `?disco=` URL reload.
+
+### Event handling
+
+- **Comment listitems**: Respond to bare `.click()` — this navigates to the comment, scrolls the document, and highlights the text.
+- **Google Docs UI buttons** (toolbar, pane controls): Require a full `mousedown` → `mouseup` → `click` event sequence. Bare `.click()` is ignored by the Closure event system.
+- **Canvas content area**: Does not respond to synthetic mouse events. The document text is canvas-rendered.
+
+### DOM lifecycle
+
+- On initial page load, only **anchored** (open) comments are in the DOM
+- Opening the comments pane loads **all** comments (resolved, unanchored) into the DOM
+- Once loaded, resolved comments persist as hidden DOM elements even after the pane is closed
+- The stream view DOM is **rebuilt** when: the pane opens/closes, a document tab switch occurs, or a comment is resolved/accepted/rejected
+- After any rebuild, all previous DOM element references are stale — must re-query
+
 ## Goal
 
 Docreview comments page open in one window, Google Docs in another. Clicking a comment in Docreview scrolls the Google Doc to that comment's location. Currently, Docreview's "Open" links use `?disco=<id>` URLs which reload the page — slow and jarring. Also, `disco=` doesn't work for suggestions (only comments).
@@ -42,6 +121,8 @@ const allComments = listitem[lmKey].listeners.click[0].Yd.t3b.qq;
 ```
 
 **Property names are minified** (`Yd`, `Ai`, `t3b`, `qq`) and could change between Google Docs releases. The structural pattern (closure_lm → click listener → model object with ID) should be more stable than the specific property names.
+
+**Dynamic discovery:** Rather than hardcoding these minified names, the extension discovers the correct path at runtime. The key insight is that each listitem's click handler has two kinds of paths to AAAB strings: (1) a short, direct path to the per-item disco ID (e.g., `Yd.Ai`), and (2) paths through numeric array indices to a shared array of all comment IDs (e.g., `Yd.t3b.qq[N].Ai`). With 2+ items, diffing two items reveals which non-array paths have different values — those are the per-item ID paths. With 1 item, the shortest non-array path is used. Discovery takes ~3ms and is cached for the page session.
 
 #### Other useful properties in the comment model
 

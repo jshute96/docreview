@@ -42,9 +42,17 @@ Easy:
   * record notes about where it came from, when I asked permission
   * built-in tag for PermissionPending, transition when I get permission
 
-* chrome plugin
+* chrome extension
   * capture linked-from notes when requesting permission
-  * scroll to comments in the doc window without reloading: done, but needs more testing and robustness against docs changes
+  * docs jump-to-comment works - what about sheets and slides?
+  * bi-directional linking - click a comment in the doc or docreview, focus that comment in the other too
+  * notice comments added/replied/resolved in docs, update docreview
+  * get better content for suggestions from open docs, vs limited info we have from the API
+  * accept or reject suggestions by sending clicks to buttons in docs (there's no API for this)
+  * maybe: context-menu items for links to docs (maybe shortened links too) for docreview actions
+  * maybe: inline/popup docreview status - labels, etc.
+  * cosmetic: icon placement in title is glitchy while the page is loading and things move around
+  * cosmetic: in drive, omit docreview links for files of unsupported types
 
 * sandbox test environment
 * snapshot database and simulated or recorded google APIs

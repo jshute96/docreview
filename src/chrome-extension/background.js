@@ -304,53 +304,124 @@ function navigateToCommentInPage(discoId, _resolvedHint, fallbackUrl) {
 
   // --- ID extraction from Closure component tree ---
 
-  // Extract the disco ID from a listitem's Closure listener map.
-  // Fast path uses known minified property names; fallback does a deep search.
-  var loggedFallback = false;
-  function getDiscoId(item) {
+  // The disco ID for each comment listitem is stored in Google's Closure Library
+  // component tree under minified property names (e.g., .Yd.Ai) that change when
+  // Google releases new code. Instead of hardcoding these names, we discover the
+  // path dynamically by walking the tree and looking for AAAB-pattern strings.
+  //
+  // Discovery strategy:
+  //   - With 2+ items: diff two items' trees. Paths that exist in both but have
+  //     different values are per-item IDs. Paths through array indices contain the
+  //     shared model array (all IDs) — filter those out.
+  //   - With 1 item: find the shortest path to an AAAB string that doesn't traverse
+  //     an array index. The shared array goes through numeric indices; the per-item
+  //     ID is at a short, direct property path.
+  //
+  // The discovered path is used for all items within a single navigation call.
+  // Since this function is injected fresh each time, there's no cross-call cache,
+  // but discovery is fast (~3ms) and only runs once per invocation.
+
+  var discoveredIdPath = null;
+
+  // Walk an object tree collecting paths to AAAB-pattern strings.
+  // Each result: { path: string[], value, throughArray: boolean }
+  // throughArray is true if any step in the path was a numeric array index.
+  function collectIdPaths(obj, maxDepth) {
+    var results = [];
+    var seen = new WeakSet();
+    function walk(cur, path, depth, throughArray) {
+      if (depth > maxDepth || !cur) return;
+      if (typeof cur === 'object') {
+        if (seen.has(cur)) return;
+        seen.add(cur);
+      }
+      var keys = Object.keys(cur);
+      for (var i = 0; i < keys.length && i < 200; i++) {
+        var key = keys[i];
+        var isNum = /^\d+$/.test(key);
+        try {
+          var v = cur[key];
+          if (typeof v === 'string' && /^AAAB[A-Za-z0-9_-]{5,}$/.test(v) && v.length < 20) {
+            results.push({
+              path: isNum ? path.concat('*') : path.concat(key),
+              value: v,
+              throughArray: throughArray || isNum
+            });
+          }
+          if (typeof v === 'object' && v !== null && !(v instanceof HTMLElement) && !(v instanceof Window)) {
+            walk(v, isNum ? path.concat('*') : path.concat(key), depth + 1, throughArray || isNum);
+          }
+        } catch(e) {}
+      }
+    }
+    walk(obj, [], 0, false);
+    return results;
+  }
+
+  function getClickRoot(item) {
     var lk = Object.keys(item).find(function(k) { return k.startsWith('closure_lm'); });
     if (!lk) return null;
-    try {
-      var id = item[lk].listeners.click[0].Yd.Ai;
-      if (typeof id === 'string' && id.match(/^AAAB/)) return id;
-    } catch(e) {}
+    try { return item[lk].listeners.click[0]; } catch(e) { return null; }
+  }
 
-    // Fallback: deep search for AAAB-pattern strings in the click listener.
-    // This handles cases where Google updates their minified property names.
-    // Note: the shared comment model array (t3b.qq) contains all IDs, so the
-    // deep search may return a wrong ID. The fast path above is authoritative.
-    if (!loggedFallback) {
-      console.log('[docreview-nav] fast path failed, using deep search fallback');
-      loggedFallback = true;
+  // Discover the property path to the per-item disco ID.
+  function discoverIdPath(items) {
+    if (items.length >= 2) {
+      // Differential: find non-array paths that have different values across two items
+      var root0 = getClickRoot(items[0]);
+      var root1 = getClickRoot(items[1]);
+      if (!root0 || !root1) return null;
+      var paths0 = collectIdPaths(root0, 4);
+      var paths1 = collectIdPaths(root1, 4);
+      var map0 = {}, map1 = {};
+      paths0.forEach(function(p) { if (!p.throughArray) map0[p.path.join('.')] = p.value; });
+      paths1.forEach(function(p) { if (!p.throughArray) map1[p.path.join('.')] = p.value; });
+      var candidates = [];
+      for (var key in map0) {
+        if (map1[key] && map0[key] !== map1[key]) candidates.push(key);
+      }
+      candidates.sort(function(a, b) { return a.length - b.length; });
+      if (candidates.length > 0) return candidates[0].split('.');
+    } else if (items.length === 1) {
+      // Single item: shortest non-array path to an AAAB string
+      var root = getClickRoot(items[0]);
+      if (!root) return null;
+      var paths = collectIdPaths(root, 4);
+      var nonArray = paths.filter(function(p) { return !p.throughArray; });
+      nonArray.sort(function(a, b) { return a.path.length - b.path.length; });
+      if (nonArray.length > 0) return nonArray[0].path;
     }
+    return null;
+  }
+
+  // Extract the disco ID from an item using a known property path.
+  function extractIdByPath(item, pathParts) {
     try {
-      var clickHandlers = item[lk].listeners && item[lk].listeners.click;
-      if (!clickHandlers) return null;
-      var seen = new WeakSet();
-      function findId(obj, depth) {
-        if (depth > 12 || !obj) return null;
-        if (typeof obj === 'object') {
-          if (seen.has(obj)) return null;
-          seen.add(obj);
-        }
-        var keys = Object.keys(obj);
-        for (var i = 0; i < keys.length && i < 200; i++) {
-          try {
-            var v = obj[keys[i]];
-            if (typeof v === 'string' && v.match(/^AAAB[A-Za-z0-9_-]{5,}$/) && v.length < 20) return v;
-            if (typeof v === 'object' && v !== null && !(v instanceof HTMLElement) && !(v instanceof Window)) {
-              var found = findId(v, depth + 1);
-              if (found) return found;
-            }
-          } catch(e) {}
-        }
-        return null;
-      }
-      for (var h = 0; h < clickHandlers.length; h++) {
-        var found = findId(clickHandlers[h], 0);
-        if (found) return found;
-      }
-    } catch(e) {}
+      var cur = getClickRoot(item);
+      if (!cur) return null;
+      for (var i = 0; i < pathParts.length; i++) cur = cur[pathParts[i]];
+      return (typeof cur === 'string' && /^AAAB/.test(cur)) ? cur : null;
+    } catch(e) { return null; }
+  }
+
+  function getDiscoId(item) {
+    // Try the cached path first
+    if (discoveredIdPath) {
+      var id = extractIdByPath(item, discoveredIdPath);
+      if (id) return id;
+    }
+
+    // Cached path failed or doesn't exist — discover it
+    var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
+    var newPath = discoverIdPath(items);
+    if (newPath) {
+      discoveredIdPath = newPath;
+      console.log('[docreview-nav] discovered ID path:', newPath.join('.'));
+      var id = extractIdByPath(item, newPath);
+      if (id) return id;
+    }
+
+    console.log('[docreview-nav] ID extraction failed');
     return null;
   }
 
