@@ -57,13 +57,23 @@
     const params = new URLSearchParams(window.location.search);
     const page = params.get("page") || "quick-start";
 
+    // Open all links in a new tab (the viewer runs inside an iframe)
+    const renderer = new marked.Renderer();
+    renderer.link = function({ href, title, text }) {
+      const titleAttr = title ? ` title="${title}"` : "";
+      return `<a href="${href}"${titleAttr} target="_blank" rel="noopener">${text}</a>`;
+    };
+
     fetch(`/help/${page}.md`)
       .then(res => {
         if (!res.ok) throw new Error(`Page not found: ${page}`);
         return res.text();
       })
       .then(md => {
-        document.getElementById("content").innerHTML = marked.parse(md);
+        // Replace template variables with values passed from the parent
+        const chromeExtensionUrl = params.get("chromeExtensionUrl") || "";
+        md = md.replace(/\{\{CHROME_EXTENSION_URL\}\}/g, chromeExtensionUrl);
+        document.getElementById("content").innerHTML = marked.parse(md, { renderer });
       })
       .catch(err => {
         document.getElementById("content").innerHTML =

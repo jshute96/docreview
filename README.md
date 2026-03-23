@@ -50,6 +50,12 @@ status, comments, and suggestions via the Google Drive API.
    AUTH_GOOGLE_SECRET="..."
    ```
 
+   Optional:
+   ```
+   NEXT_PUBLIC_CHROME_EXTENSION_URL="..."  # link to Chrome extension info/install page
+   ```
+   Defaults to the GitHub source directory if not set.
+
 5. **Proxy & HTTPS Setup:**
    This is not necessary to access a server directly using http://localhost:3000.
 

@@ -30,6 +30,7 @@ import { LabelProvider } from "@/contexts/label-context";
 import { HelpDialog } from "@/components/help-dialog";
 import { DeleteAllDialog } from "@/components/delete-all-dialog";
 import { clearAll as clearBrowserCache } from "@/lib/browser-cache";
+import { CHROME_EXTENSION_URL } from "@/lib/env-config";
 import { WelcomeDialog } from "@/components/welcome-dialog";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import {
@@ -438,6 +439,13 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
               >
                 <FileText className="h-4 w-4 mr-2" />
                 Bookmarklet page
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => window.open(CHROME_EXTENSION_URL, "_blank")}
+                title="Info and installation instructions for the Chrome extension"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Chrome extension
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

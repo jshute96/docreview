@@ -2,11 +2,13 @@ The Docreview Chrome extension adds quick-access icons to Google Docs, Drive, an
 
 ## Installation
 
-The extension is installed manually from the source code:
+[Get the Chrome extension here]({{CHROME_EXTENSION_URL}}).
+
+The extension is installed manually from files:
 
 1. Open `chrome://extensions` in Chrome.
 2. Enable **Developer mode** (toggle in the top right).
-3. Click **Load unpacked** and select the `src/chrome-extension` folder from the Docreview source code.
+3. Click **Load unpacked** and select the files downloaded above or the `src/chrome-extension` folder from the Docreview source code.
 
 ## What it adds
 
@@ -41,6 +43,8 @@ This works for both open and resolved comments. For resolved comments, the exten
 
 Without the extension installed, the "Open" buttons still work but they have to reload the page each time, which is slow.
 
+Comment navigation requires the "Enable on Google Docs" option to be turned on in the extension settings.
+
 ## Configuration
 
 By default, the extension connects to `http://localhost:3000`. To change this:
@@ -49,4 +53,6 @@ By default, the extension connects to `http://localhost:3000`. To change this:
 2. Enter your Docreview server URL.
 3. Click **Save**.
 
-The setting syncs across your Chrome devices.
+The options page also has toggles for enabling/disabling the extension on each Google service.
+
+The settings sync across your Chrome devices.

@@ -6,6 +6,7 @@
 export interface ExtensionStatus {
   version: number;
   baseUrl: string;
+  enableDocs: boolean;
   enableResolve: boolean;
   resolveHosts: string[];
 }
@@ -123,7 +124,7 @@ export function navigateToComment(
   });
 }
 
-/** Check if the extension supports in-page comment navigation (version >= 2). */
+/** Check if the extension supports in-page comment navigation (version >= 2, Docs enabled). */
 export function supportsCommentNavigation(): boolean {
-  return (cachedExtensionStatus?.version ?? 0) >= 2;
+  return (cachedExtensionStatus?.version ?? 0) >= 2 && (cachedExtensionStatus?.enableDocs ?? false);
 }

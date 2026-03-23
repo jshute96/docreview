@@ -182,14 +182,16 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   }
 
   if (msg.type === 'trackDocTab' && sender.tab) {
-    setDocTab(msg.docId, sender.tab.id);
+    chrome.storage.sync.get({ enableDocs: DEFAULTS.enableDocs }, function(config) {
+      if (config.enableDocs) setDocTab(msg.docId, sender.tab.id);
+    });
     return;
   }
 
   if (msg.type === 'ping') {
     console.log('[background] ping received');
-    chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl, enableResolve: DEFAULTS.enableResolve, resolveHosts: DEFAULTS.resolveHosts }, function(config) {
-      sendResponse({ version: 2, baseUrl: config.baseUrl, enableResolve: config.enableResolve, resolveHosts: config.resolveHosts });
+    chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl, enableDocs: DEFAULTS.enableDocs, enableResolve: DEFAULTS.enableResolve, resolveHosts: DEFAULTS.resolveHosts }, function(config) {
+      sendResponse({ version: 2, baseUrl: config.baseUrl, enableDocs: config.enableDocs, enableResolve: config.enableResolve, resolveHosts: config.resolveHosts });
     });
     return true; // async response
   }
@@ -214,12 +216,18 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   }
 
   if (msg.type === 'navigateToComment') {
-    navigateToComment(msg.docId, msg.discoId, msg.docUrl, msg.resolved, sender.tab).then(function(result) {
-      console.log('[background] navigateToComment result:', result);
-      sendResponse(result);
-    }).catch(function(err) {
-      console.error('[background] navigateToComment error:', err);
-      sendResponse({ success: false, error: err.message });
+    chrome.storage.sync.get({ enableDocs: DEFAULTS.enableDocs }, function(config) {
+      if (!config.enableDocs) {
+        sendResponse({ success: false, error: 'Google Docs integration is disabled' });
+        return;
+      }
+      navigateToComment(msg.docId, msg.discoId, msg.docUrl, msg.resolved, sender.tab).then(function(result) {
+        console.log('[background] navigateToComment result:', result);
+        sendResponse(result);
+      }).catch(function(err) {
+        console.error('[background] navigateToComment error:', err);
+        sendResponse({ success: false, error: err.message });
+      });
     });
     return true; // async response
   }

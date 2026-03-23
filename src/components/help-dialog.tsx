@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CHROME_EXTENSION_URL } from "@/lib/env-config";
 
 interface HelpPage {
   slug: string;
@@ -91,7 +92,7 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
             <iframe
               ref={iframeRef}
               key={currentPage.slug}
-              src={`/help/viewer.html?page=${currentPage.slug}`}
+              src={`/help/viewer.html?page=${currentPage.slug}&chromeExtensionUrl=${encodeURIComponent(CHROME_EXTENSION_URL)}`}
               className="w-full border border-zinc-200 rounded-md bg-white"
               style={{ height: "60vh" }}
               title={currentPage.title}
