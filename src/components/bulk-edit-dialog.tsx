@@ -24,7 +24,7 @@ import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId } from "@/lib/api-fetch";
 import { useLabels } from "@/contexts/label-context";
 import { useMultiSelect } from "@/hooks/use-multi-select";
-import { openCommentsPage } from "@/lib/tab-targets";
+import { commentsTarget } from "@/lib/tab-targets";
 
 interface BulkEditDialogProps {
   initialDocs: DocWithLabels[];
@@ -413,9 +413,15 @@ export function BulkEditDialog({
                     >
                       <X className="h-3 w-3" />
                     </button>
-                    <span
-                      onDoubleClick={() => openCommentsPage(doc.docId, doc.googleDocId)}
-                      title="Click to select, double-click to open"
+                    <a
+                      href={`/comments/${doc.docId}`}
+                      target={commentsTarget(doc.googleDocId)}
+                      onClick={(e) => {
+                        if (e.detail === 1) {
+                          e.preventDefault();
+                        }
+                      }}
+                      title="Click to select, middle- or double-click to open"
                       className={`flex items-center gap-2 ${
                         doc.accessState !== "OK" ? "text-zinc-400 line-through" : ""
                       }`}
@@ -424,14 +430,14 @@ export function BulkEditDialog({
                       <span className="whitespace-nowrap pr-4 text-xs font-medium">
                         {cachedTitles?.[doc.googleDocId] || doc.title || "Unknown title"}
                       </span>
-                    </span>
+                    </a>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <p className="mx-6 mt-1 text-sm text-zinc-400 shrink-0">Click to select, double-click to open</p>
+          <p className="mx-6 mt-1 text-sm text-zinc-400 shrink-0">Click to select, middle- or double-click to open</p>
         </div>
 
         <div className="p-6 pt-0">

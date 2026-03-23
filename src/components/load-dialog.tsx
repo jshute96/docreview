@@ -37,7 +37,7 @@ import type { DocWithLabels } from "@/types";
 import { broadcastChange } from "@/lib/cross-tab";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { StarButton } from "@/components/star-button";
-import { openDocPage } from "@/lib/tab-targets";
+import { docTarget } from "@/lib/tab-targets";
 
 type TimeUnit = "days" | "months" | "years" | "all";
 
@@ -542,9 +542,16 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                           {doc.isNew ? "NEW" : ""}
                         </span>
                       )}
-                      <span
-                        onDoubleClick={() => openDocPage(doc.googleDocId, doc.driveUrl)}
-                        title="Click to select, double-click to open"
+                      <a
+                        href={doc.driveUrl}
+                        target={docTarget(doc.googleDocId)}
+                        onClick={(e) => {
+                          // Left-click selects the row; double-click opens
+                          if (e.detail === 1) {
+                            e.preventDefault();
+                          }
+                        }}
+                        title="Click to select, middle- or double-click to open"
                         className="flex items-center gap-2"
                       >
                         <DocTypeIcon
@@ -554,7 +561,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                         <span className="whitespace-nowrap pr-4 text-xs font-medium">
                           {doc.title}
                         </span>
-                      </span>
+                      </a>
                     </div>
                   ))}
                 </div>
@@ -565,15 +572,11 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
           {/* Below doc list - fixed */}
           {scanResult && hasAnyDocs && (
             <div className="flex flex-col gap-4 px-6 py-4 shrink-0">
-              <div>
-                <p className="text-sm text-zinc-400">Click to select, double-click to open</p>
-                {(removedDocIds.size > 0 || highlightedIds.size > 0) && (
-                  <p className="text-sm text-zinc-500">
-                    {effectiveDocs.length} document
-                    {effectiveDocs.length === 1 ? "" : "s"} selected
-                  </p>
-                )}
-              </div>
+              <p className="text-sm text-zinc-400">
+                {removedDocIds.size > 0 || highlightedIds.size > 0
+                  ? `${effectiveDocs.length} document${effectiveDocs.length === 1 ? "" : "s"} selected`
+                  : "Click to select, middle- or double-click to open"}
+              </p>
 
               <LabelPicker
                 selectedLabelIds={selectedLabelIds}
