@@ -93,7 +93,7 @@ Click the comment, then click "Mark as resolved and hide discussion".
 | Toggle Inbox filter | Click "Inbox" button in the Filters section — toggles between inbox-only and all docs |
 | Open comments page | Click a doc title link (opens in new tab — switch to it) |
 | Open doc in Google | Click "Open" link on a doc row |
-| Find a Google Doc/Sheet/Slides | Look at the file type icon in each doc row to identify the type. Click "Open" on the desired row to open it in Google. Useful when you need a specific document type for testing (e.g., a Sheets file to test bookmarklets on Sheets). |
+| Find a Google Doc/Sheet/Slides | Look at the file type icon in each doc row to identify the type. Click "Open" on the desired row to open it in Google. Useful when you need a specific document type for testing. |
 
 ### Comments page (/comments/{id})
 
@@ -188,46 +188,7 @@ For testing, we normally choose when to do these Refreshes manually so we can co
 
 **Consent screens**: During Google login, you may encounter multiple consent/warning screens. Click "Continue" on each one — there can be 2-3 of them.
 
-## Bookmarklet Testing
-
-Bookmarklets inject JavaScript into Google Docs/Drive pages. Because they run as `javascript:` URLs in the real browser, testing them via Playwright requires executing the bookmarklet code with `browser_evaluate`. The test cases are defined in `src/bookmarklet/testing.md`.
-
-### How to execute a bookmarklet
-
-1. **Read the source** from `src/bookmarklet/bookmarklet-source.js` or `open-in-docreview-source.js`.
-2. **Replace `__BASE_URL__`** with `http://localhost:3000` (this is what the install page does at runtime via `window.location.origin`).
-3. **Run via `browser_evaluate`** — paste the full source (with replacement) into the function body and execute it.
-
-### Testing workflow
-
-1. **Reload the page** before each test to clear previous state (old injected elements, `window._dr`, etc.). Navigate to the URL again or use `page.reload()`.
-2. **Verify clean state** before running: check that the bookmarklet's injected elements don't exist (read the source to find the IDs/classes it uses for guards).
-3. **Run the bookmarklet** via `browser_evaluate`.
-4. **Verify results**: use `browser_evaluate` to check DOM state (element counts, image load status) and `browser_take_screenshot` for visual confirmation.
-5. **Test idempotency**: run the bookmarklet a second time on the same page and verify no duplicate elements are created.
-
-### Handling alerts
-
-Some bookmarklets call `alert()` to give messages. Using `browser_handle_dialog` often fails because the dialog is "already handled" by the time the tool runs. Instead, use `browser_run_code` with a `page.once('dialog')` listener set up *before* running the bookmarklet code:
-
-```javascript
-async (page) => {
-  let dialogMessage = null;
-  page.once('dialog', async dialog => {
-    dialogMessage = dialog.message();
-    await dialog.accept();
-  });
-  await page.evaluate(() => { /* bookmarklet code */ });
-  await page.waitForTimeout(500);
-  return { dialogMessage };
-}
-```
-
-### Mixed content
-
-On HTTPS pages (docs.google.com, drive.google.com), the browser may block HTTP resources from localhost. If an icon image doesn't load (`img.complete === false`, `img.naturalWidth === 0`), the user can allow mixed content by clicking the shield/lock icon in the address bar and enabling "Load unsafe scripts" (or "Site settings" → "Insecure content" → Allow). This persists for the session. The injected elements and click handlers still work even when the image is blocked.
-
-### Google Drive reload
+## Google Drive reload
 
 Google Drive never reaches `networkidle` — `page.reload({ waitUntil: 'networkidle' })` will time out. Use `domcontentloaded` plus a `waitForTimeout`:
 

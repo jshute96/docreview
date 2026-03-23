@@ -1,10 +1,8 @@
-// Derived from src/bookmarklet/bookmarklet-source.js — sync changes manually
-//
 // Content script for Docreview Chrome Extension.
 // Injects Docreview icons into Google Docs, Drive, and Gmail.
 //
-// Key differences from the bookmarklet:
-//   - baseUrl comes from chrome.storage.sync instead of a build-time __BASE_URL__
+// Key design notes:
+//   - baseUrl comes from chrome.storage.sync (configurable via options page)
 //   - Icon uses chrome.runtime.getURL (works offline, no mixed-content issues)
 //   - Gmail "Open in Docreview" link resolves the doc URL at click time via the
 //     background service worker, not at injection time. This avoids stale URLs when

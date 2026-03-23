@@ -21,7 +21,7 @@ the redirect URI (the Cloud Run URL instead of `localhost:3000`).
 On each deploy, Cloud Build creates a new Docker image using the multi-stage `Dockerfile`:
 
 1. **Build stage**: Installs dependencies, generates the Prisma client (with Alpine-compatible
-   engine binaries), builds the Next.js standalone output, and minifies bookmarklets.
+   engine binaries), and builds the Next.js standalone output.
 2. **Runtime stage**: A minimal Alpine image with just the standalone build output, static
    assets, Prisma schema/migrations, and the Prisma CLI.
 

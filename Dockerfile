@@ -13,7 +13,7 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build the Next.js app (includes bookmarklet build)
+# Build the Next.js app
 RUN npm run build
 
 # Stage 3: Production runner

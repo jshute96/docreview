@@ -53,6 +53,7 @@ Easy:
   * maybe: inline/popup docreview status - labels, etc.
   * cosmetic: icon placement in title is glitchy while the page is loading and things move around
   * cosmetic: in drive, omit docreview links for files of unsupported types
+  * testing: get automated testing working. see `testing/chrome-extension.md`.
 
 * sandbox test environment
 * snapshot database and simulated or recorded google APIs

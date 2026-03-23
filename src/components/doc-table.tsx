@@ -434,13 +434,6 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
                 Add doc page
               </DropdownMenuItem>
               <DropdownMenuItem
-                onSelect={() => window.open("/bookmarklet", "_blank")}
-                title="Install the Docreview bookmarklet"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Bookmarklet page
-              </DropdownMenuItem>
-              <DropdownMenuItem
                 onSelect={() => window.open(CHROME_EXTENSION_URL, "_blank")}
                 title="Info and installation instructions for the Chrome extension"
               >

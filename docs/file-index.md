@@ -28,22 +28,7 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/page.tsx` | Doc list page (server) — fetches docs+labels, renders `DocTable` |
 | `add/page.tsx` | Add document page (server) — standalone add-doc form, accepts optional `?doc=` and `?notes=` query params |
 | `open/page.tsx` | Open page (server) — redirects to `/comments/<docId>` if doc exists, otherwise to `/add?doc=...` |
-| `bookmarklet/page.tsx` | Bookmarklet install page (server) — metadata and wrapper for `BookmarkletClient` |
-| `bookmarklet/bookmarklet-client.tsx` | Bookmarklet install page (client) — "Drag to Install" UI for both bookmarklets |
 | `comments/[docId]/page.tsx` | Doc detail page (server) — fetches single doc with comments, renders `DocDetail`; page title set client-side via `DocDetail` |
-
-## Bookmarklet (`src/bookmarklet/`)
-
-| File | Description |
-|------|-------------|
-| `bookmarklet-source.js` | Source for "Add Docreview links" bookmarklet (injects icons into Drive/Docs/Sheets/Slides) |
-| `bookmarklet-code.ts` | Auto-generated minified "Add Docreview links" bookmarklet |
-| `bookmarklet.txt` | Auto-generated minified "Add Docreview links" bookmarklet for manual install |
-| `open-in-docreview-source.js` | Source for "Open in Docreview" bookmarklet (redirects current doc to Docreview) |
-| `open-in-docreview-code.ts` | Auto-generated minified "Open in Docreview" bookmarklet |
-| `open-in-docreview.txt` | Auto-generated minified "Open in Docreview" bookmarklet for manual install |
-| `README.md` | Documentation for bookmarklet internals, build process, and manual install instructions |
-| `testing.md` | Test cases for interactive Playwright-based bookmarklet testing |
 
 ## Chrome Extension (`src/chrome-extension/`)
 
@@ -51,7 +36,7 @@ One-line descriptions of every source file, grouped by layer.
 |------|-------------|
 | `manifest.json` | Manifest V3 config — permissions, host permissions, content script registration, service worker |
 | `background.js` | Service worker — toolbar click (opens doc in Docreview), context menus, Gmail doc URL extraction via `executeScript(allFrames)` |
-| `content.js` | Content script — injects Docreview icons into Docs titlebar, Drive file lists, Gmail notification emails; derived from `bookmarklet-source.js` |
+| `content.js` | Content script — injects Docreview icons into Docs titlebar, Drive file lists, Gmail notification emails |
 | `defaults.js` | Shared default config (base URL) loaded by all other scripts |
 | `options.html` | Settings page HTML — single URL input with Save/Cancel |
 | `options.js` | Settings page logic — reads/writes `chrome.storage.sync` |
@@ -175,7 +160,6 @@ Shadcn/ui components:
 
 | File | Description |
 |------|-------------|
-| `build-bookmarklet.mjs` | Builds both bookmarklets by minifying source files and updating `.txt` and `.ts` outputs |
 | `check-deps.mjs` | Checks that required Node.js version and dependencies are installed |
 | `check-db.mjs` | Checks that the database is reachable and migrations are up-to-date |
 | `query_database.sh` | Readonly SQL queries via `docreview_ro` user — supports inline SQL, file input, `--schema` |

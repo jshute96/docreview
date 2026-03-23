@@ -5,8 +5,7 @@
   "scripts": {
     "dev": "node scripts/check-deps.mjs && node scripts/check-db.mjs && next dev",
     "dev:offline": "node scripts/check-deps.mjs && node scripts/check-db.mjs && OFFLINE_MODE=true next dev",
-    "build": "npm run build:bookmarklet && next build",
-    "build:bookmarklet": "node scripts/build-bookmarklet.mjs",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
@@ -51,7 +50,6 @@
     "eslint-config-next": "16.1.6",
     "husky": "^9.1.7",
     "tailwindcss": "^4",
-    "terser": "^5.46.0",
     "typescript": "5.9.3",
     "vitest": "^4.0.18"
   }
