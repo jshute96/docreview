@@ -247,6 +247,7 @@ Shadcn/ui components:
 | `architecture.md` | High-level system architecture — tech stack, data model, API layer, client/server split, security |
 | `auth.md` | Authentication — NextAuth v5 + Google OAuth, session handling, token refresh |
 | `bulk-edit.md` | Bulk editing logic — tri-state UI, context-aware cycling, no-op protection |
+| `chrome-extension.md` | Chrome extension design — file descriptions, app integration, comment navigation implementation, content script isolation, dynamic registration |
 | `comment-tracking.md` | Comment status logic, unarchive rules, filter behavior |
 | `cross-tab.md` | Cross-tab sync — BroadcastChannel events, deduplication, listener hook |
 | `dialog-sizing.md` | Shared dialog sizing pattern — flexible item list, stable height on removal |
