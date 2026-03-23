@@ -35,6 +35,6 @@ Documents with items mentioning you or assigned to you are highlighted.
 
 ## Chrome extension
 
-There's an optional Chrome extension that adds Docreview links next to document titles in Google Drive, Documents, and Gmail. It also enables smooth in-page comment navigation in Google Docs when clicking comment links in Docreview.
+There's an optional Chrome extension that adds Docreview links next to document titles in Google Drive, Documents, and Gmail. It also enables smooth in-page comment navigation in Google Docs, Sheets, and Slides when clicking comment links in Docreview.
 
 [Install the Chrome extension]({{CHROME_EXTENSION_URL}})

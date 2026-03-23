@@ -57,7 +57,7 @@ Click a comment row to expand it and see the full thread. The expanded view show
 - A **reply textarea** -- type a response and press Enter (or click Send) to reply.
 - A **Resolve/Reopen button** to change the thread's resolved state.
 - Status controls to move the thread between Inbox, Archived, and Muted.
-- A link to **open the comment in Google Docs**, which navigates directly to the commented text.
+- A link to **open the comment in Google Docs** (or Sheets/Slides), which navigates directly to the commented text.
 
 All threads are pre-fetched when the page loads, so expanding a comment is instant.
 

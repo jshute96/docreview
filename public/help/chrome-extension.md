@@ -1,4 +1,4 @@
-The Docreview Chrome extension adds quick-access icons to Google Docs, Drive, and Gmail so you can open documents in Docreview with one click. It also enables smooth in-page comment navigation from Docreview to Google Docs.
+The Docreview Chrome extension adds quick-access icons to Google Docs, Drive, and Gmail so you can open documents in Docreview with one click. It also enables smooth in-page comment navigation from Docreview to Google Docs, Sheets, and Slides.
 
 ## Installation
 
@@ -37,7 +37,7 @@ Right-click the toolbar icon for additional options:
 
 ## Comment navigation
 
-When viewing a document's comments in Docreview, clicking "Open" on any comment navigates to that comment in Google Docs without reloading the page. The extension keeps track of which tab has the document open -- the first click opens a new tab, and subsequent clicks reuse it, scrolling to the selected comment instantly. If you open Docreview from a Google Docs tab (via the Docreview icon), that tab is remembered, so clicking "Open" takes you back to the same tab.
+When viewing a document's comments in Docreview, clicking "Open" on any comment navigates to that comment in Google Docs, Sheets, or Slides without reloading the page. The extension keeps track of which tab has the document open -- the first click opens a new tab, and subsequent clicks reuse it, scrolling to the selected comment instantly. If you open Docreview from a Google Docs tab (via the Docreview icon), that tab is remembered, so clicking "Open" takes you back to the same tab.
 
 This works for both open and resolved comments. For resolved comments, the extension opens the comments pane in Google Docs so the resolved comment is visible.
 

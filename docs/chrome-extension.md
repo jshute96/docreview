@@ -31,6 +31,8 @@ The extension is automatically detected by the Docreview web app via a ping/resp
 
 ## Comment navigation implementation
 
+Comment navigation works across Google Docs, Sheets, and Slides — they all run on `docs.google.com` and share the same Closure Library component tree and comment DOM structure.
+
 The injected navigation script (`navigateToCommentInPage`) handles several complications:
 
 - **Disco ID discovery**: Comment disco IDs are stored deep in Google's Closure Library component tree under minified property names that change between releases. Instead of hardcoding these names, the script discovers the correct path dynamically by walking the tree and looking for AAAB-pattern ID strings. With 2+ comments, it diffs two items to find paths that differ (per-item ID) vs paths through array indices (shared model). With 1 comment, it finds the shortest non-array path. The discovered path is used for all items within a single navigation call.

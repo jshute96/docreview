@@ -1,6 +1,6 @@
 # Notes on Google Docs Comment Navigation
 
-Working notes on navigating between comments in an already-open Google Docs page, without triggering a full page reload.
+Working notes on navigating between comments in an already-open Google Docs, Sheets, or Slides page, without triggering a full page reload. All three apps run on `docs.google.com` and share the same comment DOM structure.
 
 ## Google Docs DOM structure snapshot (as of March 2026)
 

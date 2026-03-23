@@ -2,7 +2,7 @@
 
 An optional Chrome extension that adds improved integration with Google Docs, Google Drive, and Gmail.
 
-Docreview works without it, but the extension adds links to open Docreview easily, and provides smoother navigation from Docreview to comments in Docs.
+Docreview works without it, but the extension adds links to open Docreview easily, and provides smoother navigation from Docreview to comments in Docs, Sheets, and Slides.
 
 ## What it does
 
@@ -34,7 +34,7 @@ Right-click the toolbar icon for:
 When adding a document via a shortened link (e.g. `go/my-doc`), the server first attempts to follow the redirect itself. If the server can't resolve it (e.g. the shortener requires browser cookies for authentication), and the extension's redirect-link resolver is enabled, the extension resolves the redirect by opening the URL in a background tab (which has the user's cookies). If the redirect lands on a Google Docs URL, it's captured and used for validation. The background tab is closed automatically once the redirect completes or fails. This feature is disabled by default in the extension settings.
 
 ### In-page comment navigation
-When viewing a document's comments in Docreview, clicking "Open" on a comment navigates to that comment in the Google Docs tab without reloading the page. The extension tracks which Chrome tab has each document open — the first click opens a new tab, and subsequent clicks reuse it. If you open Docreview from a Google Docs tab (via the titlebar icon or toolbar icon), that tab is automatically tracked, so clicking "Open" in Docreview reuses the original tab instead of opening a new one.
+When viewing a document's comments in Docreview, clicking "Open" on a comment navigates to that comment in the Google Docs, Sheets, or Slides tab without reloading the page. The extension tracks which Chrome tab has each document open — the first click opens a new tab, and subsequent clicks reuse it. If you open Docreview from a Google Docs tab (via the titlebar icon or toolbar icon), that tab is automatically tracked, so clicking "Open" in Docreview reuses the original tab instead of opening a new one.
 
 This feature requires the "Enable on Google Docs" option to be on in the extension settings. When disabled, "Open" links fall back to page-reload navigation.
 
