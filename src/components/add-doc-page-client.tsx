@@ -8,6 +8,7 @@ import type { DocWithLabels } from "@/types";
 import { Button } from "@/components/ui/button";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { LabelProvider } from "@/contexts/label-context";
+import { commentsTarget } from "@/lib/tab-targets";
 import { broadcastChange, useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
 import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
@@ -24,6 +25,7 @@ interface AddDocPageClientProps {
 
 interface LastAdded {
   docId: string;
+  googleDocId: string;
   title: string;
   mimeType: string | null;
   wasExisting: boolean;
@@ -62,7 +64,7 @@ export function AddDocPageClient({
   const handleSuccess = useCallback((doc: DocWithLabels) => {
     const wasExisting = pageExistingRef.current;
     contentRef.current?.reset();
-    setLastAdded({ docId: doc.docId, title: doc.title, mimeType: doc.mimeType, wasExisting });
+    setLastAdded({ docId: doc.docId, googleDocId: doc.googleDocId, title: doc.title, mimeType: doc.mimeType, wasExisting });
     broadcastChange({ type: "docs", docIds: [doc.docId] });
     toast.success(`${wasExisting ? "Updated" : "Added"} "${doc.title}"`);
   }, []);
@@ -147,8 +149,7 @@ export function AddDocPageClient({
               <span>{lastAdded.wasExisting ? "Document updated:" : "Document added:"}</span>
               <a
                 href={`/comments/${lastAdded.docId}`}
-                target="_blank"
-                rel="noopener noreferrer"
+                target={commentsTarget(lastAdded.googleDocId)}
                 className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline"
               >
                 <DocTypeIcon

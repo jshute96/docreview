@@ -37,6 +37,7 @@ import type { DocWithLabels } from "@/types";
 import { broadcastChange } from "@/lib/cross-tab";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { StarButton } from "@/components/star-button";
+import { openDocPage } from "@/lib/tab-targets";
 
 type TimeUnit = "days" | "months" | "years" | "all";
 
@@ -542,7 +543,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
                         </span>
                       )}
                       <span
-                        onDoubleClick={() => window.open(doc.driveUrl, "_blank")}
+                        onDoubleClick={() => openDocPage(doc.googleDocId, doc.driveUrl)}
                         title="Click to select, double-click to open"
                         className="flex items-center gap-2"
                       >

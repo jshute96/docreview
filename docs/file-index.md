@@ -194,6 +194,7 @@ Shadcn/ui components:
 | `prisma-obscure.ts` | Prisma client extension that base64-encodes/decodes Doc.title, Doc.notes, Label.name transparently |
 | `bulk-edit.ts` | `BulkEditState` type and `cycleBulkEditState` helper for multi-doc editing |
 | `env-config.ts` | Client-accessible environment config — `CHROME_EXTENSION_URL` with env var override |
+| `tab-targets.ts` | Named window targets for tab reuse — `commentsTarget()`, `docTarget()`, `openCommentsPage()`, `openDocPage()` |
 | `offline.ts` | Offline mode constants — `OFFLINE_MODE` flag, `OfflineModeError`, fallback user |
 | `role-colors.ts` | Tailwind class maps for Author (blue) and Reviewer (violet) role badges/filters |
 | `load-options.ts` | `parseLoadOptions()` — shared validation for scan/load request body (daysBack, ownership, includeSharedDrives, source) |

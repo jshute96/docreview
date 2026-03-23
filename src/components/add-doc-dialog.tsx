@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { broadcastChange } from "@/lib/cross-tab";
+import { openCommentsPage } from "@/lib/tab-targets";
 import {
   DocForm,
   type DocFormHandle,
@@ -96,7 +97,7 @@ export function AddDocDialog({
                     disabled={!isValid || processing}
                     onClick={async () => {
                       const doc = await handleAction();
-                      if (doc) window.open(`/comments/${doc.docId}`, "_blank");
+                      if (doc) openCommentsPage(doc.docId, doc.googleDocId);
                     }}
                     title={isExisting ? "Update the document and open its comments page" : "Add the document and open its comments page"}
                   >

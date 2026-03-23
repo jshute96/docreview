@@ -14,6 +14,7 @@ import { StarButton } from "@/components/star-button";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId } from "@/lib/api-fetch";
 import { UNREAD_COMMENTS_TOOLTIP, INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
+import { commentsTarget, docTarget } from "@/lib/tab-targets";
 
 interface DocRowProps {
   doc: DocWithLabels;
@@ -95,8 +96,7 @@ export function DocRow({
         <div className="flex flex-wrap items-center gap-2">
           <a
             href={`/comments/${doc.docId}`}
-            target="_blank"
-            rel="noopener noreferrer"
+            target={commentsTarget(doc.googleDocId)}
             title="Open document comments page"
             className={`inline-flex items-center gap-1.5 text-sm font-medium hover:underline hover:text-blue-600 ${
               notOk ? "line-through text-zinc-400" : "text-zinc-900"
@@ -149,7 +149,7 @@ export function DocRow({
       <td className="py-1.5 pr-4">
         <div className="flex items-center gap-1">
           <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Open this document" asChild>
-            <a href={doc.driveUrl} target="_blank" rel="noopener noreferrer">Open</a>
+            <a href={doc.driveUrl} target={docTarget(doc.googleDocId)}>Open</a>
           </Button>
           <EditDocDialog
             doc={doc}

@@ -13,6 +13,7 @@ import { StarButton } from "@/components/star-button";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { navigateToComment, supportsCommentNavigation } from "@/lib/extension-bridge";
+import { docTarget } from "@/lib/tab-targets";
 
 interface CommentRowProps {
   comment: Comment;
@@ -453,7 +454,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             title={openTitle}
             asChild
           >
-            <a href={commentUrl()} target="docreview-doc" onClick={handleOpenClick}>
+            <a href={commentUrl()} target={docTarget(googleDocId)} onClick={handleOpenClick}>
               Open
             </a>
           </Button>
@@ -526,7 +527,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                 <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
                   <div className="float-right relative z-10 flex gap-1 ml-2 mb-1">
                     <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title={openTitle} asChild>
-                      <a href={commentUrl()} target="docreview-doc" onClick={handleOpenClick}>
+                      <a href={commentUrl()} target={docTarget(googleDocId)} onClick={handleOpenClick}>
                         {openLabel}
                       </a>
                     </Button>
@@ -544,6 +545,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   loading={loadingThreads}
                   resolved={comment.resolved}
                   commentUrl={commentUrl()}
+                  openTarget={docTarget(googleDocId)}
                   onOpenClick={handleOpenClick}
                   onRefresh={refreshThread}
                   refreshing={refreshingThread}

@@ -24,6 +24,7 @@ import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId } from "@/lib/api-fetch";
 import { useLabels } from "@/contexts/label-context";
 import { useMultiSelect } from "@/hooks/use-multi-select";
+import { openCommentsPage } from "@/lib/tab-targets";
 
 interface BulkEditDialogProps {
   initialDocs: DocWithLabels[];
@@ -413,7 +414,7 @@ export function BulkEditDialog({
                       <X className="h-3 w-3" />
                     </button>
                     <span
-                      onDoubleClick={() => window.open(`/comments/${doc.docId}`, "_blank")}
+                      onDoubleClick={() => openCommentsPage(doc.docId, doc.googleDocId)}
                       title="Click to select, double-click to open"
                       className={`flex items-center gap-2 ${
                         doc.accessState !== "OK" ? "text-zinc-400 line-through" : ""

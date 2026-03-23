@@ -22,6 +22,7 @@ import { useLabelSync } from "@/hooks/use-label-sync";
 import { StarButton } from "@/components/star-button";
 import { useLabels } from "@/contexts/label-context";
 import { XIcon } from "@/components/x-icon";
+import { docTarget } from "@/lib/tab-targets";
 
 interface EditDocDialogProps {
   doc: DocWithLabels;
@@ -112,8 +113,7 @@ export function EditDocDialog({
           <div className="flex flex-col gap-4 p-6 pt-1">
             <a
               href={doc.driveUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              target={docTarget(doc.googleDocId)}
               draggable="false"
               title="Open document"
               className={`flex items-center gap-1.5 text-base hover:text-blue-600 hover:underline line-clamp-1 ${

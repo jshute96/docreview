@@ -50,6 +50,7 @@ import { HelpDialog } from "@/components/help-dialog";
 import { StarButton } from "@/components/star-button";
 import { LabelProvider } from "@/contexts/label-context";
 import { useCachedMetadata } from "@/hooks/use-cached-metadata";
+import { docTarget } from "@/lib/tab-targets";
 
 // Key for looking up thread/content/suggestion data — suggestions use googleSuggestionId,
 // comments use googleCommentId.
@@ -686,7 +687,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
           <DocTypeIcon mimeType={doc.mimeType} className="h-5 w-5 flex-shrink-0 mr-1" />
           <a
             href={doc.driveUrl}
-            target="docreview-doc"
+            target={docTarget(doc.googleDocId)}
             title="Open document"
             onClick={handleOpenDoc}
             className={`hover:underline hover:text-blue-600 ${
@@ -706,7 +707,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
             {doc.status === "INBOX" ? "Archive" : "Unarchive"}
           </Button>
           <Button variant="outline" size="sm" title="Open the document" className="text-zinc-900" asChild>
-            <a href={doc.driveUrl} target="docreview-doc" onClick={handleOpenDoc}>Open</a>
+            <a href={doc.driveUrl} target={docTarget(doc.googleDocId)} onClick={handleOpenDoc}>Open</a>
           </Button>
           <Button
             variant="outline"
