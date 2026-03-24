@@ -65,7 +65,7 @@ export function AddDocDialog({
                 onDocAdded(newDoc);
                 setOpen(false);
                 broadcastChange({ type: "docs", docIds: [newDoc.docId] });
-                toast.success(`${wasExisting ? "Updated" : "Added"} "${newDoc.title}"`);
+                toast.success(`${wasExisting ? "Updated" : "Added"} "${newDoc.title || "Unknown title"}"`)
               }}
               buttons={({ handleAction, processing, isValid, isExisting, existingDocId }) => (
                 <div className="mt-4 flex gap-2 justify-end">

@@ -112,6 +112,9 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
     const initialUrlTriggered = useRef(false);
     const resolveInFlight = useRef(false);
     const pastedRef = useRef(false);
+    const validTitleRef = useRef<string | null>(validTitle);
+
+    validTitleRef.current = validTitle;
 
     useLabelSync(allLabels, setSelectedLabelIds);
     useAutoResize(notesRef, notes);
@@ -346,6 +349,8 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
           throw new Error(code ? errorMessageForCode(code) : "Operation failed");
         }
         const newDoc: DocWithLabels = await res.json();
+        // API strips titles (stripServerOnly) — restore from validation state
+        if (!newDoc.title && validTitleRef.current) newDoc.title = validTitleRef.current;
         onSuccess(newDoc);
         return newDoc;
       } catch (err) {

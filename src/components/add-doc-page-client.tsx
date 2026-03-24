@@ -65,9 +65,9 @@ export function AddDocPageClient({
   const handleSuccess = useCallback((doc: DocWithLabels) => {
     const wasExisting = pageExistingRef.current;
     contentRef.current?.reset();
-    setLastAdded({ docId: doc.docId, googleDocId: doc.googleDocId, title: doc.title, mimeType: doc.mimeType, wasExisting });
+    setLastAdded({ docId: doc.docId, googleDocId: doc.googleDocId, title: doc.title || "Unknown title", mimeType: doc.mimeType, wasExisting });
     broadcastChange({ type: "docs", docIds: [doc.docId] });
-    toast.success(`${wasExisting ? "Updated" : "Added"} "${doc.title}"`);
+    toast.success(`${wasExisting ? "Updated" : "Added"} "${doc.title || "Unknown title"}"`);
   }, []);
 
   return (
