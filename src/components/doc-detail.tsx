@@ -651,6 +651,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
       const res = await apiFetch(`/api/docs/${doc.docId}`, { method: "DELETE", contextId });
       if (!res.ok) throw new Error("Failed to delete");
       broadcastChange({ type: "docs", docIds: [doc.docId] }, contextId);
+      // Brief delay so the BroadcastChannel message is delivered before this tab closes
+      await new Promise((r) => setTimeout(r, 100));
       window.close();
       // Some browsers block window.close() — fall back to navigation
       window.location.href = "/docs";
