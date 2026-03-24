@@ -17,8 +17,8 @@ vi.mock("@/lib/google-drive", () => {
     getDriveClient: vi.fn(),
     createDriveService: vi.fn(() => ({ comments: { get: commentsGet } })),
     fetchThreadDetail: vi.fn(),
-    fetchSuggestions: vi.fn(),
-    fetchAllThreads: vi.fn(),
+    fetchDocData: vi.fn(),
+    fetchCommentData: vi.fn(),
     invalidGrantResponse: vi.fn(() => null),
     _commentsGet: commentsGet,
   };
@@ -30,8 +30,8 @@ import { prisma } from "@/lib/prisma";
 import {
   getDriveClient,
   fetchThreadDetail,
-  fetchSuggestions,
-  fetchAllThreads,
+  fetchDocData,
+  fetchCommentData,
 } from "@/lib/google-drive";
 import * as googleDriveMod from "@/lib/google-drive";
 
@@ -43,8 +43,8 @@ const mockComment = prisma.comment as unknown as {
 };
 const mockGetDriveClient = vi.mocked(getDriveClient);
 const mockFetchThreadDetail = vi.mocked(fetchThreadDetail);
-const mockFetchSuggestions = vi.mocked(fetchSuggestions);
-const mockFetchAllThreads = vi.mocked(fetchAllThreads);
+const mockFetchDocData = vi.mocked(fetchDocData);
+const mockFetchCommentData = vi.mocked(fetchCommentData);
 // Access the mock comments.get via the helper we attached to the mock module
 const mockCommentsGet = (googleDriveMod as unknown as { _commentsGet: ReturnType<typeof vi.fn> })
   ._commentsGet;
@@ -140,10 +140,10 @@ describe("GET /api/docs/[docId]/threads", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
-    mockFetchAllThreads.mockResolvedValue([
+    mockFetchCommentData.mockResolvedValue({ threads: [
       { id: "c1", author: "A", fromMe: false, content: "x", createdTime: "", resolved: false, replies: [] },
       { id: "c2", author: "B", fromMe: false, content: "y", createdTime: "", resolved: true, replies: [] },
-    ]);
+    ] });
 
     const req = new NextRequest("http://localhost/api/docs/d1/threads");
     const res = await GET(req, makeParams("d1"));
@@ -298,7 +298,7 @@ describe("POST /api/docs/[docId]/threads", () => {
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
-    mockFetchSuggestions.mockResolvedValue([]); // suggestion no longer live
+    mockFetchDocData.mockResolvedValue({ suggestions: [], suggestionContent: {}, documentText: null }); // suggestion no longer live
 
     const updatedComment = { ...commentRecord, resolved: true, status: "ARCHIVED" };
     mockComment.update.mockResolvedValue(updatedComment);
@@ -322,9 +322,9 @@ describe("POST /api/docs/[docId]/threads", () => {
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
-    mockFetchSuggestions.mockResolvedValue([
+    mockFetchDocData.mockResolvedValue({ suggestions: [
       { id: "suggest.abc", suggestionType: "EDIT", insertedText: "new", deletedText: "old" },
-    ]);
+    ], suggestionContent: {}, documentText: null });
 
     const req = new NextRequest(
       "http://localhost/api/docs/d1/threads?commentId=suggest.abc",
@@ -345,7 +345,7 @@ describe("POST /api/docs/[docId]/threads", () => {
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
-    mockFetchSuggestions.mockResolvedValue([]); // no longer live
+    mockFetchDocData.mockResolvedValue({ suggestions: [], suggestionContent: {}, documentText: null }); // no longer live
 
     mockComment.update.mockResolvedValue({ ...commentRecord, resolved: true, status: "MUTED" });
 
@@ -380,7 +380,7 @@ describe("POST /api/docs/[docId]/threads", () => {
     const data = await res.json();
     expect(data.comment).toBeTruthy();
     expect(data.threads).toHaveLength(0);
-    expect(mockFetchSuggestions).not.toHaveBeenCalled();
+    expect(mockFetchDocData).not.toHaveBeenCalled();
   });
 
   it("returns 404 when fetchThreadDetail returns null", async () => {

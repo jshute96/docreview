@@ -190,103 +190,219 @@ export function deriveCommentFlags(
   return { isThreadAuthor, isReplyAuthor, iResolvedIt, isRead };
 }
 
-export async function fetchComments(
+// Raw Drive API comment shape — loose type covering the superset of fields
+// that fetchCommentData may request.  Used only by the parsing helpers below.
+type RawDriveComment = {
+  id?: string | null;
+  resolved?: boolean | null;
+  content?: string | null;
+  htmlContent?: string | null;
+  quotedFileContent?: { mimeType?: string | null; value?: string | null } | null;
+  createdTime?: string | null;
+  modifiedTime?: string | null;
+  author?: { me?: boolean | null; displayName?: string | null } | null;
+  assigneeEmailAddress?: string | null;
+  mentionedEmailAddresses?: string[] | null;
+  replies?: Array<{
+    content?: string | null;
+    htmlContent?: string | null;
+    createdTime?: string | null;
+    action?: string | null;
+    author?: { me?: boolean | null; displayName?: string | null } | null;
+    mentionedEmailAddresses?: string[] | null;
+  }> | null;
+};
+
+// Parses a raw Drive comment into a DriveComment (sync metadata).
+function parseDriveComment(c: RawDriveComment, emailLower?: string): DriveComment {
+  const replies = c.replies ?? [];
+  const flags = deriveCommentFlags(c.author, replies);
+
+  const assignedToMe = emailLower
+    ? c.assigneeEmailAddress?.toLowerCase() === emailLower
+    : false;
+  const mentionedMe = emailLower
+    ? (c.mentionedEmailAddresses ?? []).some((e) => e.toLowerCase() === emailLower)
+    : false;
+  const replyAuthorMeFlags = replies.map((r) => r.author?.me === true);
+  const replyMentionedMeFlags = replies.map((r) =>
+    emailLower
+      ? (r.mentionedEmailAddresses ?? []).some(
+            (e) => e.toLowerCase() === emailLower
+          )
+      : false
+  );
+
+  let mentionedMeUnreplied = false;
+  if (mentionedMe || replyMentionedMeFlags.some(Boolean)) {
+    let lastMentionIdx = -1;
+    for (let i = replyMentionedMeFlags.length - 1; i >= 0; i--) {
+      if (replyMentionedMeFlags[i]) { lastMentionIdx = i; break; }
+    }
+    if (lastMentionIdx === -1 && mentionedMe) {
+      mentionedMeUnreplied = !replyAuthorMeFlags.some(Boolean);
+    } else if (lastMentionIdx >= 0) {
+      const hasMyReplyAfter = replyAuthorMeFlags.slice(lastMentionIdx + 1).some(Boolean);
+      mentionedMeUnreplied = !hasMyReplyAfter;
+    }
+  }
+
+  const effectiveMentionedMe = assignedToMe ? false : mentionedMe;
+  const effectiveReplyMentionedMeFlags = assignedToMe
+    ? replyMentionedMeFlags.map(() => false)
+    : replyMentionedMeFlags;
+
+  return {
+    id: c.id!,
+    resolved: c.resolved === true,
+    ...flags,
+    assignedToMe,
+    mentionedMe: effectiveMentionedMe,
+    mentionedMeUnreplied: assignedToMe ? false : mentionedMeUnreplied,
+    driveCreatedAt: c.createdTime ? new Date(c.createdTime) : null,
+    driveModifiedAt: c.modifiedTime ? new Date(c.modifiedTime) : null,
+    replyCount: replies.length,
+    replyAuthorMeFlags,
+    replyMentionedMeFlags: effectiveReplyMentionedMeFlags,
+  };
+}
+
+// Parses a raw Drive comment into a CommentThread (UI display).
+// Returns null if the comment has no content (deleted/empty comment).
+function parseCommentThread(c: RawDriveComment): CommentThread | null {
+  if (c.content == null) return null;
+  const replies = c.replies ?? [];
+
+  const threadReplies: ThreadReply[] = replies.map((r) => ({
+    author: r.author?.displayName ?? "Unknown",
+    fromMe: r.author?.me === true,
+    content: r.content ?? "",
+    ...(r.htmlContent ? { htmlContent: r.htmlContent } : {}),
+    createdTime: r.createdTime ?? "",
+    ...(r.action === "resolve" || r.action === "reopen" ? { action: r.action } : {}),
+  }));
+
+  return {
+    id: c.id!,
+    author: c.author?.displayName ?? "Unknown",
+    fromMe: c.author?.me === true,
+    content: c.content,
+    ...(c.htmlContent ? { htmlContent: c.htmlContent } : {}),
+    createdTime: c.createdTime ?? "",
+    ...(c.modifiedTime ? { modifiedTime: c.modifiedTime } : {}),
+    resolved: c.resolved === true,
+    replies: threadReplies,
+    quotedFileContent: extractQuotedFileContent(c.quotedFileContent, c.id),
+  };
+}
+
+/** Options for fetchCommentData — at least one of sync/threads must be true. */
+export interface FetchCommentDataOptions {
+  /** Return DriveComment[] for DB sync (requires sync-specific fields: assignee, mentions). */
+  sync?: boolean;
+  /** Return CommentThread[] for UI display (requires content, displayName, quotedFileContent). */
+  threads?: boolean;
+  /** User email — needed when sync is true, for assignee/mention detection. */
+  userEmail?: string;
+}
+
+/** Result of fetchCommentData — fields are present based on the options passed. */
+export interface CommentDataResult {
+  comments?: DriveComment[];
+  threads?: CommentThread[];
+}
+
+// Builds the Drive API fields string based on which outputs are needed.
+// sync-only: lean metadata fields. threads-only: content/display fields.
+// Both: superset of all fields.
+function buildCommentFields(options: FetchCommentDataOptions): string {
+  const { sync, threads } = options;
+  // Author fields
+  const authorFields = threads ? "me, displayName" : "me";
+  // Reply fields
+  const replyParts = ["action", `author(${authorFields})`];
+  if (threads) replyParts.push("content", "htmlContent", "createdTime");
+  if (sync) replyParts.push("mentionedEmailAddresses");
+  // Comment fields
+  const commentParts = [
+    "id", "resolved", "createdTime", "modifiedTime",
+    `author(${authorFields})`,
+    `replies(${replyParts.join(", ")})`,
+  ];
+  if (threads) commentParts.push("content", "htmlContent", "quotedFileContent(mimeType, value)");
+  if (sync) commentParts.push("assigneeEmailAddress", "mentionedEmailAddresses");
+
+  return `nextPageToken, comments(${commentParts.join(", ")})`;
+}
+
+/**
+ * Fetches comment data from the Drive API with only the fields needed by the
+ * requested outputs. Single entry point for all comments.list calls —
+ * field string is built dynamically based on which outputs are needed.
+ */
+export async function fetchCommentData(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string,
-  since?: Date,
-  userEmail?: string
-): Promise<DriveComment[]> {
+  options: FetchCommentDataOptions = { threads: true },
+): Promise<CommentDataResult> {
+  const { sync, threads } = options;
   const drive = createDrive({ version: "v3", auth });
-  const sinceStr = since ? since.toISOString() : undefined;
   const t0 = Date.now();
-  const emailLower = userEmail?.toLowerCase();
+  const emailLower = options.userEmail?.toLowerCase();
+  const fields = buildCommentFields(options);
 
-  const comments: DriveComment[] = [];
+  const commentsList: DriveComment[] = [];
+  const threadsList: CommentThread[] = [];
   let pageToken: string | undefined;
 
-  do {
-    const res = await withProgressLogging(
-      drive.comments.list({
-        fileId: googleDocId,
-        fields:
-          "nextPageToken, comments(id, resolved, createdTime, modifiedTime, author(me), assigneeEmailAddress, replies(action, author(me), mentionedEmailAddresses), mentionedEmailAddresses)",
-        ...(sinceStr ? { startModifiedTime: sinceStr } : {}),
-        ...(pageToken ? { pageToken } : {}),
-      }),
-      `[Drive] comments.list ${googleDocId}${pageToken ? " (page)" : ""}`
-    );
+  // Label for logging — indicates which outputs were requested
+  const mode = sync && threads ? "unified" : sync ? "sync" : "threads";
 
-    const items = res.data.comments ?? [];
-    for (const c of items) {
-      if (!c.id) continue;
-      const replies = c.replies ?? [];
-      const flags = deriveCommentFlags(c.author, replies);
-
-      const assignedToMe = emailLower
-        ? (c as { assigneeEmailAddress?: string }).assigneeEmailAddress?.toLowerCase() === emailLower
-        : false;
-      const mentionedMe = emailLower
-        ? (c.mentionedEmailAddresses ?? []).some((e) => e.toLowerCase() === emailLower)
-        : false;
-      const replyAuthorMeFlags = replies.map((r) => r.author?.me === true);
-      const replyMentionedMeFlags = replies.map((r) =>
-        emailLower
-          ? ((r as { mentionedEmailAddresses?: string[] }).mentionedEmailAddresses ?? []).some(
-              (e) => e.toLowerCase() === emailLower
-            )
-          : false
+  try {
+    do {
+      const res = await withProgressLogging(
+        drive.comments.list({
+          fileId: googleDocId,
+          fields,
+          pageSize: 100,
+          ...(pageToken ? { pageToken } : {}),
+        }),
+        `[Drive] comments.list ${googleDocId} (${mode}${pageToken ? " page" : ""})`
       );
 
-      // mentionedMeUnreplied: true if there is a mention of me (in the
-      // comment itself or any reply) with no subsequent reply/resolve by me.
-      // Walk backwards through replies: if my reply or resolve comes before
-      // (i.e. after in time) the last mention, it's been replied to.
-      let mentionedMeUnreplied = false;
-      if (mentionedMe || replyMentionedMeFlags.some(Boolean)) {
-        // Find the index of the last mention of me (-1 means the comment itself)
-        let lastMentionIdx = -1;
-        for (let i = replyMentionedMeFlags.length - 1; i >= 0; i--) {
-          if (replyMentionedMeFlags[i]) { lastMentionIdx = i; break; }
-        }
-        if (lastMentionIdx === -1 && mentionedMe) {
-          // Mentioned in the comment itself; check if any reply is from me
-          mentionedMeUnreplied = !replyAuthorMeFlags.some(Boolean);
-        } else if (lastMentionIdx >= 0) {
-          // Check if there's a reply from me after the last mention
-          const hasMyReplyAfter = replyAuthorMeFlags.slice(lastMentionIdx + 1).some(Boolean);
-          mentionedMeUnreplied = !hasMyReplyAfter;
+      for (const c of res.data.comments ?? []) {
+        if (!c.id) continue;
+        const raw = c as RawDriveComment;
+        if (sync) commentsList.push(parseDriveComment(raw, emailLower));
+        if (threads) {
+          const thread = parseCommentThread(raw);
+          if (thread) threadsList.push(thread);
         }
       }
 
-      // Assignment takes precedence over @mention — if assigned to me,
-      // clear mention flags so they don't double-count.
-      const effectiveMentionedMe = assignedToMe ? false : mentionedMe;
-      const effectiveReplyMentionedMeFlags = assignedToMe
-        ? replyMentionedMeFlags.map(() => false)
-        : replyMentionedMeFlags;
-
-      comments.push({
-        id: c.id,
-        resolved: c.resolved === true,
-        ...flags,
-        assignedToMe,
-        mentionedMe: effectiveMentionedMe,
-        mentionedMeUnreplied: assignedToMe ? false : mentionedMeUnreplied,
-        driveCreatedAt: c.createdTime ? new Date(c.createdTime) : null,
-        driveModifiedAt: c.modifiedTime ? new Date(c.modifiedTime) : null,
-        replyCount: replies.length,
-        replyAuthorMeFlags,
-        replyMentionedMeFlags: effectiveReplyMentionedMeFlags,
-      });
+      pageToken = res.data.nextPageToken ?? undefined;
+    } while (pageToken);
+  } catch (err: any) {
+    // When only fetching threads (UI display), gracefully return empty on
+    // permission denied — the user can still see the doc, just not comments.
+    // When sync is requested, let the error propagate so syncComments can
+    // handle it (e.g. stamping sync time, flagging permissionDenied).
+    if (err.code === 403 && threads && !sync) {
+      logWarning(`[Drive] Permission denied for comments on ${googleDocId}.`);
+      return { threads: [] };
     }
+    throw err;
+  }
 
-    pageToken = res.data.nextPageToken ?? undefined;
-  } while (pageToken);
+  const parts: string[] = [];
+  if (sync) parts.push(`${commentsList.length} comments`);
+  if (threads) parts.push(`${threadsList.length} threads`);
+  logInfo(`[Drive] comments.list ${googleDocId} (${mode}) → ${parts.join(", ")} (${Date.now() - t0}ms)`);
 
-  logInfo(
-    `[Drive] comments.list ${googleDocId} (since ${since ? formatDate(since) : "all"}) → ${comments.length} comments (${Date.now() - t0}ms)`
-  );
-  return comments;
+  return {
+    ...(sync ? { comments: commentsList } : {}),
+    ...(threads ? { threads: threadsList } : {}),
+  };
 }
 
 export interface DriveSuggestion {
@@ -301,86 +417,30 @@ export interface SuggestionContent {
   deletedText: string;
 }
 
-// Walks a Docs document body and extracts all pending suggestions with their text.
-// With SUGGESTIONS_INLINE, the Docs API returns the document body with suggestion
-// edits inlined as annotated text runs. Each text run can carry suggestedInsertionIds
-// (text this suggestion would add) and/or suggestedDeletionIds (text it would remove).
-// A suggestion that replaces text appears as two runs: one deletion + one insertion
-// with the same suggest.xxx ID. We walk all runs, accumulate inserted/deleted text
-// per suggestion ID, then classify each as INSERT, DELETE, or EDIT based on which
-// sets it appears in.
-export async function fetchSuggestions(
-  auth: Awaited<ReturnType<typeof getDriveClient>>,
-  googleDocId: string
-): Promise<DriveSuggestion[]> {
-  const docs = createDocs({ version: "v1", auth });
-  const t0 = Date.now();
-
-  const res = await withProgressLogging(
-    docs.documents.get({
-      documentId: googleDocId,
-      suggestionsViewMode: "SUGGESTIONS_INLINE",
-      fields: "body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds)))))",
-    }),
-    `[Docs] documents.get ${googleDocId} (suggestions)`
-  );
-  const elapsed = Date.now() - t0;
-
-  // Track which suggestion IDs appear as insertions vs deletions, and accumulate
-  // the text content for each. A single suggestion may span multiple text runs
-  // (e.g., a multi-word edit), so we concatenate text across runs for each ID.
-  const insertionIds = new Set<string>();
-  const deletionIds = new Set<string>();
-  const insertions: Record<string, string> = {};
-  const deletions: Record<string, string> = {};
-
-  for (const el of res.data.body?.content ?? []) {
-    for (const pe of el.paragraph?.elements ?? []) {
-      const run = pe.textRun;
-      const text = run?.content ?? "";
-      for (const id of run?.suggestedInsertionIds ?? []) {
-        insertionIds.add(id);
-        if (text) insertions[id] = (insertions[id] ?? "") + text;
-      }
-      for (const id of run?.suggestedDeletionIds ?? []) {
-        deletionIds.add(id);
-        if (text) deletions[id] = (deletions[id] ?? "") + text;
-      }
-    }
-  }
-
-  for (const id in insertions) insertions[id] = insertions[id].replace(/\n$/, "");
-  for (const id in deletions) deletions[id] = deletions[id].replace(/\n$/, "");
-
-  // Classify each suggestion: present in both sets = EDIT (replace),
-  // insertion only = INSERT, deletion only = DELETE.
-  const allIds = new Set([...insertionIds, ...deletionIds]);
-  const suggestions: DriveSuggestion[] = [];
-
-  for (const id of allIds) {
-    const hasInsert = insertionIds.has(id);
-    const hasDelete = deletionIds.has(id);
-    suggestions.push({
-      id,
-      suggestionType: hasInsert && hasDelete ? "EDIT" : hasInsert ? "INSERT" : "DELETE",
-      insertedText: insertions[id] ?? "",
-      deletedText: deletions[id] ?? "",
-    });
-  }
-
-  logInfo(`[Docs] documents.get ${googleDocId} → ${suggestions.length} suggestions (${elapsed}ms)`);
-  return suggestions;
+/** Result of fetchDocData — always returns all fields from a single documents.get call. */
+export interface DocDataResult {
+  /** Full document text (with suggestion text inlined). Null on permission error. */
+  documentText: string | null;
+  /** Suggestion content keyed by suggestion ID — for UI display (diffs). */
+  suggestionContent: Record<string, SuggestionContent>;
+  /** DriveSuggestion[] — for DB sync (type classification + content hashing). */
+  suggestions: DriveSuggestion[];
 }
 
-// Fetches document text and suggestion content in a single Docs API call.
-// Uses SUGGESTIONS_INLINE so both pending insertions and deletions are visible
-// alongside the base text. This means documentText includes suggestion text —
-// anchor-text matching may give false results if a suggestion overlaps the
-// anchor region, but the consequence is only a spurious "not found" warning.
-export async function fetchDocContent(
+/**
+ * Fetches document data via the Docs API — a single documents.get call that
+ * returns document text, suggestion content (for UI), and DriveSuggestion[]
+ * (for DB sync). Single entry point for all documents.get calls.
+ *
+ * Uses SUGGESTIONS_INLINE so both pending insertions and deletions are visible
+ * alongside the base text. This means documentText includes suggestion text —
+ * anchor-text matching may give false results if a suggestion overlaps the
+ * anchor region, but the consequence is only a spurious "not found" warning.
+ */
+export async function fetchDocData(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string
-): Promise<{ documentText: string | null; suggestions: Record<string, SuggestionContent> }> {
+): Promise<DocDataResult> {
   const docs = createDocs({ version: "v1", auth });
   const t0 = Date.now();
 
@@ -393,7 +453,7 @@ export async function fetchDocContent(
         fields:
           "body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds)))))",
       }),
-      `[Docs] documents.get ${googleDocId} (content)`
+      `[Docs] documents.get ${googleDocId}`
     );
   } catch (err: any) {
     // If we have view-only access but no permission for comments/suggestions,
@@ -411,7 +471,7 @@ export async function fetchDocContent(
             documentId: googleDocId,
             fields: "body(content(paragraph(elements(textRun(content)))))",
           }),
-          `[Docs] documents.get ${googleDocId} (content, no suggestions)`
+          `[Docs] documents.get ${googleDocId} (no suggestions)`
         );
       } catch (innerErr) {
         logError(
@@ -420,7 +480,7 @@ export async function fetchDocContent(
           }ms):`,
           innerErr
         );
-        return { documentText: null, suggestions: {} };
+        return { documentText: null, suggestionContent: {}, suggestions: [] };
       }
     } else {
       const isPermission = err.code === 403 || err.code === 404 ||
@@ -430,11 +490,15 @@ export async function fetchDocContent(
       } else {
         logError(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
       }
-      return { documentText: null, suggestions: {} };
+      return { documentText: null, suggestionContent: {}, suggestions: [] };
     }
   }
 
   const textParts: string[] = [];
+  // Track insertion/deletion IDs via sets (for type classification) and accumulate
+  // text per suggestion ID. A single suggestion may span multiple text runs.
+  const insertionIds = new Set<string>();
+  const deletionIds = new Set<string>();
   const insertions: Record<string, string> = {};
   const deletions: Record<string, string> = {};
 
@@ -446,9 +510,11 @@ export async function fetchDocContent(
       const text = run.content;
 
       for (const id of run.suggestedInsertionIds ?? []) {
+        insertionIds.add(id);
         insertions[id] = (insertions[id] ?? "") + text;
       }
       for (const id of run.suggestedDeletionIds ?? []) {
+        deletionIds.add(id);
         deletions[id] = (deletions[id] ?? "") + text;
       }
     }
@@ -458,17 +524,27 @@ export async function fetchDocContent(
   for (const id in insertions) insertions[id] = insertions[id].replace(/\n$/, "");
   for (const id in deletions) deletions[id] = deletions[id].replace(/\n$/, "");
 
-  const allIds = new Set([...Object.keys(insertions), ...Object.keys(deletions)]);
-  const suggestions: Record<string, SuggestionContent> = {};
+  // Build both output formats from the same parsed data
+  const allIds = new Set([...insertionIds, ...deletionIds]);
+
+  const suggestionContent: Record<string, SuggestionContent> = {};
+  const suggestions: DriveSuggestion[] = [];
   for (const id of allIds) {
-    suggestions[id] = {
-      insertedText: insertions[id] ?? "",
-      deletedText: deletions[id] ?? "",
-    };
+    const hasInsert = insertionIds.has(id);
+    const hasDelete = deletionIds.has(id);
+    const insertedText = insertions[id] ?? "";
+    const deletedText = deletions[id] ?? "";
+    suggestionContent[id] = { insertedText, deletedText };
+    suggestions.push({
+      id,
+      suggestionType: hasInsert && hasDelete ? "EDIT" : hasInsert ? "INSERT" : "DELETE",
+      insertedText,
+      deletedText,
+    });
   }
 
-  logInfo(`[Docs] documents.get ${googleDocId} (doc content: ${documentText.length} chars, ${allIds.size} suggestions) (${Date.now() - t0}ms)`);
-  return { documentText, suggestions };
+  logInfo(`[Docs] documents.get ${googleDocId} (${documentText.length} chars, ${allIds.size} suggestions) (${Date.now() - t0}ms)`);
+  return { documentText, suggestionContent, suggestions };
 }
 
 // A single reply within a comment thread (not the initial comment).
@@ -546,17 +622,9 @@ export async function fetchThreadDetail(
   const c = res.data;
   if (!c.id || c.content == null) return null;
 
+  const thread = parseCommentThread(c as RawDriveComment)!;
   const allReplies = c.replies ?? [];
   const flags = deriveCommentFlags(c.author, allReplies);
-
-  const threadReplies: ThreadReply[] = allReplies.map((r) => ({
-    author: r.author?.displayName ?? "Unknown",
-    fromMe: r.author?.me === true,
-    content: r.content ?? "",
-    ...(r.htmlContent ? { htmlContent: r.htmlContent } : {}),
-    createdTime: r.createdTime ?? "",
-    ...(r.action === "resolve" || r.action === "reopen" ? { action: r.action } : {}),
-  }));
 
   return {
     resolved: c.resolved === true,
@@ -564,87 +632,10 @@ export async function fetchThreadDetail(
     driveCreatedAt: c.createdTime ? new Date(c.createdTime) : null,
     driveModifiedAt: c.modifiedTime ? new Date(c.modifiedTime) : null,
     replyCount: allReplies.length,
-    thread: {
-      id: c.id,
-      author: c.author?.displayName ?? "Unknown",
-      fromMe: c.author?.me === true,
-      content: c.content,
-      ...(c.htmlContent ? { htmlContent: c.htmlContent } : {}),
-      createdTime: c.createdTime ?? "",
-      resolved: c.resolved === true,
-      replies: threadReplies,
-      quotedFileContent: extractQuotedFileContent(c.quotedFileContent, c.id),
-    },
+    thread,
   };
 }
 
-// Fetches all comment threads for a document from Drive (paginated).
-export async function fetchAllThreads(
-  auth: Awaited<ReturnType<typeof getDriveClient>>,
-  googleDocId: string
-): Promise<CommentThread[]> {
-  const drive = createDrive({ version: "v3", auth });
-  const t0 = Date.now();
-
-  const threads: CommentThread[] = [];
-  let pageToken: string | undefined;
-
-  try {
-    do {
-      const res = await withProgressLogging(
-        drive.comments.list({
-          fileId: googleDocId,
-          fields:
-            "nextPageToken, comments(id, resolved, content, htmlContent, quotedFileContent(mimeType, value), createdTime, modifiedTime, author(me, displayName), replies(content, htmlContent, createdTime, action, author(me, displayName)))",
-          pageSize: 100,
-          ...(pageToken ? { pageToken } : {}),
-        }),
-        `[Drive] comments.list ${googleDocId} (threads${pageToken ? " page" : ""})`
-      );
-
-      for (const c of res.data.comments ?? []) {
-        if (!c.id || c.content == null) continue;
-
-        const replies: ThreadReply[] = (c.replies ?? []).map((r) => ({
-          author: r.author?.displayName ?? "Unknown",
-          fromMe: r.author?.me === true,
-          content: r.content ?? "",
-          ...(r.htmlContent ? { htmlContent: r.htmlContent } : {}),
-          createdTime: r.createdTime ?? "",
-          ...(r.action === "resolve" || r.action === "reopen" ? { action: r.action } : {}),
-        }));
-
-        threads.push({
-          id: c.id,
-          author: c.author?.displayName ?? "Unknown",
-          fromMe: c.author?.me === true,
-          content: c.content,
-          ...(c.htmlContent ? { htmlContent: c.htmlContent } : {}),
-          createdTime: c.createdTime ?? "",
-          ...(c.modifiedTime ? { modifiedTime: c.modifiedTime } : {}),
-          resolved: c.resolved === true,
-          replies,
-          quotedFileContent: extractQuotedFileContent(c.quotedFileContent, c.id),
-        });
-      }
-
-      pageToken = res.data.nextPageToken ?? undefined;
-    } while (pageToken);
-  } catch (err: any) {
-    if (err.code === 403) {
-      logWarning(`[Drive] Permission denied for comments on ${googleDocId}.`);
-      return [];
-    }
-    throw err;
-  }
-
-  logInfo(
-    `[Drive] comments.list ${googleDocId} (threads) → ${
-      threads.length
-    } threads (${Date.now() - t0}ms)`
-  );
-  return threads;
-}
 
 // Creates a reply on a Drive comment thread. Replying to a resolved thread
 // reopens it automatically. Pass resolve=true to resolve (with optional content).

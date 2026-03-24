@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { fetchComments, fetchSuggestions, getDriveClient } from "@/lib/google-drive";
+import { fetchCommentData, fetchDocData, getDriveClient } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { computeSuggestionHash } from "@/lib/suggestion-hash";
 import type { Doc, Comment, Prisma } from "@prisma/client";
-import type { DriveSuggestion } from "@/lib/google-drive";
+import type { DriveComment, DriveSuggestion } from "@/lib/google-drive";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 
@@ -36,9 +36,6 @@ function datesEqual(a: Date | null | undefined, b: Date | null | undefined): boo
   return timeA === timeB;
 }
 
-// Drive comment as returned by fetchComments — just the fields we use here.
-type DriveComment = Awaited<ReturnType<typeof fetchComments>>[number];
-
 // --- Main entry point ---
 
 /**
@@ -53,23 +50,44 @@ type DriveComment = Awaited<ReturnType<typeof fetchComments>>[number];
  *   5. Resolve suggestions no longer in the document
  *   6. Stamp commentsLastSyncedAt
  */
+/** Optional pre-fetched data to avoid redundant API calls during single-doc refresh. */
+export interface SyncPrefetchedData {
+  comments?: DriveComment[];
+  suggestions?: DriveSuggestion[];
+}
+
 export async function syncComments(
   doc: Doc,
   driveAuth: Awaited<ReturnType<typeof getDriveClient>>,
-  userEmail?: string
+  userEmail?: string,
+  prefetched?: SyncPrefetchedData
 ): Promise<SyncResult> {
   // Record sync start time BEFORE fetching — any changes that arrive during
   // the sync will have timestamps after this, ensuring the next sync covers them.
   const syncStartedAt = new Date();
 
-  // --- Phase 1: Fetch from APIs ---
+  // --- Phase 1: Fetch from APIs (or use pre-fetched data) ---
 
-  const commentsOrError = await fetchDriveComments(doc, driveAuth, syncStartedAt, userEmail);
-  if (!Array.isArray(commentsOrError)) return commentsOrError; // error result
-  const comments = commentsOrError;
+  let comments: DriveComment[];
+  if (prefetched?.comments) {
+    comments = prefetched.comments;
+  } else {
+    const commentsOrError = await fetchDriveComments(doc, driveAuth, syncStartedAt, userEmail);
+    if (!Array.isArray(commentsOrError)) return commentsOrError; // error result
+    comments = commentsOrError;
+  }
 
-  const { suggestions: docsSuggestions, failed: suggestionFetchFailed, denied: suggestionPermissionDenied } =
-    await fetchDocsSuggestions(doc, driveAuth);
+  let docsSuggestions: DriveSuggestion[];
+  let suggestionFetchFailed = false;
+  let suggestionPermissionDenied = false;
+  if (prefetched?.suggestions) {
+    docsSuggestions = prefetched.suggestions;
+  } else {
+    const result = await fetchDocsSuggestions(doc, driveAuth);
+    docsSuggestions = result.suggestions;
+    suggestionFetchFailed = result.failed;
+    suggestionPermissionDenied = result.denied;
+  }
 
   // --- Phase 2: Sync comments from Drive ---
 
@@ -123,7 +141,8 @@ async function fetchDriveComments(
   userEmail?: string,
 ): Promise<DriveComment[] | SyncResult> {
   try {
-    return await fetchComments(driveAuth, doc.googleDocId, undefined, userEmail);
+    const result = await fetchCommentData(driveAuth, doc.googleDocId, { sync: true, userEmail });
+    return result.comments!;
   } catch (err: any) {
     const code = err.code;
     if (code === 404) {
@@ -154,13 +173,9 @@ async function fetchDocsSuggestions(
     return { suggestions: [], failed: false, denied: false };
   }
   try {
-    const suggestions = await fetchSuggestions(driveAuth, doc.googleDocId);
-    return { suggestions, failed: false, denied: false };
-  } catch (err: any) {
-    if (err.code === 403 && err.message?.includes("permission to access the document suggestions")) {
-      logWarning(`[Suggestions:Docs] permission denied for ${doc.googleDocId}`);
-      return { suggestions: [], failed: false, denied: true };
-    }
+    const result = await fetchDocData(driveAuth, doc.googleDocId);
+    return { suggestions: result.suggestions, failed: false, denied: false };
+  } catch (err) {
     logError(`[Suggestions:Docs] fetch failed for ${doc.googleDocId}:`, err);
     return { suggestions: [], failed: true, denied: false };
   }

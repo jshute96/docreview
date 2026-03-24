@@ -10,7 +10,7 @@ import {
 } from "@/lib/google-drive";
 import { scanGmailForDocIds, buildInaccessibleDocs, type GmailInaccessibleDoc } from "@/lib/gmail";
 import type { ParsedEmail } from "@/lib/parse-gmail-notification";
-import { syncComments } from "@/lib/sync-comments";
+import { syncComments, type SyncPrefetchedData } from "@/lib/sync-comments";
 import { mergeSuggestionsFromGmail } from "@/lib/suggestion-merge";
 import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "@/lib/status";
 import { logWarning, logInfo } from "@/lib/log";
@@ -58,10 +58,11 @@ export async function upsertDocsAndSyncComments(
     gmailEmailMeta?: Map<string, ParsedEmail[]>;
     mode?: "refresh" | "full-refresh" | "selected" | "load";
     docId?: string; // Optional: restrict upsert to a specific docId (for single-doc refresh)
+    prefetched?: SyncPrefetchedData; // Pre-fetched data to avoid redundant API calls (single-doc refresh)
   },
   onProgress?: OnProgress,
 ): Promise<RefreshResult> {
-  const { existingDocIds, fromGmailDocIdSet = new Set(), shareNotes, gmailEmailMeta, mode = "refresh", docId } = options;
+  const { existingDocIds, fromGmailDocIdSet = new Set(), shareNotes, gmailEmailMeta, mode = "refresh", docId, prefetched } = options;
   const driveAuth = await getDriveClient(userId);
 
   let added = 0;
@@ -159,7 +160,9 @@ export async function upsertDocsAndSyncComments(
   const parallelismLimit = pLimit(10);
   const syncResults = await Promise.all(
     processedDocs.map((doc) => parallelismLimit(async () => {
-      const result = await syncComments(doc, driveAuth, userEmail);
+      // prefetched is only set from single-doc refresh — safe to pass here
+      // because processedDocs will contain exactly one doc in that case.
+      const result = await syncComments(doc, driveAuth, userEmail, prefetched);
       // Merge suggestion data from Gmail notifications (if available for this doc).
       // Runs after syncComments so Drive-created suggestions with content hashes
       // are in the DB for hash matching. If Gmail arrived first, inserts new rows.

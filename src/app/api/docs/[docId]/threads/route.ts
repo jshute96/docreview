@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, createDriveService, fetchThreadDetail, fetchSuggestions, fetchAllThreads, invalidGrantResponse } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, fetchThreadDetail, fetchDocData, fetchCommentData, invalidGrantResponse } from "@/lib/google-drive";
 import { logError } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 
@@ -45,8 +45,8 @@ export async function GET(
       return NextResponse.json({ threads: data ? [data.thread] : [] });
     }
 
-    const threads = await fetchAllThreads(driveAuth, doc.googleDocId);
-    return NextResponse.json({ threads });
+    const result = await fetchCommentData(driveAuth, doc.googleDocId, { threads: true });
+    return NextResponse.json({ threads: result.threads ?? [] });
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
@@ -103,7 +103,8 @@ export async function POST(
       if (doc.mimeType !== DOCS_MIME_TYPE) {
         return NextResponse.json({ comment: commentRecord, threads: [] });
       }
-      const liveSuggestions = await fetchSuggestions(driveAuth, doc.googleDocId);
+      const docData = await fetchDocData(driveAuth, doc.googleDocId);
+      const liveSuggestions = docData.suggestions;
       const stillLive = liveSuggestions.some((s) => s.id === commentRecord.googleSuggestionId);
 
       if (!stillLive && !commentRecord.resolved) {

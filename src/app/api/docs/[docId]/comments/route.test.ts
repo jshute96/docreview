@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { GET, PATCH } from "./route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, createDriveService, fetchAllThreads } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, fetchCommentData } from "@/lib/google-drive";
 
 vi.mock("@/auth", () => ({
   auth: vi.fn(),
@@ -22,7 +22,7 @@ const mockFilesGet = vi.fn();
 vi.mock("@/lib/google-drive", () => ({
   getDriveClient: vi.fn(),
   createDriveService: vi.fn(() => ({ files: { get: mockFilesGet } })),
-  fetchAllThreads: vi.fn(),
+  fetchCommentData: vi.fn(),
   invalidGrantResponse: vi.fn().mockReturnValue(null),
 }));
 
@@ -33,7 +33,7 @@ const mockDoc = prisma.doc as unknown as {
 const mockComment = prisma.comment as unknown as {
   updateMany: ReturnType<typeof vi.fn>;
 };
-const mockFetchAllThreads = vi.mocked(fetchAllThreads);
+const mockFetchCommentData = vi.mocked(fetchCommentData);
 
 function makeParams(docId: string) {
   return { params: Promise.resolve({ docId }) };
@@ -62,9 +62,9 @@ describe("GET /api/docs/[docId]/comments", () => {
   it("returns 200 with threads and viewedByMeTime", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ docId: "d1", userId: "u1", googleDocId: "g1" });
-    mockFetchAllThreads.mockResolvedValue([
+    mockFetchCommentData.mockResolvedValue({ threads: [
       { id: "c1", author: "A", fromMe: false, content: "C", createdTime: "T", resolved: false, replies: [] },
-    ]);
+    ] });
     mockFilesGet.mockResolvedValue({ data: { viewedByMeTime: "2026-03-01T12:00:00Z" } });
     const req = new NextRequest("http://localhost/api/docs/d1/comments");
     const res = await GET(req, makeParams("d1"));

@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { POST } from "./route";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, createDriveService } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, fetchCommentData, fetchDocData } from "@/lib/google-drive";
 import { upsertDocsAndSyncComments } from "@/lib/refresh";
 
 vi.mock("@/auth", () => ({
@@ -32,6 +32,9 @@ describe("Single-doc Refresh API", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(getValidSession).mockResolvedValue({ user: { id: userId, email: "test@example.com" } } as any);
+    // Default mocks for unified fetchers (called in parallel, feeding both sync and UI)
+    vi.mocked(fetchCommentData).mockResolvedValue({ comments: [], threads: [] });
+    vi.mocked(fetchDocData).mockResolvedValue({ documentText: null, suggestionContent: {}, suggestions: [] });
   });
 
   function makeParams() {

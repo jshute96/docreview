@@ -351,11 +351,17 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
     try {
       const res = await apiFetch(`/api/docs/${doc.docId}/refresh`, { method: "POST", contextId });
       if (!res.ok) throw new Error("Failed");
-      const updated: DocWithComments = await res.json();
-      setDoc(updated);
+      const data = await res.json();
+      const { threads, viewedByMeTime: vbmt, suggestionContent, documentText, ...updated } = data;
+      setDoc(updated as DocWithComments);
       setComments(updated.comments);
       setSortActive(true);
-      void fetchContent(contextId);
+      // Use thread/content data returned by the refresh endpoint instead of
+      // making separate /comments + /content fetches.
+      if (threads !== undefined) setThreadMap(threads);
+      if (vbmt !== undefined) setViewedByMeTime(vbmt);
+      if (suggestionContent !== undefined) setSuggestionContent(suggestionContent);
+      if (documentText !== undefined) setDocumentText(documentText);
       broadcastChange({ type: "comments", docId: doc.docId }, contextId);
       toast.success("Comments synced");
     } catch (err) {

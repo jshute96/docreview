@@ -31,10 +31,11 @@ refresh (detail page) is separate — see below.
 ## Per-doc Refresh (detail page)
 
 The doc detail page has its own **Refresh** button that calls `POST /api/docs/[docId]/refresh`.
-This fetches fresh file metadata from Drive (`files.get`), updates the doc record, then syncs
-comments — all for that one doc — and returns the updated doc + comments in a single response.
-No separate GET needed. Useful for quickly checking a single doc without waiting for a full
-sync.
+This endpoint performs a unified fetch: after getting file metadata (`files.get`), it fetches
+comments+threads and doc content in parallel — each Drive API is called once, and the results
+feed both the DB sync and the client response. The endpoint returns the updated doc, comments,
+thread map, suggestion content, document text, and `viewedByMeTime` all in one response, so
+the client doesn't need separate `/comments` or `/content` fetches after refresh.
 
 ---
 
@@ -243,7 +244,9 @@ resets `accessState` to `OK`. See [`access-states.md`](./access-states.md) for f
 
 Both the main Refresh and the per-doc Refresh run the same `syncComments` function
 (`src/lib/sync-comments.ts`). The main Refresh processes docs in parallel (`Promise.all`);
-the per-doc Refresh runs it for a single doc.
+the per-doc Refresh runs it for a single doc with pre-fetched data (comments and suggestions
+already retrieved by the unified `fetchCommentData` + `fetchDocData` calls), so `syncComments`
+skips its own API fetches and only does the DB sync.
 
 **Comment sync scope by mode:**
 
@@ -326,9 +329,11 @@ in `DocTable` has the full set. Source-specific refreshes from the hamburger men
 the same pattern via `handleSourceRefresh`.
 
 **Per-doc refresh:** The `POST /api/docs/[docId]/refresh` response includes the full updated doc
-with its comments array. `DocDetail` calls `setDoc(updated)` and `setComments(updated.comments)`
-directly, so the owner and modified date in the header reflect the latest Drive
-data without a page reload. Titles are fetched separately via the browser's title cache.
+with its comments array, plus thread details, suggestion content, document text, and
+`viewedByMeTime`. `DocDetail` destructures all of this from the response and updates state
+directly — no follow-up `/comments` or `/content` fetches needed. The owner and modified date
+in the header reflect the latest Drive data without a page reload. Titles are fetched
+separately via the browser's title cache.
 
 The main POST response includes summary counts (`added`, `updated`, `deleted`, `unarchived`,
 `commentsCreated`, `commentsUpdated`, `suggestionsCreated`, `suggestionsUpdated`,

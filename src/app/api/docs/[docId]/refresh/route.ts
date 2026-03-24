@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, createDriveService, invalidGrantResponse } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, invalidGrantResponse, fetchCommentData, fetchDocData, fetchFileTextViaExport } from "@/lib/google-drive";
+import type { CommentThread, SuggestionContent, DriveSuggestion } from "@/lib/google-drive";
 import { upsertDocsAndSyncComments } from "@/lib/refresh";
 import { docWithCommentsInclude, stripServerOnly } from "@/lib/doc-queries";
 import { logError, logWarning } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
+
+const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
+const SLIDES_MIME_TYPE = "application/vnd.google-apps.presentation";
 
 export async function POST(
   _req: NextRequest,
@@ -37,14 +41,16 @@ export async function POST(
 
   // Update file metadata first so lastModifiedInDrive is current before comment sync.
   let driveDoc;
+  let viewedByMeTime: string | null = null;
   try {
     const drive = createDriveService(driveAuth);
     const fileRes = await drive.files.get({
       fileId: doc.googleDocId,
-      fields: "id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed",
+      fields: "id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed, viewedByMeTime",
       supportsAllDrives: true,
     });
     const f = fileRes.data;
+    viewedByMeTime = f.viewedByMeTime ?? null;
     const isOwner = f.owners?.some((o) => o.me === true) ?? false;
     driveDoc = {
       googleDocId: f.id!,
@@ -76,15 +82,52 @@ export async function POST(
     }
   }
 
+  let threadMap: Record<string, CommentThread> | undefined;
+  let uiContent: { suggestions: Record<string, SuggestionContent>; documentText: string | null } | null = null;
+
   if (driveDoc) {
     if (driveDoc.trashed) {
       await prisma.doc.update({ where: { docId }, data: { accessState: "TRASHED" } });
     } else {
+      // Fetch comments+threads and doc content in parallel — each API is called
+      // once, then the results feed both the DB sync and the client response.
+      const mimeType = driveDoc.mimeType ?? doc.mimeType;
+      const [commentResult, docDataResult] = await Promise.all([
+        fetchCommentData(driveAuth, doc.googleDocId, { sync: true, threads: true, userEmail }).catch((err) => {
+          logWarning("[Refresh] fetchCommentData failed, will fall back to individual fetches:", err);
+          return null;
+        }),
+        (mimeType === DOCS_MIME_TYPE
+          ? fetchDocData(driveAuth, doc.googleDocId).catch((err) => {
+              logWarning("[Refresh] fetchDocData failed:", err);
+              return null;
+            })
+          : mimeType === SLIDES_MIME_TYPE
+            ? fetchFileTextViaExport(driveAuth, doc.googleDocId).then(
+                (text) => ({ suggestions: [] as DriveSuggestion[], suggestionContent: {} as Record<string, SuggestionContent>, documentText: text }),
+              ).catch(() => null)
+            : Promise.resolve(null)),
+      ]);
+
+      // Pass pre-fetched data to the sync so it doesn't re-fetch from Drive.
       await upsertDocsAndSyncComments(userId, userEmail, [driveDoc], {
         existingDocIds: new Set([doc.googleDocId]),
         mode: "selected",
-        docId
+        docId,
+        prefetched: {
+          ...(commentResult?.comments ? { comments: commentResult.comments } : {}),
+          ...(docDataResult ? { suggestions: docDataResult.suggestions } : {}),
+        },
       });
+
+      // Build thread map keyed by thread ID for the client response.
+      if (commentResult?.threads) {
+        threadMap = {};
+        for (const t of commentResult.threads) threadMap[t.id] = t;
+      }
+      if (docDataResult) {
+        uiContent = { suggestions: docDataResult.suggestionContent, documentText: docDataResult.documentText };
+      }
     }
   }
 
@@ -93,6 +136,16 @@ export async function POST(
     include: docWithCommentsInclude,
   });
 
-  return NextResponse.json(updated ? stripServerOnly(updated) : updated);
+  const docData = updated ? stripServerOnly(updated) : updated;
+  return NextResponse.json({
+    ...docData,
+    // Extra fields so the client can skip separate /comments + /content fetches
+    ...(threadMap !== undefined && { threads: threadMap }),
+    viewedByMeTime,
+    ...(uiContent && {
+      suggestionContent: uiContent.suggestions,
+      ...(uiContent.documentText != null && { documentText: uiContent.documentText }),
+    }),
+  });
   });
 }

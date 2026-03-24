@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, fetchDocContent, fetchFileTextViaExport, invalidGrantResponse } from "@/lib/google-drive";
+import { getDriveClient, fetchDocData, fetchFileTextViaExport, invalidGrantResponse } from "@/lib/google-drive";
 import { runWithRequestId } from "@/lib/request-context";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
@@ -39,8 +39,8 @@ export async function GET(
     const isSlides = doc.mimeType === SLIDES_MIME_TYPE;
 
     if (isDoc) {
-      const { documentText, suggestions } = await fetchDocContent(driveAuth, doc.googleDocId);
-      return NextResponse.json({ suggestions, ...(documentText != null ? { documentText } : {}) });
+      const { documentText, suggestionContent } = await fetchDocData(driveAuth, doc.googleDocId);
+      return NextResponse.json({ suggestions: suggestionContent, ...(documentText != null ? { documentText } : {}) });
     }
 
     if (isSlides) {
