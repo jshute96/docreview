@@ -12,7 +12,7 @@ import { FriendlyDate } from "@/components/friendly-date";
 import { StarButton } from "@/components/star-button";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
-import { navigateToComment, supportsCommentNavigation } from "@/lib/extension-bridge";
+import { navigateToComment, supportsCommentNavigation } from "@/lib/bridge-to-extension";
 import { docTarget } from "@/lib/tab-targets";
 
 interface CommentRowProps {

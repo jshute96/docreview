@@ -15,7 +15,7 @@ import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId } from "@/lib/api-fetch";
 import { UNREAD_COMMENTS_TOOLTIP, INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 import { commentsTarget, docTarget } from "@/lib/tab-targets";
-import { handleOpenDocClick } from "@/lib/extension-bridge";
+import { handleOpenDocClick } from "@/lib/bridge-to-extension";
 
 interface DocRowProps {
   doc: DocWithLabels;

@@ -104,7 +104,7 @@ broadcastChange({ type: "docs", docId: doc.docId }, contextId);
 | `doc-detail.tsx` handleBulkStatusChange | Bulk archive/unarchive visible comments |
 | `comment-row.tsx` postReply | Reply, resolve, or reopen a thread |
 | `comment-row.tsx` updateStatus | Change comment status (inbox/archive/mute) |
-| `extension-bridge.ts` commentSynced listener | Chrome extension detected comment activity on a Google Docs page and server sync completed |
+| `bridge-to-extension.ts` commentSynced listener | Chrome extension detected comment activity on a Google Docs page and server sync completed |
 
 ## Receivers
 

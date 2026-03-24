@@ -335,8 +335,8 @@ The Docreview Chrome extension (version 2+) implements in-page comment navigatio
 
 ### Architecture
 
-1. **Docreview web app** (`comment-row.tsx`, `doc-detail.tsx`): Intercepts "Open" clicks when the extension is detected (version >= 2). Sends `navigateToComment` message via `extension-bridge.ts`.
-2. **Bridge** (`docreview-bridge.js`): Relays postMessage to the background worker.
+1. **Docreview web app** (`comment-row.tsx`, `doc-detail.tsx`): Intercepts "Open" clicks when the extension is detected (version >= 2). Sends `navigateToComment` message via `bridge-to-extension.ts`.
+2. **Bridge** (`bridge-to-docreview.js`): Relays postMessage to the background worker.
 3. **Background worker** (`background.js`): Tracks which Chrome tab has which Google Doc (persisted in `chrome.storage.session`). If a tab exists, injects the navigation script via `chrome.scripting.executeScript` in `MAIN` world. If not, opens a new tab with `?disco=` URL.
 4. **Injected script** (`navigateToCommentInPage`): Finds the comment by disco ID in the Closure component tree and clicks it.
 

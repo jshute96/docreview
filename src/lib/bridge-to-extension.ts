@@ -1,6 +1,6 @@
-// Bridge for communicating with the Docreview Chrome extension.
+// Bridge to Extension — Web app module for communicating with the Chrome extension.
 //
-// The extension's docreview-bridge.js content script relays messages between
+// The extension's bridge-to-docreview.js content script relays messages between
 // the web page and the extension's background worker via window.postMessage.
 
 export interface ExtensionStatus {
@@ -184,7 +184,7 @@ function setupCommentSyncedListener() {
     // as a valid recipient, so the singleton listener in this tab will fire.
     const docId = event.data.docId;
     // eslint-disable-next-line no-console -- extension bridge diagnostic, not server-side app code
-    console.log("[extension-bridge] commentSynced received, broadcasting for", docId);
+    console.log("[bridge-to-extension] commentSynced received, broadcasting for", docId);
     const ch = new BroadcastChannel("docreview-sync");
     ch.postMessage({ type: "comments", docId });
     ch.close();

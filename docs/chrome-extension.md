@@ -10,13 +10,13 @@ The extension has three main scripts that run in different contexts:
 
 - **`background.js`** — Service worker (Manifest V3). Runs in the extension's background context, independent of any page. Handles toolbar clicks, context menus, tab tracking, comment navigation, URL resolution, and server-side comment sync. Communicates with content scripts via `chrome.runtime.onMessage` / `chrome.tabs.sendMessage`.
 
-- **`docreview-bridge.js`** — Content script dynamically registered for Docreview app pages only. Bridges communication between the web app (page world) and the background worker (extension world) using `window.postMessage` ↔ `chrome.runtime.sendMessage`. Also relays unsolicited messages from the background worker to the page (e.g., `commentSynced` notifications).
+- **`bridge-to-docreview.js`** — Content script dynamically registered for Docreview app pages only. Bridges communication between the web app (page world) and the background worker (extension world) using `window.postMessage` ↔ `chrome.runtime.sendMessage`. Also relays unsolicited messages from the background worker to the page (e.g., `commentSynced` notifications).
 
 Communication flow:
 
 ```
 Google Docs page                    Docreview page
-  content.js                          docreview-bridge.js ↔ extension-bridge.ts (React app)
+  content.js                          bridge-to-docreview.js ↔ bridge-to-extension.ts (React app)
        ↕ chrome.runtime messages            ↕ chrome.runtime messages + window.postMessage
                     background.js
                 (service worker)
@@ -33,7 +33,7 @@ Google Docs page                    Docreview page
 - **Gmail**: Injects icons into attachment chips and "Open in Docreview" links into Docs notification emails. The link resolves its target URL at click time rather than injection time (to handle Gmail's SPA navigation correctly).
 - **Access-denied pages**: Injects an "Add in Docreview" link on Docs and Drive access-denied pages.
 
-**`background.js`** — Service worker that handles toolbar clicks, context menu actions, and messages from content scripts. Dynamically registers the `docreview-bridge.js` content script for the configured `baseUrl`. Tab tracking is persisted in `chrome.storage.session` to survive MV3 service worker restarts.
+**`background.js`** — Service worker that handles toolbar clicks, context menu actions, and messages from content scripts. Dynamically registers the `bridge-to-docreview.js` content script for the configured `baseUrl`. Tab tracking is persisted in `chrome.storage.session` to survive MV3 service worker restarts.
 
 Message handlers:
 - `commentActivity` — Debounces and triggers server-side comment sync via `POST /api/docs/sync-comments/[googleDocId]`, then notifies the first open Docreview tab via `chrome.tabs.sendMessage`.
@@ -44,7 +44,7 @@ Message handlers:
 - `navigateToComment` — Tracks Google Docs tabs per document and injects navigation scripts via `executeScript` in MAIN world.
 - `openDocInDocreview` — Opens a doc from Gmail in Docreview, using `chrome.scripting.executeScript` with `allFrames: true` to search all frames (including sandboxed AMP iframes).
 
-**`docreview-bridge.js`** — Content script dynamically registered for Docreview app pages.
+**`bridge-to-docreview.js`** — Content script dynamically registered for Docreview app pages.
 
 - Relays `window.postMessage` calls from the web app to the background worker via `chrome.runtime.sendMessage`, and posts responses back.
 - Handles unsolicited messages from the background worker (e.g., `commentSynced` after a server-side comment sync) and relays them to the page.
@@ -64,7 +64,7 @@ done
 
 ## Docreview app integration
 
-The extension is automatically detected by the Docreview web app via a ping/response handshake over `window.postMessage`. The `docreview-bridge.js` content script is dynamically registered for the configured `baseUrl` and relays messages between the web page and the background worker. Each page instance gets a unique `pageId` so that cancellation of in-flight resolves is scoped per tab.
+The extension is automatically detected by the Docreview web app via a ping/response handshake over `window.postMessage`. The `bridge-to-docreview.js` content script is dynamically registered for the configured `baseUrl` and relays messages between the web page and the background worker. Each page instance gets a unique `pageId` so that cancellation of in-flight resolves is scoped per tab.
 
 **Note:** The `http://localhost/*` entry in `host_permissions` is required for the dynamic content script registration to work in development. For non-localhost deployments, add the production URL to `host_permissions` in `manifest.json`.
 
@@ -92,7 +92,7 @@ The extension bridges this gap via `focusDocTab`: the web app asks the extension
 
 **Opening Google Docs (no extension)**: Use `docTarget(googleDocId)` -> `doc-{id}`. The `<a target>` link handles tab reuse natively.
 
-**Opening Google Docs (extension available)**: The `handleOpenDocClick()` helper in `extension-bridge.ts` intercepts the click, asks the extension to `focusDocTab`, and only falls through to `window.open` with the named target if no tab was found. This handles both directions:
+**Opening Google Docs (extension available)**: The `handleOpenDocClick()` helper in `bridge-to-extension.ts` intercepts the click, asks the extension to `focusDocTab`, and only falls through to `window.open` with the named target if no tab was found. This handles both directions:
 - Doc list opens first, then comments page "Open" -> extension's `findDocTab` finds the tab by URL
 - Comments page opens first (via extension), then doc list "Open" -> extension's `focusDocTab` finds it in `docTabMap`
 
@@ -107,7 +107,7 @@ The extension sets `window.name = 'doc-{id}'` on Google Docs tabs it tracks (via
 | File | Role |
 |------|------|
 | `src/lib/tab-targets.ts` | Named target helpers: `commentsTarget()`, `docTarget()`, `openCommentsPage()`, `openDocPage()` |
-| `src/lib/extension-bridge.ts` | `focusDocTab()`, `handleOpenDocClick()`, `navigateToComment()` |
+| `src/lib/bridge-to-extension.ts` | `focusDocTab()`, `handleOpenDocClick()`, `navigateToComment()` |
 | `src/chrome-extension/background.js` | `findDocTab()`, `setDocTabName()`, `focusDocTab` handler, `navigateToComment()` |
 
 ## Comment navigation implementation
@@ -160,7 +160,7 @@ First event for a docId: fires `POST /api/docs/sync-comments/{googleDocId}` imme
 
 Looks up doc by Google doc ID, calls `syncComments()` which fetches all comments from Drive API + all suggestions from Docs API, updates database.
 
-**Step 5 — Notify docreview tabs** (`background.js` → `docreview-bridge.js` → `extension-bridge.ts`)
+**Step 5 — Notify docreview tabs** (`background.js` → `bridge-to-docreview.js` → `bridge-to-extension.ts`)
 
 Background sends `commentSynced` to first open docreview tab via `chrome.tabs.sendMessage`. Bridge content script relays to page via `window.postMessage`. Extension bridge posts to `BroadcastChannel` (using a separate short-lived instance so the receiving tab also gets it — the shared singleton suppresses self-delivery by spec). All docreview tabs receive via `useCrossTabListener` and refetch from database. If no docreview tab is open, nothing to notify — database is already updated for next visit.
 

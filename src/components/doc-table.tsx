@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import { useCrossTabListener, crossTabReason, broadcastChange, type CrossTabReceivedEvent } from "@/lib/cross-tab";
-import { pingExtension } from "@/lib/extension-bridge";
+import { pingExtension } from "@/lib/bridge-to-extension";
 import type { TriState } from "@/lib/tri-state";
 import { DocRow } from "@/components/doc-row";
 import { FilterBar } from "@/components/filter-bar";

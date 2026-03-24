@@ -1,4 +1,4 @@
-// Docreview Bridge — Content script for Docreview app pages
+// Bridge to Docreview — Content script for Docreview app pages
 //
 // Bridges communication between the web app and the extension's background
 // service worker using window.postMessage. This avoids the need for the web
@@ -17,7 +17,7 @@
   // notifications) and relay them to the web page via window.postMessage.
   chrome.runtime.onMessage.addListener(function(msg, _sender, sendResponse) {
     if (msg.type === 'commentSynced' && msg.docId) {
-      console.log('[docreview-bridge] relaying commentSynced for', msg.docId);
+      console.log('[bridge-to-docreview] relaying commentSynced for', msg.docId);
       window.postMessage({ source: 'docreview-extension', type: 'commentSynced', docId: msg.docId }, '*');
       sendResponse({ received: true });
       return true;

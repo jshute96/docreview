@@ -20,7 +20,7 @@ import { useLabelSync } from "@/hooks/use-label-sync";
 import { useLabels } from "@/contexts/label-context";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StarButton } from "@/components/star-button";
-import { getExtensionStatus, pingExtension, resolveUrl, cancelResolve } from "@/lib/extension-bridge";
+import { getExtensionStatus, pingExtension, resolveUrl, cancelResolve } from "@/lib/bridge-to-extension";
 
 type ValidationState = "idle" | "validating" | "valid" | "invalid";
 

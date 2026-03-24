@@ -15,7 +15,7 @@ import { ROLE_COLORS } from "@/lib/role-colors";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
-import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation } from "@/lib/extension-bridge";
+import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation } from "@/lib/bridge-to-extension";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,

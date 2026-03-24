@@ -210,10 +210,10 @@ function fireCommentSync(docId) {
 // - commentActivity: from Docs content script, syncs comments for a doc (debounced)
 // - openDocInDocreview: from Gmail content script, opens doc in Docreview
 // - trackDocTab: from Docs content script, tracks the tab for comment navigation reuse
-// - ping: from docreview-bridge, returns extension status
-// - resolveUrl: from docreview-bridge, follows redirects to resolve shortened URLs
-// - focusDocTab: from docreview-bridge, focuses an existing Google Docs tab without creating one
-// - navigateToComment: from docreview-bridge, navigates to a comment in an open Google Docs tab
+// - ping: from bridge-to-docreview, returns extension status
+// - resolveUrl: from bridge-to-docreview, follows redirects to resolve shortened URLs
+// - focusDocTab: from bridge-to-docreview, focuses an existing Google Docs tab without creating one
+// - navigateToComment: from bridge-to-docreview, navigates to a comment in an open Google Docs tab
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
   if (msg.type === 'commentActivity' && msg.docId) {
     var docId = msg.docId;
@@ -835,10 +835,10 @@ function resolveUrlViaTab(url, pageId) {
   });
 }
 
-// Dynamically register the docreview-bridge content script for the configured
+// Dynamically register the bridge-to-docreview content script for the configured
 // baseUrl. This lets the web app detect the extension and send it messages
 // (e.g. to resolve shortened URLs). Re-registers whenever baseUrl changes.
-var BRIDGE_SCRIPT_ID = 'docreview-bridge';
+var BRIDGE_SCRIPT_ID = 'bridge-to-docreview';
 
 async function registerBridgeScript() {
   var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
@@ -853,7 +853,7 @@ async function registerBridgeScript() {
     await chrome.scripting.registerContentScripts([{
       id: BRIDGE_SCRIPT_ID,
       matches: [pattern],
-      js: ['defaults.js', 'docreview-bridge.js'],
+      js: ['defaults.js', 'bridge-to-docreview.js'],
       runAt: 'document_start'
     }]);
   } catch (e) {
