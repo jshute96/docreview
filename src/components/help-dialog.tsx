@@ -78,7 +78,7 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); else onOpenChange(true); }}>
-      <DialogContent className="sm:max-w-3xl focus:outline-none" hideClose>
+      <DialogContent className="sm:max-w-3xl focus:outline-none" hideClose aria-describedby={undefined}>
         <DialogHeader className="pt-5 px-6 pb-0">
           <DialogTitle className="flex items-center gap-3 text-xl">
             <img src="/docreview.svg" alt="Docreview Logo" className="h-8 w-8 rounded-lg shadow-sm" />

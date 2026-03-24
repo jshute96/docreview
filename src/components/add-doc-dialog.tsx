@@ -50,7 +50,7 @@ export function AddDocDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{dialogExisting ? "Update Document" : "Add Document"}</DialogTitle>
         </DialogHeader>

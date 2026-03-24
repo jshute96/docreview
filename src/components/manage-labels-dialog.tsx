@@ -283,7 +283,7 @@ export function ManageLabelsDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md flex flex-col" hideClose>
+      <DialogContent className="sm:max-w-md flex flex-col" hideClose aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Manage Labels</DialogTitle>
         </DialogHeader>
@@ -366,7 +366,7 @@ export function ManageLabelsDialog({
       </DialogContent>
 
       <AlertDialog open={!!labelToDelete} onOpenChange={(o) => !o && setLabelToDelete(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent aria-describedby={undefined}>
           <AlertDialogHeader>
             <AlertDialogTitle>
               Label {labelToDelete?.name} is attached to {labelToDelete?._count?.docs ?? 0} documents. Delete it?

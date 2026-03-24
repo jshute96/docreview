@@ -816,7 +816,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
         </div>
 
         <Dialog open={showViewedTimeDialog} onOpenChange={setShowViewedTimeDialog}>
-          <DialogContent className="sm:max-w-sm">
+          <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle>Edit Viewed Time</DialogTitle>
             </DialogHeader>

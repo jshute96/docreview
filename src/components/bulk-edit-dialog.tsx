@@ -252,7 +252,7 @@ export function BulkEditDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Edit {effectiveDocs.length} Document{effectiveDocs.length === 1 ? "" : "s"}</DialogTitle>
         </DialogHeader>

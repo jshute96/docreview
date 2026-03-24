@@ -104,7 +104,7 @@ export function EditDocDialog({
       setOpen(v);
     }}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="line-clamp-1">Edit Document</DialogTitle>
         </DialogHeader>
