@@ -206,13 +206,15 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
     try {
       const contextId = generateContextId();
       const reason = crossTabReason(event, "doc-detail");
-      const refetchDoc = async () => {
+      // freezeSort: when true, preserves the current table order so updated
+      // comments don't jump (e.g. after an extension-triggered comment sync).
+      const refetchDoc = async (freezeSort = false) => {
         const docRes = await apiFetch(`/api/docs/${initialDoc.docId}`, { contextId, reason });
         if (docRes.ok) {
           const updated: DocWithComments = await docRes.json();
           setDoc(updated);
           setComments(updated.comments);
-          setSortActive(true);
+          setSortActive(!freezeSort);
         } else if (docRes.status === 404 || docRes.status === 410) {
           setNotFound(true);
         }
@@ -240,7 +242,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
       } else if (event.type === "comments" && (event.docId === initialDoc.docId || event.docId === initialDoc.googleDocId)) {
         console.log("[cross-tab] doc-detail: refreshing (comments event)"); // eslint-disable-line no-console
-        await refetchDoc();
+        // Freeze sort order so updated comments don't jump to the top —
+        // same behavior as an in-app reply. Applies to both extension-triggered
+        // comment syncs and cross-tab updates from other Docreview tabs.
+        await refetchDoc(true);
         void fetchContent(contextId);
       } else {
         console.log("[cross-tab] doc-detail: ignored", event.type, "event"); // eslint-disable-line no-console
