@@ -45,7 +45,6 @@ Easy:
 * chrome extension
   * capture linked-from notes when requesting permission
   * bi-directional linking - click a comment in the doc or docreview, focus that comment in the other too
-  * notice comments added/replied/resolved in docs, update docreview
   * get better content for suggestions from open docs, vs limited info we have from the API
   * accept or reject suggestions by sending clicks to buttons in docs (there's no API for this)
   * maybe: context-menu items for links to docs (maybe shortened links too) for docreview actions

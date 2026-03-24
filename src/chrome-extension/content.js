@@ -314,9 +314,57 @@
     if (!m) return;
     var googleDocId = m[1];
 
+    // Pending observer — tracks an active MutationObserver waiting for Google
+    // to finish processing a comment action. If a new action arrives while one
+    // is pending, the old observer is disconnected (the new one will catch it).
+    var pendingObserver = null;
+    var pendingTimeout = null;
+
     function notifyCommentActivity(action) {
       console.log('[docreview] comment activity detected:', action, googleDocId);
-      chrome.runtime.sendMessage({ type: 'commentActivity', docId: googleDocId });
+
+      // Clean up any pending observer from a previous action
+      if (pendingObserver) {
+        pendingObserver.disconnect();
+        pendingObserver = null;
+      }
+      if (pendingTimeout) {
+        clearTimeout(pendingTimeout);
+        pendingTimeout = null;
+      }
+
+      function sendNotification() {
+        if (pendingObserver) {
+          pendingObserver.disconnect();
+          pendingObserver = null;
+        }
+        if (pendingTimeout) {
+          clearTimeout(pendingTimeout);
+          pendingTimeout = null;
+        }
+        console.log('[docreview] comment action confirmed, notifying:', action, googleDocId);
+        chrome.runtime.sendMessage({ type: 'commentActivity', docId: googleDocId });
+      }
+
+      // Watch the comment list for DOM changes — Google updates the DOM once
+      // the action is saved (reply appears, comment removed on resolve, etc.)
+      var commentList = document.querySelector('[role="list"]');
+      if (!commentList) {
+        // No comment list found — wait briefly for Google to save, then notify
+        pendingTimeout = setTimeout(sendNotification, 500);
+        return;
+      }
+
+      pendingObserver = new MutationObserver(function() {
+        sendNotification();
+      });
+      pendingObserver.observe(commentList, { childList: true, subtree: true, attributes: true });
+
+      // Fallback timeout in case no mutation fires (e.g., action failed silently)
+      pendingTimeout = setTimeout(function() {
+        console.log('[docreview] timeout waiting for DOM change, notifying anyway:', action);
+        sendNotification();
+      }, 3000);
     }
 
     // Catch actions on comment buttons via event delegation on mouseup.

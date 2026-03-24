@@ -174,7 +174,8 @@ chrome.action.onClicked.addListener(async function(tab) {
 // When the content script detects comment activity on a Google Docs page,
 // it sends a commentActivity message with { docId }. We use leading+trailing
 // debounce: fire immediately on the first event, then suppress for 1s. If
-// more events arrive during the cooldown, fire once more when it expires.
+// more events arrive during cooldown, fire once more when it expires — the
+// trailing sync catches changes that the leading sync may have missed.
 var commentActivityTimers = new Map(); // docId -> { timerId, pending }
 var COMMENT_SYNC_COOLDOWN = 1000;
 
@@ -218,9 +219,9 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     var docId = msg.docId;
     var state = commentActivityTimers.get(docId);
     if (state) {
-      // In cooldown — mark that another event arrived so we fire again at the end
+      // In cooldown — mark pending so trailing sync fires when cooldown expires
       state.pending = true;
-      console.log('[background] commentActivity for', docId, '(queued, cooldown active)');
+      console.log('[background] commentActivity for', docId, '(cooldown active, trailing will fire)');
     } else {
       // No cooldown — fire immediately and start cooldown
       console.log('[background] commentActivity for', docId, '(firing immediately)');
@@ -228,7 +229,8 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
       var timerId = setTimeout(function() {
         var s = commentActivityTimers.get(docId);
         commentActivityTimers.delete(docId);
-        // If more events arrived during cooldown, fire once more
+        // Only fire trailing sync if more events arrived during cooldown —
+        // the leading sync may have missed their changes.
         if (s && s.pending) {
           console.log('[background] commentActivity for', docId, '(firing trailing after cooldown)');
           fireCommentSync(docId);

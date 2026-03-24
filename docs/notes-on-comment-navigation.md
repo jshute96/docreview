@@ -70,6 +70,7 @@ and navigation will fall back to `?disco=` URL reload.
 ### Event handling
 
 - **Comment listitems**: Respond to bare `.click()` — this navigates to the comment, scrolls the document, and highlights the text.
+- **Comment action buttons** (Reply, Resolve, Accept, Reject): Handled on `mousedown`/`mouseup` only — `click` events never fire. Must listen for `mouseup` to detect user actions.
 - **Google Docs UI buttons** (toolbar, pane controls): Require a full `mousedown` → `mouseup` → `click` event sequence. Bare `.click()` is ignored by the Closure event system.
 - **Canvas content area**: Does not respond to synthetic mouse events. The document text is canvas-rendered.
 
@@ -217,6 +218,44 @@ This means **item references become stale** after any of these events. Code must
 - `element.click()` (bare) doesn't work for Google Docs UI buttons — they need `fullClick` (mousedown+mouseup+click sequence)
 - `.click()` *does* work for comment listitems (they respond to bare click)
 - Deselecting comments via synthetic events is unreliable — Google Docs uses canvas rendering and doesn't respond to synthetic mouse events on the content area
+
+### Comment action buttons
+
+The comment UI has several action buttons that Docreview's auto-sync feature listens for. Key findings about their behavior:
+
+**Button identification (stable aria-labels):**
+
+| Action | aria-label | Notes |
+|--------|-----------|-------|
+| Reply (submit) | `Reply to comment` | Only active when text is typed; has `jfk-button-disabled` class when empty |
+| New comment (submit) | `Post Comment` | Capital C — appears after selecting text and starting a comment |
+| Resolve | `Mark as resolved and hide discussion` | |
+| Accept suggestion | `Accept suggestion` | |
+| Reject suggestion | `Reject suggestion` | |
+
+**Event handling — mouseup, not click:**
+
+Google's Closure Library wires these buttons via `mousedown`/`mouseup` handlers, **not** `click`. A `click` event never fires on these elements. This was confirmed via Playwright testing — adding a capture-phase `click` listener on `document` caught nothing when clicking Resolve, but `mouseup` fired reliably.
+
+This is different from comment listitems (which respond to bare `.click()`) and from toolbar buttons (which need the full `mousedown` → `mouseup` → `click` sequence via `fullClick()`).
+
+**Button DOM structure:**
+- All action buttons are `<div role="button">` elements (not `<button>`)
+- Reply/Comment submit: class `docos-input-post` with `jfk-button-action`
+- Resolve: class `docs-suggestion-button` with `jfk-button-flat`
+- Accept/Reject: class `docs-suggestion-button` / `docos-reject-suggestion-button`
+- Disabled state: `jfk-button-disabled` class (Reply/Comment button when input is empty)
+
+**Reply input area:**
+- Class `docos-input-textarea docos-input-contenteditable` with `contenteditable="true"`
+- `aria-label="Reply"` or similar
+- Supports `Ctrl+Enter` / `Cmd+Enter` keyboard shortcut to submit
+- The Reply/Comment button and input area appear inside `docos-replyview` containers
+
+**Comment list container:**
+- `[role="list"]` with class `docos docos-stream-view`
+- Children are `[role="listitem"]` divs, one per comment/suggestion thread
+- The list DOM is updated when comments are added, resolved, or have new replies — useful for MutationObserver-based change detection
 
 ### Anchored vs non-anchored detection
 
