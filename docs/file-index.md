@@ -250,5 +250,9 @@ Shadcn/ui components:
 
 | File | Description |
 |------|-------------|
+| `README.md` | How to run and maintain the Chrome extension content script tests |
 | `chrome-extension.md` | Chrome extension test cases — content script injection, idempotency, toolbar button, adapted from former bookmarklet tests |
+| `content-script.spec.ts` | Playwright tests for content script DOM injection against saved snapshots |
+| `playwright.config.ts` | Playwright config — system Chrome, snapshot HTTP server |
+| `snapshots/` | Saved rendered DOM from live Google pages (Docs, Sheets, Slides, Drive, Gmail) — gitignored |
 | `gmail_notifications/` | `.eml` + `.json` pairs for testing `parse-gmail-notification.ts` — comment notifications, sharing invitations, suggestions, edge cases |

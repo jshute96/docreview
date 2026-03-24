@@ -60,3 +60,6 @@ scripts/data-export.json
 .playwright-mcp/
 
 testing/test_users.json
+testing/snapshots/
+test-results/
+playwright-report/

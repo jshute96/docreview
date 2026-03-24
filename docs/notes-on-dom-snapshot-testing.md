@@ -91,9 +91,18 @@ Gmail snapshots are ~4MB. Could potentially trim non-essential DOM (sidebar, hid
 ### Missing CSS
 Some Google-hosted stylesheets may not load from localhost, causing minor visual differences. The DOM structure is correct — just the styling may be off.
 
-## Potential next steps
+## Current state
 
-- Save snapshots for other surfaces: Google Docs titlebar, Drive list view, Drive grid view, Gmail inbox list
-- Build a helper script to automate: save snapshot, serve it, open before/after tabs
-- Consider jsdom/happy-dom for fast non-visual tests (selector validation, injection logic, idempotency) that run in CI without a browser
-- Could evolve into a test skill for iterating on content script changes against saved snapshots
+Snapshots have been captured for all major surfaces and automated Playwright
+tests run against them. See `testing/README.md` for how to run and maintain
+the tests.
+
+**Implemented:**
+- Snapshots for Google Docs, Sheets, Slides, Drive list view, Gmail inbox, Gmail message view
+- Automated Playwright tests (`npm run test:e2e`) that extract content script functions, inject them with mocked variables, and assert DOM state
+- Hostname check bypassed by shadowing `location` in the injection wrapper
+
+**Potential next steps:**
+- Drive grid view snapshot
+- jsdom/happy-dom for faster non-visual tests in CI
+- Visual regression screenshots comparing before/after injection
