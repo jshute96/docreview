@@ -16,6 +16,8 @@ The extension is installed manually from files:
 
 A small Docreview icon appears in the document's title bar. Click it to open the document in Docreview -- if it's already tracked, you go to the comment detail page; if not, the Add Document page.
 
+When you add, reply to, resolve, or accept/reject comments in Google Docs, the extension automatically syncs those changes back to Docreview and updates all open Docreview tabs -- no manual refresh needed. This is controlled by the "Notify on comment activity" setting.
+
 On access-denied pages, an "Add in Docreview" link appears so you can track the document even before you have access.
 
 ### Google Drive
@@ -53,6 +55,6 @@ By default, the extension connects to `http://localhost:3000`. To change this:
 2. Enter your Docreview server URL.
 3. Click **Save**.
 
-The options page also has toggles for enabling/disabling the extension on each Google service.
+The options page also has toggles for enabling/disabling the extension on each Google service and comment activity notifications.
 
 The settings sync across your Chrome devices.

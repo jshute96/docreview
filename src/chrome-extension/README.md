@@ -9,6 +9,8 @@ Docreview works without it, but the extension adds links to open Docreview easil
 ### Google Docs
 A Docreview icon appears in the document titlebar (next to the sharing badges). Click it to open the document in Docreview.
 
+When comment activity is detected (new comment, reply, resolve, accept/reject suggestion), the extension automatically syncs the change back to Docreview's database and live-updates all open Docreview tabs. This is controlled by the "Notify on comment activity" setting, which requires "Enable on Google Docs" to be on.
+
 On "Access Denied" pages (documents you don't have permission to view), an "Add in Docreview" link appears above the "Request access" button. Clicking it opens the Add Document page with the doc URL prefilled and a note recording the request date.
 
 ### Google Drive
@@ -62,7 +64,7 @@ By default, the extension connects to `http://localhost:3000`. To change this:
 
 After changing the URL, refresh any open Google Docs/Drive/Gmail tabs.
 
-The options page also has toggles for enabling/disabling the extension on each Google service (Docs, Drive, Gmail) and the redirect-link resolver.
+The options page also has toggles for enabling/disabling the extension on each Google service (Docs, Drive, Gmail), comment activity notifications, and the redirect-link resolver.
 
 ## Design & implementation
 

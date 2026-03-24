@@ -51,7 +51,7 @@ Message handlers:
 - Each page instance generates a unique `pageId` to scope cancellation.
 - Runs in Chrome's isolated content script world; communication with the page is via `postMessage` only.
 
-**`options.html` + `options.js`** — Settings page for configuring the Docreview server URL and feature toggles (Google Docs/Drive/Gmail integration, redirect-link resolver), stored in `chrome.storage.sync`. The "Enable on Google Docs" toggle controls both content script injection and comment navigation — the setting is included in the ping response so the web app knows whether to use in-page navigation or fall back to page reloads.
+**`options.html` + `options.js`** — Settings page for configuring the Docreview server URL and feature toggles (Google Docs/Drive/Gmail integration, comment activity notifications, redirect-link resolver), stored in `chrome.storage.sync`. The "Enable on Google Docs" toggle controls both content script injection and comment navigation — the setting is included in the ping response so the web app knows whether to use in-page navigation or fall back to page reloads. The "Notify on comment activity" sub-toggle controls comment activity auto-sync and is only selectable when "Enable on Google Docs" is on.
 
 **`defaults.js`** — Shared default configuration (base URL, feature toggles) loaded by all other scripts.
 

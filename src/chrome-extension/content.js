@@ -15,18 +15,24 @@
   var settings = await chrome.storage.sync.get({
     baseUrl: DEFAULTS.baseUrl,
     enableDocs: DEFAULTS.enableDocs,
+    enableCommentSync: DEFAULTS.enableCommentSync,
     enableDrive: DEFAULTS.enableDrive,
     enableGmail: DEFAULTS.enableGmail
   });
   var baseUrl = settings.baseUrl;
   var iconUrl = chrome.runtime.getURL('icons/icon16.png');
 
-  var hostname = location.hostname;
-  var isDocs = hostname.endsWith('docs.google.com') && settings.enableDocs;
-  var isDrive = hostname.endsWith('drive.google.com') && settings.enableDrive;
-  var isGmail = hostname.endsWith('mail.google.com') && settings.enableGmail;
+  var commentSyncEnabled = settings.enableCommentSync;
+  chrome.storage.onChanged.addListener(function(changes) {
+    if (changes.enableCommentSync) commentSyncEnabled = changes.enableCommentSync.newValue;
+  });
 
-  if (!isDocs && !isDrive && !isGmail) return;
+  var hostname = location.hostname;
+  var docsEnabled = hostname.endsWith('docs.google.com') && settings.enableDocs;
+  var driveEnabled = hostname.endsWith('drive.google.com') && settings.enableDrive;
+  var gmailEnabled = hostname.endsWith('mail.google.com') && settings.enableGmail;
+
+  if (!docsEnabled && !driveEnabled && !gmailEnabled) return;
 
   // Create a clickable Docreview icon that opens the given doc in Docreview.
   // Used by Docs (titlebar badge) and Drive (next to file icons).
@@ -61,7 +67,7 @@
       suppress(e);
       // On Google Docs pages, track this tab so comment navigation can reuse it
       // instead of opening a new one when the user clicks Open in Docreview
-      if (isDocs && docId) {
+      if (docsEnabled && docId) {
         chrome.runtime.sendMessage({ type: 'trackDocTab', docId: docId });
       }
       window.open(openUrl, '_blank');
@@ -321,6 +327,7 @@
     var pendingTimeout = null;
 
     function notifyCommentActivity(action) {
+      if (!commentSyncEnabled) return;
       console.log('[docreview] comment activity detected:', action, googleDocId);
 
       // Clean up any pending observer from a previous action
@@ -418,16 +425,16 @@
   // Set up injection and MutationObservers. Google Workspace apps load content
   // dynamically, so we need observers to inject into elements that appear after
   // the initial page load (titlebar in Docs, file list in Drive, emails in Gmail).
-  if (isDocs) {
+  if (docsEnabled) {
     injectDocs();
     injectAccessDenied();
-    setupCommentActivityDetection();
+    if (commentSyncEnabled) setupCommentActivityDetection();
     new MutationObserver(function() { injectDocs(); injectAccessDenied(); }).observe(document.body, { childList: true, subtree: true });
-  } else if (isDrive) {
+  } else if (driveEnabled) {
     injectDrive();
     injectAccessDenied();
     new MutationObserver(function() { injectDrive(); injectAccessDenied(); }).observe(document.body, { childList: true, subtree: true });
-  } else if (isGmail) {
+  } else if (gmailEnabled) {
     injectGmail();
     new MutationObserver(injectGmail).observe(document.body, { childList: true, subtree: true });
   }
