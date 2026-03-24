@@ -242,11 +242,29 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
       } else if (event.type === "comments" && (event.docId === initialDoc.docId || event.docId === initialDoc.googleDocId)) {
         console.log("[cross-tab] doc-detail: refreshing (comments event)"); // eslint-disable-line no-console
-        // Freeze sort order so updated comments don't jump to the top —
-        // same behavior as an in-app reply. Applies to both extension-triggered
-        // comment syncs and cross-tab updates from other Docreview tabs.
-        await refetchDoc(true);
-        void fetchContent(contextId);
+        // Fetch doc and threads in parallel, then apply both state updates
+        // together so React batches them into one render. This prevents
+        // expanded threads from flashing a loading state — the initialThread
+        // sync effect updates fetchedModifiedMs before the staleness check
+        // sees the new driveModifiedAt. Also freezes sort order so updated
+        // comments don't jump (same as in-app reply).
+        const [docRes, threadsRes] = await Promise.all([
+          apiFetch(`/api/docs/${initialDoc.docId}`, { contextId, reason }),
+          apiFetch(`/api/docs/${initialDoc.docId}/comments`, { contextId }),
+        ]);
+        if (docRes.ok) {
+          const updated: DocWithComments = await docRes.json();
+          if (threadsRes.ok) {
+            const threadData = await threadsRes.json();
+            setThreadMap(threadData.threads ?? {});
+            if (threadData.viewedByMeTime !== undefined) setViewedByMeTime(threadData.viewedByMeTime);
+          }
+          setDoc(updated);
+          setComments(updated.comments);
+          setSortActive(false);
+        } else if (docRes.status === 404 || docRes.status === 410) {
+          setNotFound(true);
+        }
       } else {
         console.log("[cross-tab] doc-detail: ignored", event.type, "event"); // eslint-disable-line no-console
       }
