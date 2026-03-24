@@ -221,22 +221,29 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
       if (event.type === "docs") {
         // Skip if the event is for a different doc
         const isTarget = event.docIds?.includes(initialDoc.docId);
-        if (event.docIds && !isTarget) return;
-
+        if (event.docIds && !isTarget) {
+          console.log("[cross-tab] doc-detail: ignored docs event for other doc"); // eslint-disable-line no-console
+          return;
+        }
+        console.log("[cross-tab] doc-detail: refreshing (docs event)"); // eslint-disable-line no-console
         const [labelsRes] = await Promise.all([
           apiFetch("/api/labels", { contextId }),
           refetchDoc(),
         ]);
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
       } else if (event.type === "labels") {
+        console.log("[cross-tab] doc-detail: refreshing (labels event)"); // eslint-disable-line no-console
         const [labelsRes] = await Promise.all([
           apiFetch("/api/labels", { contextId }),
           refetchDoc(),
         ]);
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
-      } else if (event.type === "comments" && event.docId === initialDoc.docId) {
+      } else if (event.type === "comments" && (event.docId === initialDoc.docId || event.docId === initialDoc.googleDocId)) {
+        console.log("[cross-tab] doc-detail: refreshing (comments event)"); // eslint-disable-line no-console
         await refetchDoc();
         void fetchContent(contextId);
+      } else {
+        console.log("[cross-tab] doc-detail: ignored", event.type, "event"); // eslint-disable-line no-console
       }
     } catch { /* cross-tab sync is best-effort */ }
   }, [initialDoc.docId]); // eslint-disable-line react-hooks/exhaustive-deps

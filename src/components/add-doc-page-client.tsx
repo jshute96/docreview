@@ -53,6 +53,7 @@ export function AddDocPageClient({
       return;
     }
     try {
+      if (event) console.log("[cross-tab] add-doc: refreshing labels", `(${event.type} event)`); // eslint-disable-line no-console
       const reason = event ? crossTabReason(event, "add-doc") : undefined;
       const res = await apiFetch("/api/labels", { reason });
       if (res.ok) setLabels(await res.json());

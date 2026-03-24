@@ -82,6 +82,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
       return;
     }
     try {
+      if (event) console.log("[cross-tab] doc-list: refreshing", `(${event.type} event)`); // eslint-disable-line no-console
       const contextId = generateContextId();
       const reason = event ? crossTabReason(event, "doc-list") : undefined;
       const [docsRes, labelsRes] = await Promise.all([

@@ -304,12 +304,76 @@
     parent.insertBefore(bar, beforeEl);
   }
 
+  // --- Comment activity detection (Docs only) ---
+  // Detects when the user adds, replies to, resolves, or accepts/rejects a
+  // comment, and notifies the background worker so it can sync the change
+  // back to Docreview's database.
+  function setupCommentActivityDetection() {
+    var path = location.pathname;
+    var m = path.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (!m) return;
+    var googleDocId = m[1];
+
+    function notifyCommentActivity(action) {
+      console.log('[docreview] comment activity detected:', action, googleDocId);
+      chrome.runtime.sendMessage({ type: 'commentActivity', docId: googleDocId });
+    }
+
+    // Catch actions on comment buttons via event delegation on mouseup.
+    // Google's Closure Library handles these buttons on mousedown/mouseup,
+    // NOT click — the click event never fires. We use mouseup in the capture
+    // phase so we see the event before Google's handlers consume it.
+    document.addEventListener('mouseup', function(e) {
+      var target = e.target;
+      // Walk up a few levels to find the button (clicks may land on child elements)
+      for (var el = target; el && el !== document.body; el = el.parentElement) {
+        var aria = el.getAttribute('aria-label');
+        if (!aria) continue;
+        // Reply / Comment submit button
+        if (aria === 'Reply to comment' || aria === 'Post Comment') {
+          // Only fire if the button is not disabled (has text typed)
+          if (!el.classList.contains('jfk-button-disabled')) {
+            notifyCommentActivity(aria === 'Post Comment' ? 'comment' : 'reply');
+          }
+          return;
+        }
+        // Resolve
+        if (aria === 'Mark as resolved and hide discussion') {
+          notifyCommentActivity('resolve');
+          return;
+        }
+        // Accept / Reject suggestion
+        if (aria === 'Accept suggestion' || aria === 'Reject suggestion') {
+          notifyCommentActivity(aria === 'Accept suggestion' ? 'accept' : 'reject');
+          return;
+        }
+        // Stop walking after a few levels to avoid scanning the whole tree
+        if (el.getAttribute('role') === 'listitem') break;
+      }
+    }, true);
+
+    // Catch Ctrl+Enter in comment/reply input areas (keyboard shortcut to submit)
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        var target = e.target;
+        // Check if the focus is inside a comment input area
+        for (var el = target; el && el !== document.body; el = el.parentElement) {
+          if (el.classList && el.classList.contains('docos-input-textarea')) {
+            notifyCommentActivity('ctrl+enter');
+            return;
+          }
+        }
+      }
+    }, true);
+  }
+
   // Set up injection and MutationObservers. Google Workspace apps load content
   // dynamically, so we need observers to inject into elements that appear after
   // the initial page load (titlebar in Docs, file list in Drive, emails in Gmail).
   if (isDocs) {
     injectDocs();
     injectAccessDenied();
+    setupCommentActivityDetection();
     new MutationObserver(function() { injectDocs(); injectAccessDenied(); }).observe(document.body, { childList: true, subtree: true });
   } else if (isDrive) {
     injectDrive();

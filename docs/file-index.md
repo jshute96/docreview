@@ -83,6 +83,7 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/[docId]/re-add/route.ts` | `POST` delete and re-add document — validates ownership, delegates to shared `addDoc()` with `deleteDocId`; handles permission-denied via fallback metadata |
 | `docs/[docId]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata and syncs comments via shared logic in `refresh.ts` |
 | `docs/[docId]/refresh/route.test.ts` | Tests for single-doc metadata refresh and comment sync |
+| `docs/sync-comments/[googleDocId]/route.ts` | `POST` sync comments+suggestions for a single doc by Google doc ID — called by Chrome extension when comment activity is detected on a Google Docs page |
 | `docs/[docId]/comments/route.ts` | `GET` fetch all comment threads from Drive + `viewedByMeTime` (fast path — Drive `comments.list` + `files.get` in parallel) |
 | `docs/[docId]/content/route.ts` | `GET` fetch document text and suggestion content (slow path — Docs API `documents.get` or Drive `files.export`); for Docs, uses a single `SUGGESTIONS_INLINE` call for both |
 | `docs/[docId]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (INBOX/ARCHIVED/MUTED), read state, or star |

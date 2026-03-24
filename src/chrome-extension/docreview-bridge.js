@@ -13,6 +13,17 @@
   // cancelling a resolve in one tab doesn't affect other tabs.
   var pageId = Math.random().toString(36).slice(2);
 
+  // Handle unsolicited messages from the background worker (e.g. comment sync
+  // notifications) and relay them to the web page via window.postMessage.
+  chrome.runtime.onMessage.addListener(function(msg, _sender, sendResponse) {
+    if (msg.type === 'commentSynced' && msg.docId) {
+      console.log('[docreview-bridge] relaying commentSynced for', msg.docId);
+      window.postMessage({ source: 'docreview-extension', type: 'commentSynced', docId: msg.docId }, '*');
+      sendResponse({ received: true });
+      return true;
+    }
+  });
+
   // Relay messages from the web page to the background worker.
   // Attaches pageId so the background can scope operations per tab.
   window.addEventListener('message', async function(event) {

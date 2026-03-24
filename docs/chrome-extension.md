@@ -6,11 +6,11 @@ See `src/chrome-extension/README.md` for user-facing documentation.
 
 **`manifest.json`** — Manifest V3 configuration. Declares permissions (`storage`, `activeTab`, `contextMenus`, `scripting`, `tabs`), host permissions for Google domains and localhost, and registers the content script and service worker.
 
-**`content.js`** — Runs on Google Docs, Drive, and Gmail pages. Injects Docreview icons by manipulating the DOM. Uses MutationObservers to handle dynamically loaded content (Google Workspace apps load UI elements after the initial page load). The base URL comes from `chrome.storage.sync`, and the Gmail link resolves its target URL at click time rather than injection time (to handle Gmail's SPA navigation correctly).
+**`content.js`** — Runs on Google Docs, Drive, and Gmail pages. Injects Docreview icons by manipulating the DOM. Uses MutationObservers to handle dynamically loaded content (Google Workspace apps load UI elements after the initial page load). The base URL comes from `chrome.storage.sync`, and the Gmail link resolves its target URL at click time rather than injection time (to handle Gmail's SPA navigation correctly). On Google Docs pages, also detects comment activity (reply, resolve, accept/reject suggestion, new comment) via click and keyboard listeners, and notifies the background worker to trigger a server-side comment sync.
 
-**`background.js`** — Service worker that handles toolbar clicks, context menu actions, and messages from content scripts. For Gmail, it uses `chrome.scripting.executeScript` with `allFrames: true` to search all frames (including sandboxed AMP iframes that content scripts can't access) for document URLs. Handles `ping` (returns extension status/version), `resolveUrl` (opens a background tab to follow redirects), `cancelResolve` (closes in-flight resolve tabs), `focusDocTab` (focuses an existing Google Docs tab without creating one), and `navigateToComment` (tracks Google Docs tabs per document and injects navigation scripts via `executeScript` in MAIN world). Tab tracking is persisted in `chrome.storage.session` to survive MV3 service worker restarts. Dynamically registers the `docreview-bridge.js` content script for the configured `baseUrl`.
+**`background.js`** — Service worker that handles toolbar clicks, context menu actions, and messages from content scripts. For Gmail, it uses `chrome.scripting.executeScript` with `allFrames: true` to search all frames (including sandboxed AMP iframes that content scripts can't access) for document URLs. Handles `ping` (returns extension status/version), `resolveUrl` (opens a background tab to follow redirects), `cancelResolve` (closes in-flight resolve tabs), `focusDocTab` (focuses an existing Google Docs tab without creating one), `navigateToComment` (tracks Google Docs tabs per document and injects navigation scripts via `executeScript` in MAIN world), and `commentActivity` (debounces and triggers server-side comment sync via `POST /api/docs/sync-comments/[googleDocId]`, then notifies the first open Docreview tab via `chrome.tabs.sendMessage`). Tab tracking is persisted in `chrome.storage.session` to survive MV3 service worker restarts. Dynamically registers the `docreview-bridge.js` content script for the configured `baseUrl`.
 
-**`docreview-bridge.js`** — Content script dynamically registered for Docreview app pages. Relays `window.postMessage` calls from the web app to the background worker via `chrome.runtime.sendMessage`, and posts responses back. Each page instance generates a unique `pageId` to scope cancellation. Runs in the content script's isolated world; communication with the page is via `postMessage` only.
+**`docreview-bridge.js`** — Content script dynamically registered for Docreview app pages. Relays `window.postMessage` calls from the web app to the background worker via `chrome.runtime.sendMessage`, and posts responses back. Also handles unsolicited messages from the background worker (e.g. `commentSynced` after a server-side comment sync) and relays them to the page. Each page instance generates a unique `pageId` to scope cancellation. Runs in the content script's isolated world; communication with the page is via `postMessage` only.
 
 **`options.html` + `options.js`** — Settings page for configuring the Docreview server URL and feature toggles (Google Docs/Drive/Gmail integration, redirect-link resolver), stored in `chrome.storage.sync`. The "Enable on Google Docs" toggle controls both content script injection and comment navigation — the setting is included in the ping response so the web app knows whether to use in-page navigation or fall back to page reloads.
 
@@ -85,6 +85,46 @@ The injected navigation script (`navigateToCommentInPage`) handles several compl
 - **Fallback**: If the comment can't be found in the component tree (e.g. Google changed their code), falls back to a page reload with `?disco=` in the URL.
 
 See `docs/notes-on-comment-navigation.md` for detailed research notes on the Google Docs DOM structure and the complications encountered during implementation.
+
+## Comment activity auto-sync
+
+When the user acts on a comment in Google Docs (reply, resolve, accept/reject suggestion, new comment), the extension automatically syncs the change back to Docreview's database without requiring a manual Refresh.
+
+### Detection (content.js)
+
+The content script uses event delegation on `mouseup` (capture phase) to detect actions on comment buttons. Google's Closure Library handles these buttons on `mousedown`/`mouseup`, not `click` — the `click` event never fires. Detected buttons:
+- `[aria-label="Reply to comment"]` / `[aria-label="Post Comment"]` — Reply or Comment submit button (checked for `jfk-button-disabled` to avoid false positives)
+- `[aria-label="Mark as resolved and hide discussion"]` — Resolve button
+- `[aria-label="Accept suggestion"]` / `[aria-label="Reject suggestion"]` — Suggestion actions
+
+Also catches `Ctrl+Enter` / `Cmd+Enter` inside `.docos-input-textarea` (keyboard shortcut for submitting replies/comments).
+
+### Sync flow
+
+```
+content.js (Google Docs page)
+  detects mouseup on comment action button or Ctrl+Enter in reply input
+  → chrome.runtime.sendMessage to background.js
+
+background.js (extension service worker)
+  leading+trailing debounce (1s cooldown per docId)
+  → POST /api/docs/sync-comments/{googleDocId} (server syncs comments+suggestions from Drive+Docs APIs)
+  → chrome.tabs.sendMessage to first open Docreview tab
+
+docreview-bridge.js (extension content script on Docreview page)
+  receives chrome.runtime.onMessage
+  → window.postMessage to the page
+
+extension-bridge.ts (Docreview React app)
+  receives window message
+  → BroadcastChannel("docreview-sync") to all Docreview tabs
+
+useCrossTabListener (each open Docreview tab)
+  receives BroadcastChannel message
+  → refetches data from database
+```
+
+The debounce fires immediately on the first event (leading edge), then suppresses for 1 second. If more events arrive during cooldown, one final sync fires when the cooldown expires (trailing edge). If no Docreview tab is open, the DB sync still happens — the data will be fresh when the user next opens Docreview.
 
 ## Design notes
 

@@ -1,0 +1,57 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getValidSession } from "@/lib/auth-utils";
+import { prisma } from "@/lib/prisma";
+import { getDriveClient, invalidGrantResponse } from "@/lib/google-drive";
+import { syncComments } from "@/lib/sync-comments";
+import { logError, logInfo } from "@/lib/log";
+import { runWithRequestId } from "@/lib/request-context";
+
+/**
+ * Sync comments for a single doc, identified by Google doc ID.
+ * Called by the Chrome extension when it detects comment activity
+ * (reply, resolve, new comment, accept/reject suggestion) on a Google Docs page.
+ */
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ googleDocId: string }> }
+) {
+  return runWithRequestId("POST", req, async () => {
+    const session = await getValidSession();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+    const userEmail = session.user.email ?? undefined;
+    const { googleDocId } = await params;
+
+    const doc = await prisma.doc.findFirst({ where: { googleDocId, userId } });
+    if (!doc) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    let driveAuth;
+    try {
+      driveAuth = await getDriveClient(userId);
+    } catch (err) {
+      const reauth = invalidGrantResponse(err);
+      if (reauth) return reauth;
+      logError("[Comments] Drive auth error:", err);
+      return NextResponse.json({ error: "Failed to connect to Google Drive" }, { status: 502 });
+    }
+
+    const t0 = Date.now();
+    try {
+      const result = await syncComments(doc, driveAuth, userEmail);
+      logInfo(`[Comments] Synced comments for doc ${doc.docId} (${Date.now() - t0}ms)`, {
+        created: result.commentsCreated + result.suggestionsCreated,
+        updated: result.commentsUpdated + result.suggestionsUpdated,
+      });
+      return NextResponse.json({ success: true, result });
+    } catch (err) {
+      const reauth = invalidGrantResponse(err);
+      if (reauth) return reauth;
+      logError(`[Comments] Failed to sync comments for doc ${doc.docId} (${Date.now() - t0}ms):`, err);
+      return NextResponse.json({ error: "Failed to sync comments" }, { status: 502 });
+    }
+  });
+}

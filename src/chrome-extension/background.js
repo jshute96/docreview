@@ -170,7 +170,43 @@ chrome.action.onClicked.addListener(async function(tab) {
   chrome.tabs.create({ url: baseUrl + '/open?doc=' + encodeURIComponent(tab.url), index: tab.index + 1 });
 });
 
+// --- Comment activity debounce ---
+// When the content script detects comment activity on a Google Docs page,
+// it sends a commentActivity message with { docId }. We use leading+trailing
+// debounce: fire immediately on the first event, then suppress for 1s. If
+// more events arrive during the cooldown, fire once more when it expires.
+var commentActivityTimers = new Map(); // docId -> { timerId, pending }
+var COMMENT_SYNC_COOLDOWN = 1000;
+
+function fireCommentSync(docId) {
+  chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl }, function(config) {
+    var url = config.baseUrl + '/api/docs/sync-comments/' + docId;
+    fetch(url, { method: 'POST', credentials: 'include' }).then(function(res) {
+      if (res.ok) {
+        console.log('[background] comment sync succeeded for', docId);
+        // Notify open docreview tabs so they refresh
+        chrome.tabs.query({ url: config.baseUrl + '/*' }, function(tabs) {
+          if (tabs && tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id, { type: 'commentSynced', docId: docId }, function() {
+              if (chrome.runtime.lastError) {
+                console.warn('[background] sendMessage failed:', chrome.runtime.lastError.message);
+              }
+            });
+          } else {
+            console.log('[background] no docreview tabs open, skipping notification');
+          }
+        });
+      } else {
+        console.warn('[background] comment sync failed for', docId, 'status:', res.status);
+      }
+    }).catch(function(err) {
+      console.warn('[background] comment sync error for', docId, err);
+    });
+  });
+}
+
 // Handle messages from content scripts.
+// - commentActivity: from Docs content script, syncs comments for a doc (debounced)
 // - openDocInDocreview: from Gmail content script, opens doc in Docreview
 // - trackDocTab: from Docs content script, tracks the tab for comment navigation reuse
 // - ping: from docreview-bridge, returns extension status
@@ -178,6 +214,31 @@ chrome.action.onClicked.addListener(async function(tab) {
 // - focusDocTab: from docreview-bridge, focuses an existing Google Docs tab without creating one
 // - navigateToComment: from docreview-bridge, navigates to a comment in an open Google Docs tab
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+  if (msg.type === 'commentActivity' && msg.docId) {
+    var docId = msg.docId;
+    var state = commentActivityTimers.get(docId);
+    if (state) {
+      // In cooldown — mark that another event arrived so we fire again at the end
+      state.pending = true;
+      console.log('[background] commentActivity for', docId, '(queued, cooldown active)');
+    } else {
+      // No cooldown — fire immediately and start cooldown
+      console.log('[background] commentActivity for', docId, '(firing immediately)');
+      fireCommentSync(docId);
+      var timerId = setTimeout(function() {
+        var s = commentActivityTimers.get(docId);
+        commentActivityTimers.delete(docId);
+        // If more events arrived during cooldown, fire once more
+        if (s && s.pending) {
+          console.log('[background] commentActivity for', docId, '(firing trailing after cooldown)');
+          fireCommentSync(docId);
+        }
+      }, COMMENT_SYNC_COOLDOWN);
+      commentActivityTimers.set(docId, { timerId: timerId, pending: false });
+    }
+    return;
+  }
+
   if (msg.type === 'openDocInDocreview' && sender.tab) {
     openDocFromGmailTab(sender.tab.id);
     return;

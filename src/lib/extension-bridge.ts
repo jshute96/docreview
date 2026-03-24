@@ -164,3 +164,31 @@ export function handleOpenDocClick(
     if (!found) window.open(driveUrl, targetName);
   });
 }
+
+/**
+ * Listen for commentSynced messages from the Chrome extension bridge.
+ * When the extension detects comment activity on a Google Docs page and the
+ * server sync completes, the bridge posts a commentSynced message here.
+ * We broadcast it via BroadcastChannel so all open Docreview tabs refresh.
+ *
+ * This listener is set up once on module load (client-side only).
+ */
+function setupCommentSyncedListener() {
+  if (typeof window === "undefined") return;
+  window.addEventListener("message", (event: MessageEvent) => {
+    if (event.data?.source !== "docreview-extension") return;
+    if (event.data.type !== "commentSynced" || !event.data.docId) return;
+    // broadcastChange uses the shared singleton BroadcastChannel, which doesn't
+    // self-deliver (by spec). To notify THIS tab too, we post via a separate
+    // short-lived channel — a different object on the same channel name counts
+    // as a valid recipient, so the singleton listener in this tab will fire.
+    const docId = event.data.docId;
+    // eslint-disable-next-line no-console -- extension bridge diagnostic, not server-side app code
+    console.log("[extension-bridge] commentSynced received, broadcasting for", docId);
+    const ch = new BroadcastChannel("docreview-sync");
+    ch.postMessage({ type: "comments", docId });
+    ch.close();
+  });
+}
+
+setupCommentSyncedListener();
