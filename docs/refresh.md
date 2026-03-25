@@ -186,8 +186,9 @@ owns the file, not something we infer.
 
 For each file Drive returns:
 
-- **New AUTHOR doc (not in DB, user owns it):** created with `role: "AUTHOR"` and
-  `createdTimeInDrive` / `owner`. Default status is **ARCHIVED** to avoid "noise"
+- **New AUTHOR doc (not in DB, user owns it):** created with `role: "AUTHOR"`,
+  `createdTimeInDrive` / `owner`, and `lastCommentActivity` initialized from
+  `createdTimeInDrive`. Default status is **ARCHIVED** to avoid "noise"
   from the Drive changes feed resurfacing old documents. A doc only moves to
   **INBOX** if it was also discovered via a Gmail notification (`fromGmail`)
   or if the subsequent comment sync (Phase 3) detects relevant activity

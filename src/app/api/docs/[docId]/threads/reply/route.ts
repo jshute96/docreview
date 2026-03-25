@@ -8,6 +8,7 @@ import {
   fetchThreadDetail,
   invalidGrantResponse,
 } from "@/lib/google-drive";
+import { bumpLastCommentActivity } from "@/lib/sync-comments";
 import { logError, logInfo } from "@/lib/log";
 import { formatDate } from "@/lib/utils";
 import { runWithRequestId } from "@/lib/request-context";
@@ -108,18 +109,22 @@ export async function POST(
         ? "ARCHIVED"
         : "INBOX";
 
-    const updated = await prisma.comment.update({
-      where: { commentId: commentRecord.commentId },
-      data: {
-        resolved: data.resolved,
-        isThreadAuthor: data.isThreadAuthor,
-        isReplyAuthor: data.isReplyAuthor,
-        isRead: data.isRead,
-        ...(isMuted ? {} : { status }),
-        driveCreatedAt: data.driveCreatedAt,
-        driveModifiedAt: data.driveModifiedAt,
-        replyCount: data.replyCount,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.comment.update({
+        where: { commentId: commentRecord.commentId },
+        data: {
+          resolved: data.resolved,
+          isThreadAuthor: data.isThreadAuthor,
+          isReplyAuthor: data.isReplyAuthor,
+          isRead: data.isRead,
+          ...(isMuted ? {} : { status }),
+          driveCreatedAt: data.driveCreatedAt,
+          driveModifiedAt: data.driveModifiedAt,
+          replyCount: data.replyCount,
+        },
+      });
+      await bumpLastCommentActivity(doc.docId, [data.driveCreatedAt, data.driveModifiedAt], tx);
+      return result;
     });
 
     return NextResponse.json({ comment: updated, threads: [data.thread] });

@@ -99,6 +99,7 @@ export async function upsertDocsAndSyncComments(
         lastModifiedInDrive: doc.lastModifiedInDrive,
         createdTimeInDrive: doc.createdTimeInDrive,
         notes: shareNotes?.get(doc.googleDocId) ?? null,
+        lastCommentActivity: doc.createdTimeInDrive, // Initialize from creation time; comment sync will bump it up
         // Mode-based status defaults:
         // All new docs discovered via Drive activity start as ARCHIVED to avoid noise
         // from old docs resurfacing. We rely on Gmail notifications or the
@@ -317,6 +318,7 @@ export async function insertInaccessibleDocs(
             isStarred: options?.isStarred ?? false,
             createdTimeInDrive: doc.emailDate,
             lastModifiedInDrive: doc.emailDate,
+            lastCommentActivity: doc.emailDate,
           },
         });
 

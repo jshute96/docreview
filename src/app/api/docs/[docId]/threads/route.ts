@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getDriveClient, createDriveService, fetchThreadDetail, fetchDocData, fetchCommentData, invalidGrantResponse } from "@/lib/google-drive";
+import { bumpLastCommentActivity } from "@/lib/sync-comments";
 import { logError } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 
@@ -108,12 +109,17 @@ export async function POST(
       const stillLive = liveSuggestions.some((s) => s.id === commentRecord.googleSuggestionId);
 
       if (!stillLive && !commentRecord.resolved) {
-        const updated = await prisma.comment.update({
-          where: { commentId: commentRecord.commentId },
-          data: {
-            resolved: true,
-            status: commentRecord.status === "MUTED" ? commentRecord.status : "ARCHIVED",
-          },
+        const now = new Date();
+        const updated = await prisma.$transaction(async (tx) => {
+          const result = await tx.comment.update({
+            where: { commentId: commentRecord.commentId },
+            data: {
+              resolved: true,
+              status: commentRecord.status === "MUTED" ? commentRecord.status : "ARCHIVED",
+            },
+          });
+          await bumpLastCommentActivity(doc.docId, [now], tx);
+          return result;
         });
         return NextResponse.json({ comment: updated, threads: [] });
       }
@@ -138,18 +144,22 @@ export async function POST(
       commentRecord.driveModifiedAt?.getTime() !== data.driveModifiedAt?.getTime();
     const effectiveIsRead = modifiedChanged ? data.isRead : commentRecord.isRead;
 
-    const updated = await prisma.comment.update({
-      where: { commentId: commentRecord.commentId },
-      data: {
-        resolved: data.resolved,
-        isThreadAuthor: data.isThreadAuthor,
-        isReplyAuthor: data.isReplyAuthor,
-        isRead: effectiveIsRead,
-        ...(isMuted ? {} : { status }),
-        driveCreatedAt: data.driveCreatedAt,
-        driveModifiedAt: data.driveModifiedAt,
-        replyCount: data.replyCount,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.comment.update({
+        where: { commentId: commentRecord.commentId },
+        data: {
+          resolved: data.resolved,
+          isThreadAuthor: data.isThreadAuthor,
+          isReplyAuthor: data.isReplyAuthor,
+          isRead: effectiveIsRead,
+          ...(isMuted ? {} : { status }),
+          driveCreatedAt: data.driveCreatedAt,
+          driveModifiedAt: data.driveModifiedAt,
+          replyCount: data.replyCount,
+        },
+      });
+      await bumpLastCommentActivity(doc.docId, [data.driveCreatedAt, data.driveModifiedAt], tx);
+      return result;
     });
 
     return NextResponse.json({ comment: updated, threads: [data.thread] });

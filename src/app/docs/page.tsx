@@ -13,7 +13,7 @@ export default async function DocsPage() {
     prisma.doc.findMany({
       where: { userId },
       include: docWithCountsInclude,
-      orderBy: { lastModifiedInDrive: "desc" },
+      orderBy: { lastCommentActivity: "desc" },
     }),
     prisma.label.findMany({
       where: { userId },

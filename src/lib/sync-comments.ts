@@ -7,6 +7,36 @@ import type { DriveComment, DriveSuggestion } from "@/lib/google-drive";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 
+// Extract Prisma's interactive-transaction client type from $transaction's callback signature.
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Bumps a doc's lastCommentActivity to the max of its current value and the
+ * given timestamps via raw SQL GREATEST. Accepts an optional transaction client
+ * so the bump can run in the same transaction as the comment write. Returns the
+ * number of affected rows (0 or 1). After comment deletions the value may
+ * exceed any current comment's timestamp — this is intentional (there WAS
+ * activity at that time).
+ */
+export async function bumpLastCommentActivity(
+  docId: string,
+  timestamps: (Date | null | undefined)[],
+  tx?: TxClient,
+): Promise<number> {
+  const valid = timestamps.filter((t): t is Date => t instanceof Date);
+  if (valid.length === 0) return 0;
+  const max = new Date(Math.max(...valid.map(t => t.getTime())));
+  const client = tx ?? prisma;
+  // The column is TIMESTAMP (without tz). Prisma stores all dates as UTC in
+  // these columns. $executeRaw with a Date object converts to local time, so
+  // we pass the ISO string cast as ::timestamp to store the UTC value as-is.
+  const maxIso = max.toISOString();
+  return client.$executeRaw`
+    UPDATE docs SET last_comment_activity = GREATEST(last_comment_activity, ${maxIso}::timestamp)
+    WHERE doc_id = ${docId}
+  `;
+}
+
 // --- Result type ---
 
 interface SyncResult {
@@ -234,7 +264,14 @@ async function syncDriveComments(
   }
 
   if (toCreate.length > 0) {
-    await prisma.comment.createMany({ data: toCreate });
+    const newTs = toCreate.flatMap(c => [
+      c.driveCreatedAt instanceof Date ? c.driveCreatedAt : null,
+      c.driveModifiedAt instanceof Date ? c.driveModifiedAt : null,
+    ]);
+    await prisma.$transaction(async (tx) => {
+      await tx.comment.createMany({ data: toCreate });
+      await bumpLastCommentActivity(doc.docId, newTs, tx);
+    });
   }
 
   // Delete comment records that Drive no longer returns (deleted in Google Docs).
@@ -330,7 +367,7 @@ async function updateExistingComment(
 
   // MUTED fast-path: update metadata but preserve MUTED status unless @-mentioned
   if (existing.status === "MUTED" && !newReplyMentionsMe) {
-    const updated = await updateCommentFields(existing, c);
+    const updated = await updateCommentFields(doc.docId, existing, c);
     return { updated, unarchive: false, nonResolveActivity: false };
   }
 
@@ -386,20 +423,23 @@ async function updateExistingComment(
     existing.replyCount !== c.replyCount;
 
   if (changed) {
-    await prisma.comment.update({
-      where: { commentId: existing.commentId },
-      data: {
-        resolved: c.resolved,
-        isReplyAuthor: c.isReplyAuthor,
-        isRead: effectiveIsRead,
-        assignedToMe: c.assignedToMe,
-        mentionedMe: mentionedInThread,
-        mentionedMeUnreplied: c.mentionedMeUnreplied,
-        status,
-        driveCreatedAt: c.driveCreatedAt,
-        driveModifiedAt: c.driveModifiedAt,
-        replyCount: c.replyCount,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.comment.update({
+        where: { commentId: existing.commentId },
+        data: {
+          resolved: c.resolved,
+          isReplyAuthor: c.isReplyAuthor,
+          isRead: effectiveIsRead,
+          assignedToMe: c.assignedToMe,
+          mentionedMe: mentionedInThread,
+          mentionedMeUnreplied: c.mentionedMeUnreplied,
+          status,
+          driveCreatedAt: c.driveCreatedAt,
+          driveModifiedAt: c.driveModifiedAt,
+          replyCount: c.replyCount,
+        },
+      });
+      await bumpLastCommentActivity(doc.docId, [c.driveCreatedAt, c.driveModifiedAt], tx);
     });
   }
 
@@ -445,7 +485,7 @@ function computeCommentStatus(
  * Updates a MUTED comment's metadata without changing its status.
  * Returns true if any fields were actually changed.
  */
-async function updateCommentFields(existing: Comment, c: DriveComment): Promise<boolean> {
+async function updateCommentFields(docId: string, existing: Comment, c: DriveComment): Promise<boolean> {
   const modifiedChanged = !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
   const effectiveIsRead = modifiedChanged ? c.isRead : existing.isRead;
   const mentionedInThread = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
@@ -462,19 +502,22 @@ async function updateCommentFields(existing: Comment, c: DriveComment): Promise<
     existing.replyCount !== c.replyCount;
 
   if (changed) {
-    await prisma.comment.update({
-      where: { commentId: existing.commentId },
-      data: {
-        resolved: c.resolved,
-        isReplyAuthor: c.isReplyAuthor,
-        isRead: effectiveIsRead,
-        assignedToMe: c.assignedToMe,
-        mentionedMe: mentionedInThread,
-        mentionedMeUnreplied: c.mentionedMeUnreplied,
-        driveCreatedAt: c.driveCreatedAt,
-        driveModifiedAt: c.driveModifiedAt,
-        replyCount: c.replyCount,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.comment.update({
+        where: { commentId: existing.commentId },
+        data: {
+          resolved: c.resolved,
+          isReplyAuthor: c.isReplyAuthor,
+          isRead: effectiveIsRead,
+          assignedToMe: c.assignedToMe,
+          mentionedMe: mentionedInThread,
+          mentionedMeUnreplied: c.mentionedMeUnreplied,
+          driveCreatedAt: c.driveCreatedAt,
+          driveModifiedAt: c.driveModifiedAt,
+          replyCount: c.replyCount,
+        },
+      });
+      await bumpLastCommentActivity(docId, [c.driveCreatedAt, c.driveModifiedAt], tx);
     });
   }
 
@@ -572,6 +615,8 @@ async function syncDocsSuggestions(
       if (needsSuggestionId) {
         logInfo(`[Suggestions:Docs] ${doc.googleDocId}: adopted Gmail-first row ${existing.commentId} → ${s.id}`);
       }
+      // Metadata correction only (adopting Gmail-first ID, fixing type/hash) —
+      // not new activity, so no bumpLastCommentActivity here.
       if (needsSuggestionId || typeChanged || hashChanged) {
         await prisma.comment.update({
           where: { commentId: existing.commentId },
@@ -586,26 +631,46 @@ async function syncDocsSuggestions(
     }
   }
 
-  if (toCreate.length > 0) {
-    await prisma.comment.createMany({ data: toCreate });
-  }
-
-  // Resolve suggestions no longer in the document (accepted or rejected).
+  // Identify suggestions to resolve (no longer in the document).
   // Gmail-first rows without a googleSuggestionId are also resolved here —
   // if Drive couldn't match them to a live suggestion, they should be hidden.
-  let resolved = 0;
   const activeSuggestions = await prisma.comment.findMany({
     where: { docId: doc.docId, type: "SUGGESTION", resolved: false },
   });
-  for (const s of activeSuggestions) {
-    if (!s.googleSuggestionId || !liveIds.has(s.googleSuggestionId)) {
-      await prisma.comment.update({
-        where: { commentId: s.commentId },
-        data: { resolved: true, status: s.status === "INBOX" ? "ARCHIVED" : s.status },
-      });
-      resolved++;
-    }
+  const toResolve = activeSuggestions.filter(
+    s => !s.googleSuggestionId || !liveIds.has(s.googleSuggestionId)
+  );
+
+  if (toCreate.length > 0) {
+    const newTs = toCreate.map(c => c.driveCreatedAt instanceof Date ? c.driveCreatedAt : null);
+    await prisma.$transaction(async (tx) => {
+      await tx.comment.createMany({ data: toCreate });
+      await bumpLastCommentActivity(doc.docId, newTs, tx);
+    });
   }
+
+  if (toResolve.length > 0) {
+    // Batch-resolve all absent suggestions + bump in one transaction.
+    // INBOX suggestions move to ARCHIVED; MUTED stays MUTED.
+    const resolveInbox = toResolve.filter(s => s.status === "INBOX").map(s => s.commentId);
+    const resolveOther = toResolve.filter(s => s.status !== "INBOX").map(s => s.commentId);
+    await prisma.$transaction(async (tx) => {
+      if (resolveInbox.length > 0) {
+        await tx.comment.updateMany({
+          where: { commentId: { in: resolveInbox } },
+          data: { resolved: true, status: "ARCHIVED" },
+        });
+      }
+      if (resolveOther.length > 0) {
+        await tx.comment.updateMany({
+          where: { commentId: { in: resolveOther } },
+          data: { resolved: true },
+        });
+      }
+      await bumpLastCommentActivity(doc.docId, [new Date()], tx);
+    });
+  }
+  const resolved = toResolve.length;
 
   return {
     suggestionsCreated: toCreate.length,

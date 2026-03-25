@@ -16,6 +16,7 @@ function makeDoc(overrides: Partial<DocWithLabels> & { title: string }): DocWith
     status: overrides.status ?? "INBOX",
     accessState: overrides.accessState ?? "OK",
     lastModifiedInDrive: "lastModifiedInDrive" in overrides ? overrides.lastModifiedInDrive! : new Date("2024-06-01"),
+    lastCommentActivity: "lastCommentActivity" in overrides ? overrides.lastCommentActivity! : null,
     createdTimeInDrive: overrides.createdTimeInDrive ?? null,
     labels: overrides.labels ?? [],
     _count: overrides._count ?? { unreadComments: 0, inboxComments: 0, openComments: 0, assignedComments: 0, mentionedComments: 0 },
@@ -340,6 +341,34 @@ describe("sortDocs", () => {
     ];
     const result = sortDocs(docs, "open", "desc");
     expect(result.map((d) => d.title)).toEqual(["Many", "Few", "None"]);
+  });
+
+  it("sorts by lastCommentActivity ascending", () => {
+    const docs = [
+      makeDoc({ title: "New", lastCommentActivity: new Date("2024-06-15") }),
+      makeDoc({ title: "Old", lastCommentActivity: new Date("2024-01-01") }),
+      makeDoc({ title: "Mid", lastCommentActivity: new Date("2024-03-10") }),
+    ];
+    const result = sortDocs(docs, "lastCommentActivity", "asc");
+    expect(result.map((d) => d.title)).toEqual(["Old", "Mid", "New"]);
+  });
+
+  it("sorts by lastCommentActivity descending", () => {
+    const docs = [
+      makeDoc({ title: "Old", lastCommentActivity: new Date("2024-01-01") }),
+      makeDoc({ title: "New", lastCommentActivity: new Date("2024-06-15") }),
+    ];
+    const result = sortDocs(docs, "lastCommentActivity", "desc");
+    expect(result.map((d) => d.title)).toEqual(["New", "Old"]);
+  });
+
+  it("treats null lastCommentActivity as epoch 0", () => {
+    const docs = [
+      makeDoc({ title: "HasDate", lastCommentActivity: new Date("2024-01-01") }),
+      makeDoc({ title: "NoDate", lastCommentActivity: null }),
+    ];
+    const result = sortDocs(docs, "lastCommentActivity", "asc");
+    expect(result.map((d) => d.title)).toEqual(["NoDate", "HasDate"]);
   });
 
   it("sorts by lastModifiedInDrive ascending", () => {

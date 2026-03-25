@@ -32,7 +32,7 @@ The document stays in your list with all your labels, notes, and status preserve
 
 ## Sorting
 
-Click any column header to sort by that column. Click again to reverse the direction. Available sort columns: title, last modified, created date, and owner.
+Click any column header to sort by that column. Click again to reverse the direction. The default sort is **Last Comment** (most recent comment activity first). Other sortable columns: title, unread/inbox/open comment counts, and last modified.
 
 ## Filter bar
 

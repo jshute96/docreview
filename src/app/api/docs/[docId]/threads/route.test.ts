@@ -5,11 +5,20 @@ import { suppressingErrors } from "@/test-utils";
 vi.mock("@/auth", () => ({
   auth: vi.fn(),
 }));
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    doc: { findUnique: vi.fn() },
-    comment: { findFirst: vi.fn(), update: vi.fn() },
-  },
+vi.mock("@/lib/prisma", () => {
+  const comment = { findFirst: vi.fn(), update: vi.fn() };
+  const doc = { findUnique: vi.fn() };
+  return {
+    prisma: {
+      doc,
+      comment,
+      $executeRaw: vi.fn(),
+      $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn({ doc, comment, $executeRaw: vi.fn() })),
+    },
+  };
+});
+vi.mock("@/lib/sync-comments", () => ({
+  bumpLastCommentActivity: vi.fn(),
 }));
 vi.mock("@/lib/google-drive", () => {
   const commentsGet = vi.fn();

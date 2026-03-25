@@ -3,7 +3,7 @@ import type { TriState } from "./tri-state";
 import { partitionTriState } from "./tri-state";
 import { matchesFilter } from "./highlight";
 
-export type SortCol = "title" | "lastModifiedInDrive" | "unread" | "inbox" | "open";
+export type SortCol = "title" | "lastCommentActivity" | "lastModifiedInDrive" | "unread" | "inbox" | "open";
 export type SortDir = "asc" | "desc";
 
 export interface FilterOptions {
@@ -90,6 +90,14 @@ export function sortDocs(
       cmp = a._count.inboxComments - b._count.inboxComments;
     } else if (col === "open") {
       cmp = a._count.openComments - b._count.openComments;
+    } else if (col === "lastCommentActivity") {
+      const aTime = a.lastCommentActivity
+        ? new Date(a.lastCommentActivity).getTime()
+        : 0;
+      const bTime = b.lastCommentActivity
+        ? new Date(b.lastCommentActivity).getTime()
+        : 0;
+      cmp = aTime - bTime;
     } else {
       const aTime = a.lastModifiedInDrive
         ? new Date(a.lastModifiedInDrive).getTime()

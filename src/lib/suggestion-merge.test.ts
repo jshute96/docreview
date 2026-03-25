@@ -1,15 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    comment: {
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
+vi.mock("@/lib/prisma", () => {
+  const comment = {
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+  };
+  return {
+    prisma: {
+      comment,
+      $executeRaw: vi.fn(),
+      $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn({ comment, $executeRaw: vi.fn() })),
     },
-  },
-}));
+  };
+});
 vi.mock("@/lib/parse-gmail-notification", async () => {
   const actual = await vi.importActual("@/lib/parse-gmail-notification");
   return {

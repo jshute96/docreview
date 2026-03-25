@@ -191,6 +191,23 @@ a comment as needing attention.
 
 ---
 
+## Last Comment Activity Tracking
+
+The `lastCommentActivity` field on the `Doc` record tracks the most recent comment or
+suggestion timestamp seen during sync. It is updated atomically (via SQL `GREATEST`) whenever
+a comment or suggestion is created, updated, or resolved, using `MAX(driveCreatedAt, driveModifiedAt)`
+from the affected record. This means it only moves forward, never backwards.
+
+When comments are deleted from Drive, `lastCommentActivity` is **not** rolled back — the value
+may exceed any current comment's timestamp. This is intentional: there *was* activity at that
+time, and the field reflects "most recent activity ever seen", not "most recent surviving comment".
+
+Initialized from `createdTimeInDrive` when a doc is first added (before any comments are synced).
+
+Used in the docs table UI as a sortable "Last Comment" column (default sort, descending).
+
+---
+
 ## Detail Page Filters
 
 The doc detail page provides three ways to narrow the comment table:

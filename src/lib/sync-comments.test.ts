@@ -1,19 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { suppressingErrors } from "@/test-utils";
 
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    comment: {
-      findMany: vi.fn(),
-      createMany: vi.fn(),
-      update: vi.fn(),
-      deleteMany: vi.fn(),
+vi.mock("@/lib/prisma", () => {
+  const comment = {
+    findMany: vi.fn(),
+    createMany: vi.fn(),
+    update: vi.fn(),
+    updateMany: vi.fn(),
+    deleteMany: vi.fn(),
+  };
+  const doc = { update: vi.fn() };
+  return {
+    prisma: {
+      comment,
+      doc,
+      $executeRaw: vi.fn(),
+      $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn({ comment, doc, $executeRaw: vi.fn() })),
     },
-    doc: {
-      update: vi.fn(),
-    },
-  },
-}));
+  };
+});
 vi.mock("@/lib/google-drive", () => ({
   getDriveClient: vi.fn(),
   fetchCommentData: vi.fn(),
@@ -29,6 +34,7 @@ const mockComment = prisma.comment as unknown as {
   findMany: ReturnType<typeof vi.fn>;
   createMany: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
+  updateMany: ReturnType<typeof vi.fn>;
   deleteMany: ReturnType<typeof vi.fn>;
 };
 const mockDoc = prisma.doc as unknown as {
@@ -857,9 +863,10 @@ describe("syncComments suggestion resolution", () => {
 
     await syncComments(doc, driveAuth);
 
-    const updateCall = mockComment.update.mock.calls[0][0];
-    expect(updateCall.data.resolved).toBe(true);
-    expect(updateCall.data.status).toBe("ARCHIVED");
+    // INBOX suggestions are batch-resolved via updateMany with status → ARCHIVED
+    const updateManyCall = mockComment.updateMany.mock.calls[0][0];
+    expect(updateManyCall.data.resolved).toBe(true);
+    expect(updateManyCall.data.status).toBe("ARCHIVED");
   });
 
   it("preserves MUTED status when marking suggestion as resolved", async () => {
@@ -875,9 +882,10 @@ describe("syncComments suggestion resolution", () => {
 
     await syncComments(doc, driveAuth);
 
-    const updateCall = mockComment.update.mock.calls[0][0];
-    expect(updateCall.data.resolved).toBe(true);
-    expect(updateCall.data.status).toBe("MUTED");
+    // MUTED suggestions are batch-resolved via updateMany without changing status
+    const updateManyCall = mockComment.updateMany.mock.calls[0][0];
+    expect(updateManyCall.data.resolved).toBe(true);
+    expect(updateManyCall.data.status).toBeUndefined();
   });
 
   it("skips suggestion sync for non-Docs MIME types", async () => {
@@ -902,10 +910,10 @@ describe("syncComments suggestion resolution", () => {
 
     await syncComments(doc, driveAuth);
 
-    // Suggestion without googleSuggestionId should be resolved
-    const updateCall = mockComment.update.mock.calls[0][0];
-    expect(updateCall.data.resolved).toBe(true);
-    expect(updateCall.data.status).toBe("ARCHIVED");
+    // Suggestion without googleSuggestionId should be resolved (INBOX → ARCHIVED)
+    const updateManyCall = mockComment.updateMany.mock.calls[0][0];
+    expect(updateManyCall.data.resolved).toBe(true);
+    expect(updateManyCall.data.status).toBe("ARCHIVED");
   });
 });
 

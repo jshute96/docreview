@@ -169,6 +169,7 @@ model Doc {
   createdTimeInDrive   DateTime?  @map("created_time_in_drive")
   addedAt              DateTime   @default(now()) @map("added_at")  // when this doc was first added to docreview
   commentsLastSyncedAt DateTime?  @map("comments_last_synced_at")   // stamped with sync start time on full success (comments + suggestions); used by refresh to catch up stale docs
+  lastCommentActivity  DateTime?  @map("last_comment_activity")    // MAX of driveCreatedAt/driveModifiedAt across all comment writes; may exceed any current comment's timestamp after deletions (this is intentional — there WAS activity at that time)
   user                 User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   labels               DocLabel[]
   comments             Comment[]

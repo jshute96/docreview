@@ -150,6 +150,7 @@ export function DocRow({
           {doc._count.openComments > 0 ? doc._count.openComments : ""}
         </div>
       </td>
+      <td className="py-1.5 pr-4 text-sm text-zinc-500"><FriendlyDate date={doc.lastCommentActivity} /></td>
       <td className="py-1.5 pr-4 text-sm text-zinc-500"><FriendlyDate date={doc.lastModifiedInDrive} /></td>
       <td className="py-1.5 pr-4">
         <div className="flex items-center gap-1">

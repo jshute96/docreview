@@ -14,10 +14,18 @@ function mockModel() {
   };
 }
 
+const doc = mockModel();
+const label = mockModel();
+const docLabel = mockModel();
+const account = mockModel();
+const comment = mockModel();
+
 export const prisma = {
-  doc: mockModel(),
-  label: mockModel(),
-  docLabel: mockModel(),
-  account: mockModel(),
-  comment: mockModel(),
+  doc,
+  label,
+  docLabel,
+  account,
+  comment,
+  $executeRaw: vi.fn(),
+  $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn({ doc, label, docLabel, account, comment, $executeRaw: vi.fn() })),
 };

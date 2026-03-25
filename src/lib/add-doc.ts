@@ -144,6 +144,7 @@ export async function addDoc(params: AddDocParams): Promise<NextResponse> {
         userId,
         googleDocId,
         ...docData,
+        lastCommentActivity: docData.createdTimeInDrive, // Initialize from creation time; comment sync will bump it up
         status: status ?? "INBOX",
         notes: notes || null,
         isStarred: isStarred ?? false,

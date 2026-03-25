@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { logInfo, logWarning } from "@/lib/log";
 import { computeSuggestionHash, gmailActionToSuggestionType } from "@/lib/suggestion-hash";
+import { bumpLastCommentActivity } from "@/lib/sync-comments";
 import { parseGmailNotificationFromParsed, type ParsedEmail } from "@/lib/parse-gmail-notification";
 import type { Suggestion } from "@/lib/parse-gmail-notification";
 
@@ -67,31 +68,38 @@ export async function mergeSuggestionsFromGmail(
       // Gmail notification = interesting activity → promote ARCHIVED to INBOX
       // but respect MUTED (user explicitly silenced this thread).
       const promoteStatus = candidates[0].status === "ARCHIVED" ? "INBOX" : undefined;
-      await prisma.comment.update({
-        where: { commentId: candidates[0].commentId },
-        data: {
-          googleCommentId: suggestion.discussionId || null,
-          replyCount: Math.max(suggestion.replies.length, candidates[0].replyCount),
-          ...(gmailTime ? { driveCreatedAt: gmailTime } : {}),
-          ...(promoteStatus ? { status: promoteStatus } : {}),
-        },
+      await prisma.$transaction(async (tx) => {
+        await tx.comment.update({
+          where: { commentId: candidates[0].commentId },
+          data: {
+            googleCommentId: suggestion.discussionId || null,
+            replyCount: Math.max(suggestion.replies.length, candidates[0].replyCount),
+            ...(gmailTime ? { driveCreatedAt: gmailTime } : {}),
+            ...(promoteStatus ? { status: promoteStatus } : {}),
+          },
+        });
+        await bumpLastCommentActivity(docId, [gmailTime], tx);
       });
       merged++;
     } else if (candidates.length === 0) {
       // No match — Gmail arrived before Drive sync. Insert with what we have.
       logInfo(`[Suggestions:Gmail] ${googleDocId}: inserted ${suggestion.discussionId} ${actionType} (Gmail-first)`);
-      await prisma.comment.create({
-        data: {
-          docId,
-          googleCommentId: suggestion.discussionId || null,
-          type: "SUGGESTION",
-          suggestionType: actionType,
-          suggestionContentHash: contentHash,
-          resolved: false,
-          status: "INBOX",
-          driveCreatedAt: suggestion.time ? new Date(suggestion.time) : emailDate,
-          replyCount: suggestion.replies.length,
-        },
+      const sugCreatedAt = suggestion.time ? new Date(suggestion.time) : emailDate;
+      await prisma.$transaction(async (tx) => {
+        await tx.comment.create({
+          data: {
+            docId,
+            googleCommentId: suggestion.discussionId || null,
+            type: "SUGGESTION",
+            suggestionType: actionType,
+            suggestionContentHash: contentHash,
+            resolved: false,
+            status: "INBOX",
+            driveCreatedAt: sugCreatedAt,
+            replyCount: suggestion.replies.length,
+          },
+        });
+        await bumpLastCommentActivity(docId, [sugCreatedAt], tx);
       });
       inserted++;
     } else {
