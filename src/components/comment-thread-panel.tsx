@@ -328,7 +328,7 @@ export function CommentThreadPanel({
 
   if (loading) {
     return (
-      <div className="mx-auto w-[90%] min-w-fit my-3 rounded-lg border bg-zinc-50 p-4">
+      <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
         <p className="text-sm text-zinc-400">Loading comments...</p>
       </div>
     );
@@ -336,7 +336,7 @@ export function CommentThreadPanel({
 
   if (threads.length === 0) {
     return (
-      <div className="mx-auto w-[90%] min-w-fit my-3 rounded-lg border bg-zinc-50 p-4">
+      <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
         <p className="text-sm text-zinc-400">No comments on this document.</p>
         {replyBox}
       </div>
@@ -344,7 +344,7 @@ export function CommentThreadPanel({
   }
 
   return (
-    <div className="mx-auto w-[90%] min-w-fit my-3 rounded-lg border bg-zinc-50 p-4">
+    <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
       <div className="divide-y divide-zinc-200">
         {threads.map((thread, threadIndex) => (
           <div
