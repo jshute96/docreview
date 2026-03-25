@@ -414,8 +414,8 @@ describe("syncComments comment status", () => {
     await syncComments(makeDoc(), driveAuth);
 
     const updateCall = mockComment.update.mock.calls[0][0];
-    // MUTED path updates Drive fields but not status
-    expect(updateCall.data.status).toBeUndefined();
+    // MUTED path preserves existing status
+    expect(updateCall.data.status).toBe("MUTED");
   });
 
   it("preserves manual ARCHIVED status if no new activity", async () => {
@@ -619,8 +619,8 @@ describe("syncComments @-mention detection", () => {
     await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
 
     const updateCall = mockComment.update.mock.calls[0][0];
-    // MUTED path doesn't set status
-    expect(updateCall.data.status).toBeUndefined();
+    // MUTED path preserves existing status
+    expect(updateCall.data.status).toBe("MUTED");
   });
 
   it("@-mention in new reply unarchives the document", async () => {

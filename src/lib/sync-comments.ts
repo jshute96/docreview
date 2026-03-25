@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { fetchCommentData, fetchDocData, getDriveClient } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { computeSuggestionHash } from "@/lib/suggestion-hash";
-import type { Doc, Comment, Prisma } from "@prisma/client";
+import type { Doc, Comment, Prisma, CommentStatus } from "@prisma/client";
 import type { DriveComment, DriveSuggestion } from "@/lib/google-drive";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
@@ -367,8 +367,14 @@ async function updateExistingComment(
 
   // MUTED fast-path: update metadata but preserve MUTED status unless @-mentioned
   if (existing.status === "MUTED" && !newReplyMentionsMe) {
-    const updated = await updateCommentFields(doc.docId, existing, c);
-    return { updated, unarchive: false, nonResolveActivity: false };
+    const { changed, data } = buildCommentUpdate(existing, c);
+    if (changed) {
+      await prisma.$transaction(async (tx) => {
+        await tx.comment.update({ where: { commentId: existing.commentId }, data });
+        await bumpLastCommentActivity(doc.docId, [c.driveCreatedAt, c.driveModifiedAt], tx);
+      });
+    }
+    return { updated: changed, unarchive: false, nonResolveActivity: false };
   }
 
   const previousStatus = existing.status as "INBOX" | "ARCHIVED" | "MUTED";
@@ -405,40 +411,10 @@ async function updateExistingComment(
     if (previousStatus === "INBOX" && c.resolved && !c.iResolvedIt) unarchive = true;
   }
 
-  // Only update isRead from Drive when driveModifiedAt changed (new activity)
-  const modifiedChanged = !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
-  const effectiveIsRead = modifiedChanged ? c.isRead : existing.isRead;
-  const mentionedInThread = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
-
-  const changed =
-    existing.resolved !== c.resolved ||
-    existing.isReplyAuthor !== c.isReplyAuthor ||
-    existing.isRead !== effectiveIsRead ||
-    existing.assignedToMe !== c.assignedToMe ||
-    existing.mentionedMe !== mentionedInThread ||
-    existing.mentionedMeUnreplied !== c.mentionedMeUnreplied ||
-    existing.status !== status ||
-    !datesEqual(existing.driveCreatedAt, c.driveCreatedAt) ||
-    modifiedChanged ||
-    existing.replyCount !== c.replyCount;
-
+  const { changed, data } = buildCommentUpdate(existing, c, status);
   if (changed) {
     await prisma.$transaction(async (tx) => {
-      await tx.comment.update({
-        where: { commentId: existing.commentId },
-        data: {
-          resolved: c.resolved,
-          isReplyAuthor: c.isReplyAuthor,
-          isRead: effectiveIsRead,
-          assignedToMe: c.assignedToMe,
-          mentionedMe: mentionedInThread,
-          mentionedMeUnreplied: c.mentionedMeUnreplied,
-          status,
-          driveCreatedAt: c.driveCreatedAt,
-          driveModifiedAt: c.driveModifiedAt,
-          replyCount: c.replyCount,
-        },
-      });
+      await tx.comment.update({ where: { commentId: existing.commentId }, data });
       await bumpLastCommentActivity(doc.docId, [c.driveCreatedAt, c.driveModifiedAt], tx);
     });
   }
@@ -481,14 +457,16 @@ function computeCommentStatus(
   return previousStatus;
 }
 
-/**
- * Updates a MUTED comment's metadata without changing its status.
- * Returns true if any fields were actually changed.
- */
-async function updateCommentFields(docId: string, existing: Comment, c: DriveComment): Promise<boolean> {
+/** Builds the common Prisma update data and detects whether anything changed. */
+function buildCommentUpdate(
+  existing: Comment,
+  c: DriveComment,
+  newStatus?: CommentStatus,
+): { changed: boolean; data: Prisma.CommentUncheckedUpdateInput } {
   const modifiedChanged = !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
   const effectiveIsRead = modifiedChanged ? c.isRead : existing.isRead;
   const mentionedInThread = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
+  const status = newStatus ?? existing.status;
 
   const changed =
     existing.resolved !== c.resolved ||
@@ -497,31 +475,25 @@ async function updateCommentFields(docId: string, existing: Comment, c: DriveCom
     existing.assignedToMe !== c.assignedToMe ||
     existing.mentionedMe !== mentionedInThread ||
     existing.mentionedMeUnreplied !== c.mentionedMeUnreplied ||
+    existing.status !== status ||
     !datesEqual(existing.driveCreatedAt, c.driveCreatedAt) ||
     modifiedChanged ||
     existing.replyCount !== c.replyCount;
 
-  if (changed) {
-    await prisma.$transaction(async (tx) => {
-      await tx.comment.update({
-        where: { commentId: existing.commentId },
-        data: {
-          resolved: c.resolved,
-          isReplyAuthor: c.isReplyAuthor,
-          isRead: effectiveIsRead,
-          assignedToMe: c.assignedToMe,
-          mentionedMe: mentionedInThread,
-          mentionedMeUnreplied: c.mentionedMeUnreplied,
-          driveCreatedAt: c.driveCreatedAt,
-          driveModifiedAt: c.driveModifiedAt,
-          replyCount: c.replyCount,
-        },
-      });
-      await bumpLastCommentActivity(docId, [c.driveCreatedAt, c.driveModifiedAt], tx);
-    });
-  }
+  const data: Prisma.CommentUncheckedUpdateInput = {
+    resolved: c.resolved,
+    isReplyAuthor: c.isReplyAuthor,
+    isRead: effectiveIsRead,
+    assignedToMe: c.assignedToMe,
+    mentionedMe: mentionedInThread,
+    mentionedMeUnreplied: c.mentionedMeUnreplied,
+    status,
+    driveCreatedAt: c.driveCreatedAt,
+    driveModifiedAt: c.driveModifiedAt,
+    replyCount: c.replyCount,
+  };
 
-  return changed;
+  return { changed, data };
 }
 
 // --- Phase 3: Sync suggestions ---
