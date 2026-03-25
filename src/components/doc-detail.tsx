@@ -302,7 +302,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   // Re-enable sorting when any filter changes so the new view is properly sorted
   useEffect(() => {
     setSortActive(true);
-  }, [showMode, mineFilter, repliedFilter, assignedFilter, mentionedFilter, resolvedFilter, suggestionsFilter, isStarredFilter, searchFilter]);
+  }, [showMode, mineFilter, repliedFilter, assignedFilter, mentionedFilter, resolvedFilter, suggestionsFilter, unreadFilter, isStarredFilter, searchFilter]);
 
   // IDs of comments animating out (slide collapse) before removal from the filtered list
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
@@ -667,12 +667,12 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
     window.location.href = `/comments/${newDoc.docId}`;
   }
 
-  const pageTitle = `${displayTitle} - Docreview`;
+  const pageTitle = `${displayTitle} - Docreview`.replace(/\s+/g, " ").trim();
 
   // Next.js metadata reconciliation can reset document.title after effects run.
   // Use a MutationObserver to detect and override any external title changes.
   useEffect(() => {
-    document.title = pageTitle;
+    if (document.title !== pageTitle) document.title = pageTitle;
     const titleEl = document.querySelector("title");
     if (!titleEl) return;
     const observer = new MutationObserver(() => {

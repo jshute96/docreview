@@ -149,7 +149,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
     // Inbox "include" is the default view — only show it when it's the sole filter
     if (isInbox === "include" && parts.length === 0) parts.push("Inbox");
 
-    return "Docreview: " + parts.join(", ");
+    return ("Docreview: " + parts.join(", ")).replace(/\s+/g, " ").trim();
   }, [isInbox, hasComments, isAuthor, isStarred, mimeTypes, labelsFilter, titleFilter, labels]);
 
   // Ping extension on mount so focusDocTab() has cached status for doc-row
@@ -158,7 +158,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
   // Next.js metadata reconciliation can reset document.title after effects run.
   // Use a MutationObserver to detect and override any external title changes.
   useEffect(() => {
-    document.title = pageTitle;
+    if (document.title !== pageTitle) document.title = pageTitle;
     const titleEl = document.querySelector("title");
     if (!titleEl) return;
     const observer = new MutationObserver(() => {

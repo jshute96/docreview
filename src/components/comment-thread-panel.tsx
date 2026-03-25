@@ -133,7 +133,16 @@ export function CommentThreadPanel({
   useEffect(() => {
     const container = replyContainerRef.current;
     if (!container) return;
-    const observer = new ResizeObserver(() => resizeTextarea());
+    // Only resize on width changes — resizeTextarea() itself changes height,
+    // which would re-trigger the observer in an infinite loop.
+    let prevWidth = container.clientWidth;
+    const observer = new ResizeObserver(() => {
+      const newWidth = container.clientWidth;
+      if (newWidth !== prevWidth) {
+        prevWidth = newWidth;
+        resizeTextarea();
+      }
+    });
     observer.observe(container);
     return () => observer.disconnect();
   }, [resizeTextarea]);
