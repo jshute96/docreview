@@ -1,6 +1,7 @@
 required cleanup:
 * decide whether to keep last-view-time pinning on Reply/Resolve
-    * clean up UI for edit-last-viwed-timestamp
+  * is it doing anything useful?  docs' diff viewer is ignoring it.
+  * clean up UI for edit-last-viwed-timestamp
 * remove redirect-resolve logging
 
 P0:
@@ -9,8 +10,6 @@ P1:
 * handle gmail notifications
   * share request emails - from me, to me
   * requesting your review
-* testing
-  * test scripts for playwright testing of all interactions
 * Rewrite help text content.  It's AI generated excepted the Getting Started page.
 * cache comments in the local DB
 * cache suggestion thread contents from gmail in the local DB
@@ -24,23 +23,18 @@ Easy:
 
 * Cancel API requests and other work on tab close?
 
-* Dialog boxes
-  * dialog box moves on new vs add
-
-* Mute state on docs
 * keyboard shortcuts
 * consider saving loaded comments
-* consider preloading comments earlier (maybe from docs page too)
-* consider Comment/Reply vs Ask states - am I expecting an answer?
 
 * hosting
   * cloud run
   * deployment scripts
-* offline mode - run with a database but no API login (sort of works already, requires logout)
 
-* add a doc I'm requesting permission to
+* permission request flows
+  * auto-add a doc when I request permission to see it
   * record notes about where it came from, when I asked permission
   * built-in tag for PermissionPending, transition when I get permission
+  * show pending permission requests somehow
 
 * chrome extension
   * capture linked-from notes when requesting permission
@@ -53,15 +47,15 @@ Easy:
   * cosmetic: in drive, omit docreview links for files of unsupported types
   * testing: get automated testing working. see `testing/chrome-extension.md`.
 
-* sandbox test environment
-* snapshot database and simulated or recorded google APIs
-* demo version with some fake docs or a starting snapshot
+* testing
+  * sandbox test environment
+  * snapshot database and simulated or recorded google APIs
+  * demo version with some fake docs or a starting snapshot
+  * offline mode - run with a database but no API login (sort of works already, requires logout)
 
-* can we open the doc diff viewer
-* can we find a way to open diffs between timestamps we choose?
-
-* can we get google docs to navigate to selected comments seamlessly
-  * some work in docs/notes-on-comment-navigation.md
+* diffs
+  * can we open the doc diff viewer
+  * can we find a way to open diffs between timestamps we choose?
 
 ## cosmetic
 * better visual for the cross-out filter buttons
@@ -69,6 +63,7 @@ Easy:
 * editable notes box inline on the comments page?
 * rendering glitch when toggling filters makes scroll bar appear
 * "No comments on this doc" still shows if we try to load and fail.
+* dialog boxes move around too much, because they resize but stay centered
 
 ## gaps
 * no way to get suggestions cheaply or incrementally
