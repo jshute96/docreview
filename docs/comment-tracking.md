@@ -151,6 +151,11 @@ During `syncComments`, two flags are tracked:
 An ARCHIVED doc moves back to INBOX only when **both** flags are set. This prevents noise
 from resolved threads resurfacing a doc you've already dismissed.
 
+**Recency cutoff (bulk refresh only):** During bulk refresh, an additional check gates
+unarchive on the doc's `lastCommentActivity` being newer than a cutoff derived from the
+Drive changes feed. This prevents old docs with stale unresolved comments from appearing
+in inbox when first synced. See [Phase 3.5 — Smart Unarchive](./refresh.md#phase-35--smart-unarchive).
+
 ### shouldUnarchive triggers
 
 `shouldUnarchive` is set based on the resulting comment status, not a separate heuristic:

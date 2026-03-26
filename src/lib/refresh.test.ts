@@ -138,4 +138,100 @@ describe("upsertDocsAndSyncComments", () => {
       })
     );
   });
+
+  it("skips unarchive when lastCommentActivity is older than unarchiveCutoff", async () => {
+    const driveDocs = [
+      {
+        googleDocId: "g1",
+        title: "Stale Doc",
+        role: "AUTHOR",
+      },
+    ];
+
+    vi.mocked(prisma.doc.upsert).mockResolvedValue({
+      docId: "d1",
+      googleDocId: "g1",
+      status: "ARCHIVED",
+    } as any);
+
+    // Activity detected by sync
+    vi.mocked(syncComments).mockResolvedValue({
+      commentsCreated: 1,
+      commentsUpdated: 0,
+      suggestionsCreated: 0,
+      suggestionsUpdated: 0,
+      suggestionsResolved: 0,
+      shouldUnarchive: true,
+      hasNonResolveActivity: true,
+    });
+
+    // Last comment activity is 30 days ago
+    vi.mocked(prisma.doc.findUnique).mockResolvedValue({
+      lastCommentActivity: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    } as any);
+
+    // Cutoff is 7 days ago
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    await upsertDocsAndSyncComments(userId, userEmail, driveDocs as any, {
+      existingDocIds: new Set(["g1"]),
+      mode: "refresh",
+      unarchiveCutoff: cutoff,
+    });
+
+    // Should NOT have updated to INBOX
+    expect(prisma.doc.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "INBOX" },
+      })
+    );
+  });
+
+  it("still unarchives when lastCommentActivity is newer than unarchiveCutoff", async () => {
+    const driveDocs = [
+      {
+        googleDocId: "g1",
+        title: "Active Doc",
+        role: "AUTHOR",
+      },
+    ];
+
+    vi.mocked(prisma.doc.upsert).mockResolvedValue({
+      docId: "d1",
+      googleDocId: "g1",
+      status: "ARCHIVED",
+    } as any);
+
+    vi.mocked(syncComments).mockResolvedValue({
+      commentsCreated: 1,
+      commentsUpdated: 0,
+      suggestionsCreated: 0,
+      suggestionsUpdated: 0,
+      suggestionsResolved: 0,
+      shouldUnarchive: true,
+      hasNonResolveActivity: true,
+    });
+
+    // Last comment activity is 1 hour ago — recent
+    vi.mocked(prisma.doc.findUnique).mockResolvedValue({
+      lastCommentActivity: new Date(Date.now() - 60 * 60 * 1000),
+    } as any);
+
+    // Cutoff is 7 days ago
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    await upsertDocsAndSyncComments(userId, userEmail, driveDocs as any, {
+      existingDocIds: new Set(["g1"]),
+      mode: "refresh",
+      unarchiveCutoff: cutoff,
+    });
+
+    // Should have updated to INBOX
+    expect(prisma.doc.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { docId: "d1" },
+        data: { status: "INBOX" },
+      })
+    );
+  });
 });

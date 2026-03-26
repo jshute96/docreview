@@ -66,7 +66,7 @@ Returns all file-level mutations (edits, deletions, permission changes, renames,
 since a saved page token. Purpose-built for incremental sync — cheap to poll when nothing
 has changed. Always includes changes from **Shared Drives** (uses `includeItemsFromAllDrives: true`).
 
-**Fields:** `removed, fileId, file(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed)`
+**Fields:** `time, removed, fileId, file(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed)`
 **Pagination:** `pageSize: 1000`, follows `nextPageToken` until `newStartPageToken` is returned.
 **Deduplication:** Active editing produces multiple change entries per file. Results are
 deduplicated by `fileId`, keeping the last entry per file.
@@ -308,6 +308,16 @@ For the full picture on suggestions specifically, see [`suggestions.md`](./sugge
 After comment sync completes, each doc's sync result includes a `shouldUnarchive` flag
 indicating whether meaningful new activity was detected. ARCHIVED docs are moved back to
 INBOX only when this flag is true — not merely because they have unresolved comments.
+
+### Recency cutoff
+
+During bulk refresh, an **unarchive cutoff** prevents stale docs from appearing in inbox
+when their comments are first synced. The cutoff is derived from the oldest `time` field
+in the Drive `changes.list` feed (minus 1 day of buffer). When using the `files.list`
+fallback (bootstrap or expired token), the cutoff is 7 days ago. After comment sync, if
+a doc's `lastCommentActivity` is older than the cutoff, unarchive is skipped even if
+`shouldUnarchive` is set. This only applies to the bulk refresh path — single-doc refresh,
+load mode, and manual actions are not affected.
 
 See [Doc Unarchive Rules](./comment-tracking.md#doc-unarchive-rules) for the full logic
 (`isInteresting` check, MUTED handling, self-resolved exceptions).

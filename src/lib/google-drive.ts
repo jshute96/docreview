@@ -700,6 +700,8 @@ export interface DriveChangesResult {
   removedDocIds: Set<string>;
   newPageToken: string;
   rawChangeCount: number;
+  /** Earliest change timestamp from the changes feed (undefined if no changes had a time field). */
+  oldestChangeTime?: Date;
 }
 
 export async function listChanges(
@@ -716,13 +718,14 @@ export async function listChanges(
   let currentToken: string | undefined = pageToken;
   let newStartToken: string | undefined;
   let rawChangeCount = 0;
+  let oldestChangeTime: Date | undefined;
 
   do {
     const t0 = Date.now();
     const res: any = await withProgressLogging(
       drive.changes.list({
         pageToken: currentToken,
-        fields: "nextPageToken, newStartPageToken, changes(removed, fileId, file(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed))",
+        fields: "nextPageToken, newStartPageToken, changes(time, removed, fileId, file(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed))",
         pageSize: 1000,
         includeRemoved: true,
         supportsAllDrives: true,
@@ -740,6 +743,11 @@ export async function listChanges(
         removed: change.removed === true,
         file: change.file,
       });
+      // Track the oldest change time to establish an unarchive cutoff
+      if (change.time) {
+        const t = new Date(change.time);
+        if (!oldestChangeTime || t < oldestChangeTime) oldestChangeTime = t;
+      }
     }
 
     // Report progress based on unique supported files and raw changes found so far
@@ -794,7 +802,7 @@ export async function listChanges(
   }
 
   logInfo(`[Drive] changes summary: ${docs.length} changed docs, ${trashedDocIds.size} trashed, ${removedDocIds.size} removed (${changesByFileId.size} total changes), next token: ${newPageToken}`);
-  return { docs, trashedDocIds, removedDocIds, newPageToken, rawChangeCount };
+  return { docs, trashedDocIds, removedDocIds, newPageToken, rawChangeCount, oldestChangeTime };
 }
 
 /** Fetch Drive metadata for specific doc IDs (via individual files.get calls). */

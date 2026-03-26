@@ -59,10 +59,13 @@ export async function upsertDocsAndSyncComments(
     mode?: "refresh" | "full-refresh" | "selected" | "load";
     docId?: string; // Optional: restrict upsert to a specific docId (for single-doc refresh)
     prefetched?: SyncPrefetchedData; // Pre-fetched data to avoid redundant API calls (single-doc refresh)
+    /** Only unarchive docs with comment activity newer than this cutoff. Prevents
+     *  stale docs from appearing in inbox when first synced during a bulk refresh. */
+    unarchiveCutoff?: Date;
   },
   onProgress?: OnProgress,
 ): Promise<RefreshResult> {
-  const { existingDocIds, fromGmailDocIdSet = new Set(), shareNotes, gmailEmailMeta, mode = "refresh", docId, prefetched } = options;
+  const { existingDocIds, fromGmailDocIdSet = new Set(), shareNotes, gmailEmailMeta, mode = "refresh", docId, prefetched, unarchiveCutoff } = options;
   const driveAuth = await getDriveClient(userId);
 
   let added = 0;
@@ -184,8 +187,20 @@ export async function upsertDocsAndSyncComments(
         // Note: result.permissionDenied means comment-level 403 (comments.list or
         // Docs API suggestions), NOT file-level. files.get already succeeded for
         // these docs, so accessState stays OK (see docs/access-states.md).
-        await prisma.doc.update({ where: { docId: doc.docId }, data: { status: "INBOX" } });
-        unarchived++;
+        // Skip unarchive if comment activity is older than the cutoff — prevents
+        // stale docs from appearing in inbox when first synced during bulk refresh.
+        let recentEnough = true;
+        if (unarchiveCutoff) {
+          const fresh = await prisma.doc.findUnique({ where: { docId: doc.docId }, select: { lastCommentActivity: true } });
+          if (!fresh?.lastCommentActivity || fresh.lastCommentActivity < unarchiveCutoff) {
+            recentEnough = false;
+            logInfo(`[Refresh] Skipping unarchive for ${doc.googleDocId} — last comment activity ${fresh?.lastCommentActivity?.toISOString() ?? "null"} is before cutoff ${unarchiveCutoff.toISOString()}`);
+          }
+        }
+        if (recentEnough) {
+          await prisma.doc.update({ where: { docId: doc.docId }, data: { status: "INBOX" } });
+          unarchived++;
+        }
       }
       syncCompleted++;
       const now = Date.now();
@@ -471,6 +486,10 @@ export async function executeRefresh(
   })());
 
   let driveChangesRead = 0;
+  // Cutoff for unarchiving: only unarchive docs with comment activity newer
+  // than this. Derived from the oldest change timestamp (minus 1 day buffer)
+  // when using changes.list, or 7 days ago for the files.list fallback.
+  let unarchiveCutoff: Date | undefined;
 
   if (includeDrive) {
     discoveryPromises.push((async () => {
@@ -487,6 +506,9 @@ export async function executeRefresh(
           trashedDocIdsFromDrive = result.trashedDocIds;
           removedDocIdsFromDrive = result.removedDocIds;
           newPageToken = result.newPageToken;
+          if (result.oldestChangeTime) {
+            unarchiveCutoff = new Date(result.oldestChangeTime.getTime() - 24 * 60 * 60 * 1000);
+          }
           driveSucceeded = true;
           onProgress?.({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: result.rawChangeCount });
         } catch (err: unknown) {
@@ -498,6 +520,7 @@ export async function executeRefresh(
               onProgress?.({ phase: "drive", status: "reading", ...stats });
             });
             driveChangesRead = driveDocs.length;
+            unarchiveCutoff = new Date(Date.now() - DEFAULT_GMAIL_DAYS_BACK * 24 * 60 * 60 * 1000);
             driveSucceeded = true;
             onProgress?.({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: driveDocs.length });
           } else {
@@ -511,6 +534,7 @@ export async function executeRefresh(
           onProgress?.({ phase: "drive", status: "reading", ...stats });
         });
         driveChangesRead = driveDocs.length;
+        unarchiveCutoff = new Date(Date.now() - DEFAULT_GMAIL_DAYS_BACK * 24 * 60 * 60 * 1000);
         driveSucceeded = true;
         onProgress?.({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: driveDocs.length });
       }
@@ -583,7 +607,7 @@ export async function executeRefresh(
     userId,
     userEmail,
     allDiscoveryDocs,
-    { existingDocIds, fromGmailDocIdSet: gmailDocIdSet, shareNotes: gmailShareNotes, gmailEmailMeta, mode: "refresh" },
+    { existingDocIds, fromGmailDocIdSet: gmailDocIdSet, shareNotes: gmailShareNotes, gmailEmailMeta, mode: "refresh", unarchiveCutoff },
     onProgress,
   );
 
