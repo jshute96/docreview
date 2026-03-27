@@ -173,7 +173,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortCol(col);
-      setSortDir(col === "lastCommentActivity" || col === "lastModifiedInDrive" || col === "unread" || col === "inbox" || col === "open" ? "desc" : "asc");
+      setSortDir(col === "lastCommentActivity" || col === "unread" || col === "inbox" || col === "open" ? "desc" : "asc");
     }
   }
 
@@ -526,8 +526,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
                     <div className="flex-1 flex justify-center"><button onClick={() => handleSort("open")} title={OPEN_COMMENTS_TOOLTIP} className="inline-flex items-center text-xs font-medium text-zinc-500 uppercase tracking-wide hover:text-zinc-800">Open<SortIcon col="open" /></button></div>
                   </div>
                 </th>
-                <ThButton col="lastCommentActivity" title="Last comment time">Last Comment</ThButton>
-                <ThButton col="lastModifiedInDrive" title="Last edit time">Last Modified</ThButton>
+                <ThButton col="lastCommentActivity" title="Time of latest comment activity">Last Change</ThButton>
                 <th className="px-4 py-2 text-left">
                   <div className="flex items-center gap-2">
                     <BulkEditDialog

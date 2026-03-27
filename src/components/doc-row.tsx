@@ -150,8 +150,7 @@ export function DocRow({
           {doc._count.openComments > 0 ? doc._count.openComments : ""}
         </div>
       </td>
-      <td className="py-1.5 pr-4 text-sm text-zinc-500"><FriendlyDate date={doc.lastCommentActivity} /></td>
-      <td className="py-1.5 pr-4 text-sm text-zinc-500"><FriendlyDate date={doc.lastModifiedInDrive} /></td>
+      <td className="py-1.5 pl-4 pr-4 text-sm text-zinc-500"><FriendlyDate date={doc.lastCommentActivity} /></td>
       <td className="py-1.5 pr-4">
         <div className="flex items-center gap-1">
           <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title="Open this document" asChild>

@@ -371,34 +371,6 @@ describe("sortDocs", () => {
     expect(result.map((d) => d.title)).toEqual(["NoDate", "HasDate"]);
   });
 
-  it("sorts by lastModifiedInDrive ascending", () => {
-    const docs = [
-      makeDoc({ title: "New", lastModifiedInDrive: new Date("2024-06-15") }),
-      makeDoc({ title: "Old", lastModifiedInDrive: new Date("2024-01-01") }),
-      makeDoc({ title: "Mid", lastModifiedInDrive: new Date("2024-03-10") }),
-    ];
-    const result = sortDocs(docs, "lastModifiedInDrive", "asc");
-    expect(result.map((d) => d.title)).toEqual(["Old", "Mid", "New"]);
-  });
-
-  it("sorts by lastModifiedInDrive descending", () => {
-    const docs = [
-      makeDoc({ title: "Old", lastModifiedInDrive: new Date("2024-01-01") }),
-      makeDoc({ title: "New", lastModifiedInDrive: new Date("2024-06-15") }),
-    ];
-    const result = sortDocs(docs, "lastModifiedInDrive", "desc");
-    expect(result.map((d) => d.title)).toEqual(["New", "Old"]);
-  });
-
-  it("treats null lastModifiedInDrive as epoch 0", () => {
-    const docs = [
-      makeDoc({ title: "HasDate", lastModifiedInDrive: new Date("2024-01-01") }),
-      makeDoc({ title: "NoDate", lastModifiedInDrive: null }),
-    ];
-    const result = sortDocs(docs, "lastModifiedInDrive", "asc");
-    expect(result.map((d) => d.title)).toEqual(["NoDate", "HasDate"]);
-  });
-
   it("does not mutate the input array", () => {
     const docs = [
       makeDoc({ title: "B" }),
