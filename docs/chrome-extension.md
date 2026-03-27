@@ -174,6 +174,19 @@ Looks up doc by Google doc ID, calls `syncComments()` with optional hints. With 
 
 Background sends `commentSynced` to first open docreview tab via `chrome.tabs.sendMessage`. Bridge content script relays to page via `window.postMessage`. Extension bridge posts to `BroadcastChannel` (using a separate short-lived instance so the receiving tab also gets it — the shared singleton suppresses self-delivery by spec). All docreview tabs receive via `useCrossTabListener` and refetch from database. If no docreview tab is open, nothing to notify — database is already updated for next visit.
 
+## Debugging
+
+### Listing comments and their disco IDs
+
+Available from the **Google Docs page console** (injected at page load):
+
+- **`listComments()`** — dumps all visible comments/suggestions with disco IDs, types, authors, and text. Returns an array of `{ id, type, author, text }` and logs each entry.
+- **`getActiveCommentId()`** — returns the disco ID of the currently selected comment (the one with `docos-docoview-active` class). Click a comment first to select it.
+
+### Log tags
+
+Content script logs (Google Docs page console) use the `[docreview]` prefix. Background service worker logs use `[background]`. Injected page scripts use `[docreview-extract]` or `[docreview-nav]`.
+
 ## Design notes
 
 ### Content script ↔ page communication

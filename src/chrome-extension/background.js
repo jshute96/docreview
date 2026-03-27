@@ -242,6 +242,17 @@ function fireCommentSync(docId, commentType, googleCommentId) {
 var pendingCommentIds = new Map();
 
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+  // Inject disco ID helpers on page load so listComments() and getActiveCommentId()
+  // are available in the page console for debugging.
+  if (msg.type === 'injectDiscoHelpers' && sender.tab) {
+    chrome.scripting.executeScript({
+      target: { tabId: sender.tab.id },
+      func: injectDiscoIdHelpers,
+      world: 'MAIN'
+    }).catch(function() {});
+    return;
+  }
+
   // Pre-extraction: content script marked a listitem, inject script to extract
   // the disco ID while the element is still in the DOM (before Google removes it).
   if (msg.type === 'commentPre' && msg.docId && sender.tab) {
@@ -629,7 +640,59 @@ function injectDiscoIdHelpers() {
     return null;
   }
 
-  window.__docreviewDisco = { getDiscoId: getDiscoId };
+  // List all visible comments/suggestions with their disco IDs and text.
+  // Call from the Google Docs page console for debugging: listComments()
+  function listComments() {
+    var skip = /^(Loading\.\.\.|New|Approver|Show more|Show less|Suggestion was deleted|Reply was deleted|Comment details cannot be verified|\d+ repl(y|ies))$/;
+
+    function extractText(item, author) {
+      var divs = item.querySelectorAll('div');
+      for (var j = 0; j < divs.length; j++) {
+        var t = (divs[j].textContent || '').trim();
+        // Skip short text (timestamps, "New"), UI boilerplate, and author names
+        if (t.length <= 3 || skip.test(t) || t === author) continue;
+        // Non-leaf divs contain aggregated text from children — skip them
+        // unless they match a suggestion action pattern (Replace/Add/Delete),
+        // which is how Google renders suggestion descriptions.
+        if (divs[j].children.length > 0) {
+          if (/^(Replace|Add|Delete):/.test(t)) return t.substring(0, 60);
+          continue;
+        }
+        // First leaf div with meaningful text is the comment body
+        return t.substring(0, 60);
+      }
+      return '';
+    }
+
+    var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
+    var results = [];
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var id = getDiscoId(item) || '(no ID)';
+      var label = item.getAttribute('aria-label') || '';
+      var type = label.indexOf('Suggestions') === 0 ? 'suggestion' : 'comment';
+      var authorMatch = label.match(/Author ([^.]+)\./);
+      var author = authorMatch ? authorMatch[1] : '?';
+      var text = extractText(item, author);
+      results.push({ id: id, type: type, author: author, text: text });
+      console.log('[' + i + '] ' + type + ' ' + id + '  ' + JSON.stringify(text));
+    }
+    return results;
+  }
+
+  // Get the disco ID of the currently selected/active comment.
+  function getActiveCommentId() {
+    var active = document.querySelector('#docos-stream-view [role="listitem"].docos-docoview-active');
+    if (!active) { console.log('No active comment'); return null; }
+    var id = getDiscoId(active);
+    console.log('Active comment:', id || '(no ID)');
+    return id;
+  }
+
+  window.__docreviewDisco = { getDiscoId: getDiscoId, listComments: listComments, getActiveCommentId: getActiveCommentId };
+  // Expose debugging functions directly on window for convenience
+  window.listComments = listComments;
+  window.getActiveCommentId = getActiveCommentId;
 }
 
 // Injected into Google Docs to extract the disco ID from the listitem marked

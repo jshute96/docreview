@@ -523,7 +523,14 @@
   if (docsEnabled) {
     injectDocs();
     injectAccessDenied();
-    if (commentSyncEnabled) setupCommentActivityDetection();
+    if (commentSyncEnabled) {
+      setupCommentActivityDetection();
+      // Inject disco ID helpers at page load so listComments() and getActiveCommentId()
+      // are available in the page console for debugging without needing a prior action.
+      try {
+        chrome.runtime.sendMessage({ type: 'injectDiscoHelpers' });
+      } catch(e) {}
+    }
     new MutationObserver(function() { injectDocs(); injectAccessDenied(); }).observe(document.body, { childList: true, subtree: true });
   } else if (driveEnabled) {
     injectDrive();
