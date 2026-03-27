@@ -183,6 +183,14 @@ Available from the **Google Docs page console** (injected at page load):
 - **`listComments()`** — dumps all visible comments/suggestions with disco IDs, types, authors, and text. Returns an array of `{ id, type, author, text }` and logs each entry.
 - **`getActiveCommentId()`** — returns the disco ID of the currently selected comment (the one with `docos-docoview-active` class). Click a comment first to select it.
 
+### Selection tracking
+
+The extension automatically logs comment selection/deselection to the page console:
+- `[docreview] comment selected: <discoId>` — when a comment or suggestion is clicked
+- `[docreview] comment deselected` — when clicking away from all comments
+
+This works for both anchored comments (sidebar) and comments in the "Show all comments" pane (including resolved comments). Works on Docs, Sheets, and Slides. On Google Docs, there are two `#docos-stream-view` containers (anchored sidebar and comments pane) — the tracker discovers and observes both.
+
 ### Log tags
 
 Content script logs (Google Docs page console) use the `[docreview]` prefix. Background service worker logs use `[background]`. Injected page scripts use `[docreview-extract]` or `[docreview-nav]`.

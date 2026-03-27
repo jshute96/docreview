@@ -693,6 +693,58 @@ function injectDiscoIdHelpers() {
   // Expose debugging functions directly on window for convenience
   window.listComments = listComments;
   window.getActiveCommentId = getActiveCommentId;
+
+  // Track comment selection/deselection across all #docos-stream-view elements.
+  // Google Docs has two with the same id: the anchored sidebar and the
+  // comments pane (added when "Show all comments" is opened). Sheets and
+  // Slides may have different structures.
+  var currentActiveEl = null;
+  var trackedStreams = new WeakSet();
+
+  // Query the DOM for the currently active comment and log changes.
+  // Called on every mutation in a tracked stream view. Uses a global
+  // querySelector (not scoped to one stream) so it works regardless of
+  // which stream view contains the active comment.
+  function checkActive() {
+    var active = document.querySelector('#docos-stream-view [role="listitem"].docos-docoview-active');
+    if (active && active !== currentActiveEl) {
+      currentActiveEl = active;
+      var id = getDiscoId(active);
+      console.log('[docreview] comment selected:', id || '(no ID)');
+    } else if (!active && currentActiveEl) {
+      currentActiveEl = null;
+      console.log('[docreview] comment deselected');
+    }
+  }
+
+  // Attach a MutationObserver to a #docos-stream-view element so that
+  // class changes (comment selected/deselected) and child additions
+  // (resolved comments appearing with active class already set) both
+  // trigger checkActive(). Uses a WeakSet to avoid double-observing
+  // the same element if trackStream is called multiple times.
+  function trackStream(stream) {
+    if (trackedStreams.has(stream)) return;
+    trackedStreams.add(stream);
+    new MutationObserver(function() {
+      checkActive();
+    }).observe(stream, { attributes: true, attributeFilter: ['class'], childList: true, subtree: true });
+  }
+
+  // Scan for #docos-stream-view elements and attach observers to any
+  // new ones. Uses a lightweight interval instead of a document.body
+  // MutationObserver to avoid firing on every DOM mutation (typing,
+  // selections, etc.). Polls frequently at startup (250ms for 5s) to
+  // catch stream views as soon as they appear, then slows to 5s for
+  // the comments pane which can be opened at any time.
+  function scanForStreams() {
+    document.querySelectorAll('#docos-stream-view').forEach(trackStream);
+  }
+  scanForStreams();
+  var scanInterval = setInterval(scanForStreams, 250);
+  setTimeout(function() {
+    clearInterval(scanInterval);
+    setInterval(scanForStreams, 5000);
+  }, 5000);
 }
 
 // Injected into Google Docs to extract the disco ID from the listitem marked
