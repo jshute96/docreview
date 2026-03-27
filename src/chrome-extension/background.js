@@ -190,7 +190,7 @@ function fireCommentSync(docId) {
           if (tabs && tabs[0]) {
             chrome.tabs.sendMessage(tabs[0].id, { type: 'commentSynced', docId: docId }, function() {
               if (chrome.runtime.lastError) {
-                console.warn('[background] sendMessage failed:', chrome.runtime.lastError.message);
+                console.warn('[background] sendMessage failed for docId', docId, 'to tab', tabs[0].id, '(' + tabs[0].url + '):', chrome.runtime.lastError.message);
               }
             });
           } else {
