@@ -172,19 +172,40 @@ chrome.action.onClicked.addListener(async function(tab) {
 
 // --- Comment activity debounce ---
 // When the content script detects comment activity on a Google Docs page,
-// it sends a commentActivity message with { docId }. We use leading+trailing
-// debounce: fire immediately on the first event, then suppress for 1s. If
-// more events arrive during cooldown, fire once more when it expires — the
-// trailing sync catches changes that the leading sync may have missed.
-var commentActivityTimers = new Map(); // docId -> { timerId, pending }
+// it sends a commentActivity message with { docId, commentType, googleCommentId? }.
+// We debounce per (docId, commentId) — actions on different comments fire
+// independently, so resolving comment A then replying to comment B within 1s
+// both get their own fast single-comment syncs. Actions without a commentId
+// (e.g., suggestion accept/reject, or comment without disco URL) debounce at
+// doc level and do a full sync on trailing.
+//
+// Leading+trailing: fire immediately on the first event, then suppress for 1s.
+// If more events arrive during cooldown, fire once more when it expires.
+var commentSyncTimers = new Map(); // key -> { timerId, pending, commentType?, googleCommentId? }
 var COMMENT_SYNC_COOLDOWN = 1000;
 
-function fireCommentSync(docId) {
+function syncLabel(commentType, googleCommentId) {
+  var parts = [];
+  if (commentType === 'suggestion') parts.push('suggestion');
+  if (googleCommentId) parts.push(googleCommentId);
+  return parts.length > 0 ? ' (' + parts.join(' ') + ')' : '';
+}
+
+function fireCommentSync(docId, commentType, googleCommentId) {
   chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl }, function(config) {
     var url = config.baseUrl + '/api/docs/sync-comments/' + docId;
-    fetch(url, { method: 'POST', credentials: 'include' }).then(function(res) {
+    var body = {};
+    if (commentType) body.commentType = commentType;
+    if (googleCommentId) body.googleCommentId = googleCommentId;
+    var fetchOpts = { method: 'POST', credentials: 'include' };
+    if (commentType || googleCommentId) {
+      fetchOpts.headers = { 'Content-Type': 'application/json' };
+      fetchOpts.body = JSON.stringify(body);
+    }
+    var label = syncLabel(commentType, googleCommentId);
+    fetch(url, fetchOpts).then(function(res) {
       if (res.ok) {
-        console.log('[background] comment sync succeeded for', docId);
+        console.log('[background] comment sync succeeded for', docId + label);
         // Notify open docreview tabs so they refresh
         chrome.tabs.query({ url: config.baseUrl + '/*' }, function(tabs) {
           if (tabs && tabs[0]) {
@@ -198,15 +219,16 @@ function fireCommentSync(docId) {
           }
         });
       } else {
-        console.warn('[background] comment sync failed for', docId, 'status:', res.status);
+        console.warn('[background] comment sync failed for', docId + label, 'status:', res.status);
       }
     }).catch(function(err) {
-      console.warn('[background] comment sync error for', docId, err);
+      console.warn('[background] comment sync error for', docId + label, err);
     });
   });
 }
 
 // Handle messages from content scripts.
+// - commentPre: from Docs content script, pre-extracts comment ID before mutation
 // - commentActivity: from Docs content script, syncs comments for a doc (debounced)
 // - openDocInDocreview: from Gmail content script, opens doc in Docreview
 // - trackDocTab: from Docs content script, tracks the tab for comment navigation reuse
@@ -214,30 +236,81 @@ function fireCommentSync(docId) {
 // - resolveUrl: from bridge-to-docreview, follows redirects to resolve shortened URLs
 // - focusDocTab: from bridge-to-docreview, focuses an existing Google Docs tab without creating one
 // - navigateToComment: from bridge-to-docreview, navigates to a comment in an open Google Docs tab
+
+// Pre-extracted comment IDs, keyed by tab ID. Stores a Promise that resolves
+// to the ID (or null). Set by commentPre, awaited by commentActivity.
+var pendingCommentIds = new Map();
+
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+  // Pre-extraction: content script marked a listitem, inject script to extract
+  // the disco ID while the element is still in the DOM (before Google removes it).
+  if (msg.type === 'commentPre' && msg.docId && sender.tab) {
+    // Inject shared helpers first (idempotent), then extract the ID.
+    // Store the Promise so commentActivity can await it if it arrives
+    // before extraction completes.
+    var tabId = sender.tab.id;
+    var promise = chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: injectDiscoIdHelpers,
+      world: 'MAIN'
+    }).then(function() {
+      return chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        func: extractCommentIdFromPage,
+        world: 'MAIN'
+      });
+    }).then(function(results) {
+      var id = results && results[0] && results[0].result;
+      if (id) {
+        console.log('[background] extracted comment ID:', id, 'for tab', tabId);
+      } else {
+        console.log('[background] no comment ID extracted for tab', tabId);
+      }
+      return id || null;
+    }).catch(function(err) {
+      console.warn('[background] failed to extract comment ID:', err);
+      return null;
+    });
+    pendingCommentIds.set(tabId, promise);
+    return;
+  }
+
   if (msg.type === 'commentActivity' && msg.docId) {
     var docId = msg.docId;
-    var state = commentActivityTimers.get(docId);
-    if (state) {
-      // In cooldown — mark pending so trailing sync fires when cooldown expires
-      state.pending = true;
-      console.log('[background] commentActivity for', docId, '(cooldown active, trailing will fire)');
-    } else {
-      // No cooldown — fire immediately and start cooldown
-      console.log('[background] commentActivity for', docId, '(firing immediately)');
-      fireCommentSync(docId);
-      var timerId = setTimeout(function() {
-        var s = commentActivityTimers.get(docId);
-        commentActivityTimers.delete(docId);
-        // Only fire trailing sync if more events arrived during cooldown —
-        // the leading sync may have missed their changes.
-        if (s && s.pending) {
-          console.log('[background] commentActivity for', docId, '(firing trailing after cooldown)');
-          fireCommentSync(docId);
-        }
-      }, COMMENT_SYNC_COOLDOWN);
-      commentActivityTimers.set(docId, { timerId: timerId, pending: false });
-    }
+    var commentType = msg.commentType;
+    // Await the pre-extracted comment ID (may still be in flight)
+    var pendingPromise = sender.tab ? pendingCommentIds.get(sender.tab.id) : null;
+    if (sender.tab) pendingCommentIds.delete(sender.tab.id);
+    (pendingPromise || Promise.resolve(null)).then(function(googleCommentId) {
+      var label = syncLabel(commentType, googleCommentId);
+      // Debounce key: per-comment when we have an ID, per-doc otherwise
+      var key = googleCommentId ? docId + ':' + googleCommentId : docId;
+      var state = commentSyncTimers.get(key);
+      if (state) {
+        // In cooldown — mark pending so trailing sync fires when cooldown expires
+        state.pending = true;
+        console.log('[background] commentActivity for', docId + label, '(cooldown active, trailing will fire)');
+      } else {
+        // No cooldown — fire immediately with hints and start cooldown
+        console.log('[background] commentActivity for', docId + label, '(firing immediately)');
+        fireCommentSync(docId, commentType, googleCommentId);
+        var timerId = setTimeout(function() {
+          var s = commentSyncTimers.get(key);
+          commentSyncTimers.delete(key);
+          // Only fire trailing sync if more events arrived during cooldown —
+          // the leading sync may have missed their changes.
+          if (s && s.pending) {
+            console.log('[background] commentActivity for', docId + label, '(firing trailing after cooldown)');
+            // Per-comment trailing: re-sync same comment. Per-doc trailing: full sync.
+            fireCommentSync(docId, s.commentType, s.googleCommentId);
+          }
+        }, COMMENT_SYNC_COOLDOWN);
+        commentSyncTimers.set(key, {
+          timerId: timerId, pending: false,
+          commentType: commentType, googleCommentId: googleCommentId
+        });
+      }
+    });
     return;
   }
 
@@ -402,6 +475,7 @@ function setDocTabName(tabId, docId) {
 
 // Clean up when tabs are closed
 chrome.tabs.onRemoved.addListener(async function(tabId) {
+  pendingCommentIds.delete(tabId);
   var tabs = await getDocTabs();
   var changed = false;
   for (var docId in tabs) {
@@ -427,29 +501,20 @@ chrome.tabs.onUpdated.addListener(async function(tabId, changeInfo) {
   }
 });
 
-// The script injected into Google Docs to navigate to a comment by disco ID.
-// Runs in the MAIN world so it can access the Closure component tree.
-// Arguments are passed via the args parameter of chrome.scripting.executeScript.
+// --- Disco ID extraction (injected into page context) ---
 //
-// Navigation flow:
-//   1. Find the comment listitem by disco ID in the stream view
-//   2. If not found, open the comments pane (loads resolved/unanchored) and retry
-//   3. If still not found, fall back to page reload with ?disco= URL
-//   4. Click the item to navigate (may trigger a document tab switch)
-//   5. Wait 300ms for DOM to settle after potential tab switch
-//   6. Re-find and click again to ensure selection with fresh DOM
-//   7. Set pane state: close for anchored comments, open for non-anchored
+// Google Docs stores a disco ID for each comment/suggestion listitem in the
+// Closure Library component tree (accessible via closure_lm properties on DOM
+// elements). These scripts are injected into the page's JS context via
+// chrome.scripting.executeScript — content scripts can't access these properties.
 //
-// Key complications this handles:
-//   - Same disco ID can appear twice (anchored + stream entry); prefer anchored
-//   - Clicking a comment can switch document tabs, rebuilding the entire DOM
-//   - Resolved/unanchored comments only load when the comments pane is opened
-//   - Pane state is determined from the doc, not from Docreview's resolved flag
-//   - Google Docs buttons need full mousedown+mouseup+click (bare .click() ignored)
-//   - Multiple [role="complementary"] elements; use .docs-docos-activity-sidebar
-function navigateToCommentInPage(discoId, _resolvedHint, fallbackUrl) {
+// injectDiscoIdHelpers sets up window.__docreviewDisco.getDiscoId(item), which
+// is used by both extractCommentIdFromPage and navigateToCommentInPage.
 
-  // --- ID extraction from Closure component tree ---
+// Injected once per page to set up the shared getDiscoId helper on window.
+// Idempotent — skips if already injected.
+function injectDiscoIdHelpers() {
+  if (window.__docreviewDisco) return;
 
   // The disco ID for each comment listitem is stored in Google's Closure Library
   // component tree under minified property names (e.g., .Yd.Ai) that change when
@@ -464,9 +529,7 @@ function navigateToCommentInPage(discoId, _resolvedHint, fallbackUrl) {
   //     an array index. The shared array goes through numeric indices; the per-item
   //     ID is at a short, direct property path.
   //
-  // The discovered path is used for all items within a single navigation call.
-  // Since this function is injected fresh each time, there's no cross-call cache,
-  // but discovery is fast (~3ms) and only runs once per invocation.
+  // The discovered path is cached across calls for the lifetime of the page.
 
   var discoveredIdPath = null;
 
@@ -514,7 +577,6 @@ function navigateToCommentInPage(discoId, _resolvedHint, fallbackUrl) {
   // Discover the property path to the per-item disco ID.
   function discoverIdPath(items) {
     if (items.length >= 2) {
-      // Differential: find non-array paths that have different values across two items
       var root0 = getClickRoot(items[0]);
       var root1 = getClickRoot(items[1]);
       if (!root0 || !root1) return null;
@@ -530,7 +592,6 @@ function navigateToCommentInPage(discoId, _resolvedHint, fallbackUrl) {
       candidates.sort(function(a, b) { return a.length - b.length; });
       if (candidates.length > 0) return candidates[0].split('.');
     } else if (items.length === 1) {
-      // Single item: shortest non-array path to an AAAB string
       var root = getClickRoot(items[0]);
       if (!root) return null;
       var paths = collectIdPaths(root, 4);
@@ -551,26 +612,91 @@ function navigateToCommentInPage(discoId, _resolvedHint, fallbackUrl) {
     } catch(e) { return null; }
   }
 
+  // Get the disco ID for a [role="listitem"] element. Discovers the property
+  // path on first call (or re-discovers if the cached path fails).
   function getDiscoId(item) {
-    // Try the cached path first
     if (discoveredIdPath) {
       var id = extractIdByPath(item, discoveredIdPath);
       if (id) return id;
     }
-
-    // Cached path failed or doesn't exist — discover it
     var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
     var newPath = discoverIdPath(items);
     if (newPath) {
       discoveredIdPath = newPath;
-      console.log('[docreview-nav] discovered ID path:', newPath.join('.'));
       var id = extractIdByPath(item, newPath);
       if (id) return id;
     }
-
-    console.log('[docreview-nav] ID extraction failed');
     return null;
   }
+
+  window.__docreviewDisco = { getDiscoId: getDiscoId };
+}
+
+// Injected into Google Docs to extract the disco ID from the listitem marked
+// with [data-docreview-extract] by the content script. Requires
+// injectDiscoIdHelpers to have been injected first.
+function extractCommentIdFromPage() {
+  var disco = window.__docreviewDisco;
+  if (!disco) return null;
+
+  var marked = document.querySelector('[data-docreview-extract]');
+  if (!marked) return null;
+  marked.removeAttribute('data-docreview-extract');
+
+  // Walk up to the [role="listitem"] ancestor
+  var item = marked;
+  while (item && item.getAttribute('role') !== 'listitem') {
+    item = item.parentElement;
+  }
+  if (!item) return null;
+
+  var id = disco.getDiscoId(item);
+  if (id) return id;
+
+  // For newly added elements, Closure Library may not have attached its
+  // internals yet. Retry briefly — executeScript handles returned Promises.
+  return new Promise(function(resolve) {
+    var attempts = 0;
+    var check = setInterval(function() {
+      var id = disco.getDiscoId(item);
+      if (id || ++attempts >= 10) {
+        clearInterval(check);
+        if (id) {
+          console.log('[docreview-extract] got ID after ' + (attempts * 100) + 'ms:', id);
+        } else {
+          console.log('[docreview-extract] gave up after ' + (attempts * 100) + 'ms');
+        }
+        resolve(id);
+      }
+    }, 100);
+  });
+}
+
+// The script injected into Google Docs to navigate to a comment by disco ID.
+// Injected into the page's JS context via chrome.scripting.executeScript.
+// Requires injectDiscoIdHelpers to have been injected first.
+//
+// Navigation flow:
+//   1. Find the comment listitem by disco ID in the stream view
+//   2. If not found, open the comments pane (loads resolved/unanchored) and retry
+//   3. If still not found, fall back to page reload with ?disco= URL
+//   4. Click the item to navigate (may trigger a document tab switch)
+//   5. Wait 300ms for DOM to settle after potential tab switch
+//   6. Re-find and click again to ensure selection with fresh DOM
+//   7. Set pane state: close for anchored comments, open for non-anchored
+//
+// Key complications this handles:
+//   - Same disco ID can appear twice (anchored + stream entry); prefer anchored
+//   - Clicking a comment can switch document tabs, rebuilding the entire DOM
+//   - Resolved/unanchored comments only load when the comments pane is opened
+//   - Pane state is determined from the doc, not from Docreview's resolved flag
+//   - Google Docs buttons need full mousedown+mouseup+click (bare .click() ignored)
+//   - Multiple [role="complementary"] elements; use .docs-docos-activity-sidebar
+function navigateToCommentInPage(discoId, _resolvedHint, fallbackUrl) {
+
+  var getDiscoId = window.__docreviewDisco
+    ? window.__docreviewDisco.getDiscoId
+    : function() { return null; };
 
   // --- DOM helpers ---
 
@@ -791,9 +917,14 @@ async function navigateToComment(docId, discoId, docUrl, resolved, senderTab) {
     return { success: true, focused: true };
   }
 
-  // Inject the navigation script
+  // Inject shared helpers (idempotent) then the navigation script
   console.log('[background] injecting navigation script for:', discoId);
   try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: injectDiscoIdHelpers,
+      world: 'MAIN'
+    });
     var results = await chrome.scripting.executeScript({
       target: { tabId: tabId },
       func: navigateToCommentInPage,

@@ -36,7 +36,8 @@ Google Docs page                    Docreview page
 **`background.js`** — Service worker that handles toolbar clicks, context menu actions, and messages from content scripts. Dynamically registers the `bridge-to-docreview.js` content script for the configured `baseUrl`. Tab tracking is persisted in `chrome.storage.session` to survive MV3 service worker restarts.
 
 Message handlers:
-- `commentActivity` — Debounces and triggers server-side comment sync via `POST /api/docs/sync-comments/[googleDocId]`, then notifies the first open Docreview tab via `chrome.tabs.sendMessage`.
+- `commentPre` — Injects `extractCommentIdFromPage` into the Google Docs tab to extract the disco ID from the listitem the user just acted on (while the element is still in the DOM). Stores the result keyed by tab ID for the subsequent `commentActivity` message.
+- `commentActivity` — Debounces and triggers server-side comment sync via `POST /api/docs/sync-comments/[googleDocId]`, then notifies the first open Docreview tab via `chrome.tabs.sendMessage`. Picks up the pre-extracted `googleCommentId` from `commentPre` and passes `commentType` (`'comment'`/`'suggestion'`) so the server can skip irrelevant API calls and fetch only the affected comment.
 - `ping` — Returns extension status and version.
 - `resolveUrl` — Opens a background tab to follow redirects for shortened URLs.
 - `cancelResolve` — Closes in-flight resolve tabs.
@@ -131,12 +132,14 @@ When the user acts on a comment in Google Docs (reply, resolve, accept/reject su
 
 ### Detection (content.js)
 
-The content script uses event delegation on `mouseup` (capture phase) to detect actions on comment buttons. Google's Closure Library handles these buttons on `mousedown`/`mouseup`, not `click` — the `click` event never fires. Detected buttons:
+The content script uses two event listeners in capture phase: `mousedown` to extract the disco ID (while the element is still in the DOM), and `mouseup` to detect the action type and trigger sync. Google's Closure Library handles these buttons on `mousedown`/`mouseup`, not `click` — the `click` event never fires. Detected buttons:
 - `[aria-label="Reply to comment"]` / `[aria-label="Post Comment"]` — Reply or Comment submit button (checked for `jfk-button-disabled` to avoid false positives)
 - `[aria-label="Mark as resolved and hide discussion"]` — Resolve button
 - `[aria-label="Accept suggestion"]` / `[aria-label="Reject suggestion"]` — Suggestion actions
 
 Also catches `Ctrl+Enter` / `Cmd+Enter` inside `.docos-input-textarea` (keyboard shortcut for submitting replies/comments).
+
+**Comment vs suggestion detection:** Reply and Ctrl+Enter can appear on both comment threads and suggestion threads. To distinguish them, the content script checks whether the parent `[role="listitem"]` container has Accept/Reject suggestion buttons — if so, the action is on a suggestion thread. This is important because suggestions live in the Docs API, not Drive comments, so the server needs to know which API to call.
 
 ### Waiting for Google to save
 
@@ -146,19 +149,26 @@ After detecting the user's action, the content script doesn't notify immediately
 
 **Step 1 — Detection** (`content.js` on Google Docs page)
 
-`mouseup` listener catches clicks on Reply, Comment, Resolve, Accept, Reject buttons (matched by aria-label). `keydown` listener catches Ctrl+Enter in comment input areas.
+`mousedown` listener (capture phase) marks the parent `[role="listitem"]` with `data-docreview-extract` and sends `commentPre` to background for disco ID extraction — this happens before Google's `mouseup` handler which may remove the element. `mouseup` listener (capture phase) detects the action type and determines `commentType` by checking for Accept/Reject buttons in the parent listitem: if present → `'suggestion'`, otherwise → `'comment'`. `keydown` listener catches Ctrl+Enter in comment input areas. For new comments (no listitem at mousedown time), the mutation observer watches for the added listitem and sends `commentPre` then.
 
 **Step 2 — Wait for Google to confirm** (`content.js`)
 
-Starts a `MutationObserver` on the comment list (`[role="list"]`). When the DOM updates (reply appears, comment removed, etc.), Google has saved the change. Sends `commentActivity` message to `background.js`. Fallback: 3s timeout if no mutation fires; 500ms delay if the comment list element isn't found.
+Starts a `MutationObserver` on the comment list (`[role="list"]`). When the DOM updates (reply appears, comment removed, etc.), Google has saved the change. Sends `commentActivity` message to `background.js` with `{ docId, commentType }`. Background picks up the pre-extracted `googleCommentId` (from step 1) and proceeds with debounce/sync. Fallback: 3s timeout if no mutation fires; 500ms delay if the comment list element isn't found.
 
 **Step 3 — Sync + debounce** (`background.js`, triggered by message from step 2)
 
-First event for a docId: fires `POST /api/docs/sync-comments/{googleDocId}` immediately (leading edge), starts 1s cooldown. Events during cooldown: suppressed, but flagged as pending. After cooldown: fires one more sync only if events arrived during cooldown, to catch changes the leading sync may have missed. Single action = 1 sync. Rapid overlapping actions = 2 syncs (leading + trailing).
+Debounce key is per-comment when a `googleCommentId` is available (`docId:commentId`), otherwise per-doc (`docId`). This means actions on different comments fire independently — resolving comment A then replying to comment B within 1s both get their own fast single-comment syncs.
+
+Leading+trailing within each key: first event fires `POST /api/docs/sync-comments/{googleDocId}` immediately with hints in the request body, starts 1s cooldown. Events during cooldown: suppressed, but flagged as pending. After cooldown: fires one more sync with the same hints (per-comment key) or without hints (per-doc key). Single action = 1 optimized sync. Rapid overlapping actions on the same comment = 2 syncs (leading + trailing).
 
 **Step 4 — Server sync** (`sync-comments/[googleDocId]/route.ts`)
 
-Looks up doc by Google doc ID, calls `syncComments()` which fetches all comments from Drive API + all suggestions from Docs API, updates database.
+Looks up doc by Google doc ID, calls `syncComments()` with optional hints. With hints:
+- `commentType='comment'` + `googleCommentId`: uses `syncSingleComment()` — targeted DB lookup + `comments.get` (single-comment fetch), skips suggestions entirely. Shared with the thread refresh button.
+- `commentType='comment'` without `googleCommentId`: skips Docs API suggestion fetch, does full `comments.list`.
+- `commentType='suggestion'`: skips Drive API comment fetch, syncs only suggestions from Docs API.
+- Hint-based syncs don't stamp `commentsLastSyncedAt` — the periodic full sync handles reconciliation.
+- Without hints: full sync of all comments and suggestions (original behavior).
 
 **Step 5 — Notify docreview tabs** (`background.js` → `bridge-to-docreview.js` → `bridge-to-extension.ts`)
 

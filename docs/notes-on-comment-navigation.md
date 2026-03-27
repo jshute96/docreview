@@ -70,9 +70,13 @@ and navigation will fall back to `?disco=` URL reload.
 ### Event handling
 
 - **Comment listitems**: Respond to bare `.click()` — this navigates to the comment, scrolls the document, and highlights the text.
-- **Comment action buttons** (Reply, Resolve, Accept, Reject): Handled on `mousedown`/`mouseup` only — `click` events never fire. Must listen for `mouseup` to detect user actions.
+- **Comment action buttons** (Reply, Resolve, Accept, Reject): Handled on `mousedown`/`mouseup` only — `click` events never fire. The content script uses `mousedown` (capture phase) to extract the disco ID while the element is still in the DOM, then `mouseup` (capture phase) to detect the action type.
 - **Google Docs UI buttons** (toolbar, pane controls): Require a full `mousedown` → `mouseup` → `click` event sequence. Bare `.click()` is ignored by the Closure event system.
 - **Canvas content area**: Does not respond to synthetic mouse events. The document text is canvas-rendered.
+
+### Closure internals on new elements
+
+When a new comment is posted, the listitem is added to the DOM via a mutation. The `closure_lm` property is NOT immediately available — it takes a short time for the Closure Library to attach its event handlers to the new element. The `extractCommentIdFromPage` function handles this by retrying every 100ms (up to 10 attempts, ~1s total) until the disco ID is extractable.
 
 ### DOM lifecycle
 

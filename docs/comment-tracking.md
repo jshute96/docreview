@@ -269,11 +269,53 @@ still disappear; only the relative order of remaining rows is preserved.
 
 ---
 
-## Suggestions
+## Comments vs Suggestions
 
-Suggestions (tracked changes) are a separate comment type (`type: "SUGGESTION"`) and have
-their own sync logic. They are displayed in the comment table and can be filtered with the
-**Suggestions** toggle. For full details, see [`suggestions.md`](./suggestions.md).
+Google Docs has two distinct annotation features that Docreview tracks in the same `Comment`
+table but syncs from different APIs:
+
+| | Comments | Suggestions |
+|---|---|---|
+| **What they are** | Threaded discussions attached to selected text | Tracked changes (insertions, deletions, replacements) |
+| **Created by** | Insert menu or comment icon on selected text | Switching to "Suggesting" mode and typing |
+| **API source** | Drive API (`comments.list`, `comments.get`) | Docs API (`documents.get` with `SUGGESTIONS_INLINE`) |
+| **DB type** | `COMMENT` | `SUGGESTION` |
+| **ID format** | `googleCommentId` — Drive comment ID (`AAAB...`) | `googleSuggestionId` — Docs API ID (`suggest.xxx`) |
+| **Replies** | Full thread with reply count, author tracking, @mentions | Not tracked — Docs API doesn't expose them |
+| **Status fields** | `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, etc. from Drive | All default to `false` (no Drive data available) |
+| **Resolution** | Resolved/reopened via Drive API | Accepted/rejected — disappears from doc body |
+| **Navigation** | `?disco=` with `googleCommentId` | `?disco=` with `googleCommentId` when available (see below) |
+
+### ID formats and navigation
+
+Both comments and suggestions have Drive comment IDs (`AAAB...`), visible in the Closure
+Library component tree attached to their DOM list items. For comments, this ID is the
+primary identifier — it's used in Drive API calls, DB lookups, and `?disco=` navigation.
+
+Suggestions also have these `AAAB...` IDs in the DOM, and they work for `?disco=` navigation
+(scrolling to the suggestion in the document). However, they **cannot be used in Drive API
+calls** — `comments.get` with a suggestion's `AAAB...` ID doesn't reliably return data. The
+Docs API uses a separate `suggest.xxx` ID format. When a suggestion has a `googleCommentId`
+(from Gmail notification merge), Docreview uses it for `?disco=` deep links. Otherwise the
+doc opens without scrolling to the suggestion.
+
+### Extension sync implications
+
+When the Chrome extension detects user actions on comment buttons, it determines `commentType`
+by checking for Accept/Reject buttons in the parent list item:
+
+- **Comment thread** (no Accept/Reject): `commentType='comment'` → server syncs from Drive API
+  only, skipping the Docs API suggestion fetch. If a disco ID was extracted, uses
+  `syncSingleComment` for a targeted single-comment update.
+- **Suggestion thread** (Accept/Reject present): `commentType='suggestion'` → server syncs from
+  Docs API only, skipping the Drive API comment fetch. Disco IDs are extracted (for logging)
+  but not used for single-comment sync (suggestion IDs can't be used in Drive API calls).
+
+Replies on suggestion threads are tagged as `commentType='suggestion'`. The Docs API sync checks
+whether the suggestion still exists (for accept/reject detection) but doesn't track replies.
+This is acceptable because Docreview doesn't display suggestion replies.
+
+For full suggestion sync details, see [`suggestions.md`](./suggestions.md).
 
 ---
 

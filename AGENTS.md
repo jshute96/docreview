@@ -26,6 +26,10 @@ Uses CredentialsProvider + JWT sessions. `getDriveClient()` throws `OfflineModeE
 `Comment.type`, `Comment.suggestionType`, and `Comment.status`. Prisma 5 is pinned (Prisma 7
 dropped `url = env(...)` support in schema.prisma).
 
+**Comments vs suggestions:** Comments and suggestions on docs are handled differently,
+using different APIs and different IDs.  See `docs/comment-tracking.md` and
+`docs/suggestions.md` for details.
+
 ## Workflow Rules
 
 - **Documentation**:
@@ -108,3 +112,4 @@ user before elaborating further. Default to action over planning.
 - When changing behavior, read existing design docs to understand previous designs and intentions.  Ask questions if unsure if we should change those requirements.
 - When the user asks for a change, apply it consistently to ALL similar patterns (e.g., if optimizing bulk inserts for comments, also apply to suggestions).
 - Do NOT drop or overwrite existing content in files like README.md — preserve what's there and add to it.
+- When similar logic occurs on multiple parallel paths, use common helper methods when possible, to ensure the logic stays consistent.

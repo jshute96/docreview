@@ -86,6 +86,18 @@ export interface SyncPrefetchedData {
   suggestions?: DriveSuggestion[];
 }
 
+/**
+ * Optional hints from the Chrome extension telling us which specific action
+ * the user just took. Allows skipping irrelevant API calls and fetching only
+ * the affected comment instead of all comments.
+ */
+export interface SyncHints {
+  /** 'comment' for actions on comment threads, 'suggestion' for actions on suggestion threads. */
+  commentType?: string;
+  /** Google Drive comment ID (disco ID) — fetch only this comment instead of all. */
+  googleCommentId?: string;
+}
+
 // --- Single-comment sync ---
 
 /** Result of syncing a single comment from Drive. */
@@ -111,12 +123,33 @@ export async function syncSingleComment(
   doc: Doc,
   googleCommentId: string,
   driveAuth: Awaited<ReturnType<typeof getDriveClient>>,
-  options?: { userEmail?: string },
+  options?: { expectFresh?: boolean; userEmail?: string },
 ): Promise<SingleCommentResult> {
+  // Fetch the comment from Drive (returns null if content is empty/deleted).
+  // When expectFresh is set (extension-triggered sync), the user just acted on
+  // this comment so its modifiedTime should be recent. If Drive API returns
+  // stale data (backend replication lag), retry with exponential backoff.
+  const FRESH_CUTOFF = 5000;       // modifiedTime must be within 5s of request start
+  const INITIAL_RETRY_DELAY = 100; // first retry after 100ms, then 1.5x each time
+  const MAX_RETRY_TIME = 2000;     // give up after ~2s total retry time
+
   let result: ThreadDetailResult | null;
   let driveDeleted = false;
   try {
+    const freshAfter = Date.now() - FRESH_CUTOFF;
     result = await fetchThreadDetail(driveAuth, doc.googleDocId, googleCommentId, options?.userEmail);
+    if (options?.expectFresh) {
+      let delay = INITIAL_RETRY_DELAY;
+      let elapsed = 0;
+      while (result && elapsed < MAX_RETRY_TIME) {
+        if ((result.comment.driveModifiedAt?.getTime() ?? 0) >= freshAfter) break;
+        logInfo(`[Comments] ${doc.googleDocId}: stale modifiedTime for ${googleCommentId}, retrying in ${Math.round(delay)}ms`);
+        await new Promise(r => setTimeout(r, delay));
+        elapsed += delay;
+        delay *= 1.5;
+        result = await fetchThreadDetail(driveAuth, doc.googleDocId, googleCommentId, options?.userEmail);
+      }
+    }
   } catch (err: any) {
     if (err.code === 404) {
       result = null;
@@ -174,16 +207,44 @@ export async function syncComments(
   doc: Doc,
   driveAuth: Awaited<ReturnType<typeof getDriveClient>>,
   userEmail?: string,
-  prefetched?: SyncPrefetchedData
+  prefetched?: SyncPrefetchedData,
+  hints?: SyncHints,
 ): Promise<SyncResult> {
   // Record sync start time BEFORE fetching — any changes that arrive during
   // the sync will have timestamps after this, ensuring the next sync covers them.
   const syncStartedAt = new Date();
 
+  const skipComments = hints?.commentType === "suggestion";
+  const skipSuggestions = hints?.commentType === "comment";
+
+  // --- Fast path: single-comment sync via syncSingleComment ---
+  // Uses a targeted DB lookup + single Drive API call instead of batch-fetching.
+  if (!skipComments && hints?.googleCommentId) {
+    try {
+      const result = await syncSingleComment(doc, hints.googleCommentId, driveAuth, { expectFresh: true, userEmail });
+      logInfo(`[Comments] ${doc.googleDocId}: single-comment sync ${hints.googleCommentId} (${result.created ? "created" : result.updated ? "updated" : result.deleted ? "deleted" : "unchanged"})`);
+      return {
+        ...EMPTY_RESULT,
+        commentsCreated: result.created ? 1 : 0,
+        commentsUpdated: result.updated ? 1 : 0,
+        shouldUnarchive: result.shouldUnarchive,
+        // shouldUnarchive is only true for non-resolve activity (new replies,
+        // status transitions) — resolve-only changes don't trigger unarchive.
+        // So aliasing it here is safe.
+        hasNonResolveActivity: result.shouldUnarchive,
+      };
+    } catch (err: any) {
+      // Fall back to full sync on unexpected error (e.g., 403)
+      logWarning(`[Comments] single-comment sync failed for ${hints.googleCommentId}, falling back to full sync:`, err);
+    }
+  }
+
   // --- Phase 1: Fetch from APIs (or use pre-fetched data) ---
 
   let comments: DriveComment[];
-  if (prefetched?.comments) {
+  if (skipComments) {
+    comments = [];
+  } else if (prefetched?.comments) {
     comments = prefetched.comments;
   } else {
     const commentsOrError = await fetchDriveComments(doc, driveAuth, syncStartedAt, userEmail);
@@ -194,7 +255,9 @@ export async function syncComments(
   let docsSuggestions: DriveSuggestion[];
   let suggestionFetchFailed = false;
   let suggestionPermissionDenied = false;
-  if (prefetched?.suggestions) {
+  if (skipSuggestions) {
+    docsSuggestions = [];
+  } else if (prefetched?.suggestions) {
     docsSuggestions = prefetched.suggestions;
   } else {
     const result = await fetchDocsSuggestions(doc, driveAuth);
@@ -205,14 +268,21 @@ export async function syncComments(
 
   // --- Phase 2: Sync comments from Drive ---
 
-  const commentResult = await syncDriveComments(doc, comments);
+  let commentResult: CommentSyncResult;
+  if (skipComments) {
+    commentResult = { commentsCreated: 0, commentsUpdated: 0, commentsDeleted: 0, shouldUnarchive: false, hasNonResolveActivity: false };
+  } else {
+    commentResult = await syncDriveComments(doc, comments);
+  }
 
   // --- Phase 3: Sync suggestions from Docs API ---
   // (only for Google Docs, and only if the suggestion fetch succeeded)
 
-  if (doc.mimeType !== DOCS_MIME_TYPE) {
-    await stampSyncTime(doc.docId, syncStartedAt);
-    logCommentSummary(doc, comments.length, commentResult);
+  if (skipSuggestions || doc.mimeType !== DOCS_MIME_TYPE) {
+    // Hint-based syncs don't stamp commentsLastSyncedAt — let the periodic
+    // full sync handle reconciliation of the skipped phase.
+    if (!hints) await stampSyncTime(doc.docId, syncStartedAt);
+    logCommentSummary(doc, comments.length, commentResult, hints);
     return { ...EMPTY_RESULT, ...commentResult };
   }
 
@@ -222,16 +292,18 @@ export async function syncComments(
   }
 
   if (suggestionPermissionDenied) {
-    await stampSyncTime(doc.docId, syncStartedAt);
+    if (!hints) await stampSyncTime(doc.docId, syncStartedAt);
     logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive (${commentResult.commentsCreated} new, ${commentResult.commentsUpdated} updated) (suggestions skipped: permission denied)`);
     return { ...EMPTY_RESULT, ...commentResult, permissionDenied: true };
   }
 
   const suggestionResult = await syncDocsSuggestions(doc, docsSuggestions);
 
-  await stampSyncTime(doc.docId, syncStartedAt);
+  // Only stamp commentsLastSyncedAt for full syncs (no hints) — hint-based
+  // syncs are partial and the periodic full sync should still reconcile.
+  if (!hints) await stampSyncTime(doc.docId, syncStartedAt);
 
-  logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} comments from Drive (${commentResult.commentsCreated} new, ${commentResult.commentsUpdated} updated, ${commentResult.commentsDeleted} deleted); ${docsSuggestions.length} suggestions (${suggestionResult.suggestionsCreated} new, ${suggestionResult.suggestionsUpdated} updated, ${suggestionResult.suggestionsResolved} resolved)${commentResult.shouldUnarchive || suggestionResult.shouldUnarchive ? " → unarchive" : ""}`);
+  logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} comments from Drive (${commentResult.commentsCreated} new, ${commentResult.commentsUpdated} updated, ${commentResult.commentsDeleted} deleted); ${docsSuggestions.length} suggestions (${suggestionResult.suggestionsCreated} new, ${suggestionResult.suggestionsUpdated} updated, ${suggestionResult.suggestionsResolved} resolved)${commentResult.shouldUnarchive || suggestionResult.shouldUnarchive ? " → unarchive" : ""}${hints ? ` (hint: ${hints.commentType})` : ""}`);
 
   return {
     commentsCreated: commentResult.commentsCreated,
@@ -750,6 +822,6 @@ async function stampSyncTime(docId: string, syncStartedAt: Date) {
   });
 }
 
-function logCommentSummary(doc: Doc, commentCount: number, result: CommentSyncResult) {
-  logInfo(`[Comments] ${doc.googleDocId}: ${commentCount} from Drive (${result.commentsCreated} new, ${result.commentsUpdated} updated, ${result.commentsDeleted} deleted)${result.shouldUnarchive ? " → unarchive" : ""}`);
+function logCommentSummary(doc: Doc, commentCount: number, result: CommentSyncResult, hints?: SyncHints) {
+  logInfo(`[Comments] ${doc.googleDocId}: ${commentCount} from Drive (${result.commentsCreated} new, ${result.commentsUpdated} updated, ${result.commentsDeleted} deleted)${result.shouldUnarchive ? " → unarchive" : ""}${hints ? ` (hint: ${hints.commentType}${hints.googleCommentId ? ' single' : ''})` : ""}`);
 }

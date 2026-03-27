@@ -320,15 +320,75 @@
     if (!m) return;
     var googleDocId = m[1];
 
+    // Check whether a button is inside a suggestion thread by looking for
+    // Accept/Reject buttons in the same [role="listitem"] container.
+    // Suggestions have these buttons; regular comments don't.
+    function isSuggestionThread(el) {
+      for (var p = el; p && p !== document.body; p = p.parentElement) {
+        if (p.getAttribute('role') === 'listitem') {
+          return !!p.querySelector('[aria-label="Accept suggestion"], [aria-label="Reject suggestion"]');
+        }
+      }
+      return false;
+    }
+
+    // Mark a listitem ancestor of `el` with data-docreview-extract and send
+    // commentPre to background for disco ID extraction. Returns true if a
+    // listitem was found and marked.
+    function markListitemForExtraction(el) {
+      for (var p = el; p && p !== document.body; p = p.parentElement) {
+        if (p.getAttribute('role') === 'listitem') {
+          p.setAttribute('data-docreview-extract', '');
+          try {
+            chrome.runtime.sendMessage({ type: 'commentPre', docId: googleDocId });
+          } catch(e) {
+            console.log('[docreview] extension context invalidated, skipping commentPre');
+          }
+          return true;
+        }
+      }
+      return false;
+    }
+
     // Pending observer — tracks an active MutationObserver waiting for Google
     // to finish processing a comment action. If a new action arrives while one
     // is pending, the old observer is disconnected (the new one will catch it).
     var pendingObserver = null;
     var pendingTimeout = null;
 
-    function notifyCommentActivity(action) {
+    // Set by mousedown handler when it successfully marks a listitem for ID
+    // extraction. Consumed by notifyCommentActivity on the subsequent mouseup.
+    var preExtractedOnMousedown = false;
+
+    // Extract disco ID on mousedown — before Google's handler runs on mouseup,
+    // which may remove the element (e.g., resolve hides the comment, accept/reject
+    // removes the suggestion). Works for all button types including suggestions.
+    document.addEventListener('mousedown', function(e) {
       if (!commentSyncEnabled) return;
-      console.log('[docreview] comment activity detected:', action, googleDocId);
+      preExtractedOnMousedown = false;
+      var target = e.target;
+      for (var el = target; el && el !== document.body; el = el.parentElement) {
+        var aria = el.getAttribute('aria-label');
+        if (!aria) continue;
+        if (aria === 'Reply to comment' || aria === 'Post Comment' ||
+            aria === 'Mark as resolved and hide discussion' ||
+            aria === 'Accept suggestion' || aria === 'Reject suggestion') {
+          preExtractedOnMousedown = markListitemForExtraction(el);
+          return;
+        }
+        if (el.getAttribute('role') === 'listitem') break;
+      }
+    }, true);
+
+    function notifyCommentActivity(action, commentType) {
+      if (!commentSyncEnabled) return;
+
+      var foundListitem = preExtractedOnMousedown;
+      preExtractedOnMousedown = false;
+
+      var detail = commentType === 'suggestion' ? action + ' suggestion' : action;
+      if (foundListitem) detail += ' (extracting ID)';
+      console.log('[docreview] comment activity detected:', detail, googleDocId);
 
       // Clean up any pending observer from a previous action
       if (pendingObserver) {
@@ -349,8 +409,12 @@
           clearTimeout(pendingTimeout);
           pendingTimeout = null;
         }
-        console.log('[docreview] comment action confirmed, notifying:', action, googleDocId);
-        chrome.runtime.sendMessage({ type: 'commentActivity', docId: googleDocId });
+        console.log('[docreview] comment action confirmed, notifying:', commentType === 'suggestion' ? action + ' suggestion' : action, googleDocId);
+        try {
+          chrome.runtime.sendMessage({ type: 'commentActivity', docId: googleDocId, commentType: commentType });
+        } catch(e) {
+          console.log('[docreview] extension context invalidated, skipping commentActivity notification');
+        }
       }
 
       // Watch the comment list for DOM changes — Google updates the DOM once
@@ -362,14 +426,42 @@
         return;
       }
 
-      pendingObserver = new MutationObserver(function() {
+      // Whether we need to wait for a new listitem to appear (new comment case).
+      // When true, don't fire sendNotification until the listitem is found.
+      var waitingForListitem = !foundListitem && commentType === 'comment';
+
+      pendingObserver = new MutationObserver(function(mutations) {
+        // For new comments (no pre-extracted ID), the new listitem appears in
+        // the mutation's addedNodes. Mark it so background can extract the disco ID.
+        if (waitingForListitem) {
+          for (var i = 0; i < mutations.length; i++) {
+            var added = mutations[i].addedNodes;
+            for (var j = 0; j < added.length; j++) {
+              var node = added[j];
+              if (node.nodeType === 1 && node.getAttribute && node.getAttribute('role') === 'listitem') {
+                markListitemForExtraction(node);
+                foundListitem = true;
+                waitingForListitem = false;
+                break;
+              }
+            }
+            if (!waitingForListitem) break;
+          }
+          // Keep observing until the new listitem appears
+          if (waitingForListitem) return;
+        }
         sendNotification();
       });
       pendingObserver.observe(commentList, { childList: true, subtree: true, attributes: true });
 
       // Fallback timeout in case no mutation fires (e.g., action failed silently)
+      // or the new listitem never appeared
       pendingTimeout = setTimeout(function() {
-        console.log('[docreview] timeout waiting for DOM change, notifying anyway:', action);
+        if (waitingForListitem) {
+          console.log('[docreview] timeout waiting for new comment listitem, notifying without ID:', action);
+        } else {
+          console.log('[docreview] timeout waiting for DOM change, notifying anyway:', action);
+        }
         sendNotification();
       }, 3000);
     }
@@ -384,22 +476,23 @@
       for (var el = target; el && el !== document.body; el = el.parentElement) {
         var aria = el.getAttribute('aria-label');
         if (!aria) continue;
-        // Reply / Comment submit button
+        // Reply / Comment submit button (can appear on both comments and suggestions)
         if (aria === 'Reply to comment' || aria === 'Post Comment') {
           // Only fire if the button is not disabled (has text typed)
           if (!el.classList.contains('jfk-button-disabled')) {
-            notifyCommentActivity(aria === 'Post Comment' ? 'comment' : 'reply');
+            var kind = isSuggestionThread(el) ? 'suggestion' : 'comment';
+            notifyCommentActivity(aria === 'Post Comment' ? 'comment' : 'reply', kind);
           }
           return;
         }
-        // Resolve
+        // Resolve (comments only — suggestions use Accept/Reject instead)
         if (aria === 'Mark as resolved and hide discussion') {
-          notifyCommentActivity('resolve');
+          notifyCommentActivity('resolve', 'comment');
           return;
         }
-        // Accept / Reject suggestion
+        // Accept / Reject suggestion — always a suggestion
         if (aria === 'Accept suggestion' || aria === 'Reject suggestion') {
-          notifyCommentActivity(aria === 'Accept suggestion' ? 'accept' : 'reject');
+          notifyCommentActivity(aria === 'Accept suggestion' ? 'accept' : 'reject', 'suggestion');
           return;
         }
         // Stop walking after a few levels to avoid scanning the whole tree
@@ -414,7 +507,9 @@
         // Check if the focus is inside a comment input area
         for (var el = target; el && el !== document.body; el = el.parentElement) {
           if (el.classList && el.classList.contains('docos-input-textarea')) {
-            notifyCommentActivity('ctrl+enter');
+            var kind = isSuggestionThread(el) ? 'suggestion' : 'comment';
+            preExtractedOnMousedown = markListitemForExtraction(el);
+            notifyCommentActivity('ctrl+enter', kind);
             return;
           }
         }

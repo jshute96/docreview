@@ -168,6 +168,73 @@ Source: `src/chrome-extension/background.js`
 2. Click the toolbar button.
 3. **Expect**: No new tab opens (no document URL found).
 
+## Comment activity sync [manual]
+
+Source: `src/chrome-extension/content.js` (detection), `src/chrome-extension/background.js` (extraction + sync), `src/lib/sync-comments.ts` (`syncSingleComment`)
+
+For each test case, check the browser console (Google Docs tab) for `[docreview]` logs and the extension service worker console for `[background]` logs. Verify:
+- The disco ID is extracted (look for `extracted comment ID: AAAB...`)
+- The correct `commentType` is sent (`comment` or `suggestion`)
+- For comments with an extracted ID, the server log shows `single-comment sync AAAB...`
+- For suggestions, the server log shows `(suggestion)` and syncs from Docs API only
+
+### New comment — Post Comment button [manual]
+
+1. Open a Google Doc with existing comments. Select some text and click the comment icon (or Ctrl+Alt+M).
+2. Type a comment and click "Post Comment".
+3. **Expect**: Content script detects the action on `mouseup`. No listitem exists at `mousedown` time (new comment), so the mutation observer watches for the added listitem. After the new comment appears in the DOM, `commentPre` is sent. Background extracts the disco ID (may retry while Closure attaches internals). Server does single-comment sync.
+4. **Verify**: `[background] extracted comment ID: AAAB...` appears in service worker logs. Server log shows `single-comment sync`.
+
+### Reply to comment — button [manual]
+
+1. Open a comment thread and type a reply.
+2. Click the "Reply to comment" button.
+3. **Expect**: `mousedown` marks the listitem and sends `commentPre`. `mouseup` detects the reply action with `commentType='comment'`. Background extracts the disco ID and fires single-comment sync.
+4. **Verify**: `[docreview] comment activity detected: reply (extracting ID)` in Docs console. `[background] extracted comment ID: AAAB...` in service worker.
+
+### Reply to comment — Ctrl+Enter [manual]
+
+1. Open a comment thread and type a reply.
+2. Press Ctrl+Enter (or Cmd+Enter on Mac) to submit.
+3. **Expect**: `keydown` handler marks the listitem and sends `commentPre`. Mutation observer confirms the DOM change. Background extracts ID and fires single-comment sync.
+4. **Verify**: Same logs as button reply — `(extracting ID)` and `extracted comment ID`.
+
+### Reply to suggestion — button [manual]
+
+1. Open a suggestion thread (one with Accept/Reject buttons) and type a reply.
+2. Click the "Reply to comment" button.
+3. **Expect**: `mousedown` marks the listitem. `mouseup` detects `commentType='suggestion'` (Accept/Reject buttons present in listitem). Server syncs from Docs API only (skips Drive comments). Disco ID is extracted for logging but not used for single-comment sync.
+4. **Verify**: `[docreview] comment activity detected: reply suggestion (extracting ID)` in Docs console. Server log shows `(suggestion)`.
+
+### Reply to suggestion — Ctrl+Enter [manual]
+
+1. Open a suggestion thread and type a reply.
+2. Press Ctrl+Enter to submit.
+3. **Expect**: Same as button reply to suggestion — `commentType='suggestion'`, Docs API sync.
+
+### Accept suggestion [manual]
+
+1. Click the "Accept suggestion" button on a suggestion.
+2. **Expect**: `mousedown` marks the listitem and extracts the disco ID. `mouseup` detects `commentType='suggestion'`. Server syncs from Docs API only. The accepted suggestion should be marked resolved in the DB.
+3. **Verify**: `[docreview] comment activity detected: accept suggestion (extracting ID)`. Server log shows `(suggestion)`.
+
+### Reject suggestion [manual]
+
+1. Click the "Reject suggestion" button on a suggestion.
+2. **Expect**: Same as Accept — `commentType='suggestion'`, Docs API sync, suggestion marked resolved.
+
+### Resolve comment [manual]
+
+1. Click "Mark as resolved and hide discussion" on a comment thread.
+2. **Expect**: `mousedown` marks the listitem and extracts the disco ID before Google removes the element on `mouseup`. `commentType='comment'`. Server does single-comment sync — the comment should be marked resolved in the DB.
+3. **Verify**: `[docreview] comment activity detected: resolve (extracting ID)`. `[background] extracted comment ID: AAAB...`. Server log shows `single-comment sync`.
+
+### Rapid actions on different comments [manual]
+
+1. Quickly reply to comment A, then reply to comment B within 1 second.
+2. **Expect**: Both get independent single-comment syncs (per-comment debounce keys). Neither blocks the other.
+3. **Verify**: Two separate `(firing immediately)` log lines with different comment IDs.
+
 ## Comment navigation — diff/version history view [manual]
 
 Source: `src/chrome-extension/background.js` (`navigateToComment`, `isDiffViewFunc`)
