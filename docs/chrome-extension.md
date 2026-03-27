@@ -96,7 +96,7 @@ The extension bridges this gap via `focusDocTab`: the web app asks the extension
 - Doc list opens first, then comments page "Open" -> extension's `findDocTab` finds the tab by URL
 - Comments page opens first (via extension), then doc list "Open" -> extension's `focusDocTab` finds it in `docTabMap`
 
-**Comment navigation** (clicking "Open" on a specific comment): The extension's `navigateToComment` finds the tab via `findDocTab`, focuses it, and injects a script to scroll to the comment without reloading. If no tab exists, it creates one with a `?disco=` URL for initial scroll.
+**Comment navigation** (clicking "Open" on a specific comment): The extension's `navigateToComment` finds the tab via `findDocTab`, focuses it, and injects a script to scroll to the comment without reloading. If no tab exists, it creates one with a `?disco=` URL for initial scroll. If the tracked tab is in a diff/version history view (detected by the visibility of `.docs-revisions-chromecover-content`), a new adjacent tab is opened instead of disrupting the diff view. If that tab is later closed, the next navigation rediscovers the diff-view tab via URL search and opens a fresh tab again.
 
 ### window.name synchronization
 

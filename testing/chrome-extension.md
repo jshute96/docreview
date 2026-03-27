@@ -167,3 +167,28 @@ Source: `src/chrome-extension/background.js`
 1. Open a non-notification email in Gmail (one without `[data-docurl]` chips), or reload a notification email directly (chips won't be in DOM).
 2. Click the toolbar button.
 3. **Expect**: No new tab opens (no document URL found).
+
+## Comment navigation — diff/version history view [manual]
+
+Source: `src/chrome-extension/background.js` (`navigateToComment`, `isDiffViewFunc`)
+
+### Navigate to comment while diff view is open [manual]
+
+1. Open a Google Doc that has comments tracked in Docreview.
+2. In the Doc, open the version history (File > Version history > See version history) or the "Changes since" diff view.
+3. In Docreview, click "Open" on a comment for that doc.
+4. **Expect**: A new tab opens adjacent to the diff-view tab with the doc at the comment location. The diff-view tab is not disturbed.
+
+### Close new tab, navigate again [manual]
+
+1. Continue from the previous test (diff-view tab + new comment tab open).
+2. Close the new comment tab.
+3. In Docreview, click "Open" on another comment for that doc.
+4. **Expect**: The extension rediscovers the diff-view tab via URL search, detects it's still in diff view, and opens a new adjacent tab again.
+
+### Diff view closed, normal navigation resumes [manual]
+
+1. Open a Google Doc that has comments tracked in Docreview.
+2. Open the version history, then close it (click the back arrow to return to normal editing).
+3. In Docreview, click "Open" on a comment.
+4. **Expect**: The extension navigates to the comment in the existing tab (normal in-page navigation, no new tab).

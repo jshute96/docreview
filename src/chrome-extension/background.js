@@ -700,9 +700,34 @@ function navigateToCommentInPage(discoId, _resolvedHint, fallbackUrl) {
   })();
 }
 
+// Detect whether a Google Docs tab is showing a diff/version history view.
+// Both the "Changes since..." view and the full version history view use
+// .docs-revisions-chromecover-content as the diff overlay. The element persists
+// in the DOM after closing the diff view but becomes hidden (zero size, null
+// offsetParent), so we check visibility via offsetParent.
+function isDiffViewFunc() {
+  var el = document.querySelector('.docs-revisions-chromecover-content');
+  return !!(el && el.offsetParent !== null);
+}
+
+// Check if a tab is in diff/version history view by injecting a detection script.
+async function isTabInDiffView(tabId) {
+  try {
+    var results = await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: isDiffViewFunc
+    });
+    return results && results[0] && results[0].result === true;
+  } catch (e) {
+    return false;
+  }
+}
+
 // Handle a navigateToComment request from the Docreview web app.
 // If we have a tracked tab for this doc, inject the navigation script.
 // Otherwise, open a new tab with the disco= URL.
+// If the tracked tab is in diff/version history view, open a new adjacent tab
+// instead of navigating in the diff view (which doesn't work properly).
 async function navigateToComment(docId, discoId, docUrl, resolved, senderTab) {
   var tabId = await findDocTab(docId);
   console.log('[background] navigateToComment:', { docId, discoId, resolved, tabId });
@@ -727,6 +752,27 @@ async function navigateToComment(docId, discoId, docUrl, resolved, senderTab) {
     setDocTabName(newTab.id, docId);
     console.log('[background] new tab opened, tracking:', { docId, tabId: newTab.id });
     return { success: true, opened: true };
+  }
+
+  // Check if the tracked tab is in diff/version history view. If so, open a new
+  // adjacent tab for comment navigation instead of disrupting the diff view.
+  var inDiffView = await isTabInDiffView(tabId);
+  if (inDiffView) {
+    console.log('[background] tracked tab is in diff/version history view, opening new adjacent tab:', { docId, tabId });
+    try {
+      var diffTab = await chrome.tabs.get(tabId);
+      var newTab = await chrome.tabs.create({ url: fallbackUrl, index: diffTab.index + 1, windowId: diffTab.windowId });
+      await setDocTab(docId, newTab.id);
+      setDocTabName(newTab.id, docId);
+      return { success: true, opened: true };
+    } catch (e) {
+      console.warn('[background] diff view tab disappeared, falling back to new tab:', e);
+      var newTabIndex = senderTab ? senderTab.index + 1 : undefined;
+      var newTab = await chrome.tabs.create({ url: fallbackUrl, index: newTabIndex });
+      await setDocTab(docId, newTab.id);
+      setDocTabName(newTab.id, docId);
+      return { success: true, opened: true };
+    }
   }
 
   // Focus the existing tab. The delay lets the tab fully render before we
