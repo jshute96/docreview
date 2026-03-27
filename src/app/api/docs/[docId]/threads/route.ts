@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getDriveClient, createDriveService, fetchThreadDetail, fetchDocData, fetchCommentData, invalidGrantResponse } from "@/lib/google-drive";
-import { bumpLastCommentActivity } from "@/lib/sync-comments";
+import { bumpLastCommentActivity, syncSingleComment } from "@/lib/sync-comments";
 import { logError } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 
@@ -82,7 +82,7 @@ export async function POST(
     return NextResponse.json({ error: "commentId required" }, { status: 400 });
   }
 
-  // Look up by googleCommentId (comments) or googleSuggestionId (suggestions)
+  // Determine whether this is a comment or suggestion
   const commentRecord = await prisma.comment.findFirst({
     where: {
       docId,
@@ -127,42 +127,17 @@ export async function POST(
       return NextResponse.json({ comment: commentRecord, threads: [] });
     }
 
-    const data = await fetchThreadDetail(driveAuth, doc.googleDocId, commentId);
-    if (!data) {
+    // Comments: use syncSingleComment for targeted fetch + DB update
+    const userEmail = session.user.email ?? undefined;
+    const result = await syncSingleComment(doc, commentId, driveAuth, { userEmail });
+    if (!result.comment) {
       return NextResponse.json({ error: "Comment not found in Drive" }, { status: 404 });
     }
 
-    const isMuted = commentRecord.status === "MUTED";
-    const status = isMuted
-      ? commentRecord.status
-      : data.resolved && data.iResolvedIt
-        ? "ARCHIVED"
-        : "INBOX";
-
-    // Only update isRead from Drive when driveModifiedAt changed (new activity)
-    const modifiedChanged =
-      commentRecord.driveModifiedAt?.getTime() !== data.driveModifiedAt?.getTime();
-    const effectiveIsRead = modifiedChanged ? data.isRead : commentRecord.isRead;
-
-    const updated = await prisma.$transaction(async (tx) => {
-      const result = await tx.comment.update({
-        where: { commentId: commentRecord.commentId },
-        data: {
-          resolved: data.resolved,
-          isThreadAuthor: data.isThreadAuthor,
-          isReplyAuthor: data.isReplyAuthor,
-          isRead: effectiveIsRead,
-          ...(isMuted ? {} : { status }),
-          driveCreatedAt: data.driveCreatedAt,
-          driveModifiedAt: data.driveModifiedAt,
-          replyCount: data.replyCount,
-        },
-      });
-      await bumpLastCommentActivity(doc.docId, [data.driveCreatedAt, data.driveModifiedAt], tx);
-      return result;
+    return NextResponse.json({
+      comment: result.comment,
+      threads: result.thread ? [result.thread] : [],
     });
-
-    return NextResponse.json({ comment: updated, threads: [data.thread] });
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;

@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { fetchCommentData, fetchDocData, getDriveClient } from "@/lib/google-drive";
+import { fetchCommentData, fetchDocData, fetchThreadDetail, getDriveClient } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { computeSuggestionHash } from "@/lib/suggestion-hash";
 import type { Doc, Comment, Prisma, CommentStatus } from "@prisma/client";
-import type { DriveComment, DriveSuggestion } from "@/lib/google-drive";
+import type { DriveComment, DriveSuggestion, CommentThread, ThreadDetailResult } from "@/lib/google-drive";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 
@@ -85,6 +85,90 @@ export interface SyncPrefetchedData {
   comments?: DriveComment[];
   suggestions?: DriveSuggestion[];
 }
+
+// --- Single-comment sync ---
+
+/** Result of syncing a single comment from Drive. */
+export interface SingleCommentResult {
+  comment: Comment | null;   // updated/created DB record, null if deleted
+  thread?: CommentThread;    // display data for the thread panel
+  created: boolean;
+  updated: boolean;
+  deleted: boolean;
+  shouldUnarchive: boolean;
+}
+
+/**
+ * Syncs a single comment by Google comment ID — targeted DB lookup + single
+ * Drive API call instead of batch-fetching all comments. Used by both the
+ * extension's single-comment sync path and the thread refresh button.
+ *
+ * Uses fetchThreadDetail (comments.get with full fields) so the caller gets
+ * both a DriveComment (for DB sync via buildNewComment/updateExistingComment)
+ * and thread display data in one API call.
+ */
+export async function syncSingleComment(
+  doc: Doc,
+  googleCommentId: string,
+  driveAuth: Awaited<ReturnType<typeof getDriveClient>>,
+  options?: { userEmail?: string },
+): Promise<SingleCommentResult> {
+  let result: ThreadDetailResult | null;
+  let driveDeleted = false;
+  try {
+    result = await fetchThreadDetail(driveAuth, doc.googleDocId, googleCommentId, options?.userEmail);
+  } catch (err: any) {
+    if (err.code === 404) {
+      result = null;
+      driveDeleted = true;
+    } else {
+      throw err;
+    }
+  }
+
+  // Look up existing DB record
+  const existing = await prisma.comment.findFirst({
+    where: { docId: doc.docId, googleCommentId, type: "COMMENT" },
+  });
+
+  // --- Comment deleted from Drive ---
+  if (!result) {
+    if (existing) {
+      await prisma.$transaction(async (tx) => {
+        await tx.comment.delete({ where: { commentId: existing.commentId } });
+        await bumpLastCommentActivity(doc.docId, [new Date()], tx);
+      });
+      return { comment: null, deleted: true, created: false, updated: false, shouldUnarchive: false };
+    }
+    return { comment: null, deleted: driveDeleted, created: false, updated: false, shouldUnarchive: false };
+  }
+
+  const c = result.comment;
+
+  // --- New comment (not yet in DB) ---
+  if (!existing) {
+    const { record, unarchive } = buildNewComment(doc, c);
+    const comment = await prisma.$transaction(async (tx) => {
+      const created = await tx.comment.create({ data: record as Prisma.CommentUncheckedCreateInput });
+      await bumpLastCommentActivity(doc.docId, [c.driveCreatedAt, c.driveModifiedAt], tx);
+      return created;
+    });
+    return { comment, thread: result.thread, created: true, updated: false, deleted: false, shouldUnarchive: unarchive };
+  }
+
+  // --- Update existing comment ---
+  const updateResult = await updateExistingComment(doc, c, existing);
+  return {
+    comment: updateResult.comment,
+    thread: result.thread,
+    created: false,
+    updated: updateResult.updated,
+    deleted: false,
+    shouldUnarchive: updateResult.unarchive,
+  };
+}
+
+// --- Full sync entry point ---
 
 export async function syncComments(
   doc: Doc,
@@ -352,7 +436,7 @@ async function updateExistingComment(
   doc: Doc,
   c: DriveComment,
   existing: Comment,
-): Promise<{ updated: boolean; unarchive: boolean; nonResolveActivity: boolean }> {
+): Promise<{ comment: Comment; updated: boolean; unarchive: boolean; nonResolveActivity: boolean }> {
   const hasNewReplies = c.replyCount > existing.replyCount;
   const hasNewActivity =
     hasNewReplies ||
@@ -368,13 +452,15 @@ async function updateExistingComment(
   // MUTED fast-path: update metadata but preserve MUTED status unless @-mentioned
   if (existing.status === "MUTED" && !newReplyMentionsMe) {
     const { changed, data } = buildCommentUpdate(existing, c);
+    let comment = existing;
     if (changed) {
-      await prisma.$transaction(async (tx) => {
-        await tx.comment.update({ where: { commentId: existing.commentId }, data });
+      comment = await prisma.$transaction(async (tx) => {
+        const updated = await tx.comment.update({ where: { commentId: existing.commentId }, data });
         await bumpLastCommentActivity(doc.docId, [c.driveCreatedAt, c.driveModifiedAt], tx);
+        return updated;
       });
     }
-    return { updated: changed, unarchive: false, nonResolveActivity: false };
+    return { comment, updated: changed, unarchive: false, nonResolveActivity: false };
   }
 
   const previousStatus = existing.status as "INBOX" | "ARCHIVED" | "MUTED";
@@ -412,14 +498,16 @@ async function updateExistingComment(
   }
 
   const { changed, data } = buildCommentUpdate(existing, c, status);
+  let comment = existing;
   if (changed) {
-    await prisma.$transaction(async (tx) => {
-      await tx.comment.update({ where: { commentId: existing.commentId }, data });
+    comment = await prisma.$transaction(async (tx) => {
+      const updated = await tx.comment.update({ where: { commentId: existing.commentId }, data });
       await bumpLastCommentActivity(doc.docId, [c.driveCreatedAt, c.driveModifiedAt], tx);
+      return updated;
     });
   }
 
-  return { updated: changed, unarchive, nonResolveActivity };
+  return { comment, updated: changed, unarchive, nonResolveActivity };
 }
 
 /**

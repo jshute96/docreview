@@ -5,10 +5,9 @@ import {
   getDriveClient,
   createDriveService,
   replyToComment,
-  fetchThreadDetail,
   invalidGrantResponse,
 } from "@/lib/google-drive";
-import { bumpLastCommentActivity } from "@/lib/sync-comments";
+import { syncSingleComment } from "@/lib/sync-comments";
 import { logError, logInfo } from "@/lib/log";
 import { formatDate } from "@/lib/utils";
 import { runWithRequestId } from "@/lib/request-context";
@@ -96,38 +95,17 @@ export async function POST(
       logInfo(`[ViewedPin] Verified after restore: viewedByMeTime=${fmt(viewedRestored)}`);
     }
 
-    // Refresh thread data from Drive
-    const data = await fetchThreadDetail(driveAuth, doc.googleDocId, commentId);
-    if (!data) {
+    // Refresh thread data from Drive using shared single-comment sync
+    const userEmail = session.user.email ?? undefined;
+    const syncResult = await syncSingleComment(doc, commentId, driveAuth, { userEmail });
+    if (!syncResult.comment) {
       return NextResponse.json({ error: "Comment not found in Drive" }, { status: 404 });
     }
 
-    const isMuted = commentRecord.status === "MUTED";
-    const status = isMuted
-      ? commentRecord.status
-      : data.resolved && data.iResolvedIt
-        ? "ARCHIVED"
-        : "INBOX";
-
-    const updated = await prisma.$transaction(async (tx) => {
-      const result = await tx.comment.update({
-        where: { commentId: commentRecord.commentId },
-        data: {
-          resolved: data.resolved,
-          isThreadAuthor: data.isThreadAuthor,
-          isReplyAuthor: data.isReplyAuthor,
-          isRead: data.isRead,
-          ...(isMuted ? {} : { status }),
-          driveCreatedAt: data.driveCreatedAt,
-          driveModifiedAt: data.driveModifiedAt,
-          replyCount: data.replyCount,
-        },
-      });
-      await bumpLastCommentActivity(doc.docId, [data.driveCreatedAt, data.driveModifiedAt], tx);
-      return result;
+    return NextResponse.json({
+      comment: syncResult.comment,
+      threads: syncResult.thread ? [syncResult.thread] : [],
     });
-
-    return NextResponse.json({ comment: updated, threads: [data.thread] });
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;

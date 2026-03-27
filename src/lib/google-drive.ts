@@ -312,7 +312,8 @@ export interface CommentDataResult {
   threads?: CommentThread[];
 }
 
-// Builds the Drive API fields string based on which outputs are needed.
+// Builds the per-comment Drive API fields string based on which outputs are
+// needed. Used by both comments.list (via buildCommentListFields) and comments.get.
 // sync-only: lean metadata fields. threads-only: content/display fields.
 // Both: superset of all fields.
 function buildCommentFields(options: FetchCommentDataOptions): string {
@@ -332,7 +333,12 @@ function buildCommentFields(options: FetchCommentDataOptions): string {
   if (threads) commentParts.push("content", "htmlContent", "quotedFileContent(mimeType, value)");
   if (sync) commentParts.push("assigneeEmailAddress", "mentionedEmailAddresses");
 
-  return `nextPageToken, comments(${commentParts.join(", ")})`;
+  return commentParts.join(", ");
+}
+
+// Wraps per-comment fields for comments.list (adds pagination token).
+function buildCommentListFields(options: FetchCommentDataOptions): string {
+  return `nextPageToken, comments(${buildCommentFields(options)})`;
 }
 
 /**
@@ -349,7 +355,7 @@ export async function fetchCommentData(
   const drive = createDrive({ version: "v3", auth });
   const t0 = Date.now();
   const emailLower = options.userEmail?.toLowerCase();
-  const fields = buildCommentFields(options);
+  const fields = buildCommentListFields(options);
 
   const commentsList: DriveComment[] = [];
   const threadsList: CommentThread[] = [];
@@ -587,53 +593,47 @@ function extractQuotedFileContent(
   return null;
 }
 
-// Full Drive data for a single comment thread: sync metadata (for DB update)
-// plus the displayable thread content. Returned by fetchThreadDetail().
-export interface DriveThreadDetail {
-  resolved: boolean;
-  isThreadAuthor: boolean;
-  isReplyAuthor: boolean;
-  iResolvedIt: boolean;
-  isRead: boolean;
-  driveCreatedAt: Date | null;
-  driveModifiedAt: Date | null;
-  replyCount: number;
+/** Result of fetchThreadDetail — full sync metadata + displayable thread. */
+export interface ThreadDetailResult {
+  comment: DriveComment;
   thread: CommentThread;
 }
 
-// Fetches a single comment thread from Drive by ID, returning both
-// sync metadata and the full displayable thread (initial comment + replies).
+/**
+ * Fetches a single comment thread from Drive by ID, returning both
+ * sync metadata (DriveComment) and the displayable thread content.
+ * Uses the same fields and parsing as fetchCommentData so the sync
+ * logic can use the same code paths for single and batch updates.
+ */
 export async function fetchThreadDetail(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   googleDocId: string,
-  commentId: string
-): Promise<DriveThreadDetail | null> {
+  commentId: string,
+  userEmail?: string,
+): Promise<ThreadDetailResult | null> {
   const drive = createDrive({ version: "v3", auth });
   const t0 = Date.now();
+  const emailLower = userEmail?.toLowerCase();
+
+  // Request the superset of sync + display fields
+  const fields = buildCommentFields({ sync: true, threads: true, userEmail });
 
   const res = await drive.comments.get({
     fileId: googleDocId,
     commentId,
-    fields:
-      "id, resolved, content, htmlContent, quotedFileContent(mimeType, value), createdTime, modifiedTime, author(me, displayName), replies(content, htmlContent, createdTime, action, author(me, displayName))",
+    fields,
   });
   logInfo(`[Drive] comments.get ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
 
   const c = res.data;
   if (!c.id || c.content == null) return null;
 
-  const thread = parseCommentThread(c as RawDriveComment)!;
-  const allReplies = c.replies ?? [];
-  const flags = deriveCommentFlags(c.author, allReplies);
+  const raw = c as RawDriveComment;
+  const comment = parseDriveComment(raw, emailLower);
+  const thread = parseCommentThread(raw);
+  if (!thread) return null;
 
-  return {
-    resolved: c.resolved === true,
-    ...flags,
-    driveCreatedAt: c.createdTime ? new Date(c.createdTime) : null,
-    driveModifiedAt: c.modifiedTime ? new Date(c.modifiedTime) : null,
-    replyCount: allReplies.length,
-    thread,
-  };
+  return { comment, thread };
 }
 
 

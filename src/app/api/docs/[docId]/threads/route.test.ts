@@ -19,6 +19,7 @@ vi.mock("@/lib/prisma", () => {
 });
 vi.mock("@/lib/sync-comments", () => ({
   bumpLastCommentActivity: vi.fn(),
+  syncSingleComment: vi.fn(),
 }));
 vi.mock("@/lib/google-drive", () => {
   const commentsGet = vi.fn();
@@ -42,6 +43,7 @@ import {
   fetchDocData,
   fetchCommentData,
 } from "@/lib/google-drive";
+import { syncSingleComment } from "@/lib/sync-comments";
 import * as googleDriveMod from "@/lib/google-drive";
 
 const mockAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
@@ -54,6 +56,7 @@ const mockGetDriveClient = vi.mocked(getDriveClient);
 const mockFetchThreadDetail = vi.mocked(fetchThreadDetail);
 const mockFetchDocData = vi.mocked(fetchDocData);
 const mockFetchCommentData = vi.mocked(fetchCommentData);
+const mockSyncSingleComment = vi.mocked(syncSingleComment);
 // Access the mock comments.get via the helper we attached to the mock module
 const mockCommentsGet = (googleDriveMod as unknown as { _commentsGet: ReturnType<typeof vi.fn> })
   ._commentsGet;
@@ -120,8 +123,7 @@ describe("GET /api/docs/[docId]/threads", () => {
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
     const thread = { id: "c1", author: "Alice", fromMe: false, content: "Hi", createdTime: "", resolved: false, replies: [] };
     mockFetchThreadDetail.mockResolvedValue({
-      resolved: false, isThreadAuthor: true, isReplyAuthor: false, iResolvedIt: false, isRead: false,
-      driveCreatedAt: null, driveModifiedAt: null, replyCount: 0,
+      comment: { id: "c1", resolved: false, isThreadAuthor: true, isReplyAuthor: false, iResolvedIt: false, isRead: false, assignedToMe: false, mentionedMe: false, mentionedMeUnreplied: false, driveCreatedAt: null, driveModifiedAt: null, replyCount: 0, replyAuthorMeFlags: [], replyMentionedMeFlags: [] },
       thread,
     });
 
@@ -214,7 +216,7 @@ describe("POST /api/docs/[docId]/threads", () => {
   });
 
   it("refreshes a comment and updates DB", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockAuth.mockResolvedValue({ user: { id: "u1", email: "u1@test.com" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       commentId: "cr1", docId: "d1", googleCommentId: "c1",
@@ -224,13 +226,11 @@ describe("POST /api/docs/[docId]/threads", () => {
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
 
     const thread = { id: "c1", author: "Alice", fromMe: false, content: "Hi", createdTime: "", resolved: false, replies: [] };
-    mockFetchThreadDetail.mockResolvedValue({
-      resolved: false, isThreadAuthor: true, isReplyAuthor: false, iResolvedIt: false, isRead: false,
-      driveCreatedAt: new Date("2024-06-01"), driveModifiedAt: new Date("2024-06-10"),
-      replyCount: 2, thread,
+    mockSyncSingleComment.mockResolvedValue({
+      comment: { ...commentRecord, isThreadAuthor: true, replyCount: 2 } as any,
+      thread,
+      created: false, updated: true, deleted: false, shouldUnarchive: false,
     });
-    const updatedComment = { ...commentRecord, isThreadAuthor: true, replyCount: 2 };
-    mockComment.update.mockResolvedValue(updatedComment);
 
     const req = new NextRequest(
       "http://localhost/api/docs/d1/threads?commentId=c1",
@@ -244,7 +244,7 @@ describe("POST /api/docs/[docId]/threads", () => {
   });
 
   it("auto-archives resolved comment when I resolved it", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockAuth.mockResolvedValue({ user: { id: "u1", email: "u1@test.com" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       commentId: "cr1", docId: "d1", googleCommentId: "c1",
@@ -253,25 +253,23 @@ describe("POST /api/docs/[docId]/threads", () => {
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
 
-    const thread = { id: "c1", author: "Me", fromMe: true, content: "Done", createdTime: "", resolved: true, replies: [] };
-    mockFetchThreadDetail.mockResolvedValue({
-      resolved: true, isThreadAuthor: true, isReplyAuthor: false, iResolvedIt: true, isRead: true,
-      driveCreatedAt: null, driveModifiedAt: null, replyCount: 0, thread,
+    mockSyncSingleComment.mockResolvedValue({
+      comment: { ...commentRecord, resolved: true, status: "ARCHIVED" } as any,
+      thread: { id: "c1", author: "Me", fromMe: true, content: "Done", createdTime: "", resolved: true, replies: [] },
+      created: false, updated: true, deleted: false, shouldUnarchive: false,
     });
-    mockComment.update.mockResolvedValue({ ...commentRecord, resolved: true, status: "ARCHIVED" });
 
     const req = new NextRequest(
       "http://localhost/api/docs/d1/threads?commentId=c1",
       { method: "POST" }
     );
-    await POST(req, makeParams("d1"));
-
-    const updateCall = mockComment.update.mock.calls[0][0];
-    expect(updateCall.data.status).toBe("ARCHIVED");
+    const res = await POST(req, makeParams("d1"));
+    const data = await res.json();
+    expect(data.comment.status).toBe("ARCHIVED");
   });
 
   it("preserves MUTED status even when resolved by me", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockAuth.mockResolvedValue({ user: { id: "u1", email: "u1@test.com" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       commentId: "cr1", docId: "d1", googleCommentId: "c1",
@@ -280,22 +278,19 @@ describe("POST /api/docs/[docId]/threads", () => {
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
 
-    mockFetchThreadDetail.mockResolvedValue({
-      resolved: true, isThreadAuthor: false, isReplyAuthor: true, iResolvedIt: true, isRead: true,
-      driveCreatedAt: null, driveModifiedAt: null, replyCount: 1,
+    mockSyncSingleComment.mockResolvedValue({
+      comment: { ...commentRecord, resolved: true, status: "MUTED" } as any,
       thread: { id: "c1", author: "X", fromMe: false, content: "y", createdTime: "", resolved: true, replies: [] },
+      created: false, updated: true, deleted: false, shouldUnarchive: false,
     });
-    mockComment.update.mockResolvedValue({ ...commentRecord, resolved: true });
 
     const req = new NextRequest(
       "http://localhost/api/docs/d1/threads?commentId=c1",
       { method: "POST" }
     );
-    await POST(req, makeParams("d1"));
-
-    const updateCall = mockComment.update.mock.calls[0][0];
-    // status should NOT be in the update data — muted is preserved
-    expect(updateCall.data.status).toBeUndefined();
+    const res = await POST(req, makeParams("d1"));
+    const data = await res.json();
+    expect(data.comment.status).toBe("MUTED");
   });
 
   it("marks suggestion as resolved when no longer live", async () => {
@@ -392,8 +387,8 @@ describe("POST /api/docs/[docId]/threads", () => {
     expect(mockFetchDocData).not.toHaveBeenCalled();
   });
 
-  it("returns 404 when fetchThreadDetail returns null", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+  it("returns 404 when comment deleted from Drive", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1", email: "u1@test.com" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       commentId: "cr1", docId: "d1", googleCommentId: "c1",
@@ -401,7 +396,9 @@ describe("POST /api/docs/[docId]/threads", () => {
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
-    mockFetchThreadDetail.mockResolvedValue(null);
+    mockSyncSingleComment.mockResolvedValue({
+      comment: null, deleted: true, created: false, updated: false, shouldUnarchive: false,
+    });
 
     const req = new NextRequest(
       "http://localhost/api/docs/d1/threads?commentId=c1",
@@ -411,15 +408,16 @@ describe("POST /api/docs/[docId]/threads", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns 502 when Drive API fails", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+  it("returns 502 when Drive API fails for comment", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1", email: "u1@test.com" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     const commentRecord = {
       commentId: "cr1", docId: "d1", googleCommentId: "c1",
       type: "COMMENT", status: "INBOX", resolved: false,
     };
     mockComment.findFirst.mockResolvedValue(commentRecord);
-    mockGetDriveClient.mockRejectedValue(new Error("Drive error"));
+    mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
+    mockSyncSingleComment.mockRejectedValue(new Error("Drive error"));
 
     await suppressingErrors(async () => {
       const req = new NextRequest(
