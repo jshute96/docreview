@@ -6,9 +6,9 @@ See `src/chrome-extension/README.md` for user-facing documentation.
 
 The extension has three main scripts that run in different contexts:
 
-- **`content.js`** — Content script injected into Google Docs, Drive, and Gmail pages. Runs in Chrome's isolated content script world (shares the DOM but has a separate `window`). Injects Docreview icons into pages and detects comment activity on Google Docs.
+- **`content.js` + `content-comments.js`** — Content scripts injected into Google Docs, Drive, and Gmail pages. Run in Chrome's isolated content script world (shares the DOM but has a separate `window`). `content.js` injects Docreview icons into pages; `content-comments.js` detects comment activity and relays selection changes on Google Docs.
 
-- **`background.js`** — Service worker (Manifest V3). Runs in the extension's background context, independent of any page. Handles toolbar clicks, context menus, tab tracking, comment navigation, URL resolution, and server-side comment sync. Communicates with content scripts via `chrome.runtime.onMessage` / `chrome.tabs.sendMessage`.
+- **`background.js` + helpers** — Service worker (Manifest V3), split across four files loaded via `importScripts`. Runs in the extension's background context, independent of any page. `background.js` handles the message router, toolbar clicks, context menus, and comment navigation. `background-injected.js` contains functions injected into page context (disco ID helpers, comment selection/navigation). `background-tabs.js` manages doc tab tracking. `background-comments.js` handles comment sync state and debounce. Communicates with content scripts via `chrome.runtime.onMessage` / `chrome.tabs.sendMessage`.
 
 - **`bridge-to-docreview.js`** — Content script dynamically registered for Docreview app pages only. Bridges communication between the web app (page world) and the background worker (extension world) using `window.postMessage` ↔ `chrome.runtime.sendMessage`. Also relays unsolicited messages from the background worker to the page (e.g., `commentSynced` notifications).
 
@@ -28,12 +28,20 @@ Google Docs page                    Docreview page
 
 **`content.js`** — Runs on Google Docs, Drive, and Gmail pages. Uses MutationObservers to handle dynamically loaded content (Google Workspace apps load UI elements after the initial page load). The base URL comes from `chrome.storage.sync`.
 
-- **Google Docs**: Injects a Docreview icon into the titlebar. Detects comment activity (reply, resolve, accept/reject suggestion, new comment) via mouseup and keyboard listeners, and notifies the background worker to trigger a server-side comment sync.
+- **Google Docs**: Injects a Docreview icon into the titlebar.
 - **Google Drive**: Injects Docreview icons next to file type icons in list and grid views.
 - **Gmail**: Injects icons into attachment chips and "Open in Docreview" links into Docs notification emails. The link resolves its target URL at click time rather than injection time (to handle Gmail's SPA navigation correctly).
 - **Access-denied pages**: Injects an "Add in Docreview" link on Docs and Drive access-denied pages.
 
-**`background.js`** — Service worker that handles toolbar clicks, context menu actions, and messages from content scripts. Dynamically registers the `bridge-to-docreview.js` content script for the configured `baseUrl`. Tab tracking is persisted in `chrome.storage.session` to survive MV3 service worker restarts.
+**`content-comments.js`** — Comment-specific content script logic for Google Docs pages. Detects comment activity (reply, resolve, accept/reject suggestion, new comment) via mouseup and keyboard listeners, and notifies the background worker to trigger a server-side comment sync. Also relays comment selection changes from the MAIN world to the background worker.
+
+**`background.js`** — Service worker main file. Handles toolbar clicks, context menu actions, and messages from content scripts. Loads helper files via `importScripts`: `background-injected.js`, `background-comments.js`, `background-tabs.js`. Dynamically registers the `bridge-to-docreview.js` content script for the configured `baseUrl`.
+
+**`background-injected.js`** — Functions injected into page context via `chrome.scripting.executeScript`. Includes disco ID discovery/extraction (`injectDiscoIdHelpers`), comment selection (`selectCommentInPage`), comment navigation (`navigateToCommentInPage`), comment ID extraction (`extractCommentIdFromPage`), and Gmail doc URL extraction (`findDocUrlsInFramesFunc`).
+
+**`background-tabs.js`** — Doc tab tracking. Maps docId → tabId in `chrome.storage.session` to survive MV3 service worker restarts. Provides `findDocTab()`, `setDocTab()`, `setDocTabName()`, and cleanup listeners for tab removal/navigation.
+
+**`background-comments.js`** — Comment sync state. Manages pre-extracted comment IDs (`pendingCommentIds`) and debounced comment sync (`fireCommentSync`, `commentSyncTimers`).
 
 Message handlers:
 - `commentPre` — Injects `extractCommentIdFromPage` into the Google Docs tab to extract the disco ID from the listitem the user just acted on (while the element is still in the DOM). Stores the result keyed by tab ID for the subsequent `commentActivity` message.
@@ -111,7 +119,9 @@ The extension sets `window.name = 'doc-{id}'` on Google Docs tabs it tracks (via
 |------|------|
 | `src/lib/tab-targets.ts` | Named target helpers: `commentsTarget()`, `docTarget()`, `openCommentsPage()`, `openDocPage()` |
 | `src/lib/bridge-to-extension.ts` | `focusDocTab()`, `handleOpenDocClick()`, `navigateToComment()`, `selectCommentInDoc()`, `setCommentSelectionHandler()` |
-| `src/chrome-extension/background.js` | `findDocTab()`, `setDocTabName()`, `focusDocTab` handler, `navigateToComment()`, `selectComment` handler |
+| `src/chrome-extension/background.js` | Message handler, `navigateToComment()`, `focusDocTab` handler, `selectComment` handler |
+| `src/chrome-extension/background-tabs.js` | `findDocTab()`, `setDocTab()`, `setDocTabName()` |
+| `src/chrome-extension/background-injected.js` | `navigateToCommentInPage()`, `selectCommentInPage()`, `injectDiscoIdHelpers()` |
 
 ## Comment navigation implementation
 
@@ -132,7 +142,7 @@ See `docs/notes-on-comment-navigation.md` for detailed research notes on the Goo
 
 When the user acts on a comment in Google Docs (reply, resolve, accept/reject suggestion, new comment), the extension automatically syncs the change back to Docreview's database without requiring a manual Refresh.
 
-### Detection (content.js)
+### Detection (content-comments.js)
 
 The content script uses two event listeners in capture phase: `mousedown` to extract the disco ID (while the element is still in the DOM), and `mouseup` to detect the action type and trigger sync. Google's Closure Library handles these buttons on `mousedown`/`mouseup`, not `click` — the `click` event never fires. Detected buttons:
 - `[aria-label="Reply to comment"]` / `[aria-label="Post Comment"]` — Reply or Comment submit button (checked for `jfk-button-disabled` to avoid false positives)
@@ -149,15 +159,15 @@ After detecting the user's action, the content script doesn't notify immediately
 
 ### End-to-end flow
 
-**Step 1 — Detection** (`content.js` on Google Docs page)
+**Step 1 — Detection** (`content-comments.js` on Google Docs page)
 
 `mousedown` listener (capture phase) marks the parent `[role="listitem"]` with `data-docreview-extract` and sends `commentPre` to background for disco ID extraction — this happens before Google's `mouseup` handler which may remove the element. `mouseup` listener (capture phase) detects the action type and determines `commentType` by checking for Accept/Reject buttons in the parent listitem: if present → `'suggestion'`, otherwise → `'comment'`. `keydown` listener catches Ctrl+Enter in comment input areas. For new comments (no listitem at mousedown time), the mutation observer watches for the added listitem and sends `commentPre` then.
 
-**Step 2 — Wait for Google to confirm** (`content.js`)
+**Step 2 — Wait for Google to confirm** (`content-comments.js`)
 
 Starts a `MutationObserver` on the comment list (`[role="list"]`). When the DOM updates (reply appears, comment removed, etc.), Google has saved the change. Sends `commentActivity` message to `background.js` with `{ docId, commentType }`. Background picks up the pre-extracted `googleCommentId` (from step 1) and proceeds with debounce/sync. Fallback: 3s timeout if no mutation fires; 500ms delay if the comment list element isn't found.
 
-**Step 3 — Sync + debounce** (`background.js`, triggered by message from step 2)
+**Step 3 — Sync + debounce** (`background-comments.js`, triggered by message from step 2)
 
 Debounce key is per-comment when a `googleCommentId` is available (`docId:commentId`), otherwise per-doc (`docId`). This means actions on different comments fire independently — resolving comment A then replying to comment B within 1s both get their own fast single-comment syncs.
 

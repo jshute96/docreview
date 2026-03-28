@@ -35,8 +35,12 @@ One-line descriptions of every source file, grouped by layer.
 | File | Description |
 |------|-------------|
 | `manifest.json` | Manifest V3 config — permissions, host permissions, content script registration, service worker |
-| `background.js` | Service worker — toolbar click (opens doc in Docreview), context menus, Gmail doc URL extraction via `executeScript(allFrames)` |
+| `background.js` | Service worker main — toolbar click, context menus, message handler, comment navigation, URL resolution, bridge registration |
+| `background-injected.js` | Functions injected into page context — disco ID helpers, comment selection/navigation, Gmail doc URL extraction |
+| `background-tabs.js` | Doc tab tracking — maps docId → tabId for in-page comment navigation |
+| `background-comments.js` | Comment sync state — pre-extracted comment IDs, debounce logic, server sync |
 | `content.js` | Content script — injects Docreview icons into Docs titlebar, Drive file lists, Gmail notification emails |
+| `content-comments.js` | Comment activity detection (Docs only) — detects comment/suggestion actions, relays selection changes |
 | `defaults.js` | Shared default config (base URL) loaded by all other scripts |
 | `options.html` | Settings page HTML — single URL input with Save/Cancel |
 | `options.js` | Settings page logic — reads/writes `chrome.storage.sync` |
