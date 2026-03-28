@@ -161,17 +161,28 @@ After detecting the user's action, the content script doesn't notify immediately
 
 **Step 1 — Detection** (`content-comments.js` on Google Docs page)
 
-`mousedown` listener (capture phase) marks the parent `[role="listitem"]` with `data-docreview-extract` and sends `commentPre` to background for disco ID extraction — this happens before Google's `mouseup` handler which may remove the element. `mouseup` listener (capture phase) detects the action type and determines `commentType` by checking for Accept/Reject buttons in the parent listitem: if present → `'suggestion'`, otherwise → `'comment'`. `keydown` listener catches Ctrl+Enter in comment input areas. For new comments (no listitem at mousedown time), the mutation observer watches for the added listitem and sends `commentPre` then.
+1. `mousedown` listener (capture phase) marks the parent `[role="listitem"]` with `data-docreview-extract` and sends `commentPre` to background for disco ID extraction — this happens before Google's `mouseup` handler which may remove the element.
+2. `mouseup` listener (capture phase) detects the action type and determines `commentType` by checking for Accept/Reject buttons in the parent listitem: if present → `'suggestion'`, otherwise → `'comment'`.
+3. `keydown` listener catches Ctrl+Enter in comment input areas.
+4. For new comments (no listitem at mousedown time), the mutation observer watches for the added listitem and sends `commentPre` then.
 
 **Step 2 — Wait for Google to confirm** (`content-comments.js`)
 
-Starts a `MutationObserver` on the comment list (`[role="list"]`). When the DOM updates (reply appears, comment removed, etc.), Google has saved the change. Sends `commentActivity` message to `background.js` with `{ docId, commentType }`. Background picks up the pre-extracted `googleCommentId` (from step 1) and proceeds with debounce/sync. Fallback: 3s timeout if no mutation fires; 500ms delay if the comment list element isn't found.
+1. Starts a `MutationObserver` on the comment list (`[role="list"]`).
+2. When the DOM updates (reply appears, comment removed, etc.), Google has saved the change.
+3. Sends `commentActivity` message to `background.js` with `{ docId, commentType }`.
+4. Background picks up the pre-extracted `googleCommentId` (from step 1) and proceeds with debounce/sync.
+5. Fallback: 3s timeout if no mutation fires; 500ms delay if the comment list element isn't found.
 
 **Step 3 — Sync + debounce** (`background-comments.js`, triggered by message from step 2)
 
-Debounce key is per-comment when a `googleCommentId` is available (`docId:commentId`), otherwise per-doc (`docId`). This means actions on different comments fire independently — resolving comment A then replying to comment B within 1s both get their own fast single-comment syncs.
+Debounce key is per-comment when a `googleCommentId` is available (`docId:commentId`), otherwise per-doc (`docId`). Actions on different comments fire independently — resolving comment A then replying to comment B within 1s both get their own fast single-comment syncs.
 
-Leading+trailing within each key: first event fires `POST /api/docs/sync-comments/{googleDocId}` immediately with hints in the request body, starts 1s cooldown. Events during cooldown: suppressed, but flagged as pending. After cooldown: fires one more sync with the same hints (per-comment key) or without hints (per-doc key). Single action = 1 optimized sync. Rapid overlapping actions on the same comment = 2 syncs (leading + trailing).
+Leading+trailing within each key:
+1. First event fires `POST /api/docs/sync-comments/{googleDocId}` immediately with hints in the request body, starts 1s cooldown.
+2. Events during cooldown: suppressed, but flagged as pending.
+3. After cooldown: fires one more sync with the same hints (per-comment key) or without hints (per-doc key).
+4. Single action = 1 optimized sync. Rapid overlapping actions on the same comment = 2 syncs (leading + trailing).
 
 **Step 4 — Server sync** (`sync-comments/[googleDocId]/route.ts`)
 
@@ -184,7 +195,13 @@ Looks up doc by Google doc ID, calls `syncComments()` with optional hints. With 
 
 **Step 5 — Notify docreview tabs** (`background.js` → `bridge-to-docreview.js` → `bridge-to-extension.ts`)
 
-Background parses the sync response and sends `commentSynced` (with `docId`, optional `googleCommentId`, `commentType`, and `threads` display data) to first open docreview tab via `chrome.tabs.sendMessage`. Bridge content script relays to page via `window.postMessage`. Extension bridge posts to `BroadcastChannel` (using a separate short-lived instance so the receiving tab also gets it — the shared singleton suppresses self-delivery by spec). All docreview tabs receive via `useCrossTabListener`. When inline `threads` data is present (single-comment sync), the client uses it directly — no additional Drive API call. When no thread data is available (suggestions, missing ID, or non-extension triggers), falls back to fetching from `GET /api/docs/{docId}/threads`. If no docreview tab is open, nothing to notify — database is already updated for next visit.
+1. Background parses the sync response and sends `commentSynced` (with `docId`, optional `googleCommentId`, `commentType`, and `threads` display data) to first open docreview tab via `chrome.tabs.sendMessage`.
+2. Bridge content script relays to page via `window.postMessage`.
+3. Extension bridge posts to `BroadcastChannel` (using a separate short-lived instance so the receiving tab also gets it — the shared singleton suppresses self-delivery by spec).
+4. All docreview tabs receive via `useCrossTabListener`.
+5. When inline `threads` data is present (single-comment sync), the client uses it directly — no additional Drive API call.
+6. When no thread data is available (suggestions, missing ID, or non-extension triggers), falls back to fetching from `GET /api/docs/{docId}/threads`.
+7. If no docreview tab is open, nothing to notify — database is already updated for next visit.
 
 ## Debugging
 
