@@ -234,6 +234,7 @@ Shadcn/ui components:
 
 | File | Description |
 |------|-------------|
+| `api-routes.md` | API route reference — every endpoint, what it does, Google API vs Prisma-only, comparison tables for similar endpoints |
 | `architecture.md` | High-level system architecture — tech stack, data model, API layer, client/server split, security |
 | `auth.md` | Authentication — NextAuth v5 + Google OAuth, session handling, token refresh |
 | `bulk-edit.md` | Bulk editing logic — tri-state UI, context-aware cycling, no-op protection |

@@ -13,6 +13,7 @@ and won't pick up the regenerated client until restart.
 ## Architecture
 
 See `docs/*.md` for detailed architecture docs — keep them in sync with behavior changes:
+- `docs/api-routes.md` — API route reference, Google API vs Prisma-only, comparison tables
 - `docs/architecture.md` — high-level system architecture overview
 - `docs/file-index.md` — one-line descriptions of every source file, grouped by layer
 - `docs/refresh.md` — full refresh flow (Drive sync, deletion detection, comment sync, UI update)
