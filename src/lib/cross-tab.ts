@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useLayoutEffect } from "react";
 import type { CommentType } from "@prisma/client";
+import type { ThreadMap } from "@/lib/google-drive";
 
 const CHANNEL_NAME = "docreview-sync";
 
 export type CrossTabEvent =
   | { type: "docs"; docIds?: string[] }
   | { type: "labels" }
-  | { type: "comments"; docId: string; googleCommentId?: string; commentType?: CommentType }
+  | { type: "comments"; docId: string; googleCommentId?: string; commentType?: CommentType; threads?: ThreadMap }
   | { type: "signout" };
 
 /** Payload sent over BroadcastChannel — event data plus optional sender context ID. */

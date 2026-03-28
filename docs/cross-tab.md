@@ -52,9 +52,14 @@ Three event types, defined as `CrossTabEvent`:
 |------|---------|---------|
 | `docs` | `docIds?` | A document was added, updated, archived, or deleted. Optional `docIds` identifies the specific doc(s). |
 | `labels` | _(none)_ | Labels were created, deleted, reordered, or recolored. |
-| `comments` | `docId` (required) | Comments on a specific document changed (synced, replied, resolved, archived). |
+| `comments` | `docId` (required), `googleCommentId?`, `commentType?`, `threads?` | Comments on a specific document changed (synced, replied, resolved, archived). |
 
 The `docIds` field on `docs` events is optional because some operations affect multiple documents (bulk edit, load from Drive, full refresh) and don't target specific docs.
+
+The `comments` event has optional fields for targeted updates:
+- `googleCommentId` — the specific comment thread that changed (omitted for bulk operations or full sync).
+- `commentType` — `"COMMENT"` or `"SUGGESTION"` (uppercase, matching the Prisma enum). Used to determine whether to attempt a targeted thread fetch (suggestions use a different API and ID scheme).
+- `threads` — inline `CommentThread` display data from the sync response. When present, receiving tabs can merge this directly into their thread map without making any Drive API call. Currently only populated by the Chrome extension comment sync path (see below).
 
 ## Wire Format
 
@@ -104,7 +109,9 @@ broadcastChange({ type: "docs", docId: doc.docId }, contextId);
 | `doc-detail.tsx` handleBulkStatusChange | Bulk archive/unarchive visible comments |
 | `comment-row.tsx` postReply | Reply, resolve, or reopen a thread |
 | `comment-row.tsx` updateStatus | Change comment status (inbox/archive/mute) |
-| `bridge-to-extension.ts` commentSynced listener | Chrome extension detected comment activity on a Google Docs page and server sync completed |
+| `comment-row.tsx` toggleRead | Mark comment read / unread |
+| `comment-row.tsx` toggleStar | Star / unstar a comment |
+| `bridge-to-extension.ts` commentSynced listener | Chrome extension detected comment activity on a Google Docs page and server sync completed (includes inline `threads` data) |
 
 ## Receivers
 
@@ -120,12 +127,47 @@ Three components listen via `useCrossTabListener`:
 - **Responds to:** selectively by event type
 - **`docs` event:** If `docIds` is present and doesn't match this page's doc, the event is **ignored**. Otherwise, refetches the doc and labels in parallel.
 - **`labels` event:** Always refetches the doc and labels in parallel.
-- **`comments` event:** Only acts if `docId` matches this page's doc. Refetches the doc, threads, and content. Events for other docs are **ignored**.
+- **`comments` event:** Only acts if `docId` matches this page's doc. Events for other docs are **ignored**. Always refetches the doc metadata (DB-only, for comment counts and archive status). For thread display data, uses one of three paths:
+  1. **Inline threads** (from `threads` field): merges directly into the thread map — no API call. Currently only the Chrome extension sync path provides this.
+  2. **Targeted fetch** (`googleCommentId` present, not a suggestion): fetches `GET /api/docs/{docId}/threads?commentId=X` — one `comments.get` Drive call.
+  3. **Full fetch** (no ID, or suggestion type): fetches `GET /api/docs/{docId}/threads` — full `comments.list` Drive call.
 
 ### add-doc-page-client.tsx (add document page)
 - **Handler:** `refetchLabels`
 - **Responds to:** all event types
 - **Action:** Refetches `/api/labels` only. The add-doc page only needs fresh labels for the label picker.
+
+## Chrome Extension Bridge Path
+
+The Chrome extension has its own path into the cross-tab system. When the extension detects comment activity on a Google Docs page, it triggers a server-side sync and then notifies open Docreview tabs:
+
+```
+Google Docs tab                Extension background         Docreview tab(s)
+──────────────                 ────────────────────         ────────────────
+content-comments.js
+  detects comment action
+  → chrome.runtime.sendMessage
+    { commentActivity, docId,    background-comments.js
+      commentType }              fireCommentSync()
+                                   → fetch /api/docs/sync-comments/{docId}
+                                   ← response with { threads } data
+                                   → chrome.tabs.sendMessage to tab[0]
+                                     { commentSynced, docId,             bridge-to-docreview.js
+                                       commentType, googleCommentId,       → window.postMessage
+                                       threads }                               → bridge-to-extension.ts
+                                                                                 → BroadcastChannel
+                                                                                   → all tabs receive
+```
+
+The extension sends `commentType` in uppercase (`"COMMENT"` / `"SUGGESTION"`) to match the Prisma enum, avoiding conversion at the bridge layer.
+
+The `threads` field carries the `CommentThread` display data from the sync response, so the receiving tab can merge it directly into its thread map without a redundant Drive API call. This is the only cross-tab path that currently includes inline thread data.
+
+### Why only the extension path has inline data
+
+In-app comment actions (reply, resolve, archive, read/unread, star) also broadcast `comments` events, but without inline `threads` data. The only receiver that would use thread data is another `doc-detail` tab open on the same document — a rare scenario not worth optimizing. Those receivers fall back to a targeted or full threads fetch.
+
+The extension path is different: it's the primary way comment changes from Google Docs reach Docreview, and the sync response already contains the thread data. Passing it through eliminates a Drive API call that would otherwise happen on every extension-triggered comment update.
 
 ## Debouncing
 

@@ -253,30 +253,40 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
         ]);
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
       } else if (event.type === "comments" && (event.docId === initialDoc.docId || event.docId === initialDoc.googleDocId)) {
-        // Targeted single-comment fetch when the extension provides a specific
-        // comment ID (comment type, not suggestion). Falls back to full fetch
-        // for suggestions or when no ID is available.
         const targetedCommentId = (event.commentType !== "SUGGESTION") ? event.googleCommentId : undefined;
-        const threadsUrl = targetedCommentId
-          ? `/api/docs/${initialDoc.docId}/threads?commentId=${encodeURIComponent(targetedCommentId)}`
-          : `/api/docs/${initialDoc.docId}/threads`;
-        console.log("[cross-tab] doc-detail: refreshing (comments event" + (targetedCommentId ? `, comment=${targetedCommentId}` : "") + ")"); // eslint-disable-line no-console
-        // Fetch doc and threads in parallel, then apply both state updates
-        // together so React batches them into one render. This prevents
-        // expanded threads from flashing a loading state — the initialThread
-        // sync effect updates fetchedModifiedMs before the staleness check
-        // sees the new driveModifiedAt. Also freezes sort order so updated
-        // comments don't jump (same as in-app reply).
-        const [docRes, threadsRes] = await Promise.all([
-          apiFetch(`/api/docs/${initialDoc.docId}`, { contextId, reason }),
-          apiFetch(threadsUrl, { contextId }),
-        ]);
+        // When the sync response included thread data, use it directly instead
+        // of making a redundant Drive API call. Falls back to fetching when no
+        // thread data (suggestions, missing ID, or non-extension triggers).
+        const inlineThreads = targetedCommentId && event.threads
+          ? event.threads as ThreadMap : undefined;
+        console.log("[cross-tab] doc-detail: refreshing (comments event" + (targetedCommentId ? `, comment=${targetedCommentId}` : "") + (inlineThreads ? ", inline" : "") + ")"); // eslint-disable-line no-console
+        // Fetch doc (and threads if not inline) in parallel, then apply both
+        // state updates together so React batches them into one render. This
+        // prevents expanded threads from flashing a loading state — the
+        // initialThread sync effect updates fetchedModifiedMs before the
+        // staleness check sees the new driveModifiedAt. Also freezes sort order
+        // so updated comments don't jump (same as in-app reply).
+        const docPromise = apiFetch(`/api/docs/${initialDoc.docId}`, { contextId, reason });
+        const threadsPromise = inlineThreads
+          ? Promise.resolve(null)
+          : apiFetch(
+              targetedCommentId
+                ? `/api/docs/${initialDoc.docId}/threads?commentId=${encodeURIComponent(targetedCommentId)}`
+                : `/api/docs/${initialDoc.docId}/threads`,
+              { contextId },
+            );
+        const [docRes, threadsRes] = await Promise.all([docPromise, threadsPromise]);
         if (docRes.ok) {
           const updated: DocWithComments = await docRes.json();
-          if (threadsRes.ok) {
+          // Apply thread data: inline from sync response, or fetched from API.
+          // Inline threads always contain exactly one entry (the synced comment),
+          // so we merge directly. viewedByMeTime is not updated for inline syncs
+          // — it reflects when the user viewed the doc, not comment activity.
+          if (inlineThreads) {
+            setThreadMap(prev => ({ ...prev, ...inlineThreads }));
+          } else if (threadsRes?.ok) {
             const threadData = await threadsRes.json();
             if (targetedCommentId) {
-              // Merge single thread into existing map, or remove if deleted
               if (Object.keys(threadData.threads).length === 0) {
                 setThreadMap(prev => { const next = { ...prev }; delete next[targetedCommentId]; return next; });
               } else {

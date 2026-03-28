@@ -32,6 +32,7 @@
       var payload = { source: 'docreview-extension', type: 'commentSynced', docId: msg.docId };
       if (msg.googleCommentId) payload.googleCommentId = msg.googleCommentId;
       if (msg.commentType) payload.commentType = msg.commentType;
+      if (msg.threads) payload.threads = msg.threads;
       window.postMessage(payload, '*');
       sendResponse({ received: true });
       return true;

@@ -57,7 +57,13 @@ export async function POST(
         created: result.commentsCreated + result.suggestionsCreated,
         updated: result.commentsUpdated + result.suggestionsUpdated,
       });
-      return NextResponse.json({ success: true, result });
+      // Include thread display data when available (single-comment sync) so the
+      // extension can pass it to the client without a redundant Drive API fetch.
+      // Shape matches GET /api/docs/{docId}/comments response for consistency.
+      const { thread: _thread, ...resultWithoutThread } = result;
+      const threads = result.thread && googleCommentId
+        ? { [googleCommentId]: result.thread } : undefined;
+      return NextResponse.json({ success: true, result: resultWithoutThread, threads });
     } catch (err) {
       const reauth = invalidGrantResponse(err);
       if (reauth) return reauth;

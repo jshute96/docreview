@@ -50,6 +50,9 @@ interface SyncResult {
   isDeleted?: boolean;
   permissionDenied?: boolean;
   transientError?: boolean;
+  /** Thread display data from single-comment sync, so callers can pass it
+   *  to the client without a redundant Drive API fetch. */
+  thread?: CommentThread;
 }
 
 const EMPTY_RESULT: SyncResult = {
@@ -232,6 +235,7 @@ export async function syncComments(
         // status transitions) — resolve-only changes don't trigger unarchive.
         // So aliasing it here is safe.
         hasNonResolveActivity: result.shouldUnarchive,
+        thread: result.thread,
       };
     } catch (err: any) {
       // Fall back to full sync on unexpected error (e.g., 403)

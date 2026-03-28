@@ -227,10 +227,11 @@ function setupCommentSyncedListener() {
     const docId = event.data.docId;
     const googleCommentId: string | undefined = event.data.googleCommentId;
     const commentType: string | undefined = event.data.commentType;
+    const threads: Record<string, unknown> | undefined = event.data.threads;
     // eslint-disable-next-line no-console -- extension bridge diagnostic, not server-side app code
     console.log("[bridge-to-extension] commentSynced received, broadcasting for", docId);
     const ch = new BroadcastChannel("docreview-sync");
-    ch.postMessage({ type: "comments", docId, googleCommentId, commentType });
+    ch.postMessage({ type: "comments", docId, googleCommentId, commentType, threads });
     ch.close();
   });
 }

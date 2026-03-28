@@ -30,6 +30,26 @@ function syncLabel(commentType, googleCommentId) {
   return parts.length > 0 ? ' (' + parts.join(' ') + ')' : '';
 }
 
+// Notify open docreview tabs that a comment sync completed. Sends to the first
+// matching tab; the bridge relays via BroadcastChannel to all tabs.
+function notifyDocreviewTabs(baseUrl, docId, commentType, googleCommentId, threads) {
+  chrome.tabs.query({ url: baseUrl + '/*' }, function(tabs) {
+    if (tabs && tabs[0]) {
+      var syncedMsg = { type: 'commentSynced', docId: docId };
+      if (googleCommentId) syncedMsg.googleCommentId = googleCommentId;
+      if (commentType) syncedMsg.commentType = commentType.toUpperCase();
+      if (threads) syncedMsg.threads = threads;
+      chrome.tabs.sendMessage(tabs[0].id, syncedMsg, function() {
+        if (chrome.runtime.lastError) {
+          console.warn('[background] sendMessage failed for docId', docId, 'to tab', tabs[0].id, '(' + tabs[0].url + '):', chrome.runtime.lastError.message);
+        }
+      });
+    } else {
+      console.log('[background] no docreview tabs open, skipping notification');
+    }
+  });
+}
+
 function fireCommentSync(docId, commentType, googleCommentId) {
   chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl }, function(config) {
     var url = config.baseUrl + '/api/docs/sync-comments/' + docId;
@@ -45,20 +65,12 @@ function fireCommentSync(docId, commentType, googleCommentId) {
     fetch(url, fetchOpts).then(function(res) {
       if (res.ok) {
         console.log('[background] comment sync succeeded for', docId + label);
-        // Notify open docreview tabs so they refresh
-        chrome.tabs.query({ url: config.baseUrl + '/*' }, function(tabs) {
-          if (tabs && tabs[0]) {
-            var syncedMsg = { type: 'commentSynced', docId: docId };
-            if (googleCommentId) syncedMsg.googleCommentId = googleCommentId;
-            if (commentType) syncedMsg.commentType = commentType;
-            chrome.tabs.sendMessage(tabs[0].id, syncedMsg, function() {
-              if (chrome.runtime.lastError) {
-                console.warn('[background] sendMessage failed for docId', docId, 'to tab', tabs[0].id, '(' + tabs[0].url + '):', chrome.runtime.lastError.message);
-              }
-            });
-          } else {
-            console.log('[background] no docreview tabs open, skipping notification');
-          }
+        // Parse response for inline thread data (single-comment sync).
+        // On parse failure, still notify tabs without thread data.
+        return res.json().then(function(data) {
+          notifyDocreviewTabs(config.baseUrl, docId, commentType, googleCommentId, data.threads);
+        }).catch(function() {
+          notifyDocreviewTabs(config.baseUrl, docId, commentType, googleCommentId);
         });
       } else {
         console.warn('[background] comment sync failed for', docId + label, 'status:', res.status);
