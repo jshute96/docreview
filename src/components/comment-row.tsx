@@ -161,13 +161,15 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
 
   async function refreshThread() {
     setRefreshingThread(true);
+    const contextId = generateContextId();
     try {
       const res = await apiFetch(
         `/api/docs/${docId}/threads?commentId=${threadId}`,
-        { method: "POST" }
+        { method: "POST", contextId }
       );
       if (!res.ok) throw new Error("Failed");
       applyThreadUpdate(await res.json());
+      broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to refresh comment");
     } finally {
@@ -195,6 +197,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         );
         if (!refreshRes.ok) return;
         applyThreadUpdate(await refreshRes.json());
+        broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
       }
     } catch {
       // Silent — background check
@@ -278,7 +281,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       throw new Error("Failed");
     }
     applyThreadUpdate(await res.json());
-    broadcastChange({ type: "comments", docId }, contextId);
+    broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
     toast.success(successMsg);
   }
 
@@ -328,7 +331,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       if (!res.ok) throw new Error("Failed");
       const updated: Comment = await res.json();
       onUpdate(updated);
-      broadcastChange({ type: "comments", docId }, contextId);
+      broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
       toast.success(`Comment ${status.toLowerCase()}`);
     } catch {
       toast.error("Failed to update comment");
@@ -350,7 +353,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       if (!res.ok) throw new Error("Failed");
       const updated: Comment = await res.json();
       onUpdate(updated);
-      broadcastChange({ type: "comments", docId }, contextId);
+      broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
     } catch {
       toast.error("Failed to update comment");
     } finally {
@@ -370,7 +373,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       if (!res.ok) throw new Error("Failed");
       const updated: Comment = await res.json();
       onUpdate(updated);
-      broadcastChange({ type: "comments", docId }, contextId);
+      broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
     } catch {
       toast.error("Failed to update star");
     }

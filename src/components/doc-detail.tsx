@@ -256,7 +256,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
         // Targeted single-comment fetch when the extension provides a specific
         // comment ID (comment type, not suggestion). Falls back to full fetch
         // for suggestions or when no ID is available.
-        const targetedCommentId = (event.commentType !== "suggestion") ? event.googleCommentId : undefined;
+        const targetedCommentId = (event.commentType !== "SUGGESTION") ? event.googleCommentId : undefined;
         const commentsUrl = targetedCommentId
           ? `/api/docs/${initialDoc.docId}/comments?commentId=${encodeURIComponent(targetedCommentId)}`
           : `/api/docs/${initialDoc.docId}/comments`;

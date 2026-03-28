@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useLayoutEffect } from "react";
+import type { CommentType } from "@prisma/client";
 
 const CHANNEL_NAME = "docreview-sync";
 
 export type CrossTabEvent =
   | { type: "docs"; docIds?: string[] }
   | { type: "labels" }
-  | { type: "comments"; docId: string; googleCommentId?: string; commentType?: string }
+  | { type: "comments"; docId: string; googleCommentId?: string; commentType?: CommentType }
   | { type: "signout" };
 
 /** Payload sent over BroadcastChannel — event data plus optional sender context ID. */
@@ -47,6 +48,12 @@ export function crossTabReason(event: CrossTabReceivedEvent, receiver: string): 
   let payload = event.type as string;
   if ("docId" in event && event.docId) {
     payload += ` docId=${event.docId}`;
+    if ("googleCommentId" in event && event.googleCommentId) {
+      payload += ` googleCommentId=${event.googleCommentId}`;
+    }
+    if ("commentType" in event && event.commentType) {
+      payload += ` commentType=${event.commentType}`;
+    }
   } else if ("docIds" in event && event.docIds) {
     payload += ` docIds=[${event.docIds.join(", ")}]`;
   }
