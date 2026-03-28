@@ -113,15 +113,12 @@ describe("GET /api/docs", () => {
   });
 });
 
-function postRequest(mode?: "full-refresh" | "load") {
-  const url = mode
-    ? `http://localhost/api/docs?mode=${mode}`
-    : "http://localhost/api/docs";
-  return new NextRequest(url, { method: "POST" });
+function postRequest() {
+  return new NextRequest("http://localhost/api/docs", { method: "POST" });
 }
 
-function postRequestWithBody(mode: string, body: Record<string, unknown>) {
-  return new NextRequest(`http://localhost/api/docs?mode=${mode}`, {
+function postRequestWithBody(body: Record<string, unknown>) {
+  return new NextRequest("http://localhost/api/docs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -199,7 +196,7 @@ describe("POST /api/docs", () => {
       shouldUnarchive: false, hasNonResolveActivity: false
     });
 
-    const res = await POST(postRequestWithBody("load", {
+    const res = await POST(postRequestWithBody({
       source: "drive",
       selectedGoogleDocIds: ["g1"],
     }));
@@ -240,7 +237,7 @@ describe("POST /api/docs", () => {
       shouldUnarchive: false, hasNonResolveActivity: false
     });
 
-    const res = await POST(postRequestWithBody("load", {
+    const res = await POST(postRequestWithBody({
       source: "drive",
       selectedGoogleDocIds: ["g1"],
     }));
@@ -264,74 +261,11 @@ describe("POST /api/docs", () => {
       shouldUnarchive: false, hasNonResolveActivity: false
     });
 
-    await POST(postRequestWithBody("load", {
+    await POST(postRequestWithBody({
       source: "drive",
       selectedGoogleDocIds: ["g1", "g2"],
     }));
     expect(mockFetchDocsByIds).toHaveBeenCalledWith("u1", ["g1", "g2"], expect.any(Function));
-  });
-
-  it("full-refresh mode syncs comments for all non-deleted docs", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
-    mockGetDriveClient.mockResolvedValue(driveAuth);
-    // Drive returns metadata for both docs
-    mockFetchDocsByIds.mockResolvedValue([
-      {
-        googleDocId: "g1",
-        title: "Doc One",
-        driveUrl: "https://docs.google.com/document/d/g1/edit",
-        mimeType: "application/vnd.google-apps.document",
-        role: "AUTHOR" as const,
-        lastModifiedInDrive: new Date("2024-06-01"),
-        createdTimeInDrive: new Date("2024-05-01"),
-
-      },
-      {
-        googleDocId: "g2",
-        title: "Doc Two",
-        driveUrl: "https://docs.google.com/document/d/g2/edit",
-        mimeType: "application/vnd.google-apps.document",
-        role: "AUTHOR" as const,
-        lastModifiedInDrive: new Date("2024-06-01"),
-        createdTimeInDrive: new Date("2024-05-01"),
-
-      },
-    ]);
-
-    const dbDoc1 = { docId: "d1", googleDocId: "g1" };
-    const dbDoc2 = { docId: "d2", googleDocId: "g2" };
-    mockDoc.findMany
-      .mockResolvedValueOnce([dbDoc1, dbDoc2]) // route.ts: fetch all googleDocIds
-      .mockResolvedValueOnce([dbDoc1, dbDoc2]) // executeDirectRefresh: existingDocIds
-    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
-    mockSyncComments.mockResolvedValue({
-      commentsCreated: 0, commentsUpdated: 0,
-      suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
-    });
-
-    const res = await POST(postRequest("full-refresh"));
-    const data = await readSSEResult(res);
-    expect(data.mode).toBe("full-refresh");
-    expect(data.updated).toBe(2); // Both docs updated
-    expect(data.added).toBe(0);
-    expect(mockSyncComments).toHaveBeenCalledTimes(2);
-  });
-
-  it("full-refresh mode does NOT auto-add new docs (scan removed)", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
-    mockGetDriveClient.mockResolvedValue(driveAuth);
-
-    mockDoc.findMany
-      .mockResolvedValueOnce([]) // route.ts: fetch all googleDocIds (empty)
-
-    const res = await POST(postRequest("full-refresh"));
-    const data = await readSSEResult(res);
-    expect(data.mode).toBe("full-refresh");
-    expect(data.added).toBe(0);
-    expect(mockFetchDocsByIds).not.toHaveBeenCalled();
   });
 
   it("unarchives archived doc when syncComments signals shouldUnarchive", async () => {
@@ -364,7 +298,7 @@ describe("POST /api/docs", () => {
       shouldUnarchive: true, hasNonResolveActivity: true
     });
 
-    const res = await POST(postRequestWithBody("load", {
+    const res = await POST(postRequestWithBody({
       source: "drive",
       selectedGoogleDocIds: ["g1"],
     }));
@@ -405,7 +339,7 @@ describe("POST /api/docs", () => {
       shouldUnarchive: false, hasNonResolveActivity: false
     });
 
-    const res = await POST(postRequestWithBody("load", {
+    const res = await POST(postRequestWithBody({
       source: "drive",
       selectedGoogleDocIds: ["g1"],
     }));
@@ -446,7 +380,7 @@ describe("POST /api/docs", () => {
       shouldUnarchive: false, hasNonResolveActivity: false
     });
 
-    const res = await POST(postRequestWithBody("load", {
+    const res = await POST(postRequestWithBody({
       source: "drive",
       selectedGoogleDocIds: ["g1"], // only g1 selected
     }));
@@ -460,7 +394,7 @@ describe("POST /api/docs", () => {
     // User owns label l1 but not l2
     mockLabel.findMany.mockResolvedValue([{ labelId: "l1" }]);
 
-    const res = await POST(postRequestWithBody("load", {
+    const res = await POST(postRequestWithBody({
       labelIds: ["l1", "l2"],
     }));
     expect(res.status).toBe(400);
@@ -497,7 +431,7 @@ describe("POST /api/docs", () => {
       shouldUnarchive: false, hasNonResolveActivity: false
     });
 
-    const res = await POST(postRequestWithBody("load", {
+    const res = await POST(postRequestWithBody({
       source: "drive",
       selectedGoogleDocIds: ["g1"],
       labelIds: ["l1"],
@@ -540,7 +474,7 @@ describe("POST /api/docs", () => {
       shouldUnarchive: false, hasNonResolveActivity: false
     });
 
-    const res = await POST(postRequestWithBody("load", {
+    const res = await POST(postRequestWithBody({
       source: "drive",
       selectedGoogleDocIds: ["g1"],
       status: "ARCHIVED",
@@ -580,7 +514,7 @@ describe("POST /api/docs", () => {
       shouldUnarchive: false, hasNonResolveActivity: false
     });
 
-    const res = await POST(postRequestWithBody("load", {
+    const res = await POST(postRequestWithBody({
       source: "drive",
       selectedGoogleDocIds: ["g1"],
       status: "ARCHIVED",
@@ -623,7 +557,7 @@ describe("POST /api/docs", () => {
       shouldUnarchive: false, hasNonResolveActivity: false
     });
 
-    const res = await POST(postRequestWithBody("load", {
+    const res = await POST(postRequestWithBody({
       source: "drive",
       selectedGoogleDocIds: ["g1"],
       labelIds: ["l1"],
@@ -665,7 +599,7 @@ describe("POST /api/docs", () => {
       shouldUnarchive: false, hasNonResolveActivity: false
     });
 
-    const res = await POST(postRequestWithBody("load", {
+    const res = await POST(postRequestWithBody({
       source: "drive",
       selectedGoogleDocIds: ["g1"],
       notes: "New note",
@@ -704,7 +638,7 @@ describe("POST /api/docs", () => {
       shouldUnarchive: false, hasNonResolveActivity: false
     });
 
-    const res = await POST(postRequestWithBody("load", {
+    const res = await POST(postRequestWithBody({
       source: "drive",
       selectedGoogleDocIds: ["g1"],
     }));
@@ -744,7 +678,7 @@ describe("POST /api/docs", () => {
       shouldUnarchive: true, hasNonResolveActivity: false
     });
 
-    const res = await POST(postRequestWithBody("load", {
+    const res = await POST(postRequestWithBody({
       source: "drive",
       selectedGoogleDocIds: ["g1"],
     }));
@@ -768,7 +702,7 @@ describe("POST /api/docs", () => {
       shouldUnarchive: false, hasNonResolveActivity: false
     });
 
-    const res = await POST(postRequestWithBody("load", {
+    const res = await POST(postRequestWithBody({
       source: "drive",
       selectedGoogleDocIds: [], // nothing selected
       labelIds: ["l1"],

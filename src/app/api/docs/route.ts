@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { fetchDocsByIds, getDriveClient, getChangesStartPageToken } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { appendNotes, pluralize } from "@/lib/utils";
-import { executeRefresh, insertInaccessibleDocs } from "@/lib/refresh";
+import { insertInaccessibleDocs } from "@/lib/refresh";
 import type { GmailInaccessibleDoc } from "@/lib/gmail";
 import { updateDriveChangesToken } from "@/lib/status";
 import { docWithCountsInclude, withCommentCounts, stripServerOnly } from "@/lib/doc-queries";
@@ -53,16 +53,9 @@ export async function POST(req: NextRequest) {
   const userId = session.user.id;
   const userEmail = session.user.email ?? undefined;
 
-  const { searchParams } = new URL(req.url);
-  const modeParam = searchParams.get("mode");
-  const mode: "full-refresh" | "load" =
-    modeParam === "full-refresh" ? "full-refresh" : "load";
-
-  // Parse load options from request body (load mode only)
   let loadBody: Record<string, unknown> = {};
-  if (mode === "load") {
-    try { loadBody = await req.json(); } catch { /* no body is fine */ }
-  }
+  try { loadBody = await req.json(); } catch { /* no body is fine */ }
+
   const { source } = parseLoadOptions(loadBody);
   const selectedSet = Array.isArray(loadBody.selectedGoogleDocIds)
     ? new Set(loadBody.selectedGoogleDocIds as string[])
@@ -84,31 +77,7 @@ export async function POST(req: NextRequest) {
   const labelError = await validateLabelOwnership(userId, loadLabelIds);
   if (labelError) return labelError;
 
-  logInfo(`[Sync] Starting ${mode} sync`);
-
-  if (mode === "full-refresh") {
-    // Full refresh: get all tracked Google Doc IDs and refresh via unified path
-    const docs = await prisma.doc.findMany({
-      where: { userId },
-      select: { googleDocId: true },
-    });
-    const googleDocIds = docs.map(d => d.googleDocId);
-
-    return createProgressStream(async (send) => {
-      const result = await executeRefresh(userId, userEmail, {
-        googleDocIds,
-        mode: "full-refresh",
-        onProgress: send,
-      });
-      return {
-        ...result,
-        mode: "full-refresh" as const,
-        total: result.updated + result.added,
-      };
-    });
-  }
-
-  // Load mode
+  logInfo(`[Sync] Starting load sync`);
   logInfo(`[Sync] Load options: source=${source}${selectedSet ? `, ${selectedSet.size} docs selected` : ""}`);
 
   return createProgressStream(async (send: OnProgress) => {

@@ -74,11 +74,11 @@ One-line descriptions of every source file, grouped by layer.
 | File | Description |
 |------|-------------|
 | `auth/[...nextauth]/route.ts` | NextAuth catch-all handler (GET+POST) |
-| `docs/route.ts` | `GET` list docs (with filters); `POST` refresh/full-refresh/load sync from Drive (full-refresh is exhaustive; load accepts selectedGoogleDocIds, labelIds, notes) |
+| `docs/route.ts` | `GET` list docs (with filters); `POST` load sync from Drive (accepts selectedGoogleDocIds, labelIds, notes) |
 | `docs/gmail-refresh/route.ts` | `POST` incremental Gmail refresh — scans Gmail since last timestamp, performs upsert and sync via shared logic in `refresh.ts` |
 | `docs/gmail-refresh/route.test.ts` | Tests for incremental Gmail refresh flow, deletion detection, and timestamp updates |
-| `docs/refresh-selected/route.ts` | `POST` refresh metadata and comments for a specific set of documents (no Drive/Gmail scan) |
-| `docs/refresh/route.ts` | `POST` combined refresh — accepts `{ sources: ["drive", "gmail"] }`, runs parallel discovery, merges results, upserts, syncs comments via shared logic in `refresh.ts` |
+| `docs/refresh/route.ts` | `POST` refresh — discovery mode (`{ sources }`), full mode (`{ mode: "full" }`), or selected mode (`{ docIds }`); delegates to `executeRefresh` in `refresh.ts` |
+| `docs/refresh/route.test.ts` | Tests for discovery and full refresh modes |
 | `docs/scan/route.ts` | `POST` scan Drive or Gmail for documents without modifying DB — branches on `source` field, returns total, existing count, and new doc list |
 | `docs/add/route.ts` | `POST` add or update a doc by URL — existing docs (any access state) get labels/notes/status/star updated; new docs delegate to shared `addDoc()` in `add-doc.ts` |
 | `docs/validate/route.ts` | `GET` validate a Google Drive URL — checks access, mime type, returns metadata; for existing docs returns `existing: true` with labels, notes, status, star |

@@ -6,13 +6,12 @@ Google APIs check `invalidGrantResponse()` to return 401 on expired tokens.
 
 ## Documents
 
-### `/api/docs` — Doc list and full refresh
+### `/api/docs` — Doc list and load
 
 | Method | Purpose | Google API? |
 |--------|---------|-------------|
 | GET | List all tracked docs with comments | No (Prisma) |
-| POST `mode=full-refresh` | Full refresh of all docs — syncs comments, suggestions, metadata | Drive, Docs, Gmail (SSE streaming) |
-| POST `mode=load` | Selective load — adds scanned docs with labels/notes | Drive |
+| POST | Selective load — adds scanned docs with labels/notes | Drive (SSE streaming) |
 
 ### `/api/docs/[docId]` — Single doc CRUD
 
@@ -60,17 +59,16 @@ Uses tri-state apply rules (`"as-is"`, `"set"`, `"clear"`).
 
 No Google API (Prisma only).
 
-### `/api/docs/refresh` — Full refresh (streaming)
+### `/api/docs/refresh` — Refresh (streaming)
 
-POST. Refreshes all tracked docs — syncs comments, suggestions, and metadata
-from Drive and Gmail. Returns progress via SSE.
+POST. Three modes controlled by the request body:
 
-Google API: Drive, Docs, Gmail.
-
-### `/api/docs/refresh-selected` — Selective refresh (streaming)
-
-POST `{ docIds: string[] }`. Refreshes a subset of docs by their DB IDs.
-Same streaming format as full refresh.
+- **Discovery mode** (default): `{ sources: ["drive", "gmail"] }`. Uses Drive
+  changes API and Gmail scan to discover what changed, then syncs.
+- **Full mode**: `{ mode: "full" }`. Fetches metadata for every tracked doc
+  directly by ID, bypassing discovery. Used for exhaustive re-sync.
+- **Selected mode**: `{ docIds: ["d1", ...] }`. Same as full mode but only
+  refreshes the specified docs (by DB ID).
 
 Google API: Drive, Docs, Gmail.
 

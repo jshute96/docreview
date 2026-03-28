@@ -278,15 +278,17 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
   async function handleRefreshSelected() {
     if (filteredDocs.length === 0) return;
     const docIds = filteredDocs.map((d) => d.docId);
-    await runRefresh("selected", "/api/docs/refresh-selected", {
+    await runRefresh("selected", "/api/docs/refresh", {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ docIds }),
     }, "Refresh complete", "Failed to refresh selected docs");
   }
 
   async function handleFullRefresh() {
-    await runRefresh("full", "/api/docs?mode=full-refresh", {},
-      "Full refresh complete", "Failed to sync with Google Drive");
+    await runRefresh("full", "/api/docs/refresh", {
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "full" }),
+    }, "Full refresh complete", "Failed to sync with Google Drive");
   }
 
   async function handleSourceRefresh(sources: ("drive" | "gmail")[]) {

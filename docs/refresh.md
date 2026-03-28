@@ -17,15 +17,15 @@ a single `executeRefresh()` function in `src/lib/refresh.ts` with different opti
 
 - **Refresh** (toolbar button): `POST /api/docs/refresh` → `executeRefresh({ drive: true, gmail: true })`
 - **Source Refresh** (hamburger): same endpoint with `{ drive: true }` or `{ gmail: true }`
-- **Full Refresh** (hamburger): `POST /api/docs?mode=full-refresh` → `executeRefresh({ googleDocIds: [...all], mode: "full-refresh" })`
-- **Refresh Selected** (hamburger): `POST /api/docs/refresh-selected` → `executeRefresh({ googleDocIds: [...selected], mode: "selected" })`
+- **Full Refresh** (hamburger): `POST /api/docs/refresh` with `{ mode: "full" }` → `executeRefresh({ googleDocIds: [...all], mode: "full-refresh" })`
+- **Refresh Selected** (hamburger): `POST /api/docs/refresh` with `{ docIds: [...] }` → `executeRefresh({ googleDocIds: [...selected], mode: "selected" })`
 
 When `googleDocIds` is provided, `executeRefresh` skips Drive/Gmail discovery and goes
 straight to metadata fetch via `fetchDocsByIds`, then upsert + comment sync + deletion
 detection. When `drive`/`gmail` booleans are set, it runs the full discovery phase
 (changes.list, Gmail scan) in parallel.
 
-**Load** still uses `POST /api/docs?mode=load` with its own load-specific logic. Per-doc
+**Load** still uses `POST /api/docs` with its own load-specific logic. Per-doc
 refresh (detail page) is separate — see below.
 
 ## Per-doc Refresh (detail page)
