@@ -43,12 +43,14 @@ Message handlers:
 - `cancelResolve` — Closes in-flight resolve tabs.
 - `focusDocTab` — Focuses an existing Google Docs tab without creating a new one.
 - `navigateToComment` — Tracks Google Docs tabs per document and injects navigation scripts via `executeScript` in MAIN world.
+- `commentSelection` — Forwards comment selection/deselection events from Google Doc tabs to open Docreview tabs for cross-tab highlight sync.
+- `selectComment` — Selects a comment in a Google Doc tab (via injected script) without focusing the tab, triggered by clicking a comment thread in Docreview.
 - `openDocInDocreview` — Opens a doc from Gmail in Docreview, using `chrome.scripting.executeScript` with `allFrames: true` to search all frames (including sandboxed AMP iframes).
 
 **`bridge-to-docreview.js`** — Content script dynamically registered for Docreview app pages.
 
 - Relays `window.postMessage` calls from the web app to the background worker via `chrome.runtime.sendMessage`, and posts responses back.
-- Handles unsolicited messages from the background worker (e.g., `commentSynced` after a server-side comment sync) and relays them to the page.
+- Handles unsolicited messages from the background worker (e.g., `commentSynced` after a server-side comment sync, `commentSelection` for cross-tab highlight sync) and relays them to the page.
 - Each page instance generates a unique `pageId` to scope cancellation.
 - Runs in Chrome's isolated content script world; communication with the page is via `postMessage` only.
 
@@ -108,8 +110,8 @@ The extension sets `window.name = 'doc-{id}'` on Google Docs tabs it tracks (via
 | File | Role |
 |------|------|
 | `src/lib/tab-targets.ts` | Named target helpers: `commentsTarget()`, `docTarget()`, `openCommentsPage()`, `openDocPage()` |
-| `src/lib/bridge-to-extension.ts` | `focusDocTab()`, `handleOpenDocClick()`, `navigateToComment()` |
-| `src/chrome-extension/background.js` | `findDocTab()`, `setDocTabName()`, `focusDocTab` handler, `navigateToComment()` |
+| `src/lib/bridge-to-extension.ts` | `focusDocTab()`, `handleOpenDocClick()`, `navigateToComment()`, `selectCommentInDoc()`, `setCommentSelectionHandler()` |
+| `src/chrome-extension/background.js` | `findDocTab()`, `setDocTabName()`, `focusDocTab` handler, `navigateToComment()`, `selectComment` handler |
 
 ## Comment navigation implementation
 
@@ -183,11 +185,20 @@ Available from the **Google Docs page console** (injected at page load):
 - **`listComments()`** — dumps all visible comments/suggestions with disco IDs, types, authors, and text. Returns an array of `{ id, type, author, text }` and logs each entry.
 - **`getActiveCommentId()`** — returns the disco ID of the currently selected comment (the one with `docos-docoview-active` class). Click a comment first to select it.
 
-### Selection tracking
+### Selection tracking and cross-tab sync
 
-The extension automatically logs comment selection/deselection to the page console:
-- `[docreview] comment selected: <discoId>` — when a comment or suggestion is clicked
+The extension tracks comment selection/deselection and synchronizes it bidirectionally between Google Doc tabs and the Docreview comments page:
+
+**Doc → Docreview:** When a comment is selected/deselected in a Google Doc (Docs, Sheets, or Slides), the MAIN world tracker posts a `window.postMessage`. The content script relays it to the background worker, which forwards it to all open Docreview tabs via the bridge. The comments page highlights the corresponding row with a blue background and ring.
+
+**Docreview → Doc:** When the user clicks on an expanded comment thread in the Docreview comments page, the extension selects that comment in the Google Doc tab without focusing it. This injects a script that finds the comment by disco ID and clicks it.
+
+Both directions only work when the other page is already open — neither direction focuses or raises the other tab.
+
+Console logging:
+- `[docreview] comment selected: <discoId>` — when a comment is clicked in the doc
 - `[docreview] comment deselected` — when clicking away from all comments
+- `[docreview] selected comment from docreview: <discoId>` — when selected via Docreview click
 
 This works for both anchored comments (sidebar) and comments in the "Show all comments" pane (including resolved comments). Works on Docs, Sheets, and Slides. On Google Docs, there are two `#docos-stream-view` containers (anchored sidebar and comments pane) — the tracker discovers and observes both.
 

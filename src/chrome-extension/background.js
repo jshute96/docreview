@@ -227,34 +227,46 @@ function fireCommentSync(docId, commentType, googleCommentId) {
   });
 }
 
-// Handle messages from content scripts.
-// - commentPre: from Docs content script, pre-extracts comment ID before mutation
-// - commentActivity: from Docs content script, syncs comments for a doc (debounced)
-// - openDocInDocreview: from Gmail content script, opens doc in Docreview
-// - trackDocTab: from Docs content script, tracks the tab for comment navigation reuse
-// - ping: from bridge-to-docreview, returns extension status
-// - resolveUrl: from bridge-to-docreview, follows redirects to resolve shortened URLs
-// - focusDocTab: from bridge-to-docreview, focuses an existing Google Docs tab without creating one
-// - navigateToComment: from bridge-to-docreview, navigates to a comment in an open Google Docs tab
+// Handle messages from content scripts and the Docreview bridge.
+//
+// From Google Docs content script (content.js):
+// - injectDiscoHelpers: inject disco ID helpers at page load
+// - commentPre: pre-extract comment ID before Google mutates the DOM
+// - commentActivity: trigger server-side comment sync (debounced)
+// - trackDocTab: track a tab for comment navigation reuse
+// - commentSelection: relay comment selected/deselected in the doc
+//
+// From Gmail content script (content.js):
+// - openDocInDocreview: open doc from Gmail notification in Docreview
+//
+// From Docreview bridge (bridge-to-docreview.js → web app):
+// - ping: return extension status and version
+// - resolveUrl: follow redirects to resolve shortened URLs
+// - cancelResolve: close in-flight resolve tabs
+// - focusDocTab: focus an existing Google Docs tab without creating one
+// - navigateToComment: navigate to a comment in an open Google Docs tab
+// - selectComment: select a comment in the doc without focusing the tab
 
 // Pre-extracted comment IDs, keyed by tab ID. Stores a Promise that resolves
 // to the ID (or null). Set by commentPre, awaited by commentActivity.
 var pendingCommentIds = new Map();
 
 chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
-  // Inject disco ID helpers on page load so listComments() and getActiveCommentId()
-  // are available in the page console for debugging.
+  // From Docs content script: inject disco ID helpers on page load so
+  // listComments() and getActiveCommentId() are available for debugging.
   if (msg.type === 'injectDiscoHelpers' && sender.tab) {
     chrome.scripting.executeScript({
       target: { tabId: sender.tab.id },
       func: injectDiscoIdHelpers,
       world: 'MAIN'
-    }).catch(function() {});
+    }).catch(function(err) {
+      console.warn('[background] injectDiscoHelpers failed for tab', sender.tab.id, ':', err.message);
+    });
     return;
   }
 
-  // Pre-extraction: content script marked a listitem, inject script to extract
-  // the disco ID while the element is still in the DOM (before Google removes it).
+  // From Docs content script: pre-extract the disco ID from a listitem marked
+  // with [data-docreview-extract] while it's still in the DOM.
   if (msg.type === 'commentPre' && msg.docId && sender.tab) {
     // Inject shared helpers first (idempotent), then extract the ID.
     // Store the Promise so commentActivity can await it if it arrives
@@ -286,6 +298,7 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     return;
   }
 
+  // From Docs content script: comment action detected, trigger server sync.
   if (msg.type === 'commentActivity' && msg.docId) {
     var docId = msg.docId;
     var commentType = msg.commentType;
@@ -325,11 +338,14 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     return;
   }
 
+  // From Gmail content script: open the doc from a notification email.
   if (msg.type === 'openDocInDocreview' && sender.tab) {
+    console.log('[background] openDocInDocreview from tab', sender.tab.id);
     openDocFromGmailTab(sender.tab.id);
     return;
   }
 
+  // From Docs content script: track this tab for comment navigation reuse.
   if (msg.type === 'trackDocTab' && sender.tab) {
     chrome.storage.sync.get({ enableDocs: DEFAULTS.enableDocs }, function(config) {
       if (!config.enableDocs) return;
@@ -339,16 +355,18 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     return;
   }
 
+  // From Docreview bridge: return extension status and version.
   if (msg.type === 'ping') {
-    console.log('[background] ping received');
+    console.log('[background] ping from docreview');
     chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl, enableDocs: DEFAULTS.enableDocs, enableResolve: DEFAULTS.enableResolve, resolveHosts: DEFAULTS.resolveHosts }, function(config) {
       sendResponse({ version: 2, baseUrl: config.baseUrl, enableDocs: config.enableDocs, enableResolve: config.enableResolve, resolveHosts: config.resolveHosts });
     });
     return true; // async response
   }
 
+  // From Docreview bridge: follow redirects to resolve a shortened URL.
   if (msg.type === 'resolveUrl') {
-    console.log('[background] resolveUrl:', msg.url);
+    console.log('[background] resolveUrl from docreview:', msg.url);
     chrome.storage.sync.get({ enableResolve: DEFAULTS.enableResolve }, function(config) {
       if (!config.enableResolve) {
         sendResponse({ resolved: false, error: 'disabled' });
@@ -361,15 +379,14 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     return true; // async response
   }
 
+  // From Docreview bridge: close in-flight URL resolve tabs.
   if (msg.type === 'cancelResolve') {
     cancelResolveTabs(msg.pageId);
     return;
   }
 
+  // From Docreview bridge: focus an existing Google Docs tab without creating one.
   if (msg.type === 'focusDocTab') {
-    // Try to focus an existing Google Docs tab for this doc. Returns { found: true }
-    // if successful, { found: false } if no tab exists. Does NOT create a new tab.
-    // Gated on enableDocs for consistency (caller also checks via supportsCommentNavigation).
     (async function() {
       var config = await chrome.storage.sync.get({ enableDocs: DEFAULTS.enableDocs });
       if (!config.enableDocs) { sendResponse({ found: false }); return; }
@@ -387,6 +404,7 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     return true; // async response
   }
 
+  // From Docreview bridge: navigate to a comment in an open Google Docs tab.
   if (msg.type === 'navigateToComment') {
     chrome.storage.sync.get({ enableDocs: DEFAULTS.enableDocs }, function(config) {
       if (!config.enableDocs) {
@@ -402,6 +420,65 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
       });
     });
     return true; // async response
+  }
+
+  // From Docs content script: comment selected/deselected in the doc.
+  // Relay to all open Docreview tabs so the comments page can highlight the row.
+  if (msg.type === 'commentSelection' && msg.docId) {
+    console.log('[background] commentSelection from doc:', msg.docId, msg.selected ? msg.discoId : '(deselected)');
+    chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl }, function(config) {
+      chrome.tabs.query({ url: config.baseUrl + '/*' }, function(tabs) {
+        if (!tabs || tabs.length === 0) return;
+        console.log('[background] forwarding commentSelection to', tabs.length, 'docreview tab(s)');
+        tabs.forEach(function(tab) {
+          chrome.tabs.sendMessage(tab.id, {
+            type: 'commentSelection',
+            docId: msg.docId,
+            discoId: msg.discoId,
+            selected: msg.selected
+          }, function() {
+            // Expected to fail on tabs without the bridge content script
+            if (chrome.runtime.lastError) { /* ignore */ }
+          });
+        });
+      });
+    });
+    return;
+  }
+
+  // From Docreview bridge: select a comment in the Google Doc tab without
+  // focusing it. Triggered by clicking a comment thread in the comments page.
+  if (msg.type === 'selectComment' && msg.docId && msg.discoId) {
+    console.log('[background] selectComment from docreview:', msg.docId, msg.discoId);
+    (async function() {
+      var config = await chrome.storage.sync.get({ enableDocs: DEFAULTS.enableDocs });
+      if (!config.enableDocs) return;
+      var tabId = await findDocTab(msg.docId);
+      if (!tabId) {
+        console.log('[background] selectComment: no doc tab open for', msg.docId);
+        return;
+      }
+      // Helpers are normally pre-installed at page load (content.js sends
+      // injectDiscoHelpers), but re-inject as a safety net in case the tab
+      // was opened before the extension was installed or the service worker
+      // restarted. selectCommentInPage depends on window.__docreviewDisco.
+      await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        func: injectDiscoIdHelpers,
+        world: 'MAIN'
+      }).catch(function(err) {
+        console.warn('[background] selectComment: injectDiscoIdHelpers failed:', err.message);
+      });
+      chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        func: selectCommentInPage,
+        args: [msg.discoId],
+        world: 'MAIN'
+      }).catch(function(err) {
+        console.warn('[background] selectComment: selectCommentInPage failed:', err.message);
+      });
+    })();
+    return;
   }
 });
 
@@ -689,7 +766,98 @@ function injectDiscoIdHelpers() {
     return id;
   }
 
-  window.__docreviewDisco = { getDiscoId: getDiscoId, listComments: listComments, getActiveCommentId: getActiveCommentId };
+  // --- Comment navigation helpers ---
+  // Shared by selectCommentInPage and navigateToCommentInPage. Exposed on
+  // window.__docreviewDisco so injected scripts can use them without
+  // duplicating code.
+
+  // Google Docs buttons require a full mousedown+mouseup+click sequence;
+  // a bare .click() is ignored by the Closure event system.
+  function fullClick(el) {
+    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  }
+
+  // Comments pane management. The pane has class docs-docos-activity-sidebar.
+  // There are multiple [role="complementary"] elements; must use the specific class.
+  function isCommentsPaneOpen() {
+    var panel = document.querySelector('.docs-docos-activity-sidebar');
+    return !!(panel && panel.offsetParent !== null);
+  }
+
+  function openCommentsPane() {
+    if (isCommentsPaneOpen()) return Promise.resolve();
+    console.log('[docreview] opening comments pane');
+    var btn = document.querySelector('[aria-label*="Show all comments"]');
+    if (!btn) return Promise.resolve();
+    fullClick(btn);
+    return new Promise(function(resolve) {
+      var attempts = 0;
+      var check = setInterval(function() {
+        if (isCommentsPaneOpen() || ++attempts > 15) {
+          clearInterval(check);
+          resolve();
+        }
+      }, 100);
+    });
+  }
+
+  function closeCommentsPane() {
+    if (!isCommentsPaneOpen()) return;
+    console.log('[docreview] closing comments pane');
+    var panel = document.querySelector('.docs-docos-activity-sidebar');
+    var closeBtn = panel ? panel.querySelector('[aria-label="Close"]') : null;
+    if (closeBtn) fullClick(closeBtn);
+  }
+
+  // Find a comment listitem by disco ID. Returns { item, anchored } or null.
+  // Prefers anchored entries (docos-anchoreddocoview) which have margin
+  // highlights and don't need the comments pane. Non-anchored entries
+  // (docos-streamdocoview) include resolved and unanchored comments.
+  // The same ID can appear in both an anchored and non-anchored entry.
+  function findCommentByDiscoId(discoId) {
+    var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
+    var nonAnchoredMatch = null;
+    for (var i = 0; i < items.length; i++) {
+      if (getDiscoId(items[i]) !== discoId) continue;
+      if (items[i].classList.contains('docos-anchoreddocoview')) {
+        return { item: items[i], anchored: true };
+      }
+      if (!nonAnchoredMatch) nonAnchoredMatch = items[i];
+    }
+    return nonAnchoredMatch ? { item: nonAnchoredMatch, anchored: false } : null;
+  }
+
+  // Wait for resolved comments to appear after opening the pane.
+  function waitForResolvedComments() {
+    return new Promise(function(resolve) {
+      var attempts = 0;
+      var check = setInterval(function() {
+        var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
+        for (var i = 0; i < items.length; i++) {
+          if (items[i].textContent.indexOf('Resolved') !== -1) {
+            clearInterval(check);
+            resolve();
+            return;
+          }
+        }
+        if (++attempts > 25) { clearInterval(check); resolve(); }
+      }, 200);
+    });
+  }
+
+  window.__docreviewDisco = {
+    getDiscoId: getDiscoId,
+    listComments: listComments,
+    getActiveCommentId: getActiveCommentId,
+    fullClick: fullClick,
+    isCommentsPaneOpen: isCommentsPaneOpen,
+    openCommentsPane: openCommentsPane,
+    closeCommentsPane: closeCommentsPane,
+    findCommentByDiscoId: findCommentByDiscoId,
+    waitForResolvedComments: waitForResolvedComments
+  };
   // Expose debugging functions directly on window for convenience
   window.listComments = listComments;
   window.getActiveCommentId = getActiveCommentId;
@@ -705,15 +873,19 @@ function injectDiscoIdHelpers() {
   // Called on every mutation in a tracked stream view. Uses a global
   // querySelector (not scoped to one stream) so it works regardless of
   // which stream view contains the active comment.
+  // Posts a window message so the content script can relay selection
+  // changes to the background worker for cross-tab sync.
   function checkActive() {
     var active = document.querySelector('#docos-stream-view [role="listitem"].docos-docoview-active');
     if (active && active !== currentActiveEl) {
       currentActiveEl = active;
       var id = getDiscoId(active);
       console.log('[docreview] comment selected:', id || '(no ID)');
+      window.postMessage({ source: 'docreview-comment-selection', selected: true, discoId: id || null }, '*');
     } else if (!active && currentActiveEl) {
       currentActiveEl = null;
       console.log('[docreview] comment deselected');
+      window.postMessage({ source: 'docreview-comment-selection', selected: false, discoId: null }, '*');
     }
   }
 
@@ -745,6 +917,48 @@ function injectDiscoIdHelpers() {
     clearInterval(scanInterval);
     setInterval(scanForStreams, 5000);
   }, 5000);
+}
+
+// Injected into a Google Docs tab to select a comment by disco ID without
+// focusing the tab. Used when the user clicks a comment thread in the
+// Docreview comments page. Like navigateToCommentInPage but without tab
+// focusing or fallback URL — just selects the comment and manages the
+// comments pane (close for anchored, open for non-anchored/resolved).
+// Requires injectDiscoIdHelpers to have been injected first.
+function selectCommentInPage(discoId) {
+  var disco = window.__docreviewDisco;
+  if (!disco) return;
+
+  return (async function() {
+    if (!discoId) return;
+
+    var match = disco.findCommentByDiscoId(discoId);
+    if (!match) {
+      console.log('[docreview] comment not in stream view, opening pane');
+      await disco.openCommentsPane();
+      await disco.waitForResolvedComments();
+      match = disco.findCommentByDiscoId(discoId);
+    }
+    if (!match) {
+      console.log('[docreview] comment not found for selection:', discoId);
+      return;
+    }
+
+    console.log('[docreview] selecting comment from docreview:', discoId, match.anchored ? '(anchored)' : '(non-anchored)');
+    match.item.click();
+
+    // Wait for DOM to settle (clicking can switch document tabs, rebuilding DOM)
+    await new Promise(function(r) { setTimeout(r, 300); });
+    var final = disco.findCommentByDiscoId(discoId);
+    if (final) {
+      final.item.click();
+      if (final.anchored) {
+        disco.closeCommentsPane();
+      } else {
+        await disco.openCommentsPane();
+      }
+    }
+  })();
 }
 
 // Injected into Google Docs to extract the disco ID from the listitem marked
@@ -789,7 +1003,9 @@ function extractCommentIdFromPage() {
 
 // The script injected into Google Docs to navigate to a comment by disco ID.
 // Injected into the page's JS context via chrome.scripting.executeScript.
-// Requires injectDiscoIdHelpers to have been injected first.
+// Requires injectDiscoIdHelpers to have been injected first (provides the
+// shared helpers on window.__docreviewDisco: findCommentByDiscoId,
+// openCommentsPane, closeCommentsPane, waitForResolvedComments).
 //
 // Navigation flow:
 //   1. Find the comment listitem by disco ID in the stream view
@@ -800,101 +1016,14 @@ function extractCommentIdFromPage() {
 //   6. Re-find and click again to ensure selection with fresh DOM
 //   7. Set pane state: close for anchored comments, open for non-anchored
 //
-// Key complications this handles:
-//   - Same disco ID can appear twice (anchored + stream entry); prefer anchored
+// Key complications:
 //   - Clicking a comment can switch document tabs, rebuilding the entire DOM
-//   - Resolved/unanchored comments only load when the comments pane is opened
+//     (hence the 300ms wait + re-find + second click)
 //   - Pane state is determined from the doc, not from Docreview's resolved flag
-//   - Google Docs buttons need full mousedown+mouseup+click (bare .click() ignored)
-//   - Multiple [role="complementary"] elements; use .docs-docos-activity-sidebar
+//   - Resolved/unanchored comments only load when the comments pane is opened
 function navigateToCommentInPage(discoId, _resolvedHint, fallbackUrl) {
-
-  var getDiscoId = window.__docreviewDisco
-    ? window.__docreviewDisco.getDiscoId
-    : function() { return null; };
-
-  // --- DOM helpers ---
-
-  // Google Docs buttons require a full mousedown+mouseup+click sequence;
-  // a bare .click() is ignored by the Closure event system.
-  function fullClick(el) {
-    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-  }
-
-  // --- Comments pane management ---
-  // The pane has class docs-docos-activity-sidebar. There are multiple
-  // [role="complementary"] elements on the page; must use the specific class.
-
-  function isCommentsPaneOpen() {
-    var panel = document.querySelector('.docs-docos-activity-sidebar');
-    return !!(panel && panel.offsetParent !== null);
-  }
-
-  function openCommentsPane() {
-    if (isCommentsPaneOpen()) return Promise.resolve();
-    console.log('[docreview-nav] opening comments pane');
-    var btn = document.querySelector('[aria-label*="Show all comments"]');
-    if (!btn) return Promise.resolve();
-    fullClick(btn);
-    return new Promise(function(resolve) {
-      var attempts = 0;
-      var check = setInterval(function() {
-        if (isCommentsPaneOpen() || ++attempts > 15) {
-          clearInterval(check);
-          resolve();
-        }
-      }, 100);
-    });
-  }
-
-  function closeCommentsPane() {
-    if (!isCommentsPaneOpen()) return;
-    console.log('[docreview-nav] closing comments pane');
-    var panel = document.querySelector('.docs-docos-activity-sidebar');
-    var closeBtn = panel ? panel.querySelector('[aria-label="Close"]') : null;
-    if (closeBtn) fullClick(closeBtn);
-  }
-
-  // --- Comment finding ---
-
-  // Find the comment listitem by disco ID. Returns { item, anchored } or null.
-  // Prefers anchored entries (docos-anchoreddocoview) which have margin
-  // highlights and don't need the comments pane. Non-anchored entries
-  // (docos-streamdocoview) include resolved and unanchored comments.
-  // The same ID can appear in both an anchored and non-anchored entry.
-  function findItem() {
-    var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
-    var nonAnchoredMatch = null;
-    for (var i = 0; i < items.length; i++) {
-      var id = getDiscoId(items[i]);
-      if (id !== discoId) continue;
-      if (items[i].classList.contains('docos-anchoreddocoview')) {
-        return { item: items[i], anchored: true };
-      }
-      if (!nonAnchoredMatch) nonAnchoredMatch = items[i];
-    }
-    return nonAnchoredMatch ? { item: nonAnchoredMatch, anchored: false } : null;
-  }
-
-  // Wait for resolved comments to appear after opening the pane
-  function waitForResolvedComments() {
-    return new Promise(function(resolve) {
-      var attempts = 0;
-      var check = setInterval(function() {
-        var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
-        for (var i = 0; i < items.length; i++) {
-          if (items[i].textContent.indexOf('Resolved') !== -1) {
-            clearInterval(check);
-            resolve();
-            return;
-          }
-        }
-        if (++attempts > 25) { clearInterval(check); resolve(); }
-      }, 200);
-    });
-  }
+  var disco = window.__docreviewDisco;
+  if (!disco) return { success: false, error: 'disco helpers not loaded' };
 
   // --- Main navigation logic ---
 
@@ -902,12 +1031,12 @@ function navigateToCommentInPage(discoId, _resolvedHint, fallbackUrl) {
     if (!discoId) return { success: true };
 
     // Step 1-2: Find the comment, opening pane if needed to load more
-    var match = findItem();
+    var match = disco.findCommentByDiscoId(discoId);
     if (!match) {
       console.log('[docreview-nav] not in stream view, opening pane to load more');
-      await openCommentsPane();
-      await waitForResolvedComments();
-      match = findItem();
+      await disco.openCommentsPane();
+      await disco.waitForResolvedComments();
+      match = disco.findCommentByDiscoId(discoId);
     }
     if (!match) {
       console.log('[docreview-nav] comment not found:', discoId);
@@ -925,13 +1054,13 @@ function navigateToCommentInPage(discoId, _resolvedHint, fallbackUrl) {
     // Steps 5-7: Wait for DOM to settle, re-find and click for reliable
     // selection, then set pane state based on final anchored/non-anchored.
     await new Promise(function(r) { setTimeout(r, 300); });
-    var final = findItem();
+    var final = disco.findCommentByDiscoId(discoId);
     if (final) {
       final.item.click();
       if (final.anchored) {
-        closeCommentsPane();
+        disco.closeCommentsPane();
       } else {
-        await openCommentsPane();
+        await disco.openCommentsPane();
       }
       console.log('[docreview-nav] done:', final.anchored ? 'anchored' : 'non-anchored');
     } else {
@@ -1032,7 +1161,8 @@ async function navigateToComment(docId, discoId, docUrl, resolved, senderTab) {
     return { success: true, focused: true };
   }
 
-  // Inject shared helpers (idempotent) then the navigation script
+  // Helpers are normally pre-installed at page load, but re-inject as a
+  // safety net. navigateToCommentInPage depends on window.__docreviewDisco.
   console.log('[background] injecting navigation script for:', discoId);
   try {
     await chrome.scripting.executeScript({

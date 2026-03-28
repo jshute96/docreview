@@ -30,6 +30,8 @@ interface CommentRowProps {
   expandSignal?: number;
   expandUnreadSignal?: number;
   collapseSignal?: number;
+  isSelected?: boolean;
+  onSelectInDoc?: () => void;
 }
 
 function splitContent(raw: string): { author: string | null; text: string } {
@@ -38,7 +40,7 @@ function splitContent(raw: string): { author: string | null; text: string } {
   return { author: raw.slice(0, sep), text: raw.slice(sep + 2) };
 }
 
-export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal }: CommentRowProps) {
+export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal, isSelected, onSelectInDoc }: CommentRowProps) {
   const isSuggestion = comment.type === "SUGGESTION";
   const currentModifiedMs = comment.driveModifiedAt
     ? new Date(comment.driveModifiedAt).getTime()
@@ -54,6 +56,37 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   const [hasDirtyReply, setHasDirtyReply] = useState(false);
   // Epoch ms of driveModifiedAt at the time threads were last fetched
   const fetchedModifiedMs = useRef<number | null>(initialThread ? currentModifiedMs : null);
+
+  // Refs for auto-scroll when the comment is selected from the Google Doc tab
+  const rowRef = useRef<HTMLTableRowElement>(null);
+  const buttonsRowRef = useRef<HTMLDivElement>(null);
+  // Suppresses auto-scroll briefly after we initiate a selection from docreview.
+  // Without this, clicking a row here sends selectComment to the doc, the doc
+  // selects it and echoes commentSelection back, which would scroll the page
+  // to the row the user just clicked — jarring since it's already visible.
+  const suppressScrollRef = useRef(false);
+
+  // Auto-scroll when this comment becomes selected from the doc. Positions the
+  // buttons row (if expanded) or the comment row (if collapsed) at ~80% of
+  // viewport height so the user sees the reply area plus as much thread above
+  // as possible.
+  const prevSelectedRef = useRef(false);
+  useEffect(() => {
+    const wasSelected = prevSelectedRef.current;
+    prevSelectedRef.current = !!isSelected;
+    if (!isSelected || wasSelected || suppressScrollRef.current) return;
+    requestAnimationFrame(() => {
+      const el = (expanded && buttonsRowRef.current) ? buttonsRowRef.current : rowRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const target = window.innerHeight * 0.8;
+      const delta = rect.bottom - target;
+      // Only scroll if the element bottom isn't already near the target
+      if (Math.abs(delta) > 40) {
+        window.scrollBy({ top: delta, behavior: "smooth" });
+      }
+    });
+  }, [isSelected, expanded]);
 
   // Sync threads state when parent re-fetches threadMap (e.g., global refresh)
   useEffect(() => {
@@ -195,7 +228,18 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     setExpanded(false);
   }, [collapseSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Wrap onSelectInDoc to suppress the auto-scroll that would fire when the
+  // doc echoes the selection back. Used by both handleRowClick and the thread
+  // panel's click handler.
+  function doSelectInDoc() {
+    if (!onSelectInDoc) return;
+    suppressScrollRef.current = true;
+    setTimeout(() => { suppressScrollRef.current = false; }, 2000);
+    onSelectInDoc();
+  }
+
   function handleRowClick() {
+    doSelectInDoc();
     if (!expanded) {
       if (!isSuggestion) {
         if (fetchedModifiedMs.current === null || fetchedModifiedMs.current !== currentModifiedMs) {
@@ -345,7 +389,9 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   const { author, text } = content ? splitContent(content) : { author: null, text: "" };
   const isAssignedHighlight = comment.status === "INBOX" && comment.assignedToMe && !comment.resolved;
   const isMentionedHighlight = !isAssignedHighlight && comment.status === "INBOX" && comment.mentionedMeUnreplied && !comment.isRead && !comment.resolved;
-  const rowBg = isAssignedHighlight
+  const rowBg = isSelected
+    ? (hovered ? "bg-blue-200" : "bg-blue-100")
+    : isAssignedHighlight
     ? (hovered ? "bg-red-200" : "bg-red-100")
     : isMentionedHighlight
     ? (hovered ? "bg-amber-200" : "bg-amber-100")
@@ -398,6 +444,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   return (
     <>
     <tr
+      ref={rowRef}
       className={`${rowBg} ${rowCls}${hasContentRow || expanded || isExiting ? "" : " border-b border-zinc-100"}`}
       onClick={handleRowClick}
       {...hoverHandlers}
@@ -562,6 +609,9 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   onDirtyChange={setHasDirtyReply}
                   searchFilter={searchFilter}
                   documentText={documentText}
+                  isSelected={isSelected}
+                  onSelectInDoc={onSelectInDoc ? doSelectInDoc : undefined}
+                  buttonsRowRef={buttonsRowRef}
                 />
               )}
             </div>

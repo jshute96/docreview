@@ -166,6 +166,48 @@ export function handleOpenDocClick(
 }
 
 /**
+ * Select a comment in a Google Doc tab without focusing it.
+ * Used when the user clicks a comment thread in the Docreview comments page.
+ * Fire-and-forget — no response expected.
+ */
+export function selectCommentInDoc(docId: string, discoId: string): void {
+  window.postMessage({
+    source: "docreview-page",
+    id: ++messageId,
+    type: "selectComment",
+    docId,
+    discoId,
+    fireAndForget: true,
+  }, "*");
+}
+
+/** Callback type for comment selection events from Google Doc tabs. */
+export type CommentSelectionHandler = (docId: string, discoId: string | null, selected: boolean) => void;
+
+let commentSelectionHandler: CommentSelectionHandler | null = null;
+
+/** Register a callback for comment selection/deselection events from Google Doc tabs. */
+export function setCommentSelectionHandler(handler: CommentSelectionHandler | null): void {
+  commentSelectionHandler = handler;
+}
+
+/**
+ * Listen for commentSelection messages from the Chrome extension bridge.
+ * When a comment is selected/deselected in a Google Doc, the extension
+ * relays the event here so the comments page can highlight the row.
+ */
+function setupCommentSelectionListener() {
+  if (typeof window === "undefined") return;
+  window.addEventListener("message", (event: MessageEvent) => {
+    if (event.data?.source !== "docreview-extension") return;
+    if (event.data.type !== "commentSelection") return;
+    commentSelectionHandler?.(event.data.docId, event.data.discoId, event.data.selected);
+  });
+}
+
+setupCommentSelectionListener();
+
+/**
  * Listen for commentSynced messages from the Chrome extension bridge.
  * When the extension detects comment activity on a Google Docs page and the
  * server sync completes, the bridge posts a commentSynced message here.

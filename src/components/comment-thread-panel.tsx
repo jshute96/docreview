@@ -51,6 +51,11 @@ interface CommentThreadPanelProps {
   onDirtyChange?: (dirty: boolean) => void;
   searchFilter?: string;
   documentText?: string;
+  isSelected?: boolean;
+  onSelectInDoc?: () => void;
+  /** Ref to the buttons row, used by CommentRow for auto-scroll positioning
+   *  when this comment is selected from the Google Doc tab. */
+  buttonsRowRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export function CommentThreadPanel({
@@ -75,6 +80,9 @@ export function CommentThreadPanel({
   onDirtyChange,
   searchFilter,
   documentText,
+  isSelected,
+  onSelectInDoc,
+  buttonsRowRef,
 }: CommentThreadPanelProps) {
   const [replyText, setReplyText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -221,7 +229,7 @@ export function CommentThreadPanel({
         className={TEXTAREA_CLASSES}
         style={{ width: "25%", overflow: "hidden" }}
       />
-      <div className="mt-2 flex items-center gap-2 whitespace-nowrap">
+      <div ref={buttonsRowRef} className="mt-2 flex items-center gap-2 whitespace-nowrap">
         {resolved ? (
           <Button
             variant="outline"
@@ -344,8 +352,9 @@ export function CommentThreadPanel({
   }
 
   return (
-    <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
-      <div className="divide-y divide-zinc-200">
+    <div className={`mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4${isSelected ? " ring-2 ring-blue-400" : ""}`}>
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- click to select comment in Google Doc */}
+      <div className={`divide-y divide-zinc-200${onSelectInDoc ? " cursor-pointer" : ""}`} onClick={onSelectInDoc} title={onSelectInDoc ? "Click to select this comment in the document" : undefined}>
         {threads.map((thread, threadIndex) => (
           <div
             key={thread.id}

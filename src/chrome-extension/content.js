@@ -530,6 +530,28 @@
       try {
         chrome.runtime.sendMessage({ type: 'injectDiscoHelpers' });
       } catch(e) {}
+      // Relay comment selection changes from MAIN world to the background worker.
+      // The MAIN world selection tracker (inside injectDiscoIdHelpers) posts
+      // messages when a comment is selected/deselected; we forward them with
+      // the Google Doc ID so the background can route to Docreview tabs.
+      window.addEventListener('message', function(event) {
+        if (event.source !== window) return;
+        if (!event.data || event.data.source !== 'docreview-comment-selection') return;
+        // Extract the Google Doc ID from the URL path (/d/XXXXX/).
+        // The MAIN world code doesn't know the doc ID — it only sees the
+        // DOM — so the content script adds it here from the URL. The
+        // background uses this to route to the right Docreview tab.
+        var docMatch = location.pathname.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (!docMatch) return;
+        try {
+          chrome.runtime.sendMessage({
+            type: 'commentSelection',
+            docId: docMatch[1],
+            discoId: event.data.discoId,
+            selected: event.data.selected
+          });
+        } catch(e) {}
+      });
     }
     new MutationObserver(function() { injectDocs(); injectAccessDenied(); }).observe(document.body, { childList: true, subtree: true });
   } else if (driveEnabled) {

@@ -15,7 +15,7 @@ import { ROLE_COLORS } from "@/lib/role-colors";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
-import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation } from "@/lib/bridge-to-extension";
+import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler } from "@/lib/bridge-to-extension";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -196,6 +196,18 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   // Ping extension on mount so supportsCommentNavigation() has cached status
   // before the user clicks "Open" on a comment.
   useEffect(() => { void pingExtension(); }, []);
+
+  // Track which comment is currently selected in the Google Doc tab.
+  // When the extension reports a selection change, we highlight the
+  // corresponding row in the comments table.
+  const [selectedDiscoId, setSelectedDiscoId] = useState<string | null>(null);
+  useEffect(() => {
+    setCommentSelectionHandler((docId, discoId, selected) => {
+      if (docId !== googleDocId) return;
+      setSelectedDiscoId(selected ? discoId : null);
+    });
+    return () => setCommentSelectionHandler(null);
+  }, [googleDocId]);
 
   const [notFound, setNotFound] = useState(false);
   const handleCrossTab = useCallback(async (event: CrossTabReceivedEvent) => {
@@ -1042,6 +1054,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
                   expandSignal={expandSignal}
                   expandUnreadSignal={expandUnreadSignal}
                   collapseSignal={collapseSignal}
+                  isSelected={!!selectedDiscoId && selectedDiscoId === comment.googleCommentId}
+                  onSelectInDoc={supportsCommentNavigation() && comment.googleCommentId
+                    ? () => selectCommentInDoc(googleDocId, comment.googleCommentId!)
+                    : undefined}
                 />
               ))}
             </tbody>
