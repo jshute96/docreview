@@ -23,14 +23,16 @@ vi.mock("@/lib/sync-comments", () => ({
 }));
 vi.mock("@/lib/google-drive", () => {
   const commentsGet = vi.fn();
+  const filesGet = vi.fn().mockResolvedValue({ data: { viewedByMeTime: null } });
   return {
     getDriveClient: vi.fn(),
-    createDriveService: vi.fn(() => ({ comments: { get: commentsGet } })),
+    createDriveService: vi.fn(() => ({ comments: { get: commentsGet }, files: { get: filesGet } })),
     fetchThreadDetail: vi.fn(),
     fetchDocData: vi.fn(),
     fetchCommentData: vi.fn(),
     invalidGrantResponse: vi.fn(() => null),
     _commentsGet: commentsGet,
+    _filesGet: filesGet,
   };
 });
 
@@ -60,6 +62,8 @@ const mockSyncSingleComment = vi.mocked(syncSingleComment);
 // Access the mock comments.get via the helper we attached to the mock module
 const mockCommentsGet = (googleDriveMod as unknown as { _commentsGet: ReturnType<typeof vi.fn> })
   ._commentsGet;
+const mockFilesGet = (googleDriveMod as unknown as { _filesGet: ReturnType<typeof vi.fn> })
+  ._filesGet;
 
 function makeParams(docId: string) {
   return { params: Promise.resolve({ docId }) };
@@ -131,8 +135,8 @@ describe("GET /api/docs/[docId]/threads", () => {
     const res = await GET(req, makeParams("d1"));
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.threads).toHaveLength(1);
-    expect(data.threads[0].author).toBe("Alice");
+    expect(data.threads["c1"]).toBeDefined();
+    expect(data.threads["c1"].author).toBe("Alice");
   });
 
   it("returns empty threads when fetchThreadDetail returns null", async () => {
@@ -144,10 +148,10 @@ describe("GET /api/docs/[docId]/threads", () => {
     const req = new NextRequest("http://localhost/api/docs/d1/threads?commentId=c1");
     const res = await GET(req, makeParams("d1"));
     const data = await res.json();
-    expect(data.threads).toHaveLength(0);
+    expect(Object.keys(data.threads)).toHaveLength(0);
   });
 
-  it("returns all threads when no commentId", async () => {
+  it("returns all threads as record with viewedByMeTime when no commentId", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
@@ -155,11 +159,15 @@ describe("GET /api/docs/[docId]/threads", () => {
       { id: "c1", author: "A", fromMe: false, content: "x", createdTime: "", resolved: false, replies: [] },
       { id: "c2", author: "B", fromMe: false, content: "y", createdTime: "", resolved: true, replies: [] },
     ] });
+    mockFilesGet.mockResolvedValue({ data: { viewedByMeTime: "2026-03-01T12:00:00Z" } });
 
     const req = new NextRequest("http://localhost/api/docs/d1/threads");
     const res = await GET(req, makeParams("d1"));
     const data = await res.json();
-    expect(data.threads).toHaveLength(2);
+    expect(Object.keys(data.threads)).toHaveLength(2);
+    expect(data.threads["c1"]).toBeDefined();
+    expect(data.threads["c2"]).toBeDefined();
+    expect(data.viewedByMeTime).toBe("2026-03-01T12:00:00Z");
   });
 
   it("returns 502 when Drive API fails", async () => {
@@ -240,7 +248,7 @@ describe("POST /api/docs/[docId]/threads", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.comment.isThreadAuthor).toBe(true);
-    expect(data.threads).toHaveLength(1);
+    expect(Object.keys(data.threads)).toHaveLength(1);
   });
 
   it("auto-archives resolved comment when I resolved it", async () => {
@@ -383,7 +391,7 @@ describe("POST /api/docs/[docId]/threads", () => {
     const res = await POST(req, makeParams("d1"));
     const data = await res.json();
     expect(data.comment).toBeTruthy();
-    expect(data.threads).toHaveLength(0);
+    expect(Object.keys(data.threads)).toHaveLength(0);
     expect(mockFetchDocData).not.toHaveBeenCalled();
   });
 

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { RefreshCw, Menu, Trash2, Pencil, CircleHelp } from "lucide-react";
 import type { Comment, Label } from "@prisma/client";
 import type { DocWithComments, DocWithLabels } from "@/types";
-import type { CommentThread, SuggestionContent } from "@/lib/google-drive";
+import type { CommentThread, ThreadMap, SuggestionContent } from "@/lib/google-drive";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { LabelBadge } from "@/components/label-badge";
 import { EditDocDialog } from "@/components/edit-doc-dialog";
@@ -105,7 +105,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   const [bulkUnarchiving, setBulkUnarchiving] = useState(false);
   const [bulkMarkingRead, setBulkMarkingRead] = useState(false);
   const [bulkMarkingUnread, setBulkMarkingUnread] = useState(false);
-  const [threadMap, setThreadMap] = useState<Record<string, CommentThread>>({});
+  const [threadMap, setThreadMap] = useState<ThreadMap>({});
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
   const [documentText, setDocumentText] = useState<string | undefined>(undefined);
   const [viewedByMeTime, setViewedByMeTime] = useState<string | null>(null);
@@ -166,7 +166,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
 
   async function fetchThreads(contextId?: string) {
     try {
-      const res = await apiFetch(`/api/docs/${doc.docId}/comments`, { contextId });
+      const res = await apiFetch(`/api/docs/${doc.docId}/threads`, { contextId });
       if (res.ok) {
         const data = await res.json();
         setThreadMap(data.threads ?? {});
@@ -257,9 +257,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
         // comment ID (comment type, not suggestion). Falls back to full fetch
         // for suggestions or when no ID is available.
         const targetedCommentId = (event.commentType !== "SUGGESTION") ? event.googleCommentId : undefined;
-        const commentsUrl = targetedCommentId
-          ? `/api/docs/${initialDoc.docId}/comments?commentId=${encodeURIComponent(targetedCommentId)}`
-          : `/api/docs/${initialDoc.docId}/comments`;
+        const threadsUrl = targetedCommentId
+          ? `/api/docs/${initialDoc.docId}/threads?commentId=${encodeURIComponent(targetedCommentId)}`
+          : `/api/docs/${initialDoc.docId}/threads`;
         console.log("[cross-tab] doc-detail: refreshing (comments event" + (targetedCommentId ? `, comment=${targetedCommentId}` : "") + ")"); // eslint-disable-line no-console
         // Fetch doc and threads in parallel, then apply both state updates
         // together so React batches them into one render. This prevents
@@ -269,7 +269,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
         // comments don't jump (same as in-app reply).
         const [docRes, threadsRes] = await Promise.all([
           apiFetch(`/api/docs/${initialDoc.docId}`, { contextId, reason }),
-          apiFetch(commentsUrl, { contextId }),
+          apiFetch(threadsUrl, { contextId }),
         ]);
         if (docRes.ok) {
           const updated: DocWithComments = await docRes.json();

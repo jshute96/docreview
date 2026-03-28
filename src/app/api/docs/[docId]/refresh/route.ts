@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getDriveClient, createDriveService, invalidGrantResponse, fetchCommentData, fetchDocData, fetchFileTextViaExport } from "@/lib/google-drive";
-import type { CommentThread, SuggestionContent, DriveSuggestion } from "@/lib/google-drive";
+import type { ThreadMap, SuggestionContent, DriveSuggestion } from "@/lib/google-drive";
 import { upsertDocsAndSyncComments } from "@/lib/refresh";
 import { docWithCommentsInclude, stripServerOnly } from "@/lib/doc-queries";
 import { logError, logWarning } from "@/lib/log";
@@ -82,7 +82,7 @@ export async function POST(
     }
   }
 
-  let threadMap: Record<string, CommentThread> | undefined;
+  let threadMap: ThreadMap | undefined;
   let uiContent: { suggestions: Record<string, SuggestionContent>; documentText: string | null } | null = null;
 
   if (driveDoc) {

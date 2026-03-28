@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import type { Comment } from "@prisma/client";
-import type { CommentThread, SuggestionContent } from "@/lib/google-drive";
+import type { CommentThread, ThreadMap, SuggestionContent } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
 import { CommentThreadPanel } from "@/components/comment-thread-panel";
 import { highlightText } from "@/lib/highlight";
@@ -129,10 +129,11 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     navigateToComment(googleDocId, comment.googleCommentId ?? "", driveUrl, comment.resolved);
   }
 
-  function applyThreadUpdate(data: { threads: CommentThread[]; comment: Comment }) {
-    setThreads(data.threads);
-    if (onThreadUpdate && data.threads.length > 0) {
-      onThreadUpdate(threadId, data.threads[0]);
+  function applyThreadUpdate(data: { threads: ThreadMap; comment: Comment }) {
+    const threadList = Object.values(data.threads);
+    setThreads(threadList);
+    if (onThreadUpdate && threadList.length > 0) {
+      onThreadUpdate(threadId, threadList[0]);
     }
     onUpdate(data.comment);
     fetchedModifiedMs.current = data.comment.driveModifiedAt
@@ -147,9 +148,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       const res = await apiFetch(`/api/docs/${docId}/threads?commentId=${threadId}`);
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-      setThreads(data.threads);
-      if (onThreadUpdate && data.threads.length > 0) {
-        onThreadUpdate(threadId, data.threads[0]);
+      const threadList: CommentThread[] = Object.values(data.threads);
+      setThreads(threadList);
+      if (onThreadUpdate && threadList.length > 0) {
+        onThreadUpdate(threadId, threadList[0]);
       }
       fetchedModifiedMs.current = currentModifiedMs;
     } catch (err) {

@@ -579,6 +579,9 @@ export interface CommentThread {
   quotedFileContent?: { mimeType: string; value: string } | null;
 }
 
+/** Map of Google comment/suggestion IDs to their thread data. */
+export type ThreadMap = Record<string, CommentThread>;
+
 /** Extract quotedFileContent from a Drive comment, filtering to displayable MIME types.
  *  Note: the Drive API truncates long quoted text (the truncation format is undocumented).
  *  Callers comparing against document text should strip trailing "..." or "…" first. */

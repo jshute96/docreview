@@ -88,10 +88,10 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/[docId]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata and syncs comments via shared logic in `refresh.ts` |
 | `docs/[docId]/refresh/route.test.ts` | Tests for single-doc metadata refresh and comment sync |
 | `docs/sync-comments/[googleDocId]/route.ts` | `POST` sync comments+suggestions for a single doc by Google doc ID — called by Chrome extension when comment activity is detected on a Google Docs page |
-| `docs/[docId]/comments/route.ts` | `GET` fetch all comment threads from Drive + `viewedByMeTime` (fast path — Drive `comments.list` + `files.get` in parallel) |
+| `docs/[docId]/comments/route.ts` | `PATCH` bulk update comment status or isRead |
 | `docs/[docId]/content/route.ts` | `GET` fetch document text and suggestion content (slow path — Docs API `documents.get` or Drive `files.export`); for Docs, uses a single `SUGGESTIONS_INLINE` call for both |
 | `docs/[docId]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (INBOX/ARCHIVED/MUTED), read state, or star |
-| `docs/[docId]/threads/route.ts` | `GET` fetch thread(s) from Drive; `POST` refresh a single thread (updates DB) |
+| `docs/[docId]/threads/route.ts` | `GET` fetch threads from Drive (all with `viewedByMeTime`, single, or checkOnly); `POST` refresh a single thread (updates DB) |
 | `docs/metadata/route.ts` | `POST` fetch current doc titles and owners from Google Drive for given IDs — used by client-side metadata cache for stale/missing entries |
 | `docs/[docId]/threads/reply/route.ts` | `POST` reply to / resolve / reopen a comment thread via Drive API; pins `viewedByMeTime` around the action (debug logging) |
 | `docs/[docId]/viewed-time/route.ts` | `PUT` update `viewedByMeTime` on a Google Drive file |

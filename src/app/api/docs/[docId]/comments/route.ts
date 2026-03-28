@@ -1,84 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, createDriveService, fetchCommentData, fetchThreadDetail, invalidGrantResponse } from "@/lib/google-drive";
-import type { CommentThread } from "@/lib/google-drive";
 import { CommentStatus } from "@prisma/client";
 import { runWithRequestId } from "@/lib/request-context";
-import { logInfo } from "@/lib/log";
-
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ docId: string }> }
-) {
-  return runWithRequestId("GET", _req, async () => {
-  const session = await getValidSession();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const userId = session.user.id;
-  const { docId } = await params;
-
-  const doc = await prisma.doc.findUnique({ where: { docId } });
-  if (!doc || doc.userId !== userId) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  let driveAuth;
-  try {
-    driveAuth = await getDriveClient(userId);
-  } catch (err) {
-    const reauth = invalidGrantResponse(err);
-    if (reauth) return reauth;
-    const message = err instanceof Error ? err.message : "Failed to connect to Google Drive";
-    return NextResponse.json({ error: message }, { status: 502 });
-  }
-
-  // Single-comment mode: ?commentId=X fetches one thread via comments.get
-  // instead of listing all comments. Used by the extension-triggered comment
-  // sync path to avoid a redundant full comments.list after the server already
-  // synced the specific comment.
-  const commentId = _req.nextUrl.searchParams.get("commentId");
-
-  try {
-    if (commentId) {
-      const t0 = Date.now();
-      const result = await fetchThreadDetail(driveAuth, doc.googleDocId, commentId, session.user.email ?? undefined);
-      const threads: Record<string, CommentThread> = {};
-      if (result?.thread) {
-        threads[result.thread.id] = result.thread;
-      }
-      logInfo(`[Comments] Single thread fetch for ${doc.googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
-      return NextResponse.json({ threads });
-    }
-
-    const drive = createDriveService(driveAuth);
-    const [threadResult, fileRes] = await Promise.all([
-      fetchCommentData(driveAuth, doc.googleDocId, { threads: true }),
-      drive.files.get({
-        fileId: doc.googleDocId,
-        fields: "viewedByMeTime",
-        supportsAllDrives: true,
-      }),
-    ]);
-
-    const threads: Record<string, CommentThread> = {};
-    for (const t of threadResult.threads ?? []) {
-      threads[t.id] = t;
-    }
-
-    return NextResponse.json({
-      threads,
-      viewedByMeTime: fileRes.data.viewedByMeTime ?? null,
-    });
-  } catch (err) {
-    const reauth = invalidGrantResponse(err);
-    if (reauth) return reauth;
-    const message = err instanceof Error ? err.message : "Failed to fetch comment threads";
-    return NextResponse.json({ error: message }, { status: 502 });
-  }
-  });
-}
 
 export async function PATCH(
   req: NextRequest,

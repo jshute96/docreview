@@ -95,23 +95,13 @@ Google API: Drive.
 
 ## Comments and Threads
 
-These four endpoints serve different purposes for comment data — see the
-comparison table below.
+### `/api/docs/[docId]/comments` — Bulk comment updates
 
-### `/api/docs/[docId]/comments` — Thread list from Drive
+PATCH only. Bulk-updates comment `status` or `isRead` for multiple comments.
 
-| Method | Purpose | Google API? |
-|--------|---------|-------------|
-| GET | Fetch all comment threads (or single via `?commentId=X`) | Drive (`comments.list`) |
-| PATCH | Bulk update comment status or isRead | No (Prisma) |
+Body: `{ commentIds: string[], status?: CommentStatus, isRead?: boolean }`
 
-GET calls Drive `comments.list` to fetch thread data, builds a `threadMap`
-keyed by comment ID, and returns `viewedByMeTime`. With `?commentId=X`, fetches
-only that one thread. With `?checkOnly=true`, returns just the doc's
-`modifiedTime` for staleness checks.
-
-PATCH accepts `{ commentIds, status?, isRead? }` for bulk operations (e.g.,
-"archive all resolved").
+No Google API (Prisma only).
 
 ### `/api/docs/[docId]/comments/[commentId]` — Single comment update
 
@@ -120,17 +110,22 @@ database. Auto-unarchives the parent doc if a comment moves to INBOX.
 
 No Google API (Prisma only).
 
-### `/api/docs/[docId]/threads` — Thread detail
+### `/api/docs/[docId]/threads` — Thread data from Drive
 
 | Method | Purpose | Google API? |
 |--------|---------|-------------|
-| GET | Fetch all threads or single thread (`?commentId=X`) | Drive |
-| POST | Fetch single thread with sync (`?commentId=X`) | Drive |
+| GET | Fetch threads from Drive | Yes (Drive) |
+| POST | Refresh single thread with DB sync (`?commentId=X`) | Yes (Drive or Docs) |
 
-GET without `?commentId` fetches all threads (used on initial page load).
-GET with `?commentId=X` fetches one thread. POST with `?commentId=X` does the
-same but forces a fresh fetch from Drive (used by the Refresh button on an
-expanded comment). With `?checkOnly=true`, returns just `modifiedTime`.
+GET modes:
+- No params: fetches all threads + `viewedByMeTime` (page load, cross-tab)
+- `?commentId=X`: fetches one thread
+- `?commentId=X&checkOnly=true`: returns just `modifiedTime` (staleness check)
+
+All responses return threads as `Record<id, CommentThread>`.
+
+POST with `?commentId=X` forces a fresh fetch and syncs the DB comment record.
+Returns `{ comment, threads }`.
 
 ### `/api/docs/[docId]/threads/reply` — Reply to thread
 
@@ -148,26 +143,16 @@ scope.
 
 Google API: Drive, Docs.
 
-### Comparison: comments vs threads vs comments/[id]
-
-These endpoints handle overlapping concerns. Here's when each is used:
+### Comparison: comments vs threads
 
 | Endpoint | Used by | Calls Google? | What it does |
 |----------|---------|---------------|--------------|
-| `GET /comments` | doc-detail page load, cross-tab handler | Yes (Drive) | Fetches all thread data via `comments.list`, returns `threadMap` |
-| `GET /comments?commentId=X` | doc-detail cross-tab (targeted) | Yes (Drive) | Fetches one thread from the full `comments.list` response |
 | `PATCH /comments` | doc-detail bulk actions | No | Bulk-updates status/isRead for multiple comments in DB |
 | `PATCH /comments/[id]` | comment-row (archive, star, read) | No | Updates one comment in DB — cheapest path for local-only changes |
-| `GET /threads` | doc-detail initial load | Yes (Drive) | Fetches all threads (same Drive call as `/comments` GET) |
-| `GET /threads?commentId=X` | comment-row expand | Yes (Drive) | Fetches one thread detail |
-| `POST /threads?commentId=X` | comment-row Refresh button | Yes (Drive) | Forces fresh single-thread fetch from Drive |
+| `GET /threads` | doc-detail page load, cross-tab handler | Yes (Drive) | Fetches all threads as Record + `viewedByMeTime` |
+| `GET /threads?commentId=X` | comment-row expand, cross-tab (targeted) | Yes (Drive) | Fetches one thread as Record |
+| `POST /threads?commentId=X` | comment-row Refresh button | Yes (Drive) | Syncs single thread to DB, returns updated comment + thread |
 | `GET /threads?checkOnly=true` | comment-row background check | Yes (Drive) | Lightweight — just checks `modifiedTime` |
-
-**Why two thread-fetching endpoints?** `/comments` is used by the page-level
-cross-tab handler which needs to merge thread data into the full `threadMap`
-and update `viewedByMeTime`. `/threads` is used by individual `CommentRow`
-components for on-demand single-thread operations (expand, refresh,
-background staleness check).
 
 ## Labels
 

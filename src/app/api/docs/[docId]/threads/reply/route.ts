@@ -104,7 +104,7 @@ export async function POST(
 
     return NextResponse.json({
       comment: syncResult.comment,
-      threads: syncResult.thread ? [syncResult.thread] : [],
+      threads: syncResult.thread ? { [syncResult.thread.id]: syncResult.thread } : {},
     });
   } catch (err) {
     const reauth = invalidGrantResponse(err);

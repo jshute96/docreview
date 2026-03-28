@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getDriveClient, createDriveService, fetchThreadDetail, fetchDocData, fetchCommentData, invalidGrantResponse } from "@/lib/google-drive";
+import type { ThreadMap } from "@/lib/google-drive";
 import { bumpLastCommentActivity, syncSingleComment } from "@/lib/sync-comments";
 import { logError } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
@@ -42,12 +43,32 @@ export async function GET(
     }
 
     if (commentId) {
-      const data = await fetchThreadDetail(driveAuth, doc.googleDocId, commentId);
-      return NextResponse.json({ threads: data ? [data.thread] : [] });
+      const data = await fetchThreadDetail(driveAuth, doc.googleDocId, commentId, session.user.email ?? undefined);
+      const threads: ThreadMap = {};
+      if (data?.thread) threads[data.thread.id] = data.thread;
+      return NextResponse.json({ threads });
     }
 
-    const result = await fetchCommentData(driveAuth, doc.googleDocId, { threads: true });
-    return NextResponse.json({ threads: result.threads ?? [] });
+    // Full thread list: fetch all threads + viewedByMeTime in parallel
+    const drive = createDriveService(driveAuth);
+    const [threadResult, fileRes] = await Promise.all([
+      fetchCommentData(driveAuth, doc.googleDocId, { threads: true }),
+      drive.files.get({
+        fileId: doc.googleDocId,
+        fields: "viewedByMeTime",
+        supportsAllDrives: true,
+      }),
+    ]);
+
+    const threads: ThreadMap = {};
+    for (const t of threadResult.threads ?? []) {
+      threads[t.id] = t;
+    }
+
+    return NextResponse.json({
+      threads,
+      viewedByMeTime: fileRes.data.viewedByMeTime ?? null,
+    });
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
@@ -102,7 +123,7 @@ export async function POST(
     // Suggestions live in the Docs API, not Drive comments
     if (commentRecord.type === "SUGGESTION") {
       if (doc.mimeType !== DOCS_MIME_TYPE) {
-        return NextResponse.json({ comment: commentRecord, threads: [] });
+        return NextResponse.json({ comment: commentRecord, threads: {} });
       }
       const docData = await fetchDocData(driveAuth, doc.googleDocId);
       const liveSuggestions = docData.suggestions;
@@ -121,10 +142,10 @@ export async function POST(
           await bumpLastCommentActivity(doc.docId, [now], tx);
           return result;
         });
-        return NextResponse.json({ comment: updated, threads: [] });
+        return NextResponse.json({ comment: updated, threads: {} });
       }
 
-      return NextResponse.json({ comment: commentRecord, threads: [] });
+      return NextResponse.json({ comment: commentRecord, threads: {} });
     }
 
     // Comments: use syncSingleComment for targeted fetch + DB update
@@ -136,7 +157,7 @@ export async function POST(
 
     return NextResponse.json({
       comment: result.comment,
-      threads: result.thread ? [result.thread] : [],
+      threads: result.thread ? { [result.thread.id]: result.thread } : {},
     });
   } catch (err) {
     const reauth = invalidGrantResponse(err);
