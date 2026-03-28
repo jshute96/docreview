@@ -315,6 +315,11 @@ Replies on suggestion threads are tagged as `commentType='suggestion'`. The Docs
 whether the suggestion still exists (for accept/reject detection) but doesn't track replies.
 This is acceptable because Docreview doesn't display suggestion replies.
 
+After server-side sync completes, the extension notifies open Docreview tabs with `commentSynced`
+(including `googleCommentId` and `commentType` when available). The client uses a targeted
+`comments.get` for comment threads with a known ID, merging the single thread into the existing
+thread map. For suggestions or when no ID is available, it falls back to a full `comments.list`.
+
 For full suggestion sync details, see [`suggestions.md`](./suggestions.md).
 
 ---

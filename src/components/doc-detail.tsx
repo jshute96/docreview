@@ -253,7 +253,14 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
         ]);
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
       } else if (event.type === "comments" && (event.docId === initialDoc.docId || event.docId === initialDoc.googleDocId)) {
-        console.log("[cross-tab] doc-detail: refreshing (comments event)"); // eslint-disable-line no-console
+        // Targeted single-comment fetch when the extension provides a specific
+        // comment ID (comment type, not suggestion). Falls back to full fetch
+        // for suggestions or when no ID is available.
+        const targetedCommentId = (event.commentType !== "suggestion") ? event.googleCommentId : undefined;
+        const commentsUrl = targetedCommentId
+          ? `/api/docs/${initialDoc.docId}/comments?commentId=${encodeURIComponent(targetedCommentId)}`
+          : `/api/docs/${initialDoc.docId}/comments`;
+        console.log("[cross-tab] doc-detail: refreshing (comments event" + (targetedCommentId ? `, comment=${targetedCommentId}` : "") + ")"); // eslint-disable-line no-console
         // Fetch doc and threads in parallel, then apply both state updates
         // together so React batches them into one render. This prevents
         // expanded threads from flashing a loading state — the initialThread
@@ -262,13 +269,22 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
         // comments don't jump (same as in-app reply).
         const [docRes, threadsRes] = await Promise.all([
           apiFetch(`/api/docs/${initialDoc.docId}`, { contextId, reason }),
-          apiFetch(`/api/docs/${initialDoc.docId}/comments`, { contextId }),
+          apiFetch(commentsUrl, { contextId }),
         ]);
         if (docRes.ok) {
           const updated: DocWithComments = await docRes.json();
           if (threadsRes.ok) {
             const threadData = await threadsRes.json();
-            setThreadMap(threadData.threads ?? {});
+            if (targetedCommentId) {
+              // Merge single thread into existing map, or remove if deleted
+              if (Object.keys(threadData.threads).length === 0) {
+                setThreadMap(prev => { const next = { ...prev }; delete next[targetedCommentId]; return next; });
+              } else {
+                setThreadMap(prev => ({ ...prev, ...threadData.threads }));
+              }
+            } else {
+              setThreadMap(threadData.threads ?? {});
+            }
             if (threadData.viewedByMeTime !== undefined) setViewedByMeTime(threadData.viewedByMeTime);
           }
           setDoc(updated);

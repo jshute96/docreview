@@ -19,8 +19,9 @@
   // commentSynced: background → here → web app.
   //   Sent after the server-side comment sync completes (the background
   //   already called POST /api/docs/sync-comments/{docId} with the specific
-  //   commentId). This just notifies the web app that fresh data is available
-  //   so it re-fetches — it only carries docId, not the commentId.
+  //   commentId). Carries docId plus optional googleCommentId and commentType
+  //   so the web app can do a targeted single-comment fetch instead of
+  //   reloading all comments.
   //
   // commentSelection: Docs page (MAIN world) → content.js → background → here → web app.
   //   Carries a discoId identifying which specific comment the user
@@ -28,7 +29,10 @@
   chrome.runtime.onMessage.addListener(function(msg, _sender, sendResponse) {
     if (msg.type === 'commentSynced' && msg.docId) {
       console.log('[bridge-to-docreview] relaying commentSynced for', msg.docId);
-      window.postMessage({ source: 'docreview-extension', type: 'commentSynced', docId: msg.docId }, '*');
+      var payload = { source: 'docreview-extension', type: 'commentSynced', docId: msg.docId };
+      if (msg.googleCommentId) payload.googleCommentId = msg.googleCommentId;
+      if (msg.commentType) payload.commentType = msg.commentType;
+      window.postMessage(payload, '*');
       sendResponse({ received: true });
       return true;
     }

@@ -7,7 +7,7 @@ const CHANNEL_NAME = "docreview-sync";
 export type CrossTabEvent =
   | { type: "docs"; docIds?: string[] }
   | { type: "labels" }
-  | { type: "comments"; docId: string }
+  | { type: "comments"; docId: string; googleCommentId?: string; commentType?: string }
   | { type: "signout" };
 
 /** Payload sent over BroadcastChannel — event data plus optional sender context ID. */

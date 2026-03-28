@@ -184,7 +184,7 @@ Looks up doc by Google doc ID, calls `syncComments()` with optional hints. With 
 
 **Step 5 — Notify docreview tabs** (`background.js` → `bridge-to-docreview.js` → `bridge-to-extension.ts`)
 
-Background sends `commentSynced` to first open docreview tab via `chrome.tabs.sendMessage`. Bridge content script relays to page via `window.postMessage`. Extension bridge posts to `BroadcastChannel` (using a separate short-lived instance so the receiving tab also gets it — the shared singleton suppresses self-delivery by spec). All docreview tabs receive via `useCrossTabListener` and refetch from database. If no docreview tab is open, nothing to notify — database is already updated for next visit.
+Background sends `commentSynced` (with `docId`, optional `googleCommentId`, and `commentType`) to first open docreview tab via `chrome.tabs.sendMessage`. Bridge content script relays to page via `window.postMessage`. Extension bridge posts to `BroadcastChannel` (using a separate short-lived instance so the receiving tab also gets it — the shared singleton suppresses self-delivery by spec). All docreview tabs receive via `useCrossTabListener`. When a `googleCommentId` is present (comment type, not suggestion), the client does a targeted single-thread fetch (`GET /api/docs/{docId}/comments?commentId=X` → `comments.get`) and merges into the existing thread map. Without an ID (or for suggestions), falls back to full `comments.list`. If no docreview tab is open, nothing to notify — database is already updated for next visit.
 
 ## Debugging
 

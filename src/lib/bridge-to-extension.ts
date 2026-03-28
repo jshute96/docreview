@@ -225,10 +225,12 @@ function setupCommentSyncedListener() {
     // short-lived channel — a different object on the same channel name counts
     // as a valid recipient, so the singleton listener in this tab will fire.
     const docId = event.data.docId;
+    const googleCommentId: string | undefined = event.data.googleCommentId;
+    const commentType: string | undefined = event.data.commentType;
     // eslint-disable-next-line no-console -- extension bridge diagnostic, not server-side app code
     console.log("[bridge-to-extension] commentSynced received, broadcasting for", docId);
     const ch = new BroadcastChannel("docreview-sync");
-    ch.postMessage({ type: "comments", docId });
+    ch.postMessage({ type: "comments", docId, googleCommentId, commentType });
     ch.close();
   });
 }

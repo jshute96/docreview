@@ -48,7 +48,10 @@ function fireCommentSync(docId, commentType, googleCommentId) {
         // Notify open docreview tabs so they refresh
         chrome.tabs.query({ url: config.baseUrl + '/*' }, function(tabs) {
           if (tabs && tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id, { type: 'commentSynced', docId: docId }, function() {
+            var syncedMsg = { type: 'commentSynced', docId: docId };
+            if (googleCommentId) syncedMsg.googleCommentId = googleCommentId;
+            if (commentType) syncedMsg.commentType = commentType;
+            chrome.tabs.sendMessage(tabs[0].id, syncedMsg, function() {
               if (chrome.runtime.lastError) {
                 console.warn('[background] sendMessage failed for docId', docId, 'to tab', tabs[0].id, '(' + tabs[0].url + '):', chrome.runtime.lastError.message);
               }

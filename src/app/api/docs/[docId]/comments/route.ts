@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, createDriveService, fetchCommentData, invalidGrantResponse } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, fetchCommentData, fetchThreadDetail, invalidGrantResponse } from "@/lib/google-drive";
 import type { CommentThread } from "@/lib/google-drive";
 import { CommentStatus } from "@prisma/client";
 import { runWithRequestId } from "@/lib/request-context";
+import { logInfo } from "@/lib/log";
 
 export async function GET(
   _req: NextRequest,
@@ -33,7 +34,24 @@ export async function GET(
     return NextResponse.json({ error: message }, { status: 502 });
   }
 
+  // Single-comment mode: ?commentId=X fetches one thread via comments.get
+  // instead of listing all comments. Used by the extension-triggered comment
+  // sync path to avoid a redundant full comments.list after the server already
+  // synced the specific comment.
+  const commentId = _req.nextUrl.searchParams.get("commentId");
+
   try {
+    if (commentId) {
+      const t0 = Date.now();
+      const result = await fetchThreadDetail(driveAuth, doc.googleDocId, commentId, session.user.email ?? undefined);
+      const threads: Record<string, CommentThread> = {};
+      if (result?.thread) {
+        threads[result.thread.id] = result.thread;
+      }
+      logInfo(`[Comments] Single thread fetch for ${doc.googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
+      return NextResponse.json({ threads });
+    }
+
     const drive = createDriveService(driveAuth);
     const [threadResult, fileRes] = await Promise.all([
       fetchCommentData(driveAuth, doc.googleDocId, { threads: true }),
