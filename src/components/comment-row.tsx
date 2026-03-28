@@ -569,7 +569,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             className="grid transition-[grid-template-rows] duration-200 ease-out"
             style={{ gridTemplateRows: expanded && !isExiting ? "1fr" : "0fr" }}
           >
-            <div className="overflow-hidden min-h-0">
+            <div className={`min-h-0${expanded && !isExiting ? "" : " overflow-hidden"}`}>
               {isSuggestion ? (
                 <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
                   <div className="float-right relative z-10 flex gap-1 ml-2 mb-1">

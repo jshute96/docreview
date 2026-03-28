@@ -336,7 +336,7 @@ export function CommentThreadPanel({
 
   if (loading) {
     return (
-      <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
+      <div className="mx-auto w-[90%] min-w-fit my-3 rounded-lg border bg-zinc-50 p-4">
         <p className="text-sm text-zinc-400">Loading comments...</p>
       </div>
     );
@@ -344,7 +344,7 @@ export function CommentThreadPanel({
 
   if (threads.length === 0) {
     return (
-      <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
+      <div className="mx-auto w-[90%] min-w-fit my-3 rounded-lg border bg-zinc-50 p-4">
         <p className="text-sm text-zinc-400">No comments on this document.</p>
         {replyBox}
       </div>
@@ -352,7 +352,7 @@ export function CommentThreadPanel({
   }
 
   return (
-    <div className={`mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4${isSelected ? " ring-2 ring-blue-400" : ""}`}>
+    <div className={`mx-auto w-[90%] min-w-fit my-3 rounded-lg border bg-zinc-50 p-4${isSelected ? " ring-2 ring-blue-400" : ""}`}>
       {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- click to select comment in Google Doc */}
       <div className={`divide-y divide-zinc-200${onSelectInDoc ? " cursor-pointer" : ""}`} onClick={onSelectInDoc} title={onSelectInDoc ? "Click to select this comment in the document" : undefined}>
         {threads.map((thread, threadIndex) => (
