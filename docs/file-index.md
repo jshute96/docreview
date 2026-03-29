@@ -266,12 +266,14 @@ Shadcn/ui components:
 | `open-browser-live.sh` | Open a regular Chrome with dedicated profile for online mode (Google session saved) |
 | `test_users.json` | Test account credentials (gitignored) |
 | `shared/test-env.ts` | Shared config: test DB URL, port 3010, server command builder |
+| `shared/test-db.ts` | Prisma client for the test database (with base64 field encoding), used for DB assertions in tests |
 | `extension-snapshot/playwright.config.ts` | Config for DOM snapshot tests (Python HTTP server on port 8889) |
 | `extension-snapshot/content-script.spec.ts` | Playwright tests for content script DOM injection against saved snapshots |
 | `extension-snapshot/snapshots/` | Saved rendered DOM from live Google pages (gitignored) |
 | `app-offline/playwright.config.ts` | Config for offline app tests (Next.js on port 3010, OFFLINE_MODE) |
 | `app-offline/smoke.spec.ts` | Smoke tests: login, page loads, auth redirect |
 | `app-offline/docs.spec.ts` | Doc list and individual doc page tests |
+| `app-offline/labels.spec.ts` | Label management tests: create, assign, reorder, color change, delete, cancel — with DB verification |
 | `extension-live/playwright.config.ts` | Config for extension + app tests (Chrome with --load-extension) |
 | `app-live/playwright.config.ts` | Config for tests with real Google OAuth |
 | `gmail_notifications/` | `.eml` + `.json` pairs for testing `parse-gmail-notification.ts` |

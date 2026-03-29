@@ -251,8 +251,12 @@ export function ManageLabelsDialog({
         if (!res.ok) throw new Error("Failed to update label color");
       }
 
-      // Build final labels list: start from draft, replace temp IDs with real ones
-      const finalLabels = draft.map((l) => tempToReal.get(l.labelId) ?? l);
+      // Build final labels list: start from draft, replace temp IDs with real ones,
+      // and update position fields to match the new array order.
+      const finalLabels = draft.map((l, i) => {
+        const resolved = tempToReal.get(l.labelId) ?? l;
+        return { ...resolved, position: i };
+      });
 
       // 4. Persist label order
       const orderIds = finalLabels.map((l) => l.labelId);
