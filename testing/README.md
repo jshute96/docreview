@@ -42,6 +42,27 @@ npm run test:e2e
 | `npm run test:open-browser` | Open an ephemeral Playwright browser (offline mode) |
 | `npm run test:open-browser-live` | Open a regular Chrome with saved profile (Google login survives across runs) |
 
+## Running individual tests
+
+`scripts/run-test.sh` finds the right `playwright.config.ts` automatically:
+
+```bash
+# Run a specific test file
+scripts/run-test.sh testing/app-offline/labels.spec.ts
+
+# Run a whole suite directory
+scripts/run-test.sh testing/app-offline/
+
+# Run with visible browsers (default is headless)
+scripts/run-test.sh testing/app-offline/labels.spec.ts --headed
+```
+
+Or pass the config explicitly:
+
+```bash
+npx playwright test --config testing/app-offline/playwright.config.ts testing/app-offline/labels.spec.ts
+```
+
 ## Interactive testing
 
 Start the test dev server on port 3009 and browse to it:
@@ -87,6 +108,7 @@ by replacing the database name with `docreview_test`.
 | File | Purpose |
 |------|---------|
 | `shared/test-env.ts` | Test database URL, port, and server command builder |
+| `shared/test-db.ts` | Prisma client for test DB, used for DB assertions in tests |
 | `setup-test-db.sh` | Create/migrate the test database |
 | `test_users.json` | Test account credentials (gitignored) |
 | `chrome-extension.md` | Full test case catalog (auto + manual) |
@@ -104,6 +126,7 @@ testing/
   test_users.json                  — test credentials (gitignored)
   shared/
     test-env.ts                    — shared config (DB URL, port, server command)
+    test-db.ts                     — Prisma client for test DB (with base64 encoding)
   extension-snapshot/
     playwright.config.ts           — static HTTP server on port 8889
     content-script.spec.ts         — DOM injection tests
@@ -111,6 +134,9 @@ testing/
   app-offline/
     playwright.config.ts           — Next.js on port 3010, OFFLINE_MODE=true
     smoke.spec.ts                  — login, page load, auth redirect tests
+    docs.spec.ts                   — doc list and individual doc page tests
+    labels.spec.ts                 — label CRUD, reorder, color, delete, cancel
+    labels-crosstab.spec.ts        — cross-tab label sync across all pages/dialogs
   extension-live/
     playwright.config.ts           — Next.js + Chrome extension loaded
     (tests TBD)

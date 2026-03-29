@@ -83,7 +83,8 @@
       "Bash(identify:*)",
       "Bash(curl:*)",
       "Bash(gws schema:*)",
-      "Bash(npm list:*)"
+      "Bash(npm list:*)",
+      "Bash(scripts/run-test.sh:*)"
     ],
     "defaultMode": "acceptEdits"
   },

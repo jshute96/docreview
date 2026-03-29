@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { getDriveClient, createDriveService } from "@/lib/google-drive";
+import { OFFLINE_MODE } from "@/lib/offline";
 import { prisma } from "@/lib/prisma";
 import { logInfo, logWarning } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
@@ -43,6 +44,20 @@ export async function POST(req: NextRequest) {
     // Cap at 100 to prevent abuse
     if (googleDocIds.length > 100) {
       return NextResponse.json({ error: "Too many IDs (max 100)" }, { status: 400 });
+    }
+
+    // In offline mode, skip Drive and fall back to DB titles only
+    if (OFFLINE_MODE) {
+      logWarning(`[Metadata] Offline mode — skipping Drive fetch for ${googleDocIds.length} docs, using DB titles`);
+      const dbDocs = await prisma.doc.findMany({
+        where: { userId, googleDocId: { in: googleDocIds }, title: { not: "" } },
+        select: { googleDocId: true, title: true },
+      });
+      const metadata: Record<string, DocMetadataEntry> = {};
+      for (const doc of dbDocs) {
+        metadata[doc.googleDocId] = { title: doc.title, owner: null };
+      }
+      return NextResponse.json(metadata);
     }
 
     const idSummary = googleDocIds.length <= 1

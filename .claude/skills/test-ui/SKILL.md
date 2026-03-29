@@ -248,3 +248,23 @@ WHERE d.user_id = '<user_id>' AND d.title = 'Some Doc Title'"
 scripts/query_database.sh "SELECT l.name, l.color FROM labels l WHERE l.user_id = '<user_id>'"
 ```
 
+## Automated Playwright Tests
+
+In addition to interactive testing, there are automated Playwright test suites in `testing/`. These run headless against the `docreview_test` database on port 3010.
+
+```bash
+# Run a specific test file (finds the right config automatically)
+scripts/run-test.sh testing/app-offline/labels.spec.ts
+
+# Run a whole suite
+scripts/run-test.sh testing/app-offline/
+
+# Run with visible browsers
+scripts/run-test.sh testing/app-offline/labels-crosstab.spec.ts --headed
+
+# Run all suites
+npm run test:e2e
+```
+
+Test suites live in subdirectories under `testing/` — see `testing/README.md` for details.
+

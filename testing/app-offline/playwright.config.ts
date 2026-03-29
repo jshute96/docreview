@@ -18,6 +18,9 @@ export default defineConfig({
   testMatch: '**/*.spec.ts',
   timeout: 30_000,
   retries: 0,
+  // Single worker: label tests mutate shared DB state and cross-tab
+  // broadcasts (BroadcastChannel) leak across contexts on the same origin.
+  workers: 1,
   use: {
     baseURL: TEST_BASE_URL,
     channel: 'chrome',

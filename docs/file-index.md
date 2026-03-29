@@ -170,6 +170,7 @@ Shadcn/ui components:
 | `query_database.sh` | Readonly SQL queries against production DB via `docreview_ro` user |
 | `query_test_database.sh` | Readonly SQL queries against `docreview_test` DB via `docreview_ro` user |
 | `query_db_common.sh` | Shared implementation for query scripts — arg parsing, psql invocation |
+| `run-test.sh` | Run Playwright e2e tests — finds the right config file automatically |
 
 ## Contexts (`src/contexts/`)
 
@@ -274,6 +275,7 @@ Shadcn/ui components:
 | `app-offline/smoke.spec.ts` | Smoke tests: login, page loads, auth redirect |
 | `app-offline/docs.spec.ts` | Doc list and individual doc page tests |
 | `app-offline/labels.spec.ts` | Label management tests: create, assign, reorder, color change, delete, cancel — with DB verification |
+| `app-offline/labels-crosstab.spec.ts` | Cross-tab label sync: verifies label changes broadcast to all open pages and dialogs |
 | `extension-live/playwright.config.ts` | Config for extension + app tests (Chrome with --load-extension) |
 | `app-live/playwright.config.ts` | Config for tests with real Google OAuth |
 | `gmail_notifications/` | `.eml` + `.json` pairs for testing `parse-gmail-notification.ts` |

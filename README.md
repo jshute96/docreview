@@ -141,12 +141,28 @@ Log files are written to `logs/docreview-YYYY-MM-DD.log`.
 ## Testing
 
 ```bash
-npm test            # run all tests once
-npm run test:watch  # run tests in watch mode
+npm test            # run all unit tests once
+npm run test:watch  # run unit tests in watch mode
 npm run typecheck   # type check without building
 ```
 
 A pre-commit hook (via Husky) runs `npm test` and `npm run typecheck` automatically before each commit.
+
+### UI tests (Playwright)
+
+UI tests live in `testing/` and run against a separate `docreview_test` database.
+They are not part of the pre-commit hook since they require database setup and
+are slower to run.
+
+```bash
+testing/setup-test-db.sh                                # one-time DB setup
+npm run test:e2e                                        # run all UI test suites
+scripts/run-test.sh testing/app-offline/labels.spec.ts  # run a specific test file
+scripts/run-test.sh testing/app-offline/ --headed       # run a suite with visible browsers
+```
+
+See `testing/README.md` for full details on test suites, interactive testing,
+and database setup.
 
 ## Troubleshooting
 

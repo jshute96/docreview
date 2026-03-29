@@ -64,9 +64,15 @@ using different APIs and different IDs.  See `docs/comment-tracking.md` and
 - **State**: Schema changes or regeneration of the Prisma client require a dev server restart, as Next.js holds the client in memory.
 
 ### Testing
-- **Coverage**: Write tests for all non-trivial logic.
-- **Mocks**: Mock the Prisma client using the provided `src/lib/__mocks__/prisma.ts`.
-- This project uses **Vitest**.
+- **Unit tests**: Write tests for all non-trivial logic. Uses **Vitest**. Mock the Prisma client using `src/lib/__mocks__/prisma.ts`.
+- **UI tests (Playwright)**: Live in `testing/` with suites in subdirectories (e.g., `testing/app-offline/`). Run against a separate `docreview_test` database on port 3010. Not part of the pre-commit hook (slower). Run with:
+  ```bash
+  scripts/run-test.sh testing/app-offline/labels.spec.ts           # one test file
+  scripts/run-test.sh testing/app-offline/                         # whole suite
+  scripts/run-test.sh testing/app-offline/labels.spec.ts --headed  # visible browser
+  npm run test:e2e                                                 # all suites
+  ```
+  See `testing/README.md` for setup and details.
 
 ### UI Controls
 - **Tooltips**: All buttons, filter controls, and column headings should have a `title` attribute providing a brief description of what the control does. When adding new controls, always include a tooltip. For toggle buttons with two states (e.g., Archive/Unarchive), use a dynamic title that reflects the current action.
@@ -87,7 +93,7 @@ using different APIs and different IDs.  See `docs/comment-tracking.md` and
 - **Warnings:** Use `logWarning(message, ...args)` from `src/lib/log.ts` — prints yellow with `WARNING:` prefix via `console.warn`.
 - **Info:** Use `logInfo(message, ...args)` from `src/lib/log.ts` — wraps `console.log` and writes to daily log files.
 - **Never** use raw `console.log()`, `console.error()`, or `console.warn()` in application code; always use the helpers in `log.ts`.
-- **Prefix** every log message with a bracketed tag: `[Drive]`, `[Gmail]`, `[Sync]`, `[Comments]`, `[Suggestions]`, `[Scan]`, `[Refresh]`, `[Prisma]`, `[Auth]`, `[API]`, `[GmailRefresh]`, `[Docs]`.
+- **Prefix** every log message with a bracketed tag: `[Drive]`, `[Gmail]`, `[Sync]`, `[Comments]`, `[Suggestions]`, `[Scan]`, `[Refresh]`, `[Prisma]`, `[Auth]`, `[API]`, `[GmailRefresh]`, `[Docs]`, `[Metadata]`.
 - **Include timing** for external API calls: `(${Date.now() - t0}ms)`.
 - **No PII in logs**: Never log document titles, user/owner names, email subjects, or comment content. Use Google Doc IDs instead of titles. The logged-in user's own email is the only exception (e.g., auth denial logs).
 - Client-side toasts don't need corresponding `console.log` — the server-side API route already logs the operation or error.

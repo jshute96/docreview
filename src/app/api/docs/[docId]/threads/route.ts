@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getDriveClient, createDriveService, fetchThreadDetail, fetchDocData, fetchCommentData, invalidGrantResponse } from "@/lib/google-drive";
+import { OfflineModeError } from "@/lib/offline";
 import type { ThreadMap } from "@/lib/google-drive";
 import { bumpLastCommentActivity, syncSingleComment } from "@/lib/sync-comments";
-import { logError } from "@/lib/log";
+import { logError, logWarning } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
@@ -70,6 +71,10 @@ export async function GET(
       viewedByMeTime: fileRes.data.viewedByMeTime ?? null,
     });
   } catch (err) {
+    if (err instanceof OfflineModeError) {
+      logWarning(`[API] Offline mode — skipping Drive thread fetch for doc ${docId}`);
+      return NextResponse.json({ threads: {} });
+    }
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
     logError(`[API] Failed to fetch threads for doc ${docId}:`, err);
@@ -160,6 +165,10 @@ export async function POST(
       threads: result.thread ? { [result.thread.id]: result.thread } : {},
     });
   } catch (err) {
+    if (err instanceof OfflineModeError) {
+      logWarning(`[API] Offline mode — skipping Drive comment refresh for ${commentId}`);
+      return NextResponse.json({ comment: commentRecord, threads: {} });
+    }
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
     logError(`[API] Failed to refresh comment ${commentId} for doc ${docId}:`, err);
