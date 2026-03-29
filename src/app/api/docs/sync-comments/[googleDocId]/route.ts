@@ -59,7 +59,7 @@ export async function POST(
       });
       // Include thread display data when available (single-comment sync) so the
       // extension can pass it to the client without a redundant Drive API fetch.
-      // Shape matches GET /api/docs/{docId}/comments response for consistency.
+      // Shape matches GET /api/docs/{docId}/threads response for consistency.
       const { thread: _thread, ...resultWithoutThread } = result;
       const threads = result.thread && googleCommentId
         ? { [googleCommentId]: result.thread } : undefined;

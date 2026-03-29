@@ -216,6 +216,182 @@ function injectDiscoIdHelpers() {
     return results;
   }
 
+  // List all visible suggestions with detailed info: disco ID, suggestion type,
+  // old/new text, status (open/accepted/rejected), author, timestamp, and
+  // replies with author/timestamp/text.
+  // Call from the Google Docs page console for debugging: getSuggestions()
+  //
+  // When the comments pane is open, the same suggestion appears in both the
+  // anchored sidebar (docos-anchoreddocoview) and the pane (docos-streamdocoview).
+  // We deduplicate by disco ID, preferring the anchored version for open
+  // suggestions (richer DOM) and the stream version for resolved ones (only
+  // place they appear).
+  function getSuggestions() {
+    var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
+    var seenIds = {};
+    var results = [];
+
+    // Helper: extract reply body text from either anchored or stream view.
+    // Anchored view uses .docos-replyview-body; stream view uses
+    // .docos-replyview-body-container (the -body div exists but is empty).
+    function getReplyText(replyEl) {
+      var body = replyEl.querySelector('.docos-replyview-body');
+      var text = body ? body.textContent.trim() : '';
+      if (!text) {
+        var container = replyEl.querySelector('.docos-replyview-body-container');
+        if (container) text = container.innerText.trim();
+      }
+      return text;
+    }
+
+    // Helper: extract author name from a reply entry.
+    function getReplyAuthor(replyEl) {
+      var d = replyEl.querySelector('.docos-author');
+      return d ? d.textContent.trim() : '';
+    }
+
+    // Helper: extract timestamp from a reply entry.
+    // Anchored view stores it in a div with class containing "authortimestamp";
+    // stream view uses a div with class containing "timestamp" (e.g.,
+    // docos-streamdocoview-timestamp). Look for the first unstyled <span>
+    // inside either container.
+    function getReplyTimestamp(replyEl) {
+      var ts = replyEl.querySelector('[class*="authortimestamp"]') ||
+               replyEl.querySelector('[class*="timestamp"]');
+      if (!ts) return '';
+      var spans = ts.querySelectorAll('span');
+      for (var i = 0; i < spans.length; i++) {
+        var t = spans[i].textContent.trim();
+        if (t && !spans[i].getAttribute('style')) return t;
+      }
+      return '';
+    }
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var label = item.getAttribute('aria-label') || '';
+      if (label.indexOf('Suggestions') !== 0) continue;
+
+      var id = getDiscoId(item) || '(no ID)';
+
+      // Deduplicate: skip if we already have this suggestion from a richer source.
+      // Prefer anchored entries for open suggestions (more DOM detail),
+      // but accept stream entries for resolved ones (only source).
+      var isAnchored = item.classList.contains('docos-anchoreddocoview');
+      if (seenIds[id]) {
+        if (isAnchored) {
+          // Replace the stream version with this anchored version
+          results = results.filter(function(r) { return r.id !== id; });
+        } else {
+          continue; // already have anchored version
+        }
+      }
+      seenIds[id] = true;
+
+      // Parse suggestion type and old/new text from styled description spans
+      var descDiv = item.querySelector('.docos-replyview-body div[style*="font-size:13px"]');
+      var suggestionType = '', oldText = '', newText = '';
+      if (descDiv) {
+        var actionSpan = descDiv.querySelector('span[style*="font-weight:bold"]');
+        if (actionSpan) suggestionType = actionSpan.textContent.trim().replace(':', '');
+        var italicSpans = descDiv.querySelectorAll('span[style*="font-style:italic"]');
+        if (suggestionType === 'Replace' && italicSpans.length >= 2) {
+          oldText = italicSpans[0].textContent.replace(/[\u201c\u201d]/g, '');
+          newText = italicSpans[1].textContent.replace(/[\u201c\u201d]/g, '');
+        } else if (suggestionType === 'Add' && italicSpans.length >= 1) {
+          newText = italicSpans[0].textContent.replace(/[\u201c\u201d]/g, '');
+        } else if (suggestionType === 'Delete' && italicSpans.length >= 1) {
+          oldText = italicSpans[0].textContent.replace(/[\u201c\u201d]/g, '');
+        }
+      }
+
+      // Determine status: open, accepted, or rejected.
+      // Open suggestions have Accept/Reject buttons. Resolved ones have the
+      // docos-docoview-resolved class and a final reply with status text
+      // ("Suggestion accepted" or "Suggestion rejected").
+      var status = 'open';
+      if (item.classList.contains('docos-docoview-resolved') ||
+          !item.querySelector('[aria-label="Accept suggestion"]')) {
+        // Check the last reply's text for accepted/rejected
+        var innerText = item.innerText || '';
+        if (innerText.indexOf('Suggestion accepted') !== -1) {
+          status = 'accepted';
+        } else if (innerText.indexOf('Suggestion rejected') !== -1) {
+          status = 'rejected';
+        }
+      }
+
+      // Extract author and timestamp from the first (suggestion) entry.
+      // Anchored view uses .docos-replyview-first; stream view (especially
+      // for resolved suggestions) may not have that class, so fall back to
+      // the content container and aria-label for the author.
+      var firstEntry = item.querySelector('.docos-replyview-first');
+      var author = '', timestamp = '';
+      if (firstEntry) {
+        author = getReplyAuthor(firstEntry);
+        timestamp = getReplyTimestamp(firstEntry);
+      }
+      if (!author || !timestamp) {
+        var contentDiv = item.querySelector('[class*="streamdocoview-content"]');
+        if (contentDiv) {
+          if (!author) {
+            var cd = contentDiv.querySelector('.docos-author');
+            if (cd) author = cd.textContent.trim();
+          }
+          if (!timestamp) {
+            var ct = contentDiv.querySelector('[class*="timestamp"]');
+            if (ct) {
+              var ctSpans = ct.querySelectorAll('span');
+              for (var cs = 0; cs < ctSpans.length; cs++) {
+                var cst = ctSpans[cs].textContent.trim();
+                if (cst && !ctSpans[cs].getAttribute('style')) { timestamp = cst; break; }
+              }
+            }
+          }
+        }
+        // Last resort: author from aria-label
+        if (!author) {
+          var authorMatch = label.match(/Author ([^.]+)\./);
+          if (authorMatch) author = authorMatch[1];
+        }
+      }
+
+      // Extract replies (all docos-replyview entries after the first/suggestion one)
+      var replyEntries = item.querySelectorAll('.docos-replyview');
+      var replies = [];
+      for (var r = 0; r < replyEntries.length; r++) {
+        if (replyEntries[r].classList.contains('docos-replyview-first')) continue;
+        var rText = getReplyText(replyEntries[r]);
+        // Skip system status entries ("Suggestion accepted"/"Suggestion rejected")
+        if (rText === 'Suggestion accepted' || rText === 'Suggestion rejected') continue;
+        if (rText) {
+          replies.push({
+            author: getReplyAuthor(replyEntries[r]),
+            timestamp: getReplyTimestamp(replyEntries[r]),
+            text: rText
+          });
+        }
+      }
+
+      var entry = {
+        id: id,
+        suggestionType: suggestionType,
+        status: status,
+        oldText: oldText,
+        newText: newText,
+        author: author,
+        timestamp: timestamp,
+        replies: replies
+      };
+      results.push(entry);
+      console.log('[' + results.length + '] ' + status + ' ' + suggestionType + ' ' + id +
+        '  ' + JSON.stringify(oldText ? oldText.substring(0, 30) : '') +
+        ' → ' + JSON.stringify(newText ? newText.substring(0, 30) : '') +
+        (replies.length ? '  (' + replies.length + ' replies)' : ''));
+    }
+    return results;
+  }
+
   // Get the disco ID of the currently selected/active comment.
   function getActiveCommentId() {
     var active = document.querySelector('#docos-stream-view [role="listitem"].docos-docoview-active');
@@ -309,6 +485,7 @@ function injectDiscoIdHelpers() {
   window.__docreviewDisco = {
     getDiscoId: getDiscoId,
     listComments: listComments,
+    getSuggestions: getSuggestions,
     getActiveCommentId: getActiveCommentId,
     fullClick: fullClick,
     isCommentsPaneOpen: isCommentsPaneOpen,
@@ -319,6 +496,7 @@ function injectDiscoIdHelpers() {
   };
   // Expose debugging functions directly on window for convenience
   window.listComments = listComments;
+  window.getSuggestions = getSuggestions;
   window.getActiveCommentId = getActiveCommentId;
 
   // Track comment selection/deselection across all #docos-stream-view elements.

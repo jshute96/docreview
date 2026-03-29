@@ -210,6 +210,7 @@ Looks up doc by Google doc ID, calls `syncComments()` with optional hints. With 
 Available from the **Google Docs page console** (injected at page load):
 
 - **`listComments()`** — dumps all visible comments/suggestions with disco IDs, types, authors, and text. Returns an array of `{ id, type, author, text }` and logs each entry.
+- **`getSuggestions()`** — dumps all visible suggestions with detailed info: disco ID, suggestion type (Replace/Add/Delete), old/new text, status (open/accepted/rejected), author, isMine flag, timestamp, and reply threads with author/timestamp/text/html. Deduplicates across anchored sidebar and comments pane. When the comments pane is open, also includes resolved (accepted/rejected) suggestions. Returns an array and logs a summary per entry.
 - **`getActiveCommentId()`** — returns the disco ID of the currently selected comment (the one with `docos-docoview-active` class). Click a comment first to select it.
 
 ### Selection tracking and cross-tab sync
