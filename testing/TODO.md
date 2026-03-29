@@ -403,6 +403,60 @@ don't yet have e2e coverage.
 
 ---
 
+## Multi-Tab Documents (Google Docs with multiple tabs)
+
+### Suggestions
+- [ ] Suggestions on non-first tabs are detected and synced
+- [ ] Suggestion text (inserted/deleted) is correct for each tab
+- [ ] Suggestion type (insert/delete/edit) is correct across tabs
+- [ ] Resolved suggestions on non-first tabs are correctly marked resolved
+- [ ] Document text includes content from all tabs (for anchor matching)
+- [ ] This all works on multi-level nested tabs too
+
+### Comments
+- [ ] Comments on non-first tabs appear in comments list
+- [ ] Comment quoted text is correct for comments on non-first tabs
+- [ ] Reply/resolve works for comments on non-first tabs
+- [ ] Comment deep links (?disco=) work for comments on non-first tabs
+- [ ] This all works on multi-level nested tabs too
+
+### Chrome Extension
+- [ ] Extension suggestion scraping finds suggestions on all tabs
+- [ ] Extension comment activity sync works for actions on non-first tabs
+- [ ] Comment navigation (Docreview → Google Docs) works for comments on non-first tabs
+- [ ] Comment selection sync works across tabs
+- [ ] This all works on multi-level nested tabs too
+
+---
+
+## Sheets & Slides
+
+### Google Sheets
+- [ ] Adding a Google Sheet by URL works (validation, title, owner)
+- [ ] Refresh syncs comments on Sheets
+- [ ] Comments from multiple sheets appear in comments list
+- [ ] Reply/resolve works for Sheet comments
+- [ ] Document text export includes content from all sheets
+- [ ] Sheet type icon displays correctly in doc list
+
+### Google Slides
+- [ ] Adding a Google Slides presentation by URL works (validation, title, owner)
+- [ ] Refresh syncs comments on Slides
+- [ ] Comments from multiple slides appear in comments list
+- [ ] Reply/resolve works for Slides comments
+- [ ] Document text export includes content from all slides
+- [ ] Slides type icon displays correctly in doc list
+
+### Chrome Extension (Sheets & Slides)
+- [ ] Titlebar badge appears on Google Sheets and links to Docreview
+- [ ] Titlebar badge appears on Google Slides and links to Docreview
+- [ ] Comment activity auto-sync works on Sheets
+- [ ] Comment activity auto-sync works on Slides
+- [ ] Comment click navigation works on Sheets
+- [ ] Comment click navigation works on Slides
+
+---
+
 ## Browser Cache & Performance
 
 - [ ] Document titles cached in localStorage (prevents title flicker on load)

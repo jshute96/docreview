@@ -1,5 +1,5 @@
 import { drive as createDrive } from "@googleapis/drive";
-import { docs as createDocs } from "@googleapis/docs";
+import { docs as createDocs, type docs_v1 } from "@googleapis/docs";
 import { OAuth2Client } from "google-auth-library";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -450,14 +450,21 @@ export async function fetchDocData(
   const docs = createDocs({ version: "v1", auth });
   const t0 = Date.now();
 
+  // Use includeTabsContent to get content from ALL tabs, not just the first.
+  // When true, document.body is empty and content lives in document.tabs[].
+  const tabsFields =
+    "tabs(documentTab(body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds)))))))";
+  const tabsFieldsNoSuggestions =
+    "tabs(documentTab(body(content(paragraph(elements(textRun(content)))))))";
+
   let res;
   try {
     res = await withProgressLogging(
       docs.documents.get({
         documentId: googleDocId,
+        includeTabsContent: true,
         suggestionsViewMode: "SUGGESTIONS_INLINE",
-        fields:
-          "body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds)))))",
+        fields: tabsFields,
       }),
       `[Docs] documents.get ${googleDocId}`
     );
@@ -475,7 +482,8 @@ export async function fetchDocData(
         res = await withProgressLogging(
           docs.documents.get({
             documentId: googleDocId,
-            fields: "body(content(paragraph(elements(textRun(content)))))",
+            includeTabsContent: true,
+            fields: tabsFieldsNoSuggestions,
           }),
           `[Docs] documents.get ${googleDocId} (no suggestions)`
         );
@@ -500,6 +508,19 @@ export async function fetchDocData(
     }
   }
 
+  // Collect all structural elements from all tabs (including nested child tabs).
+  // With includeTabsContent: true, document.body is empty — content is in tabs[].
+  const allContent: docs_v1.Schema$StructuralElement[] = [];
+  function collectTabContent(tabs: docs_v1.Schema$Tab[] | undefined): void {
+    for (const tab of tabs ?? []) {
+      for (const el of tab.documentTab?.body?.content ?? []) {
+        allContent.push(el);
+      }
+      if (tab.childTabs) collectTabContent(tab.childTabs);
+    }
+  }
+  collectTabContent(res.data.tabs);
+
   const textParts: string[] = [];
   // Track insertion/deletion IDs via sets (for type classification) and accumulate
   // text per suggestion ID. A single suggestion may span multiple text runs.
@@ -508,7 +529,7 @@ export async function fetchDocData(
   const insertions: Record<string, string> = {};
   const deletions: Record<string, string> = {};
 
-  for (const el of res.data.body?.content ?? []) {
+  for (const el of allContent) {
     for (const pe of el.paragraph?.elements ?? []) {
       const run = pe.textRun;
       if (!run?.content) continue;

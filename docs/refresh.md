@@ -291,7 +291,8 @@ comment status (INBOX, ARCHIVED, MUTED). It is safe from transient errors becaus
 return early before reaching the deletion code.
 
 **Suggestions via Docs API:** For Google Docs files, a second pass calls `documents.get`
-via the Docs API to capture all pending suggestions. These are stored as `type: "SUGGESTION"`
+via the Docs API (with `includeTabsContent: true` to capture suggestions from all tabs)
+to capture all pending suggestions. These are stored as `type: "SUGGESTION"`
 with `suggest.xxx` IDs. New suggestions are bulk-inserted with `createMany` (like comments).
 Existing suggestions are only updated if `suggestionType` changed (which is rare), and
 skipped entirely otherwise — no write at all. Any previously-active suggestion no longer

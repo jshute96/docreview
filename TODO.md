@@ -89,6 +89,7 @@ Easy:
 * check and refine rules for detecting hasNewActivity on comment threads - reply count, change timestamp, etc.
 * embedded pgvector index for semantic search on docs, titles, comments
 * gmail notificaitons include a reply-to for adding replies to a suggestion by email. we could use that to allow adding replies (but not accept/reject).
+* tabbed docs - capture and show which tab comments are on, allow filter by tab, etc.
 
 ## low priority
 * rename a label

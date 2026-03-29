@@ -38,8 +38,9 @@ store suggestions**. All suggestion data comes from the Docs API.
 ## Sync Approach (Docs API)
 
 Every Refresh calls `fetchSuggestions`, which calls `documents.get` with
-`suggestionsViewMode: "SUGGESTIONS_INLINE"` and walks the document body to collect all
-pending suggestion IDs (`suggest.xxx`). Each is upserted into the Comment table:
+`suggestionsViewMode: "SUGGESTIONS_INLINE"` and `includeTabsContent: true`, then walks
+the body content of every tab (including nested child tabs) to collect all pending
+suggestion IDs (`suggest.xxx`). Each is upserted into the Comment table:
 
 - **Create** (new): `type: "SUGGESTION"`, `googleSuggestionId` set to the `suggest.xxx` ID,
   `suggestionType` set, `resolved: false`, `status: "INBOX"` if `doc.role === "AUTHOR"`,
@@ -248,9 +249,9 @@ filters have no effect on suggestions.
 ### Suggestion text content
 
 Suggestion text (inserted and deleted strings) is fetched on page load via `fetchDocContent`,
-which makes a single `documents.get` call with `SUGGESTIONS_INLINE` to extract both suggestion
-content and document body text. Results are keyed by `suggest.xxx` (`googleSuggestionId`) and
-display correctly for all suggestion records.
+which makes a single `documents.get` call with `SUGGESTIONS_INLINE` and `includeTabsContent: true`
+to extract both suggestion content and document body text from all tabs. Results are keyed by
+`suggest.xxx` (`googleSuggestionId`) and display correctly for all suggestion records.
 
 ### Permissions and View-Only Access
 
