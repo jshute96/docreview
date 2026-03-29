@@ -9,7 +9,9 @@
  */
 
 import { defineConfig } from '@playwright/test';
-import { TEST_BASE_URL, TEST_PORT, buildServerCommand, PROJECT_ROOT } from '../shared/test-env';
+import { TEST_BASE_URL, TEST_PORT, buildServerCommand, PROJECT_ROOT, getFirstTestUser } from '../shared/test-env';
+
+const testUser = getFirstTestUser();
 
 export default defineConfig({
   testDir: '.',
@@ -23,7 +25,7 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: buildServerCommand({ offline: true }),
+    command: buildServerCommand({ offline: true, userId: testUser?.user_id }),
     port: TEST_PORT,
     cwd: PROJECT_ROOT,
     reuseExistingServer: true,

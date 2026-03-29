@@ -60,6 +60,17 @@ run_migrations() {
   echo "Migrations complete."
 }
 
+grant_readonly() {
+  echo "Granting readonly access to docreview_ro..."
+  psql "$DATABASE_URL" -c "
+    GRANT CONNECT ON DATABASE docreview_test TO docreview_ro;
+    GRANT USAGE ON SCHEMA public TO docreview_ro;
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO docreview_ro;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO docreview_ro;
+  " 2>/dev/null
+  echo "Readonly access granted."
+}
+
 # --- Main ---
 
 source_env
@@ -69,6 +80,7 @@ case "${1:-}" in
     drop_db
     create_db
     run_migrations
+    grant_readonly
     echo "Test database reset complete."
     ;;
   --status)
@@ -89,6 +101,7 @@ case "${1:-}" in
       create_db
     fi
     run_migrations
+    grant_readonly
     echo "Test database ready."
     ;;
   *)

@@ -167,7 +167,9 @@ Shadcn/ui components:
 |------|-------------|
 | `check-deps.mjs` | Checks that required Node.js version and dependencies are installed |
 | `check-db.mjs` | Checks that the database is reachable and migrations are up-to-date |
-| `query_database.sh` | Readonly SQL queries via `docreview_ro` user — supports inline SQL, file input, `--schema` |
+| `query_database.sh` | Readonly SQL queries against production DB via `docreview_ro` user |
+| `query_test_database.sh` | Readonly SQL queries against `docreview_test` DB via `docreview_ro` user |
+| `query_db_common.sh` | Shared implementation for query scripts — arg parsing, psql invocation |
 
 ## Contexts (`src/contexts/`)
 
@@ -269,6 +271,7 @@ Shadcn/ui components:
 | `extension-snapshot/snapshots/` | Saved rendered DOM from live Google pages (gitignored) |
 | `app-offline/playwright.config.ts` | Config for offline app tests (Next.js on port 3010, OFFLINE_MODE) |
 | `app-offline/smoke.spec.ts` | Smoke tests: login, page loads, auth redirect |
+| `app-offline/docs.spec.ts` | Doc list and individual doc page tests |
 | `extension-live/playwright.config.ts` | Config for extension + app tests (Chrome with --load-extension) |
 | `app-live/playwright.config.ts` | Config for tests with real Google OAuth |
 | `gmail_notifications/` | `.eml` + `.json` pairs for testing `parse-gmail-notification.ts` |

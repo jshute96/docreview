@@ -38,7 +38,7 @@ export const TEST_BASE_URL = `http://localhost:${TEST_PORT}`;
  *
  * @param offline - Whether to enable OFFLINE_MODE (default: true)
  */
-export function buildServerCommand(opts: { offline?: boolean } = {}): string {
+export function buildServerCommand(opts: { offline?: boolean; userId?: string } = {}): string {
   const offline = opts.offline ?? true;
   const env = [
     `DATABASE_URL=${TEST_DATABASE_URL}`,
@@ -46,6 +46,7 @@ export function buildServerCommand(opts: { offline?: boolean } = {}): string {
     `AUTH_TRUST_HOST=true`,
     `NEXT_DIST_DIR=.next-test`,
     offline ? 'OFFLINE_MODE=true' : '',
+    opts.userId ? `OFFLINE_USER_ID=${opts.userId}` : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -56,3 +57,22 @@ export function buildServerCommand(opts: { offline?: boolean } = {}): string {
 
 /** Project root directory */
 export const PROJECT_ROOT = PROJECT_DIR;
+
+/**
+ * Look up a test user by email from test_users.json.
+ * Returns the user object or undefined if not found.
+ */
+export function getTestUser(email: string): { user: string; user_id?: string; password?: string } | undefined {
+  const usersFile = path.join(PROJECT_DIR, 'testing', 'test_users.json');
+  if (!fs.existsSync(usersFile)) return undefined;
+  const users = JSON.parse(fs.readFileSync(usersFile, 'utf-8'));
+  return users.find((u: { user: string }) => u.user === email);
+}
+
+/** The first test user (with a user_id) from test_users.json */
+export function getFirstTestUser(): { user: string; user_id: string } | undefined {
+  const usersFile = path.join(PROJECT_DIR, 'testing', 'test_users.json');
+  if (!fs.existsSync(usersFile)) return undefined;
+  const users = JSON.parse(fs.readFileSync(usersFile, 'utf-8'));
+  return users.find((u: { user_id?: string }) => u.user_id);
+}
