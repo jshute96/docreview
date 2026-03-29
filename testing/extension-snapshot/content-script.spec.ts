@@ -18,7 +18,7 @@ import * as path from 'path';
 const ICON_DATA_URI =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAAA0lEQVQI12P4z8BQDwAEgAF/QualzQAAAABJRU5ErkJggg==';
 
-const EXTENSION_DIR = path.resolve(__dirname, '../src/chrome-extension');
+const EXTENSION_DIR = path.resolve(__dirname, '../../src/chrome-extension');
 
 // Read the content script and extract function bodies from the IIFE.
 const contentScriptSource = fs.readFileSync(

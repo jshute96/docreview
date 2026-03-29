@@ -15,6 +15,8 @@
 
 # next.js
 /.next/
+/.next-test/
+/.next-test-interactive/
 /out/
 
 # production
@@ -58,8 +60,9 @@ scripts/data-export.json
 .gemini/policies/
 
 .playwright-mcp/
+.chrome-test-profile/
 
 testing/test_users.json
-testing/snapshots/
+testing/extension-snapshot/snapshots/
 test-results/
 playwright-report/

@@ -59,6 +59,9 @@ Only visit these domains:
 3. Click the "Rename" textbox in the title bar, clear it, type the title.
 4. Click in the document body area (`page.mouse.click(400, 500)`), then type content.
 
+Suggestion for doc contents:
+* Pick a random animal. Name the doc "<animal> facts". Add a few short paragraphs with interesting facts about that animal.
+
 ### Add text to an existing document
 1. Click in the document body (`page.mouse.click(400, 500)`) to focus the iframe.
 2. Press Ctrl+End to move to the end of the document.

@@ -1,173 +1,129 @@
-# Chrome Extension Content Script Tests
+# Playwright Test Suites
 
-Playwright tests that verify the Chrome extension's content script correctly
-injects DOM elements into Google Docs, Drive, and Gmail pages.
+Automated UI and integration tests organized by what they test and what
+infrastructure they need.
+
+## Test suites
+
+| Suite | Directory | What it tests | Infrastructure |
+|-------|-----------|---------------|----------------|
+| **App Offline** | `app-offline/` | Docreview UI in offline mode (no Google APIs) | Next.js on port 3010 + `docreview_test` DB |
+| **App Live** | `app-live/` | Docreview with real Google OAuth and API access | Next.js on port 3010 + `docreview_test` DB + Google credentials |
+| **Extension Snapshot** | `extension-snapshot/` | Content script DOM injection against saved Google page snapshots | Python HTTP server (auto-started) |
+| **Extension Live** | `extension-live/` | Chrome extension interacting with running docreview | Next.js on port 3010 + `docreview_test` DB + extension loaded |
 
 ## Quick start
 
 ```bash
+# Run the fast snapshot tests (no database needed)
+npm run test:e2e:snapshot
+
+# Set up the test database (one-time, or after schema changes)
+testing/setup-test-db.sh
+
+# Run offline app tests
+npm run test:e2e:app-offline
+
+# Run all suites that are ready
 npm run test:e2e
 ```
 
-This starts a local HTTP server, loads saved DOM snapshots in headless Chrome,
-injects the content script functions, and asserts the expected elements appear.
-Runs in ~8 seconds with no network access or Google login needed.
+## npm scripts
 
-## What's tested
+| Script | Runs |
+|--------|------|
+| `npm run test:e2e` | All ready suites (snapshot + app-offline) |
+| `npm run test:e2e:snapshot` | Extension snapshot tests only |
+| `npm run test:e2e:app-offline` | App offline tests only |
+| `npm run test:e2e:extension-live` | Extension + app tests |
+| `npm run test:e2e:app-live` | App with Google login tests |
+| `npm run dev:test-live` | Start dev server on port 3009, online mode (Google OAuth) |
+| `npm run dev:test-offline` | Start dev server on port 3009, offline mode (auto-login) |
+| `npm run test:open-browser` | Open an ephemeral Playwright browser (offline mode) |
+| `npm run test:open-browser-live` | Open a regular Chrome with saved profile (Google login survives across runs) |
 
-Each Playwright test corresponds to a test case in `chrome-extension.md` (the
-full test case catalog, which also includes manual-only cases not covered here).
-Cases marked **[auto]** in that file are the ones implemented below.
+## Interactive testing
 
-| Playwright test | Snapshot | What it checks | `chrome-extension.md` case |
-|-----------------|----------|----------------|---------------------------|
-| Google Docs — fresh injection | `google-docs.html` | 1 `#dr-badge`, 1 `.dr-link` with `img` in `.docs-titlebar-badges` | Google Docs — fresh page |
-| Google Docs — idempotency | `google-docs.html` | Still 1 `#dr-badge` after running twice | Google Docs — idempotency |
-| Google Sheets — badge | `google-sheets.html` | 1 `#dr-badge`, 1 `.dr-link` (same `injectDocs` path) | Google Sheets — titlebar badge |
-| Google Slides — badge | `google-slides.html` | 1 `#dr-badge`, 1 `.dr-link` | Google Slides — titlebar badge |
-| Google Drive — list icons | `google-drive-list.html` | `.dr-link` count matches qualifying `tr[role="row"]` rows with `[data-id]` > 20 chars | Google Drive — list view |
-| Google Drive — idempotency | `google-drive-list.html` | Same `.dr-link` count after running twice | Google Drive — idempotency |
-| Gmail inbox — chip icons | `gmail-inbox.html` | `.dr-link` count matches `[data-docurl]` chip count | Gmail — inbox list chips |
-| Gmail inbox — idempotency | `gmail-inbox.html` | Same `.dr-link` count after running twice | Gmail — inbox list idempotency |
-| Gmail message — bar | `gmail-message.html` | `.dr-gmail-bar` exists, contains "Open in Docreview" text and icon | Gmail — message view bar |
-| Gmail message — idempotency | `gmail-message.html` | Same `.dr-gmail-bar` count after running twice | Gmail — message view bar idempotency |
+Start the test dev server on port 3009 and browse to it:
 
-## How it works
+```bash
+# Online mode (Google OAuth) — use your regular browser at http://localhost:3009
+npm run dev:test-live
 
-1. **Snapshots** are saved rendered DOM from live Google pages, stored as static
-   HTML in `testing/snapshots/`. Scripts are stripped so the page is inert.
+# Offline mode (auto-login, no Google APIs)
+npm run dev:test-offline
 
-2. **Playwright** loads each snapshot via a local Python HTTP server (port 8889,
-   started automatically by `playwright.config.ts`).
+# Offline mode, impersonate a specific user (by email from test_users.json)
+npm run dev:test-offline -- docreview.dave@gmail.com
 
-3. The test **extracts function definitions** from `src/chrome-extension/content.js`
-   by parsing balanced braces — `createIconButton`, `injectDocs`, `injectDrive`,
-   `injectGmail`, etc.
+# Open a Playwright browser (ephemeral — good for offline mode)
+npm run test:open-browser
 
-4. It wraps them in an IIFE that provides mocked variables (`baseUrl`, `iconUrl`,
-   a shadowed `location` object matching the expected Google domain) and calls
-   the appropriate injection function via `page.evaluate()`.
+# Open a regular Chrome with saved profile (Google login saved across runs)
+npm run test:open-browser-live
+```
 
-5. Standard Playwright assertions check element counts, attributes, and text.
+The dev-test server uses port 3009 and its own build directory
+(`.next-test-interactive/`) so it can run concurrently with the main dev
+server (3000) and Playwright test servers (3010).
 
-This approach bypasses the content script's `location.hostname` check and
-`chrome.storage.sync` dependency while testing the actual injection logic
-against real Google DOM structures.
+## Test database
 
-## What's NOT tested here
+Suites that test the real app use a separate `docreview_test` PostgreSQL
+database on the same server, and run Next.js on port 3010 (instead of the
+default 3000). This avoids interfering with a running development instance.
 
-These tests cover DOM injection logic only. The remaining cases in
-`chrome-extension.md` (marked **[manual]**) require the real extension loaded
-in Chrome and are not automated. They fall into these categories:
+```bash
+testing/setup-test-db.sh          # create DB and run migrations
+testing/setup-test-db.sh --reset  # drop and recreate from scratch
+testing/setup-test-db.sh --status # check current state
+```
 
-- **Click handlers** — icon click opens new tab (Docs, Drive, Gmail chip, Gmail bar)
-- **MutationObserver** — re-injection after SPA navigation (Drive, Gmail)
-- **Toolbar button** — all 7 cases (background service worker behavior)
-- **Drive grid view** — needs a grid-view snapshot (not yet captured)
-- **Gmail direct page load** — `.dr-gmail-bar` should NOT appear
-- **Non-Google page** — content script should not run
-- **Settings/storage** — enable/disable per surface via `chrome.storage.sync`
-- **Comment activity detection** — `mouseup`/`keydown` listeners on Docs
+The test database URL is derived automatically from `DATABASE_URL` in `.env`
+by replacing the database name with `docreview_test`.
 
-## Files
+## Shared files
+
+| File | Purpose |
+|------|---------|
+| `shared/test-env.ts` | Test database URL, port, and server command builder |
+| `setup-test-db.sh` | Create/migrate the test database |
+| `test_users.json` | Test account credentials (gitignored) |
+| `chrome-extension.md` | Full test case catalog (auto + manual) |
+| `gmail_notifications/` | Sample Gmail notification emails for parser tests |
+
+## Directory structure
 
 ```
 testing/
-  README.md                    — this file
-  chrome-extension.md          — full test case descriptions (auto/manual tags)
-  content-script.spec.ts       — Playwright test file
-  playwright.config.ts         — Playwright config (system Chrome, snapshot server)
-  snapshots/                   — saved DOM snapshots (gitignored)
-    google-docs.html
-    google-sheets.html
-    google-slides.html
-    google-drive-list.html
-    gmail-inbox.html
-    gmail-message.html
+  README.md                        — this file
+  setup-test-db.sh                 — test database setup
+  dev-test.sh                      — start dev server on port 3009 for interactive use
+  open-browser-live.sh             — open regular Chrome with saved profile
+  chrome-extension.md              — test case catalog
+  test_users.json                  — test credentials (gitignored)
+  shared/
+    test-env.ts                    — shared config (DB URL, port, server command)
+  extension-snapshot/
+    playwright.config.ts           — static HTTP server on port 8889
+    content-script.spec.ts         — DOM injection tests
+    snapshots/                     — saved HTML snapshots (gitignored)
+  app-offline/
+    playwright.config.ts           — Next.js on port 3010, OFFLINE_MODE=true
+    smoke.spec.ts                  — login, page load, auth redirect tests
+  extension-live/
+    playwright.config.ts           — Next.js + Chrome extension loaded
+    (tests TBD)
+  app-live/
+    playwright.config.ts           — Next.js with Google OAuth
+    (tests TBD)
+  gmail_notifications/
+    README.md                      — notification testing guide
+    *.eml / *.json                 — sample emails and parsed structures
 ```
 
-## Capturing new snapshots
+## Future suites
 
-Snapshots need to be recaptured when Google changes their DOM structure
-(selectors break) or when you need a new surface (e.g., Drive grid view).
-
-### Using the Playwright MCP browser
-
-1. Open a browser with Playwright MCP (the `mcp__playwright2__browser_*` tools).
-2. Log in with a test user from `testing/test_users.json`.
-3. Navigate to the target page and wait for it to fully render.
-4. Run this in the browser console via `browser_evaluate`:
-
-```javascript
-() => {
-  const clone = document.documentElement.cloneNode(true);
-  clone.querySelectorAll('script').forEach(s => s.remove());
-  const html = '<!DOCTYPE html>\n' + clone.outerHTML;
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'snapshot-name.html';
-  a.click();
-  URL.revokeObjectURL(url);
-  return 'Saved ' + html.length + ' bytes';
-}
-```
-
-5. The file downloads to `.playwright-mcp/`. Copy it to `testing/snapshots/`:
-
-```bash
-cp .playwright-mcp/snapshot-name.html testing/snapshots/
-```
-
-### Verifying a snapshot has the right selectors
-
-Before using a snapshot in tests, check that the key selectors exist:
-
-```javascript
-// Google Docs/Sheets/Slides
-() => ({
-  hasBadges: !!document.querySelector('.docs-titlebar-badges'),
-  hasDocId: !!location.pathname.match(/\/d\/([a-zA-Z0-9_-]+)/)
-})
-
-// Google Drive
-() => ({
-  rows: document.querySelectorAll('tr[role="row"]').length,
-  qualifyingIds: [...document.querySelectorAll('[data-id]')]
-    .filter(el => el.getAttribute('data-id').length > 20).length
-})
-
-// Gmail inbox
-() => ({ chips: document.querySelectorAll('[data-docurl]').length })
-
-// Gmail message view
-() => ({
-  msgDivs: document.querySelectorAll('[data-message-id]').length,
-  overviewCards: document.querySelectorAll('[id$="overview-card-contents"]').length,
-  iframes: document.querySelectorAll('[data-message-id] iframe').length
-})
-```
-
-### What survives in a snapshot
-
-**Preserved:** DOM structure, attributes, classes, inline styles, data
-attributes, ARIA roles, element hierarchy.
-
-**Not preserved:** iframe content (cross-origin), external images (CORS),
-JavaScript behavior (stripped), some computed styles.
-
-See `docs/notes-on-dom-snapshot-testing.md` for more details.
-
-## Troubleshooting
-
-**Tests fail with "0 elements found"**: The snapshot DOM has changed or the
-content script selectors no longer match. Recapture the snapshot from a live
-page and check the selectors.
-
-**Port 8889 already in use**: Another process is using the port. Kill it or
-change the port in `playwright.config.ts`.
-
-**"Executable doesn't exist"**: Playwright can't find Chrome. The config uses
-`channel: 'chrome'` (system Chrome). Make sure Chrome is installed, or remove
-the `channel` option and run `npx playwright install` to use bundled Chromium.
+- **`app-multiuser/`** — Two Playwright browser contexts logged in as
+  different users, testing collaboration features (shared docs, comment
+  notifications across users).

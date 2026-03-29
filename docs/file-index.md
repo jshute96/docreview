@@ -257,9 +257,18 @@ Shadcn/ui components:
 
 | File | Description |
 |------|-------------|
-| `README.md` | How to run and maintain the Chrome extension content script tests |
-| `chrome-extension.md` | Chrome extension test cases — content script injection, idempotency, toolbar button, adapted from former bookmarklet tests |
-| `content-script.spec.ts` | Playwright tests for content script DOM injection against saved snapshots |
-| `playwright.config.ts` | Playwright config — system Chrome, snapshot HTTP server |
-| `snapshots/` | Saved rendered DOM from live Google pages (Docs, Sheets, Slides, Drive, Gmail) — gitignored |
-| `gmail_notifications/` | `.eml` + `.json` pairs for testing `parse-gmail-notification.ts` — comment notifications, sharing invitations, suggestions, edge cases |
+| `README.md` | Overview of all Playwright test suites |
+| `chrome-extension.md` | Chrome extension test cases — content script injection, idempotency, toolbar button |
+| `setup-test-db.sh` | Create/migrate the `docreview_test` database for UI tests |
+| `dev-test.sh` | Start dev server on port 3009 against test DB for interactive use |
+| `open-browser-live.sh` | Open a regular Chrome with dedicated profile for online mode (Google session saved) |
+| `test_users.json` | Test account credentials (gitignored) |
+| `shared/test-env.ts` | Shared config: test DB URL, port 3010, server command builder |
+| `extension-snapshot/playwright.config.ts` | Config for DOM snapshot tests (Python HTTP server on port 8889) |
+| `extension-snapshot/content-script.spec.ts` | Playwright tests for content script DOM injection against saved snapshots |
+| `extension-snapshot/snapshots/` | Saved rendered DOM from live Google pages (gitignored) |
+| `app-offline/playwright.config.ts` | Config for offline app tests (Next.js on port 3010, OFFLINE_MODE) |
+| `app-offline/smoke.spec.ts` | Smoke tests: login, page loads, auth redirect |
+| `extension-live/playwright.config.ts` | Config for extension + app tests (Chrome with --load-extension) |
+| `app-live/playwright.config.ts` | Config for tests with real Google OAuth |
+| `gmail_notifications/` | `.eml` + `.json` pairs for testing `parse-gmail-notification.ts` |
