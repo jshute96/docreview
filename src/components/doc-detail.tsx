@@ -1128,8 +1128,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
                   docId={doc.docId}
                   driveUrl={doc.driveUrl}
                   content={comment.type === "COMMENT" ? commentContent[commentKey(comment)] : undefined}
-                  suggestionContent={comment.type === "SUGGESTION" ? suggestionContent[commentKey(comment)] : undefined}
-                  initialThread={threadMap[commentKey(comment)]}
+                  suggestionContent={comment.type === "SUGGESTION"
+                    ? (suggestionContent[commentKey(comment)] ?? (comment.googleCommentId ? suggestionContent[comment.googleCommentId] : undefined))
+                    : undefined}
+                  initialThread={threadMap[commentKey(comment)] ?? (comment.googleCommentId ? threadMap[comment.googleCommentId] : undefined)}
                   onUpdate={handleCommentUpdate}
                   onThreadUpdate={handleThreadUpdate}
                   isExiting={exitingIds.has(comment.commentId)}
