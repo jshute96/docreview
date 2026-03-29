@@ -98,9 +98,9 @@ stripped before storage.
 | `isReplyAuthor` | false | — | false |
 | `mentionedMe` | false | — | false |
 
-**Extension source:** When displayed from the extension, synthetic Comment objects also
-populate `isThreadAuthor` and `isReplyAuthor` from the `isMine` flag, and `resolved`
-from the accepted/rejected status. These are display-only and not persisted.
+**Extension source:** When extension suggestions are merged into the DB, the merge also
+populates `isThreadAuthor` and `isReplyAuthor` from the `isMine` flag, and `resolved`
+from the accepted/rejected status.
 
 **Future:** `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, and `resolved` could
 potentially be derived from parsed Gmail notifications but are left for later.
@@ -191,9 +191,12 @@ This provides richer data than either the Docs API or Gmail:
 
 **Display flow:** On the comments page, after pinging the extension, `fetchExtensionSuggestions()`
 calls `getSuggestionsFromDoc(docId)` via the bridge. The extension executes `getSuggestions()`
-in the doc tab's MAIN world and returns the results. These are converted to synthetic `Comment`
-objects (with `commentId` prefix `ext-`) and `CommentThread` entries, then merged into the
-display alongside DB suggestions. A green "extension" badge distinguishes them.
+in the doc tab's MAIN world and returns the results. These are then:
+1. Converted to `CommentThread` and `SuggestionContent` entries for thread panel display
+   (reply text, HTML content, author info — data not available from the DB)
+2. POSTed to `POST /api/docs/[docId]/extension-suggestions` for DB merge via content-hash
+   matching (same algorithm as Gmail merge). The returned DB records replace the suggestion
+   entries in the comments list.
 
 **Timestamps:** The extension returns relative timestamps from the DOM (e.g., "6:29 PM Feb 21",
 "5:06 AM Yesterday"). These are parsed into `Date` objects for the created/modified columns

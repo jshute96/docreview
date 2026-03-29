@@ -16,7 +16,7 @@ import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
 import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, getSuggestionsFromDoc } from "@/lib/bridge-to-extension";
-import { extensionToComment, extensionToThread, extensionToSuggestionContent, isExtensionComment } from "@/lib/extension-suggestions";
+import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -110,7 +110,6 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   const [bulkMarkingUnread, setBulkMarkingUnread] = useState(false);
   const [threadMap, setThreadMap] = useState<ThreadMap>({});
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
-  const [extensionComments, setExtensionComments] = useState<Comment[]>([]);
   const [documentText, setDocumentText] = useState<string | undefined>(undefined);
   const [viewedByMeTime, setViewedByMeTime] = useState<string | null>(null);
   const [showUntrackDialog, setShowUntrackDialog] = useState(false);
@@ -207,34 +206,26 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch suggestions from the Google Docs DOM via the extension, then:
-  //   1. Display them immediately as synthetic ext- Comment entries (with thread data)
-  //   2. Push them to the server for DB merge (hash matching, insert/update)
-  //   3. Merge the returned DB records into the comments list
-  // The ext- entries stay visible so reply thread data (which isn't in the DB)
-  // remains accessible. DB entries show alongside for the full lifecycle features.
+  //   1. Push them to the server for DB merge (hash matching, insert/update)
+  //   2. Merge the returned DB records into the comments list
+  //   3. Keep extension thread/content data for reply display (not in DB)
   async function fetchExtensionSuggestions() {
-    // Phase 1: Fetch from extension
     const suggestions = await getSuggestionsFromDoc(googleDocId);
     if (!suggestions || suggestions.length === 0) return;
     console.log("[doc-detail] extension suggestions: got", suggestions.length, "from doc tab");
 
-    // Phase 2: Display immediately as synthetic entries
-    const syntheticComments: Comment[] = [];
+    // Keep extension thread data and suggestion content for display —
+    // the DB doesn't store reply text, so we hold it in the thread map
     const newThreads: ThreadMap = {};
     const newSuggContent: Record<string, SuggestionContent> = {};
-
     for (const s of suggestions) {
-      syntheticComments.push(extensionToComment(s, doc.docId));
       newThreads[s.id] = extensionToThread(s);
       newSuggContent[s.id] = extensionToSuggestionContent(s);
     }
-
-    setExtensionComments(syntheticComments);
     setThreadMap(prev => ({ ...prev, ...newThreads }));
     setSuggestionContent(prev => ({ ...prev, ...newSuggContent }));
-    console.log("[doc-detail] extension suggestions: displayed", syntheticComments.length, "synthetic entries");
 
-    // Phase 3: Push to server for DB merge
+    // Push to server for DB merge
     try {
       console.log("[doc-detail] extension suggestions: pushing to server for merge");
       const contextId = generateContextId();
@@ -250,11 +241,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
       const data = await res.json();
       console.log("[doc-detail] extension suggestions: server merge result", data.result);
 
-      // Phase 4: Merge returned DB records into the comments list
+      // Merge returned DB records into the comments list
       if (data.comments && Array.isArray(data.comments)) {
         console.log("[doc-detail] extension suggestions: got", data.comments.length, "DB records back");
         setComments(prev => {
-          // Replace existing suggestion records, add new ones
           const dbSuggestionIds = new Set((data.comments as Comment[]).map((c: Comment) => c.commentId));
           const nonSuggestions = prev.filter(c => !dbSuggestionIds.has(c.commentId));
           return [...nonSuggestions, ...(data.comments as Comment[])];
@@ -523,7 +513,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   }
 
   async function handleBulkStatusChange(fromStatus: "INBOX" | "ARCHIVED", toStatus: "INBOX" | "ARCHIVED") {
-    const targets = filteredComments.filter((c) => c.status === fromStatus && !isExtensionComment(c));
+    const targets = filteredComments.filter((c) => c.status === fromStatus);
     if (targets.length === 0) return;
 
     const setBusy = toStatus === "ARCHIVED" ? setBulkArchiving : setBulkUnarchiving;
@@ -577,7 +567,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   function handleUnarchiveAll() { void handleBulkStatusChange("ARCHIVED", "INBOX"); }
 
   async function handleArchiveAllResolved() {
-    const targets = filteredComments.filter((c) => c.status === "INBOX" && c.resolved && !isExtensionComment(c));
+    const targets = filteredComments.filter((c) => c.status === "INBOX" && c.resolved);
     if (targets.length === 0) return;
 
     setBulkArchivingResolved(true);
@@ -623,7 +613,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   }
 
   async function handleBulkReadChange(targetIsRead: boolean) {
-    const targets = filteredComments.filter((c) => c.isRead !== targetIsRead && !isExtensionComment(c));
+    const targets = filteredComments.filter((c) => c.isRead !== targetIsRead);
     if (targets.length === 0) return;
 
     const setBusy = targetIsRead ? setBulkMarkingRead : setBulkMarkingUnread;
@@ -693,10 +683,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
 
   const matcher = useMemo(() => createMatcher(searchFilter), [searchFilter]);
 
-  // Combine DB comments with extension-sourced synthetic comments for display
-  const allComments = useMemo(() => [...comments, ...extensionComments], [comments, extensionComments]);
-
-  const filteredComments = allComments
+  const filteredComments = comments
     .filter((c) => exitingIds.has(c.commentId) || !wouldBeFilteredOut(c))
     .filter((c) => {
       if (!searchFilter) return true;
@@ -1143,7 +1130,6 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
                   content={comment.type === "COMMENT" ? commentContent[commentKey(comment)] : undefined}
                   suggestionContent={comment.type === "SUGGESTION" ? suggestionContent[commentKey(comment)] : undefined}
                   initialThread={threadMap[commentKey(comment)]}
-                  sourceLabel={isExtensionComment(comment) ? "extension" : undefined}
                   onUpdate={handleCommentUpdate}
                   onThreadUpdate={handleThreadUpdate}
                   isExiting={exitingIds.has(comment.commentId)}

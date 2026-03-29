@@ -190,7 +190,7 @@ Shadcn/ui components:
 | `suggestion-hash.ts` | Content hash for suggestions — SHA-256 of normalized action type + deleted/inserted text, used for cross-source matching (Docs API ↔ Gmail) |
 | `suggestion-merge.ts` | Merges suggestion data from Gmail notifications into DB — matches by content hash, fills in `googleCommentId` and `replyCount`, or inserts new rows if Gmail arrives first |
 | `bridge-to-extension.ts` | Client-side bridge for communicating with the Chrome extension — handles pinging, URL resolution, in-page comment navigation, and fetching suggestion data from open doc tabs |
-| `extension-suggestions.ts` | Converts extension-scraped suggestion data into display objects — timestamp parsing, synthetic Comment/CommentThread creation, SuggestionContent extraction |
+| `extension-suggestions.ts` | Converts extension-scraped suggestion data into display objects — timestamp parsing, CommentThread/SuggestionContent creation for thread panel display |
 | `extension-suggestion-merge.ts` | Server-side merge of extension suggestions into DB — content-hash matching (same algorithm as Gmail merge), inserts or updates suggestion records with disco IDs and author data |
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
 | `doc-filters.ts` | Client-side doc filtering (tri-state logic for inbox/comments/author/starred/mimeType/labels/title regex) and sorting; accepts optional cached titles map for when `doc.title` is empty |

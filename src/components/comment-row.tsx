@@ -32,7 +32,6 @@ interface CommentRowProps {
   collapseSignal?: number;
   isSelected?: boolean;
   onSelectInDoc?: () => void;
-  sourceLabel?: string;
 }
 
 function splitContent(raw: string): { author: string | null; text: string } {
@@ -41,7 +40,7 @@ function splitContent(raw: string): { author: string | null; text: string } {
   return { author: raw.slice(0, sep), text: raw.slice(sep + 2) };
 }
 
-export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal, isSelected, onSelectInDoc, sourceLabel }: CommentRowProps) {
+export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal, isSelected, onSelectInDoc }: CommentRowProps) {
   const isSuggestion = comment.type === "SUGGESTION";
   const currentModifiedMs = comment.driveModifiedAt
     ? new Date(comment.driveModifiedAt).getTime()
@@ -493,11 +492,6 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
           {comment.resolved && (
             <span title="This comment has been resolved" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-zinc-100 text-zinc-500">
               Resolved
-            </span>
-          )}
-          {sourceLabel && (
-            <span title="Fetched from the Google Docs page via extension" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700">
-              {sourceLabel}
             </span>
           )}
         </div>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseExtensionTimestamp, extensionToComment, extensionToThread, extensionToSuggestionContent } from "./extension-suggestions";
+import { parseExtensionTimestamp, extensionToThread, extensionToSuggestionContent } from "./extension-suggestions";
 import type { ExtensionSuggestion } from "./bridge-to-extension";
 
 // ---------------------------------------------------------------------------
@@ -71,10 +71,6 @@ describe("parseExtensionTimestamp", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// extensionToComment
-// ---------------------------------------------------------------------------
-
 const baseSuggestion: ExtensionSuggestion = {
   id: "AAAB0test123",
   suggestionType: "Replace",
@@ -86,77 +82,6 @@ const baseSuggestion: ExtensionSuggestion = {
   timestamp: "6:29 PM Feb 21",
   replies: [],
 };
-
-describe("extensionToComment", () => {
-  it("creates a comment with ext- prefix", () => {
-    const c = extensionToComment(baseSuggestion, "doc1");
-    expect(c.commentId).toBe("ext-AAAB0test123");
-    expect(c.docId).toBe("doc1");
-  });
-
-  it("sets googleCommentId to disco ID", () => {
-    const c = extensionToComment(baseSuggestion, "doc1");
-    expect(c.googleCommentId).toBe("AAAB0test123");
-    expect(c.googleSuggestionId).toBeNull();
-  });
-
-  it("maps Replace to EDIT", () => {
-    const c = extensionToComment(baseSuggestion, "doc1");
-    expect(c.suggestionType).toBe("EDIT");
-  });
-
-  it("maps Add to INSERT", () => {
-    const c = extensionToComment({ ...baseSuggestion, suggestionType: "Add" }, "doc1");
-    expect(c.suggestionType).toBe("INSERT");
-  });
-
-  it("maps Delete to DELETE", () => {
-    const c = extensionToComment({ ...baseSuggestion, suggestionType: "Delete" }, "doc1");
-    expect(c.suggestionType).toBe("DELETE");
-  });
-
-  it("sets resolved from status", () => {
-    expect(extensionToComment({ ...baseSuggestion, status: "open" }, "doc1").resolved).toBe(false);
-    expect(extensionToComment({ ...baseSuggestion, status: "accepted" }, "doc1").resolved).toBe(true);
-    expect(extensionToComment({ ...baseSuggestion, status: "rejected" }, "doc1").resolved).toBe(true);
-  });
-
-  it("sets isThreadAuthor from isMine", () => {
-    expect(extensionToComment({ ...baseSuggestion, isMine: true }, "doc1").isThreadAuthor).toBe(true);
-    expect(extensionToComment({ ...baseSuggestion, isMine: false }, "doc1").isThreadAuthor).toBe(false);
-  });
-
-  it("sets isReplyAuthor when any reply is mine", () => {
-    const s = { ...baseSuggestion, replies: [
-      { author: "Other", isMine: false, timestamp: "", text: "hi" },
-      { author: "Me", isMine: true, timestamp: "", text: "reply" },
-    ]};
-    expect(extensionToComment(s, "doc1").isReplyAuthor).toBe(true);
-  });
-
-  it("sets status to INBOX", () => {
-    expect(extensionToComment(baseSuggestion, "doc1").status).toBe("INBOX");
-  });
-
-  it("parses driveCreatedAt from timestamp", () => {
-    const c = extensionToComment(baseSuggestion, "doc1");
-    expect(c.driveCreatedAt).toBeInstanceOf(Date);
-  });
-
-  it("uses last reply timestamp for driveModifiedAt", () => {
-    const s = { ...baseSuggestion, replies: [
-      { author: "A", isMine: false, timestamp: "3:00 PM Mar 15", text: "reply" },
-    ]};
-    const c = extensionToComment(s, "doc1");
-    expect(c.driveModifiedAt).toBeInstanceOf(Date);
-    expect(c.driveModifiedAt!.getMonth()).toBe(2); // March
-  });
-
-  it("uses suggestion timestamp for driveModifiedAt when no replies", () => {
-    const c = extensionToComment(baseSuggestion, "doc1");
-    expect(c.driveModifiedAt?.getTime()).toBe(c.driveCreatedAt?.getTime());
-  });
-});
 
 // ---------------------------------------------------------------------------
 // extensionToThread

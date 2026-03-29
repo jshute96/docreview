@@ -5,21 +5,8 @@
 // into synthetic Comment objects and CommentThread entries for rendering on the
 // comments page alongside DB-sourced suggestions.
 
-import type { Comment } from "@prisma/client";
 import type { CommentThread, SuggestionContent } from "@/lib/google-drive";
 import type { ExtensionSuggestion } from "@/lib/bridge-to-extension";
-
-/**
- * Prefix for synthetic commentId values on extension-sourced suggestions.
- * These comments exist only in memory for display — they have no DB record,
- * so API calls (archive, star, mark read, etc.) should skip them.
- */
-export const EXTENSION_COMMENT_PREFIX = "ext-";
-
-/** Check whether a Comment is a synthetic extension-sourced entry. */
-export function isExtensionComment(c: Comment): boolean {
-  return c.commentId.startsWith(EXTENSION_COMMENT_PREFIX);
-}
 
 // ---------------------------------------------------------------------------
 // Timestamp parsing
@@ -62,52 +49,8 @@ export function parseExtensionTimestamp(ts: string): Date | null {
 }
 
 // ---------------------------------------------------------------------------
-// Type mapping
-// ---------------------------------------------------------------------------
-
-/** Map extension suggestion types ("Replace"/"Add"/"Delete") to Prisma enum values. */
-function extensionSuggestionType(s: ExtensionSuggestion): "INSERT" | "DELETE" | "EDIT" {
-  if (s.suggestionType === "Add") return "INSERT";
-  if (s.suggestionType === "Delete") return "DELETE";
-  return "EDIT";
-}
-
-// ---------------------------------------------------------------------------
 // Conversion to display objects
 // ---------------------------------------------------------------------------
-
-/**
- * Create a synthetic Comment object from an extension suggestion.
- * These aren't persisted — they exist only for display on the comments page.
- * The commentId is prefixed with "ext-" so callers can identify them.
- */
-export function extensionToComment(s: ExtensionSuggestion, docId: string): Comment {
-  return {
-    commentId: `${EXTENSION_COMMENT_PREFIX}${s.id}`,
-    docId,
-    googleCommentId: s.id,
-    googleSuggestionId: null,
-    suggestionContentHash: null,
-    type: "SUGGESTION",
-    suggestionType: extensionSuggestionType(s),
-    resolved: s.status !== "open",
-    isThreadAuthor: s.isMine,
-    isReplyAuthor: s.replies.some(r => r.isMine),
-    isRead: true,
-    isStarred: false,
-    assignedToMe: false,
-    mentionedMe: false,
-    mentionedMeUnreplied: false,
-    status: "INBOX",
-    driveCreatedAt: parseExtensionTimestamp(s.timestamp),
-    driveModifiedAt: s.replies.length > 0
-      ? parseExtensionTimestamp(s.replies[s.replies.length - 1].timestamp)
-      : parseExtensionTimestamp(s.timestamp),
-    replyCount: s.replies.length,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-}
 
 /** Convert an extension suggestion to a CommentThread for the thread panel. */
 export function extensionToThread(s: ExtensionSuggestion): CommentThread {
