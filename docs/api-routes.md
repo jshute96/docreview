@@ -135,6 +135,16 @@ Drive from auto-marking the doc as viewed.
 
 Google API: Drive.
 
+### `/api/docs/[docId]/extension-suggestions` — Extension suggestion merge
+
+POST `{ suggestions: ExtensionSuggestionInput[] }`. Receives suggestion data
+scraped from the Google Docs DOM by the Chrome extension and merges it into the
+database using content-hash matching (same algorithm as Gmail merge). Returns
+`{ success, result: { merged, inserted, skipped, resolved }, comments }` where
+`comments` is the full list of suggestion records for the doc after merging.
+
+No Google API (Prisma only).
+
 ### `/api/docs/sync-comments/[googleDocId]` — Extension-triggered sync
 
 POST. Called by the Chrome extension when it detects comment activity on a doc.

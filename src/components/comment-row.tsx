@@ -610,6 +610,11 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   headerContent={isSuggestion ? (
                     <div className={`mb-3 text-sm${suggestionContent ? " whitespace-pre-wrap" : ""}`}>
                       {suggestionSummary}
+                      <p className="mt-1 text-xs text-zinc-300 font-mono">
+                        {comment.googleSuggestionId && <span>suggest: {comment.googleSuggestionId} </span>}
+                        {comment.googleCommentId && <span>disco: {comment.googleCommentId}</span>}
+                        {!comment.googleSuggestionId && !comment.googleCommentId && <span>(no IDs)</span>}
+                      </p>
                     </div>
                   ) : undefined}
                   emptyMessage={isSuggestion ? "Cannot show reply threads. Process suggestions in the doc." : undefined}

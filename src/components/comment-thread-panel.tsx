@@ -372,6 +372,9 @@ export function CommentThreadPanel({
             key={thread.id}
             className={`py-3 first:pt-0 last:pb-0 ${thread.resolved ? "opacity-60" : ""}`}
           >
+            {/* When headerContent is provided (suggestions), the first thread entry's
+                author/content is redundant with the header — skip it, show only replies. */}
+            {!(headerContent && threadIndex === 0) && (
             <div className={thread.fromMe ? "bg-green-50 -mx-4 px-4 pt-2 pb-1 mb-2" : ""}>
               {threadIndex === 0 && thread.quotedFileContent?.value && (
                 <div className="mb-2">
@@ -407,6 +410,7 @@ export function CommentThreadPanel({
               </div>
               <CommentContent htmlContent={thread.htmlContent} content={thread.content} searchFilter={searchFilter ?? ""} className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap" />
             </div>
+            )}
 
             {thread.replies.map((reply, i) => (
               <div key={i} className={`mt-2 ml-8 ${reply.fromMe ? "bg-green-50 -mr-4 pr-4 pt-2 pb-1" : ""}`}>

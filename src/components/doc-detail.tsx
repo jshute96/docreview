@@ -206,15 +206,19 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch suggestions directly from the Google Docs DOM via the extension.
-  // Creates synthetic Comment entries and thread data for display alongside
-  // the DB/API suggestions. These are shown even if they duplicate existing
-  // records, with a source indicator to distinguish them.
+  // Fetch suggestions from the Google Docs DOM via the extension, then:
+  //   1. Display them immediately as synthetic ext- Comment entries (with thread data)
+  //   2. Push them to the server for DB merge (hash matching, insert/update)
+  //   3. Merge the returned DB records into the comments list
+  // The ext- entries stay visible so reply thread data (which isn't in the DB)
+  // remains accessible. DB entries show alongside for the full lifecycle features.
   async function fetchExtensionSuggestions() {
+    // Phase 1: Fetch from extension
     const suggestions = await getSuggestionsFromDoc(googleDocId);
     if (!suggestions || suggestions.length === 0) return;
+    console.log("[doc-detail] extension suggestions: got", suggestions.length, "from doc tab");
 
-    // Build synthetic comments, thread entries, and suggestion content
+    // Phase 2: Display immediately as synthetic entries
     const syntheticComments: Comment[] = [];
     const newThreads: ThreadMap = {};
     const newSuggContent: Record<string, SuggestionContent> = {};
@@ -228,6 +232,37 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
     setExtensionComments(syntheticComments);
     setThreadMap(prev => ({ ...prev, ...newThreads }));
     setSuggestionContent(prev => ({ ...prev, ...newSuggContent }));
+    console.log("[doc-detail] extension suggestions: displayed", syntheticComments.length, "synthetic entries");
+
+    // Phase 3: Push to server for DB merge
+    try {
+      console.log("[doc-detail] extension suggestions: pushing to server for merge");
+      const contextId = generateContextId();
+      const res = await apiFetch(`/api/docs/${doc.docId}/extension-suggestions`, {
+        method: "POST",
+        body: JSON.stringify({ suggestions }),
+        contextId,
+      });
+      if (!res.ok) {
+        console.log("[doc-detail] extension suggestions: server merge failed", res.status);
+        return;
+      }
+      const data = await res.json();
+      console.log("[doc-detail] extension suggestions: server merge result", data.result);
+
+      // Phase 4: Merge returned DB records into the comments list
+      if (data.comments && Array.isArray(data.comments)) {
+        console.log("[doc-detail] extension suggestions: got", data.comments.length, "DB records back");
+        setComments(prev => {
+          // Replace existing suggestion records, add new ones
+          const dbSuggestionIds = new Set((data.comments as Comment[]).map((c: Comment) => c.commentId));
+          const nonSuggestions = prev.filter(c => !dbSuggestionIds.has(c.commentId));
+          return [...nonSuggestions, ...(data.comments as Comment[])];
+        });
+      }
+    } catch (err) {
+      console.log("[doc-detail] extension suggestions: server merge error", err);
+    }
   }
 
   // Track which comment is currently selected in the Google Doc tab.
