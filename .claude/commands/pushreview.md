@@ -1,3 +1,2 @@
-Do a code review.  Update any docs if necessary.
+/codereview $ARGUMENTS
 If there were no non-trivial issues or changes, then commit and push.
-$ARGUMENTS
