@@ -73,6 +73,7 @@ using different APIs and different IDs.  See `docs/comment-tracking.md` and
   npm run test:e2e                                                 # all suites
   ```
   See `testing/README.md` for setup and details.
+- **Test coverage tracking**: `testing/TODO.md` lists user-facing behaviors that need e2e coverage. When adding or changing user-facing behaviors that don't yet have e2e tests, add an entry to this list.
 
 ### UI Controls
 - **Tooltips**: All buttons, filter controls, and column headings should have a `title` attribute providing a brief description of what the control does. When adding new controls, always include a tooltip. For toggle buttons with two states (e.g., Archive/Unarchive), use a dynamic title that reflects the current action.

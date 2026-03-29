@@ -48,10 +48,10 @@ Easy:
   * testing: get automated testing working. see `testing/chrome-extension.md`.
 
 * testing
-  * sandbox test environment
-  * snapshot database and simulated or recorded google APIs
-  * demo version with some fake docs or a starting snapshot
-  * offline mode - run with a database but no API login (sort of works already, requires logout)
+  * UI testing working in offline mode - get more cases working, with live google apps, chrome extension
+  * **Test cases**: See `testing/TODO.md` for tests to add in e2e tests.
+  * maybe: snapshot database and/or simulated or recorded google APIs
+  * maybe: demo version with some fake docs or a starting snapshot
 
 * diffs
   * can we open the doc diff viewer

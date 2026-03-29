@@ -119,6 +119,7 @@ by replacing the database name with `docreview_test`.
 ```
 testing/
   README.md                        — this file
+  TODO.md                          — list of test cases needing coverage
   setup-test-db.sh                 — test database setup
   dev-test.sh                      — start dev server on port 3009 for interactive use
   open-browser-live.sh             — open regular Chrome with saved profile
@@ -147,6 +148,12 @@ testing/
     README.md                      — notification testing guide
     *.eml / *.json                 — sample emails and parsed structures
 ```
+
+## Test coverage TODO
+
+See [`TODO.md`](TODO.md) for a list of user-facing behaviors that still need
+e2e test coverage. Grab items from that list when writing new tests, and add
+entries when introducing user-facing changes that aren't yet covered.
 
 ## Future suites
 
