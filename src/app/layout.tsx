@@ -27,7 +27,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: browser extensions often inject attributes
+    // on <html> before React hydrates, causing harmless mismatch warnings
+    <html lang="en" suppressHydrationWarning>
       <head />
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
