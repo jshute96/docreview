@@ -15,7 +15,8 @@ import { ROLE_COLORS } from "@/lib/role-colors";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
-import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler } from "@/lib/bridge-to-extension";
+import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, getSuggestionsFromDoc } from "@/lib/bridge-to-extension";
+import { extensionToComment, extensionToThread, extensionToSuggestionContent, isExtensionComment } from "@/lib/extension-suggestions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -53,9 +54,11 @@ import { useCachedMetadata } from "@/hooks/use-cached-metadata";
 import { docTarget } from "@/lib/tab-targets";
 
 // Key for looking up thread/content/suggestion data — suggestions use googleSuggestionId,
-// comments use googleCommentId.
+// comments use googleCommentId. Extension-sourced suggestions only have googleCommentId
+// (disco ID) so we fall back to that.
 function commentKey(c: Comment): string {
-  return (c.type === "SUGGESTION" ? c.googleSuggestionId : c.googleCommentId) ?? "";
+  if (c.type === "SUGGESTION") return c.googleSuggestionId ?? c.googleCommentId ?? "";
+  return c.googleCommentId ?? "";
 }
 
 interface DocDetailProps {
@@ -107,6 +110,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   const [bulkMarkingUnread, setBulkMarkingUnread] = useState(false);
   const [threadMap, setThreadMap] = useState<ThreadMap>({});
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
+  const [extensionComments, setExtensionComments] = useState<Comment[]>([]);
   const [documentText, setDocumentText] = useState<string | undefined>(undefined);
   const [viewedByMeTime, setViewedByMeTime] = useState<string | null>(null);
   const [showUntrackDialog, setShowUntrackDialog] = useState(false);
@@ -169,7 +173,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
       const res = await apiFetch(`/api/docs/${doc.docId}/threads`, { contextId });
       if (res.ok) {
         const data = await res.json();
-        setThreadMap(data.threads ?? {});
+        setThreadMap(prev => ({ ...prev, ...(data.threads ?? {}) }));
         if (data.viewedByMeTime !== undefined) setViewedByMeTime(data.viewedByMeTime);
       }
     } catch { /* threads are optional */ }
@@ -180,7 +184,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
       const res = await apiFetch(`/api/docs/${doc.docId}/content`, { contextId });
       if (res.ok) {
         const data = await res.json();
-        setSuggestionContent(data.suggestions ?? {});
+        setSuggestionContent(prev => ({ ...prev, ...(data.suggestions ?? {}) }));
         if (data.documentText !== undefined) setDocumentText(data.documentText);
       }
     } catch { /* content is optional */ }
@@ -194,8 +198,37 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   useEffect(() => { void fetchContent(generateContextId()); }, [doc.docId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ping extension on mount so supportsCommentNavigation() has cached status
-  // before the user clicks "Open" on a comment.
-  useEffect(() => { void pingExtension(); }, []);
+  // before the user clicks "Open" on a comment. After ping completes, also
+  // try to fetch suggestion data from an open doc tab.
+  useEffect(() => {
+    void pingExtension().then(() => {
+      void fetchExtensionSuggestions();
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch suggestions directly from the Google Docs DOM via the extension.
+  // Creates synthetic Comment entries and thread data for display alongside
+  // the DB/API suggestions. These are shown even if they duplicate existing
+  // records, with a source indicator to distinguish them.
+  async function fetchExtensionSuggestions() {
+    const suggestions = await getSuggestionsFromDoc(googleDocId);
+    if (!suggestions || suggestions.length === 0) return;
+
+    // Build synthetic comments, thread entries, and suggestion content
+    const syntheticComments: Comment[] = [];
+    const newThreads: ThreadMap = {};
+    const newSuggContent: Record<string, SuggestionContent> = {};
+
+    for (const s of suggestions) {
+      syntheticComments.push(extensionToComment(s, doc.docId));
+      newThreads[s.id] = extensionToThread(s);
+      newSuggContent[s.id] = extensionToSuggestionContent(s);
+    }
+
+    setExtensionComments(syntheticComments);
+    setThreadMap(prev => ({ ...prev, ...newThreads }));
+    setSuggestionContent(prev => ({ ...prev, ...newSuggContent }));
+  }
 
   // Track which comment is currently selected in the Google Doc tab.
   // When the extension reports a selection change, we highlight the
@@ -455,7 +488,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   }
 
   async function handleBulkStatusChange(fromStatus: "INBOX" | "ARCHIVED", toStatus: "INBOX" | "ARCHIVED") {
-    const targets = filteredComments.filter((c) => c.status === fromStatus);
+    const targets = filteredComments.filter((c) => c.status === fromStatus && !isExtensionComment(c));
     if (targets.length === 0) return;
 
     const setBusy = toStatus === "ARCHIVED" ? setBulkArchiving : setBulkUnarchiving;
@@ -509,7 +542,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   function handleUnarchiveAll() { void handleBulkStatusChange("ARCHIVED", "INBOX"); }
 
   async function handleArchiveAllResolved() {
-    const targets = filteredComments.filter((c) => c.status === "INBOX" && c.resolved);
+    const targets = filteredComments.filter((c) => c.status === "INBOX" && c.resolved && !isExtensionComment(c));
     if (targets.length === 0) return;
 
     setBulkArchivingResolved(true);
@@ -555,7 +588,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   }
 
   async function handleBulkReadChange(targetIsRead: boolean) {
-    const targets = filteredComments.filter((c) => c.isRead !== targetIsRead);
+    const targets = filteredComments.filter((c) => c.isRead !== targetIsRead && !isExtensionComment(c));
     if (targets.length === 0) return;
 
     const setBusy = targetIsRead ? setBulkMarkingRead : setBulkMarkingUnread;
@@ -625,7 +658,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
 
   const matcher = useMemo(() => createMatcher(searchFilter), [searchFilter]);
 
-  const filteredComments = comments
+  // Combine DB comments with extension-sourced synthetic comments for display
+  const allComments = useMemo(() => [...comments, ...extensionComments], [comments, extensionComments]);
+
+  const filteredComments = allComments
     .filter((c) => exitingIds.has(c.commentId) || !wouldBeFilteredOut(c))
     .filter((c) => {
       if (!searchFilter) return true;
@@ -1071,7 +1107,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
                   driveUrl={doc.driveUrl}
                   content={comment.type === "COMMENT" ? commentContent[commentKey(comment)] : undefined}
                   suggestionContent={comment.type === "SUGGESTION" ? suggestionContent[commentKey(comment)] : undefined}
-                  initialThread={comment.type === "COMMENT" ? threadMap[commentKey(comment)] : undefined}
+                  initialThread={threadMap[commentKey(comment)]}
+                  sourceLabel={isExtensionComment(comment) ? "extension" : undefined}
                   onUpdate={handleCommentUpdate}
                   onThreadUpdate={handleThreadUpdate}
                   isExiting={exitingIds.has(comment.commentId)}

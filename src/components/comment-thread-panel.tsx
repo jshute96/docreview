@@ -53,6 +53,10 @@ interface CommentThreadPanelProps {
   documentText?: string;
   isSelected?: boolean;
   onSelectInDoc?: () => void;
+  /** Content rendered above the first thread entry (e.g., suggestion summary). */
+  headerContent?: React.ReactNode;
+  /** Message shown when threads is empty. Defaults to "No comments on this document." */
+  emptyMessage?: string;
   /** Ref to the buttons row, used by CommentRow for auto-scroll positioning
    *  when this comment is selected from the Google Doc tab. */
   buttonsRowRef?: React.RefObject<HTMLDivElement | null>;
@@ -82,6 +86,8 @@ export function CommentThreadPanel({
   documentText,
   isSelected,
   onSelectInDoc,
+  headerContent,
+  emptyMessage,
   buttonsRowRef,
 }: CommentThreadPanelProps) {
   const [replyText, setReplyText] = useState("");
@@ -213,24 +219,28 @@ export function CommentThreadPanel({
 
   const replyBox = (
     <div ref={replyContainerRef} className="mt-3 pt-3 border-t border-zinc-200">
-      {/* Hidden span mirrors textarea font to measure single-line text width */}
-      <span
-        ref={measureRef}
-        className="fixed whitespace-pre text-sm"
-        style={{ display: "inline-block", visibility: "hidden", left: "-9999px", top: "-9999px" }}
-        aria-hidden="true"
-      />
-      <textarea
-        ref={textareaRef}
-        value={replyText}
-        onChange={handleChange}
-        placeholder="Reply..."
-        rows={1}
-        className={TEXTAREA_CLASSES}
-        style={{ width: "25%", overflow: "hidden" }}
-      />
-      <div ref={buttonsRowRef} className="mt-2 flex items-center gap-2 whitespace-nowrap">
-        {resolved ? (
+      {onReply && (
+        <>
+        {/* Hidden span mirrors textarea font to measure single-line text width */}
+        <span
+          ref={measureRef}
+          className="fixed whitespace-pre text-sm"
+          style={{ display: "inline-block", visibility: "hidden", left: "-9999px", top: "-9999px" }}
+          aria-hidden="true"
+        />
+        <textarea
+          ref={textareaRef}
+          value={replyText}
+          onChange={handleChange}
+          placeholder="Reply..."
+          rows={1}
+          className={TEXTAREA_CLASSES}
+          style={{ width: "25%", overflow: "hidden" }}
+        />
+        </>
+      )}
+      <div ref={buttonsRowRef} className={`${onReply ? "mt-2 " : ""}flex items-center gap-2 whitespace-nowrap`}>
+        {onReply && (resolved ? (
           <Button
             variant="outline"
             size="sm"
@@ -274,8 +284,8 @@ export function CommentThreadPanel({
               Reply &amp; Archive
             </Button>
           </>
-        )}
-        <span className="text-zinc-300 mx-1">|</span>
+        ))}
+        {onReply && <span className="text-zinc-300 mx-1">|</span>}
         {onArchive && (
           <Button
             variant="outline"
@@ -345,7 +355,8 @@ export function CommentThreadPanel({
   if (threads.length === 0) {
     return (
       <div className="mx-auto w-[90%] min-w-fit my-3 rounded-lg border bg-zinc-50 p-4">
-        <p className="text-sm text-zinc-400">No comments on this document.</p>
+        {headerContent}
+        <p className="text-sm text-zinc-400">{emptyMessage ?? "No comments on this document."}</p>
         {replyBox}
       </div>
     );
@@ -353,6 +364,7 @@ export function CommentThreadPanel({
 
   return (
     <div className={`mx-auto w-[90%] min-w-fit my-3 rounded-lg border bg-zinc-50 p-4${isSelected ? " ring-2 ring-blue-400" : ""}`}>
+      {headerContent}
       {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- click to select comment in Google Doc */}
       <div className={`divide-y divide-zinc-200${onSelectInDoc ? " cursor-pointer" : ""}`} onClick={onSelectInDoc} title={onSelectInDoc ? "Click to select this comment in the document" : undefined}>
         {threads.map((thread, threadIndex) => (
@@ -413,8 +425,18 @@ export function CommentThreadPanel({
                       Reopened
                     </span>
                   )}
+                  {reply.action === "accept" && (
+                    <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
+                      Accepted
+                    </span>
+                  )}
+                  {reply.action === "reject" && (
+                    <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
+                      Rejected
+                    </span>
+                  )}
                 </div>
-                <CommentContent htmlContent={reply.htmlContent} content={reply.content} searchFilter={searchFilter ?? ""} className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap" />
+                {!reply.action && <CommentContent htmlContent={reply.htmlContent} content={reply.content} searchFilter={searchFilter ?? ""} className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap" />}
               </div>
             ))}
           </div>

@@ -379,6 +379,43 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     })();
     return;
   }
+
+  // From Docreview bridge: extract suggestion data from an open Google Docs tab.
+  // Returns the full list of suggestions scraped from the DOM, including type,
+  // old/new text, status, author, and reply threads.
+  if (msg.type === 'getSuggestions' && msg.docId) {
+    console.log('[background] getSuggestions from docreview:', msg.docId);
+    (async function() {
+      var config = await chrome.storage.sync.get({ enableDocs: DEFAULTS.enableDocs });
+      if (!config.enableDocs) {
+        sendResponse({ success: false, error: 'Google Docs integration is disabled' });
+        return;
+      }
+      var tabId = await findDocTab(msg.docId);
+      if (!tabId) {
+        sendResponse({ success: false, error: 'no doc tab open' });
+        return;
+      }
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: injectDiscoIdHelpers,
+          world: 'MAIN'
+        });
+        var results = await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: function() { return window.__docreviewDisco.getSuggestions(); },
+          world: 'MAIN'
+        });
+        var suggestions = results && results[0] && results[0].result;
+        sendResponse({ success: true, suggestions: suggestions || [] });
+      } catch (err) {
+        console.warn('[background] getSuggestions failed:', err.message);
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true; // async response
+  }
 });
 
 // --- Comment navigation ---

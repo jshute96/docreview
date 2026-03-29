@@ -53,6 +53,7 @@ Message handlers:
 - `navigateToComment` — Tracks Google Docs tabs per document and injects navigation scripts via `executeScript` in MAIN world.
 - `commentSelection` — Forwards comment selection/deselection events from Google Doc tabs to open Docreview tabs for cross-tab highlight sync.
 - `selectComment` — Selects a comment in a Google Doc tab (via injected script) without focusing the tab, triggered by clicking a comment thread in Docreview.
+- `getSuggestions` — Extracts suggestion data from an open Google Docs tab by executing `getSuggestions()` in MAIN world. Returns suggestion type, old/new text, status, author, isMine flag, and full reply threads. Used by the comments page to display richer suggestion data than the Docs API provides.
 - `openDocInDocreview` — Opens a doc from Gmail in Docreview, using `chrome.scripting.executeScript` with `allFrames: true` to search all frames (including sandboxed AMP iframes).
 
 **`bridge-to-docreview.js`** — Content script dynamically registered for Docreview app pages.

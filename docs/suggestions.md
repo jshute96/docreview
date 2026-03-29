@@ -98,6 +98,10 @@ stripped before storage.
 | `isReplyAuthor` | false | — | false |
 | `mentionedMe` | false | — | false |
 
+**Extension source:** When displayed from the extension, synthetic Comment objects also
+populate `isThreadAuthor` and `isReplyAuthor` from the `isMine` flag, and `resolved`
+from the accepted/rejected status. These are display-only and not persisted.
+
 **Future:** `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, and `resolved` could
 potentially be derived from parsed Gmail notifications but are left for later.
 
@@ -166,6 +170,39 @@ outcome as above.
 won't have a `?disco=` deep link. This is inherent — we can't merge what we can't
 correlate. The user may briefly see a duplicate suggestion in INBOX, but it disappears
 after the next refresh when the unmatched row is resolved.
+
+---
+
+## Extension Source (DOM Scraping)
+
+When the Chrome extension is installed and a Google Docs tab is open for the document,
+the comments page can fetch suggestion data directly from the DOM via `getSuggestions()`.
+This provides richer data than either the Docs API or Gmail:
+
+| Data | Docs API | Gmail | Extension |
+|------|----------|-------|-----------|
+| Suggestion type + text | Yes | Yes | Yes |
+| Author name | No | No | Yes |
+| isMine flag | No | No | Yes |
+| Status (open/accepted/rejected) | Pending only | No | Yes |
+| Reply threads with content | No | Count only | Yes (with HTML) |
+| Timestamps | Approximate | Minute precision | Relative from DOM |
+| Disco ID (for navigation) | No | Yes | Yes |
+
+**Display flow:** On the comments page, after pinging the extension, `fetchExtensionSuggestions()`
+calls `getSuggestionsFromDoc(docId)` via the bridge. The extension executes `getSuggestions()`
+in the doc tab's MAIN world and returns the results. These are converted to synthetic `Comment`
+objects (with `commentId` prefix `ext-`) and `CommentThread` entries, then merged into the
+display alongside DB suggestions. A green "extension" badge distinguishes them.
+
+**Timestamps:** The extension returns relative timestamps from the DOM (e.g., "6:29 PM Feb 21",
+"5:06 AM Yesterday"). These are parsed into `Date` objects for the created/modified columns
+where possible; unparseable strings are displayed as-is in the thread panel.
+
+**Limitations:** Only works when a doc tab is open. Only sees suggestions visible in the DOM
+(anchored sidebar for open suggestions; resolved ones require that the comments pane was
+opened at least once during the session — they remain loaded after the pane is closed).
+Extension suggestions are not persisted — they exist only for the current page session.
 
 ---
 

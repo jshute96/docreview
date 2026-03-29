@@ -181,6 +181,51 @@ export function selectCommentInDoc(docId: string, discoId: string): void {
   }, "*");
 }
 
+/** Shape of a suggestion returned by the extension's getSuggestions() DOM scraper. */
+export interface ExtensionSuggestion {
+  id: string;              // disco ID (AAAB format)
+  suggestionType: string;  // "Replace", "Add", "Delete"
+  status: string;          // "open", "accepted", "rejected"
+  oldText: string;
+  newText: string;
+  author: string;
+  isMine: boolean;
+  timestamp: string;       // relative timestamp from DOM, e.g. "6:29 PM Feb 21"
+  replies: {
+    author: string;
+    isMine: boolean;
+    timestamp: string;
+    text: string;
+    html?: string;
+    action?: "accept" | "reject";
+  }[];
+}
+
+/**
+ * Ask the extension to extract suggestion data from an open Google Docs tab.
+ * Returns the array of suggestions scraped from the DOM, or null if the
+ * extension isn't available or no doc tab is open.
+ */
+export async function getSuggestionsFromDoc(docId: string): Promise<ExtensionSuggestion[] | null> {
+  try {
+    const result = await sendExtensionMessage<{ success: boolean; suggestions?: ExtensionSuggestion[]; error?: string }>(
+      { type: "getSuggestions", docId },
+      5000,
+    );
+    if (result.success && result.suggestions) {
+      console.log("[extension] getSuggestions:", result.suggestions.length, "from doc tab");
+      return result.suggestions;
+    }
+    if (!result.success) {
+      console.log("[extension] getSuggestions: not available —", result.error ?? "unknown");
+    }
+    return null;
+  } catch {
+    // Extension not installed or bridge not loaded — expected when extension is absent
+    return null;
+  }
+}
+
 /** Callback type for comment selection events from Google Doc tabs. */
 export type CommentSelectionHandler = (docId: string, discoId: string | null, selected: boolean) => void;
 

@@ -32,6 +32,7 @@ interface CommentRowProps {
   collapseSignal?: number;
   isSelected?: boolean;
   onSelectInDoc?: () => void;
+  sourceLabel?: string;
 }
 
 function splitContent(raw: string): { author: string | null; text: string } {
@@ -40,7 +41,7 @@ function splitContent(raw: string): { author: string | null; text: string } {
   return { author: raw.slice(0, sep), text: raw.slice(sep + 2) };
 }
 
-export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal, isSelected, onSelectInDoc }: CommentRowProps) {
+export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal, isSelected, onSelectInDoc, sourceLabel }: CommentRowProps) {
   const isSuggestion = comment.type === "SUGGESTION";
   const currentModifiedMs = comment.driveModifiedAt
     ? new Date(comment.driveModifiedAt).getTime()
@@ -98,8 +99,9 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     fetchedModifiedMs.current = modMs;
   }, [initialThread]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // The thread/suggestion API identifier — googleCommentId for comments, googleSuggestionId for suggestions
-  const threadId = (isSuggestion ? comment.googleSuggestionId : comment.googleCommentId) ?? "";
+  // The thread/suggestion API identifier — googleCommentId for comments, googleSuggestionId
+  // for suggestions. Extension-sourced suggestions only have googleCommentId (disco ID).
+  const threadId = (isSuggestion ? (comment.googleSuggestionId ?? comment.googleCommentId) : comment.googleCommentId) ?? "";
   const hasDiscoLink = !!comment.googleCommentId;
   const openLabel = hasDiscoLink ? "Open" : "Open doc";
   const openTitle = hasDiscoLink ? "Open the document at this comment" : "Open the document";
@@ -493,6 +495,11 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
               Resolved
             </span>
           )}
+          {sourceLabel && (
+            <span title="Fetched from the Google Docs page via extension" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700">
+              {sourceLabel}
+            </span>
+          )}
         </div>
       )}
       {cell(`${cellPy} flex`,
@@ -575,50 +582,38 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             style={{ gridTemplateRows: expanded && !isExiting ? "1fr" : "0fr" }}
           >
             <div className={`min-h-0${expanded && !isExiting ? "" : " overflow-hidden"}`}>
-              {isSuggestion ? (
-                <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
-                  <div className="float-right relative z-10 flex gap-1 ml-2 mb-1">
-                    <Button variant="outline" size="sm" className="h-6 px-2 text-xs" title={openTitle} asChild>
-                      <a href={commentUrl()} target={docTarget(googleDocId)} onClick={handleOpenClick}>
-                        {openLabel}
-                      </a>
-                    </Button>
-                  </div>
-                  <div className={`mb-3 text-sm${suggestionContent ? " whitespace-pre-wrap" : ""}`}>
-                    {suggestionSummary}
-                  </div>
-                  <p className="text-sm text-zinc-400">
-                    Cannot accept or reject suggestions, or show reply threads. Process suggestions in the doc.
-                  </p>
-                </div>
-              ) : (
-                <CommentThreadPanel
+              <CommentThreadPanel
                   threads={threads}
                   loading={loadingThreads}
                   resolved={comment.resolved}
                   commentUrl={commentUrl()}
                   openTarget={docTarget(googleDocId)}
                   onOpenClick={handleOpenClick}
-                  onRefresh={refreshThread}
-                  refreshing={refreshingThread}
-                  onReply={handleReply}
-                  onResolve={handleResolve}
-                  onReopen={handleReopen}
-                  onReplyAndArchive={handleReplyAndArchive}
+                  onRefresh={isSuggestion ? undefined : refreshThread}
+                  refreshing={isSuggestion ? undefined : refreshingThread}
+                  onReply={isSuggestion ? undefined : handleReply}
+                  onResolve={isSuggestion ? undefined : handleResolve}
+                  onReopen={isSuggestion ? undefined : handleReopen}
+                  onReplyAndArchive={isSuggestion ? undefined : handleReplyAndArchive}
                   onArchive={() => updateStatus(isArchived ? "INBOX" : "ARCHIVED")}
                   isArchived={isArchived}
                   onToggleRead={toggleRead}
                   isRead={comment.isRead}
                   onMute={() => updateStatus(isMuted ? "INBOX" : "MUTED")}
                   isMuted={isMuted}
-                  onDirtyChange={setHasDirtyReply}
+                  onDirtyChange={isSuggestion ? undefined : setHasDirtyReply}
                   searchFilter={searchFilter}
-                  documentText={documentText}
+                  documentText={isSuggestion ? undefined : documentText}
                   isSelected={isSelected}
                   onSelectInDoc={onSelectInDoc ? doSelectInDoc : undefined}
                   buttonsRowRef={buttonsRowRef}
+                  headerContent={isSuggestion ? (
+                    <div className={`mb-3 text-sm${suggestionContent ? " whitespace-pre-wrap" : ""}`}>
+                      {suggestionSummary}
+                    </div>
+                  ) : undefined}
+                  emptyMessage={isSuggestion ? "Cannot show reply threads. Process suggestions in the doc." : undefined}
                 />
-              )}
             </div>
           </div>
         </td>

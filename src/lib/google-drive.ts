@@ -560,7 +560,7 @@ export interface ThreadReply {
   content: string;
   htmlContent?: string;
   createdTime: string;
-  action?: "resolve" | "reopen";
+  action?: "resolve" | "reopen" | "accept" | "reject";
 }
 
 // A comment thread on a document: the initial comment plus all replies.

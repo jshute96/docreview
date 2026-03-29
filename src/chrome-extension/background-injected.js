@@ -231,17 +231,31 @@ function injectDiscoIdHelpers() {
     var seenIds = {};
     var results = [];
 
-    // Helper: extract reply body text from either anchored or stream view.
-    // Anchored view uses .docos-replyview-body; stream view uses
-    // .docos-replyview-body-container (the -body div exists but is empty).
-    function getReplyText(replyEl) {
+    // Get the logged-in user's display name from the Google Account button
+    // (e.g., "Google Account: Dave (docreview.dave@gmail.com)").
+    var myName = '';
+    var accountBtn = document.querySelector('[aria-label*="Google Account"]');
+    if (accountBtn) {
+      var nameMatch = (accountBtn.getAttribute('aria-label') || '').match(/Google Account:\s*([^(]+)\s*\(/);
+      if (nameMatch) myName = nameMatch[1].trim();
+    }
+
+    // Helper: extract reply body from either anchored or stream view.
+    // Returns { text, html }. Anchored view uses .docos-replyview-body;
+    // stream view uses .docos-replyview-body-container (the -body div
+    // exists but is empty).
+    function getReplyBody(replyEl) {
       var body = replyEl.querySelector('.docos-replyview-body');
       var text = body ? body.textContent.trim() : '';
+      var html = body ? body.innerHTML.trim() : '';
       if (!text) {
         var container = replyEl.querySelector('.docos-replyview-body-container');
-        if (container) text = container.innerText.trim();
+        if (container) {
+          text = container.innerText.trim();
+          html = container.innerHTML.trim();
+        }
       }
-      return text;
+      return { text: text, html: html };
     }
 
     // Helper: extract author name from a reply entry.
@@ -361,16 +375,23 @@ function injectDiscoIdHelpers() {
       var replies = [];
       for (var r = 0; r < replyEntries.length; r++) {
         if (replyEntries[r].classList.contains('docos-replyview-first')) continue;
-        var rText = getReplyText(replyEntries[r]);
-        // Skip system status entries ("Suggestion accepted"/"Suggestion rejected")
-        if (rText === 'Suggestion accepted' || rText === 'Suggestion rejected') continue;
-        if (rText) {
-          replies.push({
-            author: getReplyAuthor(replyEntries[r]),
-            timestamp: getReplyTimestamp(replyEntries[r]),
-            text: rText
-          });
-        }
+        var rBody = getReplyBody(replyEntries[r]);
+        if (!rBody.text) continue;
+        var rAuthor = getReplyAuthor(replyEntries[r]);
+        // System status entries become action replies (like resolve/reopen for comments).
+        // The body text may include "Show more"/"Show less" from collapsible UI elements,
+        // so use startsWith rather than exact match.
+        var rAction = undefined;
+        if (rBody.text.indexOf('Suggestion accepted') === 0) rAction = 'accept';
+        else if (rBody.text.indexOf('Suggestion rejected') === 0) rAction = 'reject';
+        replies.push({
+          author: rAuthor,
+          isMine: !!(myName && rAuthor === myName),
+          timestamp: getReplyTimestamp(replyEntries[r]),
+          text: rAction ? '' : rBody.text,
+          html: !rAction && rBody.html !== rBody.text ? rBody.html : undefined,
+          action: rAction
+        });
       }
 
       var entry = {
@@ -380,11 +401,13 @@ function injectDiscoIdHelpers() {
         oldText: oldText,
         newText: newText,
         author: author,
+        isMine: !!(myName && author === myName),
         timestamp: timestamp,
         replies: replies
       };
       results.push(entry);
       console.log('[' + results.length + '] ' + status + ' ' + suggestionType + ' ' + id +
+        (entry.isMine ? ' (mine)' : '') +
         '  ' + JSON.stringify(oldText ? oldText.substring(0, 30) : '') +
         ' → ' + JSON.stringify(newText ? newText.substring(0, 30) : '') +
         (replies.length ? '  (' + replies.length + ' replies)' : ''));
