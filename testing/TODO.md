@@ -1,16 +1,42 @@
-# E2E Test TODO
+# E2E Test Coverage
 
-User-facing behaviors that need Playwright e2e test coverage.
-Excludes behaviors already covered by existing tests or unit tests.
+User-facing behaviors and their Playwright e2e test coverage status.
+Checked items have existing tests; unchecked items still need coverage.
 
-Update this list when adding or changing user-facing behaviors that
-don't yet have e2e coverage.
+Update this list when adding or changing user-facing behaviors.
+
+---
+
+## Authentication & Smoke Tests
+
+### Offline Mode
+
+**Files:** `app-offline/smoke.spec.ts`
+
+- [x] Login page auto-signs in and redirects to /docs
+- [x] /docs page loads successfully
+- [x] /comments page loads successfully
+- [x] /add page loads successfully
+- [x] Unauthenticated request redirects to /login
+- [ ] Sign out clears session and redirects to /login
+
+### Live Mode
+
+- [ ] Google OAuth login redirects to /docs on success
+- [ ] Unauthenticated request redirects to /login
+- [ ] Login errors: contextual error messages on login page (CredentialsSignin, AccessDenied)
+- [ ] Sign out clears session and redirects to /login
+- [ ] Expired OAuth token: toast prompting re-auth
 
 ---
 
 ## Document List Page (`/docs`)
 
+**Files:** `app-offline/docs.spec.ts`
+
 ### Display & Layout
+- [x] Document rows display with title links to /comments/
+- [x] Doc rows have action buttons (Open, Archive/Unarchive)
 - [ ] Document rows show: type icon, title, role badge, star, comment counts (unread/inbox/open), label badges, truncated notes (full on hover), archive button, edit button
 - [ ] Row highlighting: red background for assigned comments, amber for unreplied @mentions
 - [ ] Access-denied docs show strikethrough title, gray text, red indicator ("In trash" / "Not accessible" / "Permission denied")
@@ -41,16 +67,20 @@ don't yet have e2e coverage.
 - [ ] Hamburger menu items: refresh from Drive only, refresh from Gmail only, refresh selected, full refresh, add doc page, chrome extension link, clear cache, delete all data, sign out
 
 ### Row Actions
+- [x] Clicking doc title navigates to comments page
 - [ ] Star toggle persists and broadcasts cross-tab
 - [ ] Archive/unarchive toggle persists, updates row, broadcasts cross-tab
 - [ ] Edit button opens Edit Document dialog
-- [ ] Clicking doc title navigates to comments page
 
 ---
 
 ## Document Detail / Comments Page (`/comments/[docId]`)
 
+**Files:** `app-offline/docs.spec.ts`
+
 ### Header
+- [x] Shows doc metadata and comments section
+- [x] Back navigation (logo) returns to docs list
 - [ ] Displays title, role, status, star, labels, notes, owner, dates
 - [ ] Menu: untrack document, delete & re-add
 - [ ] Red warning banners for trashed / not accessible / permission denied docs
@@ -102,6 +132,33 @@ don't yet have e2e coverage.
 - [ ] Sort order freezes during single-comment interaction (reply, resolve, status change)
 - [ ] Sort icon switches to unselected state (↕) when frozen
 - [ ] Clicking any column header or Refresh unfreezes and re-sorts
+
+---
+
+## Label Management
+
+**Files:** `app-offline/labels.spec.ts`, `app-offline/labels-crosstab.spec.ts`
+
+### Manage Labels Dialog
+- [x] Create labels via Manage Labels dialog (with persistence to DB)
+- [x] Reorder labels via drag-and-drop (reflected in badges and DB positions)
+- [x] Change label color (reflected in doc row badges and DB)
+- [x] Cancel discards unsaved changes (color, reorder, new labels)
+- [x] Delete label: cancel confirm keeps it; cancel dialog keeps it on docs page
+- [x] Delete label: confirm and save removes from all doc rows and DB (cascade)
+
+### Label Assignment
+- [x] Assign labels to docs via Edit dialog (badges appear on rows, persisted to DB)
+
+### Cross-Tab Label Sync
+- [x] Label changes broadcast to /docs page (filter bar and doc row badges)
+- [x] Label changes broadcast to /comments page (doc labels section)
+- [x] Label changes broadcast to /add page (label picker)
+- [x] Label changes broadcast to /docs with Add dialog open (label picker)
+- [x] Label changes broadcast to /docs with Edit dialog open (label picker)
+- [x] Label changes broadcast to /comments with Edit dialog open (label picker)
+- [x] Label changes broadcast to /docs with Manage Labels dialog open
+- [x] Database state remains consistent after cross-tab sync
 
 ---
 
@@ -209,6 +266,9 @@ don't yet have e2e coverage.
 
 ## Cross-Tab Sync
 
+**Files:** `app-offline/labels-crosstab.spec.ts` (label sync only)
+
+- [x] Label changes sync across all open tabs and dialogs (see Label Management above)
 - [ ] Doc list updates when another tab adds/edits/archives a doc
 - [ ] Comments page updates when another tab changes doc metadata
 - [ ] Comments page updates when another tab syncs comments
@@ -313,11 +373,30 @@ don't yet have e2e coverage.
 
 ## Chrome Extension
 
-### Toolbar icon
+### Toolbar Icon
+
+**Files:** `extension-live/toolbar.spec.ts`
+
+- [x] Extension loads and service worker starts
 - [x] On blank page, opens docreview
+- [x] On non-doc page, shows error alert
 - [ ] On a google doc, go to /open for that doc
 - [ ] On gmail, go to /open for that doc if it's a notification email
-- [x] On other pages, give an error
+
+### Content Script Injection
+
+**Files:** `extension-snapshot/content-script.spec.ts`
+
+- [x] Google Docs: injects #dr-badge with .dr-link (titlebar badge)
+- [x] Google Docs: idempotent — running twice produces one badge
+- [x] Google Sheets: titlebar badge injected
+- [x] Google Slides: titlebar badge injected
+- [x] Google Drive list view: injects .dr-link into qualifying file rows
+- [x] Google Drive list view: idempotent — no duplicates on re-run
+- [x] Gmail inbox: injects .dr-link into [data-docurl] chips
+- [x] Gmail inbox: idempotent — no duplicates on re-run
+- [x] Gmail message view: injects .dr-gmail-bar above message iframe
+- [x] Gmail message view: idempotent — one bar per message on re-run
 
 ### Titlebar Badge (Google Docs/Sheets/Slides)
 - [ ] Click badge opens doc in Docreview (navigates to comments page if tracked, add page if not)
@@ -328,7 +407,6 @@ don't yet have e2e coverage.
 - [ ] Link pre-fills notes with date and access-denied context
 
 ### Google Drive Icons
-- [ ] Icons appear next to files in list view and grid view
 - [ ] Icons link to correct Docreview page
 - [ ] Folders excluded
 
@@ -399,7 +477,6 @@ don't yet have e2e coverage.
 - [ ] Document trashed: marked TRASHED, removed from Inbox
 - [ ] Partial refresh failure: summary shows error count, successful syncs still applied
 - [ ] Offline mode: all Drive/Docs/Gmail API calls gracefully skipped with logged warnings
-- [ ] Login errors: contextual error messages on login page (CredentialsSignin, AccessDenied)
 
 ---
 
