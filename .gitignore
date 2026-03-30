@@ -61,6 +61,7 @@ scripts/data-export.json
 
 .playwright-mcp/
 .chrome-test-profile/
+.chrome-test-extension-profile/
 
 testing/test_users.json
 testing/extension-snapshot/snapshots/

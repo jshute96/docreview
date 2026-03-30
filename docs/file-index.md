@@ -266,6 +266,7 @@ Shadcn/ui components:
 | `setup-test-db.sh` | Create/migrate the `docreview_test` database for UI tests |
 | `dev-test.sh` | Start dev server on port 3009 against test DB for interactive use |
 | `open-browser-live.sh` | Open a regular Chrome with dedicated profile for online mode (Google session saved) |
+| `open-browser-with-extension.sh` | Open Chrome with the Docreview extension loaded |
 | `test_users.json` | Test account credentials (gitignored) |
 | `shared/test-env.ts` | Shared config: test DB URL, port 3010, server command builder |
 | `shared/test-db.ts` | Prisma client for the test database (with base64 field encoding), used for DB assertions in tests |
@@ -277,6 +278,8 @@ Shadcn/ui components:
 | `app-offline/docs.spec.ts` | Doc list and individual doc page tests |
 | `app-offline/labels.spec.ts` | Label management tests: create, assign, reorder, color change, delete, cancel — with DB verification |
 | `app-offline/labels-crosstab.spec.ts` | Cross-tab label sync: verifies label changes broadcast to all open pages and dialogs |
-| `extension-live/playwright.config.ts` | Config for extension + app tests (Chrome with --load-extension) |
+| `extension-live/playwright.config.ts` | Config for extension + app tests (bundled Chromium with --load-extension) |
+| `extension-live/fixtures.ts` | Test fixtures: persistent context with extension, service worker, chrome API page |
+| `extension-live/toolbar.spec.ts` | Toolbar icon click behavior: blank page opens docreview, non-doc shows error |
 | `app-live/playwright.config.ts` | Config for tests with real Google OAuth |
 | `gmail_notifications/` | `.eml` + `.json` pairs for testing `parse-gmail-notification.ts` |

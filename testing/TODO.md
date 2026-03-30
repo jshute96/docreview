@@ -314,10 +314,10 @@ don't yet have e2e coverage.
 ## Chrome Extension
 
 ### Toolbar icon
-- [ ] On blank page, opens docreview
+- [x] On blank page, opens docreview
 - [ ] On a google doc, go to /open for that doc
 - [ ] On gmail, go to /open for that doc if it's a notification email
-- [ ] On other pages, give an error
+- [x] On other pages, give an error
 
 ### Titlebar Badge (Google Docs/Sheets/Slides)
 - [ ] Click badge opens doc in Docreview (navigates to comments page if tracked, add page if not)

@@ -1,19 +1,17 @@
 /**
  * Playwright config for testing docreview with the Chrome extension loaded.
  *
- * Starts a Next.js dev server on port 3010 (offline mode) and launches
- * Chrome with the extension loaded via --load-extension.
+ * Starts a Next.js dev server on port 3010 (offline mode). Browser launch
+ * is handled by the fixtures (persistent context with extension), not this
+ * config's `use` block — the `use` settings here are just for baseURL/defaults.
  *
  * Prerequisites:
  *   testing/setup-test-db.sh   # create and migrate the test database
- *   Chrome extension built in src/chrome-extension/
+ *   npx playwright install chromium  # bundled Chromium (system Chrome can't load extensions)
  */
 
-import * as path from 'path';
 import { defineConfig } from '@playwright/test';
 import { TEST_BASE_URL, TEST_PORT, buildServerCommand, PROJECT_ROOT } from '../shared/test-env';
-
-const EXTENSION_DIR = path.join(PROJECT_ROOT, 'src', 'chrome-extension');
 
 export default defineConfig({
   testDir: '.',
@@ -22,13 +20,6 @@ export default defineConfig({
   retries: 0,
   use: {
     baseURL: TEST_BASE_URL,
-    // Cannot use channel: 'chrome' with extensions — need full Chromium launch
-    launchOptions: {
-      args: [
-        `--disable-extensions-except=${EXTENSION_DIR}`,
-        `--load-extension=${EXTENSION_DIR}`,
-      ],
-    },
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
   },

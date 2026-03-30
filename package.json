@@ -19,6 +19,7 @@
     "dev:test-offline": "testing/dev-test.sh --offline",
     "test:open-browser": "npx playwright open --channel chrome http://localhost:3009",
     "test:open-browser-live": "testing/open-browser-live.sh",
+    "test:open-browser-extension": "testing/open-browser-with-extension.sh",
     "typecheck": "tsc --noEmit",
     "prepare": "husky"
   },
@@ -53,6 +54,7 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
+    "@types/chrome": "^0.1.38",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

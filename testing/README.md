@@ -41,6 +41,7 @@ npm run test:e2e
 | `npm run dev:test-offline` | Start dev server on port 3009, offline mode (auto-login) |
 | `npm run test:open-browser` | Open an ephemeral Playwright browser (offline mode) |
 | `npm run test:open-browser-live` | Open a regular Chrome with saved profile (Google login survives across runs) |
+| `npm run test:open-browser-extension` | Open Chrome with extension loaded |
 
 ## Running individual tests
 
@@ -123,6 +124,7 @@ testing/
   setup-test-db.sh                 — test database setup
   dev-test.sh                      — start dev server on port 3009 for interactive use
   open-browser-live.sh             — open regular Chrome with saved profile
+  open-browser-with-extension.sh   — open Chrome with extension loaded
   chrome-extension.md              — test case catalog
   test_users.json                  — test credentials (gitignored)
   shared/
@@ -140,7 +142,8 @@ testing/
     labels-crosstab.spec.ts        — cross-tab label sync across all pages/dialogs
   extension-live/
     playwright.config.ts           — Next.js + Chrome extension loaded
-    (tests TBD)
+    fixtures.ts                    — persistent context with extension + chrome API helpers
+    toolbar.spec.ts                — toolbar icon click behavior tests
   app-live/
     playwright.config.ts           — Next.js with Google OAuth
     (tests TBD)

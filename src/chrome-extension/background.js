@@ -84,7 +84,9 @@ async function openDocFromGmailTab(tabId) {
 // For Docs (including Sheets/Slides), the tab URL contains the doc ID directly.
 // For Gmail, delegate to openDocFromGmailTab which searches frame contents.
 // Drive pages show file lists, not single documents, so the toolbar doesn't apply there.
-chrome.action.onClicked.addListener(async function(tab) {
+// Named function (not anonymous) so the _test:toolbarClick message handler below
+// can call it. Playwright can't click the extension toolbar icon directly.
+async function handleToolbarClick(tab) {
   if (!tab.url || !isSupportedUrl(tab.url)) {
     if (!tab.url || tab.url === 'chrome://newtab/' || tab.url === 'about:blank') {
       var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
@@ -128,7 +130,9 @@ chrome.action.onClicked.addListener(async function(tab) {
 
   var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
   chrome.tabs.create({ url: baseUrl + '/open?doc=' + encodeURIComponent(tab.url), index: tab.index + 1 });
-});
+}
+
+chrome.action.onClicked.addListener(handleToolbarClick);
 
 // Handle messages from content scripts and the Docreview bridge.
 //
@@ -378,6 +382,22 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
       });
     })();
     return;
+  }
+
+  // Test helper: simulate toolbar icon click. Called from Playwright tests via
+  // chrome.runtime.sendMessage from an extension page (e.g. options.html), since
+  // Playwright can't click extension toolbar icons or evaluate in SW scope.
+  if (msg.type === '_test:toolbarClick' && msg.tabId) {
+    (async function() {
+      try {
+        var tab = await chrome.tabs.get(msg.tabId);
+        await handleToolbarClick(tab);
+        sendResponse({ success: true });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
   }
 
   // From Docreview bridge: extract suggestion data from an open Google Docs tab.
