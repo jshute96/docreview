@@ -12,7 +12,7 @@ const PROJECT_DIR = path.resolve(__dirname, '../..');
 const ENV_FILE = path.join(PROJECT_DIR, '.env');
 
 /** Read a value from the .env file */
-function readEnvVar(name: string): string | undefined {
+export function readEnvVar(name: string): string | undefined {
   if (!fs.existsSync(ENV_FILE)) return undefined;
   const content = fs.readFileSync(ENV_FILE, 'utf-8');
   const match = content.match(new RegExp(`^${name}=(.+)$`, 'm'));

@@ -6,9 +6,9 @@
 # directory to avoid lock conflicts with other Next.js instances.
 #
 # Usage:
-#   testing/dev-test.sh                                      # online mode (Google OAuth)
-#   testing/dev-test.sh --offline                            # offline mode (default user)
-#   testing/dev-test.sh --offline docreview.dave@gmail.com   # offline, impersonate by email
+#   testing/dev-test.sh                       # online mode (Google OAuth)
+#   testing/dev-test.sh --offline             # offline mode (default user)
+#   testing/dev-test.sh --offline USER_EMAIL  # offline, impersonate by email
 
 set -euo pipefail
 

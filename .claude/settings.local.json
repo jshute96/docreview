@@ -85,7 +85,9 @@
       "Bash(gws schema:*)",
       "Bash(npm list:*)",
       "Bash(scripts/run-test.sh:*)",
-      "WebFetch(domain:playwright.dev)"
+      "WebFetch(domain:playwright.dev)",
+      "Bash(bash scripts/query_database.sh:*)",
+      "Bash(bash scripts/query_test_database.sh:*)"
     ],
     "defaultMode": "acceptEdits"
   },

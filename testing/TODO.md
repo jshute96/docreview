@@ -22,6 +22,10 @@ Update this list when adding or changing user-facing behaviors.
 
 ### Live Mode
 
+**Files:** `app-live/login.spec.ts`, `app-live/docs.spec.ts`
+
+- [x] Authenticated session loads /docs with real data
+- [x] Doc list shows documents with real titles (not "Untitled")
 - [ ] Google OAuth login redirects to /docs on success
 - [ ] Unauthenticated request redirects to /login
 - [ ] Login errors: contextual error messages on login page (CredentialsSignin, AccessDenied)
@@ -101,15 +105,22 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Filters combine with AND logic against show mode
 
 ### Comment Table
+- [x] Click row to expand thread
 - [ ] Rows show: status badges, preview text with author, timestamps, reply count
 - [ ] Row highlighting: red (assigned/unresolved/inbox), amber (unreplied mention/unread), green (read)
-- [ ] Click row to expand thread
 
 ### Thread Panel
-- [ ] Shows original comment with quoted document text
+
+**Files:** `app-live/comments.spec.ts`
+
+- [x] Shows original comment text
+- [x] Reply textarea and Reply button
+- [x] Reply appears in thread after posting
+- [x] Resolve marks comment resolved (badge in thread, open count decreases)
+- [x] Reopen with text reopens comment (Reopened badge, text shown, open count increases)
+- [x] Resolve with text resolves comment (Resolved badge + text shown, open count decreases)
+- [ ] Shows quoted document text
 - [ ] All replies in chronological order
-- [ ] Reply textarea (Enter or Send to submit)
-- [ ] Resolve / Reopen button
 - [ ] Status controls: inbox / archived / muted
 - [ ] Star toggle per comment
 - [ ] Mark read / unread toggle

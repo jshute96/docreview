@@ -270,6 +270,7 @@ Shadcn/ui components:
 | `test_users.json` | Test account credentials (gitignored) |
 | `shared/test-env.ts` | Shared config: test DB URL, port 3010, server command builder |
 | `shared/test-db.ts` | Prisma client for the test database (with base64 field encoding), used for DB assertions in tests |
+| `shared/test-drive.ts` | Google Drive API client using OAuth tokens from the test database |
 | `extension-snapshot/playwright.config.ts` | Config for DOM snapshot tests (Python HTTP server on port 8889) |
 | `extension-snapshot/content-script.spec.ts` | Playwright tests for content script DOM injection against saved snapshots |
 | `extension-snapshot/snapshots/` | Saved rendered DOM from live Google pages (gitignored) |
@@ -281,5 +282,9 @@ Shadcn/ui components:
 | `extension-live/playwright.config.ts` | Config for extension + app tests (bundled Chromium with --load-extension) |
 | `extension-live/fixtures.ts` | Test fixtures: persistent context with extension, service worker, chrome API page |
 | `extension-live/toolbar.spec.ts` | Toolbar icon click behavior: blank page opens docreview, non-doc shows error |
-| `app-live/playwright.config.ts` | Config for tests with real Google OAuth |
+| `app-live/playwright.config.ts` | Config for tests with real Google OAuth (setup project + storageState) |
+| `app-live/auth.setup.ts` | Setup project: reads session from test DB, sets cookie, saves auth state |
+| `app-live/login.spec.ts` | Bootstrap login test — run first to establish auth state |
+| `app-live/docs.spec.ts` | Doc list: verifies documents show real titles |
+| `app-live/comments.spec.ts` | Comment lifecycle: create, refresh, reply, resolve, reopen, resolve-with-text |
 | `gmail_notifications/` | `.eml` + `.json` pairs for testing `parse-gmail-notification.ts` |

@@ -76,7 +76,7 @@ npm run dev:test-live
 npm run dev:test-offline
 
 # Offline mode, impersonate a specific user (by email from test_users.json)
-npm run dev:test-offline -- docreview.dave@gmail.com
+npm run dev:test-offline -- USER_EMAIL
 
 # Open a Playwright browser (ephemeral — good for offline mode)
 npm run test:open-browser
@@ -110,6 +110,7 @@ by replacing the database name with `docreview_test`.
 |------|---------|
 | `shared/test-env.ts` | Test database URL, port, and server command builder |
 | `shared/test-db.ts` | Prisma client for test DB, used for DB assertions in tests |
+| `shared/test-drive.ts` | Google Drive API client using OAuth tokens from test DB |
 | `setup-test-db.sh` | Create/migrate the test database |
 | `test_users.json` | Test account credentials (gitignored) |
 | `chrome-extension.md` | Full test case catalog (auto + manual) |
@@ -130,6 +131,7 @@ testing/
   shared/
     test-env.ts                    — shared config (DB URL, port, server command)
     test-db.ts                     — Prisma client for test DB (with base64 encoding)
+    test-drive.ts                  — Google Drive API client for live tests
   extension-snapshot/
     playwright.config.ts           — static HTTP server on port 8889
     content-script.spec.ts         — DOM injection tests
@@ -145,8 +147,11 @@ testing/
     fixtures.ts                    — persistent context with extension + chrome API helpers
     toolbar.spec.ts                — toolbar icon click behavior tests
   app-live/
-    playwright.config.ts           — Next.js with Google OAuth
-    (tests TBD)
+    playwright.config.ts           — Next.js with Google OAuth (setup + test projects)
+    auth.setup.ts                  — reads session from test DB, saves auth state
+    login.spec.ts                  — bootstrap login + basic verification
+    docs.spec.ts                   — doc list with real titles
+    comments.spec.ts               — comment lifecycle: create, reply, resolve, reopen
   gmail_notifications/
     README.md                      — notification testing guide
     *.eml / *.json                 — sample emails and parsed structures

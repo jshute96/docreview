@@ -65,6 +65,7 @@ using different APIs and different IDs.  See `docs/comment-tracking.md` and
 
 ### Testing
 - **Unit tests**: Write tests for all non-trivial logic. Uses **Vitest**. Mock the Prisma client using `src/lib/__mocks__/prisma.ts`.
+- **No usernames or tool names in code, docs, or tests**: Don't put real usernames in source code, documentation, or test string constants. Don't use tool names like "Playwright" or "Claude" in content that gets pushed to live services (Google Docs comments, Drive API calls, etc.) — it looks odd to anyone browsing the doc's history.
 - **UI tests (Playwright)**: Live in `testing/` with suites in subdirectories (e.g., `testing/app-offline/`). Run against a separate `docreview_test` database on port 3010. Not part of the pre-commit hook (slower). Run with:
   ```bash
   scripts/run-test.sh testing/app-offline/labels.spec.ts           # one test file

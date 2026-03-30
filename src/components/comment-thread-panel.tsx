@@ -440,7 +440,7 @@ export function CommentThreadPanel({
                     </span>
                   )}
                 </div>
-                {!reply.action && <CommentContent htmlContent={reply.htmlContent} content={reply.content} searchFilter={searchFilter ?? ""} className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap" />}
+                {reply.content && <CommentContent htmlContent={reply.htmlContent} content={reply.content} searchFilter={searchFilter ?? ""} className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap" />}
               </div>
             ))}
           </div>
