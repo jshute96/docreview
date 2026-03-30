@@ -262,7 +262,8 @@ Shadcn/ui components:
 |------|-------------|
 | `README.md` | Overview of all Playwright test suites |
 | `TODO.md` | User-facing behaviors that need e2e test coverage |
-| `chrome-extension.md` | Chrome extension test cases — content script injection, idempotency, toolbar button |
+| `chrome-extension.md` | Chrome extension test cases — content script injection, idempotency, toolbar button, link context menu |
+| `extension_link_tests.html` | Manual test page for "Open in Docreview" link context menu (not automatable) |
 | `setup-test-db.sh` | Create/migrate the `docreview_test` database for UI tests |
 | `dev-test.sh` | Start dev server on port 3009 against test DB for interactive use |
 | `open-browser-live.sh` | Open a regular Chrome with dedicated profile for online mode (Google session saved) |

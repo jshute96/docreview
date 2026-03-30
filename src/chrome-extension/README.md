@@ -32,6 +32,9 @@ Right-click the toolbar icon for:
 - **Open Add Document** — opens the Docreview add document page
 - **Options** — configure the Docreview server URL and feature toggles
 
+### Link context menu
+Right-click any link to a Google Doc, Sheet, Slides presentation, or Drive file on any web page and choose **Open in Docreview** to open the document directly. This also works for links to public URL shorteners (bit.ly, tinyurl.com, t.co) and any additional shortener hosts configured in the extension's redirect resolver settings.
+
 ### Shortened URL resolution
 When adding a document via a shortened link (e.g. `go/my-doc`), the server first attempts to follow the redirect itself. If the server can't resolve it (e.g. the shortener requires browser cookies for authentication), and the extension's redirect-link resolver is enabled, the extension resolves the redirect by opening the URL in a background tab (which has the user's cookies). If the redirect lands on a Google Docs URL, it's captured and used for validation. The background tab is closed automatically once the redirect completes or fails. This feature is disabled by default in the extension settings.
 

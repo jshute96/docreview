@@ -37,12 +37,6 @@ Google Docs page                    Docreview page
 
 **`background.js`** — Service worker main file. Handles toolbar clicks, context menu actions, and messages from content scripts. Loads helper files via `importScripts`: `background-injected.js`, `background-comments.js`, `background-tabs.js`. Dynamically registers the `bridge-to-docreview.js` content script for the configured `baseUrl`.
 
-**`background-injected.js`** — Functions injected into page context via `chrome.scripting.executeScript`. Includes disco ID discovery/extraction (`injectDiscoIdHelpers`), comment selection (`selectCommentInPage`), comment navigation (`navigateToCommentInPage`), comment ID extraction (`extractCommentIdFromPage`), and Gmail doc URL extraction (`findDocUrlsInFramesFunc`).
-
-**`background-tabs.js`** — Doc tab tracking. Maps docId → tabId in `chrome.storage.session` to survive MV3 service worker restarts. Provides `findDocTab()`, `setDocTab()`, `setDocTabName()`, and cleanup listeners for tab removal/navigation.
-
-**`background-comments.js`** — Comment sync state. Manages pre-extracted comment IDs (`pendingCommentIds`) and debounced comment sync (`fireCommentSync`, `commentSyncTimers`).
-
 Message handlers:
 - `commentPre` — Injects `extractCommentIdFromPage` into the Google Docs tab to extract the disco ID from the listitem the user just acted on (while the element is still in the DOM). Stores the result keyed by tab ID for the subsequent `commentActivity` message.
 - `commentActivity` — Debounces and triggers server-side comment sync via `POST /api/docs/sync-comments/[googleDocId]`, then notifies the first open Docreview tab via `chrome.tabs.sendMessage`. Picks up the pre-extracted `googleCommentId` from `commentPre` and passes `commentType` (`'comment'`/`'suggestion'`) so the server can skip irrelevant API calls and fetch only the affected comment.
@@ -55,6 +49,16 @@ Message handlers:
 - `selectComment` — Selects a comment in a Google Doc tab (via injected script) without focusing the tab, triggered by clicking a comment thread in Docreview.
 - `getSuggestions` — Extracts suggestion data from an open Google Docs tab by executing `getSuggestions()` in MAIN world. Returns suggestion type, old/new text, status, author, isMine flag, and full reply threads. Used by the comments page to display richer suggestion data than the Docs API provides.
 - `openDocInDocreview` — Opens a doc from Gmail in Docreview, using `chrome.scripting.executeScript` with `allFrames: true` to search all frames (including sandboxed AMP iframes).
+
+Context menus:
+- Toolbar icon right-click (`contexts: ['action']`): "Open Docreview" and "Open Add Document".
+- Link right-click (`contexts: ['link']`): "Open in Docreview" appears on links matching Google Docs/Sheets/Slides/Drive URLs and public shortener URLs (bit.ly, tinyurl.com, t.co). Patterns use `*://` to match both http and https. Additional shortener hosts from the user's `resolveHosts` setting are added dynamically via `rebuildLinkContextMenu()`, which re-registers the menu item whenever `resolveHosts` or `enableResolve` changes.
+
+**`background-injected.js`** — Functions injected into page context via `chrome.scripting.executeScript`. Includes disco ID discovery/extraction (`injectDiscoIdHelpers`), comment selection (`selectCommentInPage`), comment navigation (`navigateToCommentInPage`), comment ID extraction (`extractCommentIdFromPage`), and Gmail doc URL extraction (`findDocUrlsInFramesFunc`).
+
+**`background-tabs.js`** — Doc tab tracking. Maps docId → tabId in `chrome.storage.session` to survive MV3 service worker restarts. Provides `findDocTab()`, `setDocTab()`, `setDocTabName()`, and cleanup listeners for tab removal/navigation.
+
+**`background-comments.js`** — Comment sync state. Manages pre-extracted comment IDs (`pendingCommentIds`) and debounced comment sync (`fireCommentSync`, `commentSyncTimers`).
 
 **`bridge-to-docreview.js`** — Content script dynamically registered for Docreview app pages.
 
@@ -234,6 +238,12 @@ This works for both anchored comments (sidebar) and comments in the "Show all co
 ### Log tags
 
 Content script logs (Google Docs page console) use the `[docreview]` prefix. Background service worker logs use `[background]`. Injected page scripts use `[docreview-extract]` or `[docreview-nav]`.
+
+## Testing
+
+Automated tests live in `testing/extension-snapshot/` (DOM snapshot tests against saved Google page HTML) and `testing/extension-live/` (tests with the real extension loaded in Chrome). See `testing/chrome-extension.md` for the full test case catalog.
+
+The link context menu uses native browser UI that Playwright can't access, so it can only be tested manually. Open `testing/extension_link_tests.html` with the extension loaded and right-click each link to verify "Open in Docreview" appears or doesn't appear as expected.
 
 ## Design notes
 

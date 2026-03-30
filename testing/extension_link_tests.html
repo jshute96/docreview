@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Extension Context Menu — Manual Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 2em auto; line-height: 1.6; }
+    h1 { font-size: 1.3em; }
+    p.note { color: #666; font-size: 0.9em; }
+    h2 { font-size: 1.1em; margin-top: 2em; border-bottom: 1px solid #ddd; padding-bottom: 0.3em; }
+    ul { padding-left: 1.5em; }
+    li { margin: 0.4em 0; }
+    .expect { color: #666; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+  <h1>Extension "Open in Docreview" Context Menu — Manual Test</h1>
+  <p class="note">
+    This page is for manually testing the "Open in Docreview" right-click
+    context menu item added by the Docreview Chrome extension. Context menus
+    are native browser UI and cannot be tested in automated Playwright tests.
+  </p>
+  <p class="note">
+    <strong>How to test:</strong> Load the extension, open this page, and
+    right-click each link below. "Open in Docreview" should appear in the
+    context menu for links marked <em>should show</em> and should NOT appear
+    for links marked <em>should not show</em>.
+  </p>
+
+  <h2>Google Docs (should show)</h2>
+  <ul>
+    <li><a href="https://docs.google.com/document/d/1abc123/edit">Google Doc</a> <span class="expect">— should show</span></li>
+    <li><a href="https://docs.google.com/spreadsheets/d/1abc123/edit">Google Sheet</a> <span class="expect">— should show</span></li>
+    <li><a href="https://docs.google.com/presentation/d/1abc123/edit">Google Slides</a> <span class="expect">— should show</span></li>
+    <li><a href="http://docs.google.com/document/d/1abc123/edit">Google Doc (http)</a> <span class="expect">— should show</span></li>
+  </ul>
+
+  <h2>Google Drive (should show)</h2>
+  <ul>
+    <li><a href="https://drive.google.com/file/d/1abc123/view">Drive file</a> <span class="expect">— should show</span></li>
+    <li><a href="https://drive.google.com/open?id=1abc123">Drive open link</a> <span class="expect">— should show</span></li>
+    <li><a href="http://drive.google.com/file/d/1abc123/view">Drive file (http)</a> <span class="expect">— should show</span></li>
+  </ul>
+
+  <h2>Public shorteners (should show)</h2>
+  <ul>
+    <li><a href="https://bit.ly/3xYz123">bit.ly link</a> <span class="expect">— should show</span></li>
+    <li><a href="https://tinyurl.com/abc123">tinyurl.com link</a> <span class="expect">— should show</span></li>
+    <li><a href="https://t.co/abc123">t.co link</a> <span class="expect">— should show</span></li>
+    <li><a href="http://bit.ly/3xYz123">bit.ly (http)</a> <span class="expect">— should show</span></li>
+  </ul>
+
+  <h2>Non-matching links (should NOT show)</h2>
+  <ul>
+    <li><a href="https://www.google.com/">Google homepage</a> <span class="expect">— should not show</span></li>
+    <li><a href="https://drive.google.com/drive/my-drive">Drive folder (no doc ID)</a> <span class="expect">— should not show</span></li>
+    <li><a href="https://docs.google.com/forms/d/1abc123/edit">Google Forms</a> <span class="expect">— should not show</span></li>
+    <li><a href="https://github.com/example/repo">GitHub link</a> <span class="expect">— should not show</span></li>
+    <li><a href="https://example.com/">Plain website</a> <span class="expect">— should not show</span></li>
+  </ul>
+</body>
+</html>

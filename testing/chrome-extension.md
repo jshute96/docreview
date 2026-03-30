@@ -168,6 +168,39 @@ Source: `src/chrome-extension/background.js`
 2. Click the toolbar button.
 3. **Expect**: No new tab opens (no document URL found).
 
+## Link context menu [manual]
+
+Source: `src/chrome-extension/background.js` (`DOCREVIEW_LINK_PATTERNS`, `rebuildLinkContextMenu`)
+
+Context menus are native browser UI and cannot be tested via Playwright. Use `testing/extension_link_tests.html` for manual testing — it has links for each case with expected results.
+
+### Google Doc/Sheets/Slides links [manual]
+
+1. Right-click a link to a Google Doc, Sheet, or Slides document (on any page).
+2. **Expect**: "Open in Docreview" appears in the context menu.
+3. Click it.
+4. **Expect**: A new tab opens at `http://localhost:3000/open?doc={encoded-url}`.
+
+### Google Drive file links [manual]
+
+1. Right-click a link to a Google Drive file (`drive.google.com/file/d/...` or `drive.google.com/open?id=...`).
+2. **Expect**: "Open in Docreview" appears in the context menu.
+
+### Public shortener links [manual]
+
+1. Right-click a link to `bit.ly`, `tinyurl.com`, or `t.co`.
+2. **Expect**: "Open in Docreview" appears in the context menu.
+
+### Non-matching links [manual]
+
+1. Right-click a link to a plain website, a Google Drive folder, or Google Forms.
+2. **Expect**: "Open in Docreview" does NOT appear in the context menu.
+
+### HTTP links [manual]
+
+1. Right-click an `http://` (not `https://`) link to a Google Doc.
+2. **Expect**: "Open in Docreview" appears (patterns use `*://` to match both schemes).
+
 ## Comment activity sync [manual]
 
 Source: `src/chrome-extension/content.js` (detection), `src/chrome-extension/background.js` (extraction + sync), `src/lib/sync-comments.ts` (`syncSingleComment`)

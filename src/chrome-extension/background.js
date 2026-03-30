@@ -651,13 +651,58 @@ chrome.storage.onChanged.addListener(function(changes, area) {
   if (area === 'sync' && changes.baseUrl) {
     registerBridgeScript();
   }
+  if (area === 'sync' && (changes.resolveHosts || changes.enableResolve)) {
+    rebuildLinkContextMenu();
+  }
 });
 
 // --- Context menu ---
 // Context menu items on the toolbar icon (right-click).
 // Chrome automatically adds an "Options" item from the manifest's options_ui declaration.
+// Google Doc/Drive URL patterns for the "Open in Docreview" link context menu.
+// *:// matches both http and https.
+// Public shorteners match the server-side list in src/lib/url-utils.ts.
+var DOCREVIEW_LINK_PATTERNS = [
+  '*://docs.google.com/document/d/*',
+  '*://docs.google.com/spreadsheets/d/*',
+  '*://docs.google.com/presentation/d/*',
+  '*://drive.google.com/file/d/*',
+  '*://drive.google.com/open?*',
+  '*://bit.ly/*',
+  '*://tinyurl.com/*',
+  '*://t.co/*'
+];
+
+// Rebuild the "Open in Docreview" link context menu item.
+// Called at install and whenever resolveHosts changes, so that shortener links
+// (e.g. bit.ly) also get the context menu item.
+async function rebuildLinkContextMenu() {
+  // Remove old link menu item (ignore error if it doesn't exist yet)
+  try { await chrome.contextMenus.remove('open-link-in-docreview'); } catch (e) { /* ok */ }
+
+  var { resolveHosts, enableResolve } = await chrome.storage.sync.get({
+    resolveHosts: DEFAULTS.resolveHosts,
+    enableResolve: DEFAULTS.enableResolve
+  });
+
+  var patterns = DOCREVIEW_LINK_PATTERNS.slice();
+  if (enableResolve && resolveHosts.length) {
+    for (var i = 0; i < resolveHosts.length; i++) {
+      patterns.push('*://' + resolveHosts[i] + '/*');
+    }
+  }
+
+  chrome.contextMenus.create({
+    id: 'open-link-in-docreview',
+    title: 'Open in Docreview',
+    contexts: ['link'],
+    targetUrlPatterns: patterns
+  });
+}
+
 chrome.runtime.onInstalled.addListener(function() {
   registerBridgeScript();
+  // Right-click on the toolbar icon
   chrome.contextMenus.create({
     id: 'open-docreview',
     title: 'Open Docreview',
@@ -668,6 +713,8 @@ chrome.runtime.onInstalled.addListener(function() {
     title: 'Open Add Document',
     contexts: ['action']
   });
+  // Right-click on links (any page) that look like Google Docs or shortener URLs
+  rebuildLinkContextMenu();
 });
 
 chrome.contextMenus.onClicked.addListener(async function(info) {
@@ -679,5 +726,7 @@ chrome.contextMenus.onClicked.addListener(async function(info) {
     chrome.tabs.create({ url: baseUrl, index: newIndex });
   } else if (info.menuItemId === 'add-page') {
     chrome.tabs.create({ url: baseUrl + '/add', index: newIndex });
+  } else if (info.menuItemId === 'open-link-in-docreview') {
+    chrome.tabs.create({ url: baseUrl + '/open?doc=' + encodeURIComponent(info.linkUrl), index: newIndex });
   }
 });

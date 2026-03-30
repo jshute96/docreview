@@ -5,6 +5,9 @@ Checked items have existing tests; unchecked items still need coverage.
 
 Update this list when adding or changing user-facing behaviors.
 
+* Checked items (`[x]`) are done.
+* Items with `[*]` have caveats and might not be possible to cover in automated tests.
+
 ---
 
 ## Authentication & Smoke Tests
@@ -456,6 +459,14 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Doc links reuse tabs via named window targets (doc-{docId})
 - [ ] Extension tracks docId → tabId for cross-context-group reuse
 - [ ] Handles tabs opened outside web app's browsing context
+
+### Link Context Menu
+- [*] "Open in Docreview" appears on right-clicked Google Docs/Sheets/Slides/Drive links (manual only — context menus are native browser UI, not testable via Playwright; use `testing/extension_link_tests.html`)
+- [*] "Open in Docreview" appears on right-clicked shortener links (bit.ly, tinyurl.com, t.co)
+- [*] "Open in Docreview" does NOT appear on non-matching links (plain URLs, Drive folders, Google Forms)
+- [*] Clicking "Open in Docreview" opens the doc in Docreview via /open
+
+**Note:** Browser UI like context menus can't be tested automatically. Test manually with `testing/extension_link_tests.html`.
 
 ### Configuration
 - [ ] Server URL setting (syncs across Chrome devices)

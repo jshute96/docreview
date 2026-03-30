@@ -12,6 +12,14 @@ The extension is installed manually from files:
 
 ## What it adds
 
+### Link context menu
+
+Right-click any link to a Google Doc or Drive file -- on any web page -- and choose **Open in Docreview** to jump straight to that document.
+
+### Toolbar icon
+
+Click the Docreview extension icon in Chrome's toolbar to open the current page's document in Docreview. This works on Google Docs and Gmail notification pages. On blank pages, it opens Docreview's document list page.
+
 ### Google Docs, Sheets, and Slides
 
 A small Docreview icon appears in the document's title bar. Click it to open the document in Docreview -- if it's already tracked, you go to the comment detail page; if not, the Add Document page.
@@ -27,15 +35,6 @@ Docreview icons appear next to file type icons in both list and grid views. Clic
 ### Gmail
 
 When viewing a Google Docs notification email (comment notification or sharing invitation), a "Open in Docreview" link appears. This extracts the document URL from the email and opens it in Docreview.
-
-## Toolbar icon
-
-Click the Docreview extension icon in Chrome's toolbar to open the current page's document in Docreview. This works on Google Docs, Sheets, Slides, and Gmail notification pages.
-
-Right-click the toolbar icon for additional options:
-- **Open Docreview** -- Go to your document list.
-- **Open Add Document** -- Go directly to the Add Document page.
-- **Options** -- Configure the Docreview server URL.
 
 ## Comment navigation
 
