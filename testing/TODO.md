@@ -202,6 +202,7 @@ Update this list when adding or changing user-facing behaviors.
 
 - [ ] Redirect to comments page if doc exists
 - [ ] Redirect to add page if it doesn't
+- [ ] Redirect correctly after resolving a redirect-service link
 
 ---
 

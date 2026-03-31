@@ -9,63 +9,7 @@ import {
   invalidGrantResponse,
 } from "@/lib/google-drive";
 import { runWithRequestId } from "@/lib/request-context";
-import { logInfo } from "@/lib/log";
-import { isPublicShortenerUrl } from "@/lib/url-utils";
-
-/**
- * Try to resolve a shortened URL by following redirects server-side.
- * Returns the final URL if it redirected, or null if it failed or didn't redirect.
- * Uses `redirect: "follow"` with a short timeout. This won't work for shorteners
- * that require browser cookies/auth — those need the Chrome extension.
- */
-async function tryResolveRedirect(url: string): Promise<string | null> {
-  if (!isPublicShortenerUrl(url)) return null;
-
-  let fullUrl = url.trim();
-  if (!/^https?:\/\//i.test(fullUrl)) {
-    fullUrl = "http://" + fullUrl;
-  }
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch(fullUrl, {
-      method: "HEAD",
-      redirect: "follow",
-      signal: controller.signal,
-      headers: { "User-Agent": "Docreview/1.0" },
-    });
-    clearTimeout(timeout);
-
-    // If we ended up at a different URL, return it.
-    // If we landed on a Google sign-in page, the actual doc URL is in the
-    // "continue" query parameter (server has no Google cookies).
-    if (res.url && res.url !== fullUrl) {
-      let resolved = res.url;
-      try {
-        const parsed = new URL(resolved);
-        if (parsed.hostname === "accounts.google.com") {
-          const cont = parsed.searchParams.get("continue");
-          if (cont) resolved = cont;
-        }
-      } catch { /* use resolved as-is */ }
-
-      // Only accept if it resolved to a Google Doc URL (mitigates SSRF)
-      if (!parseGoogleDocId(resolved)) {
-        logInfo("[redirect-resolve]", `${fullUrl} → ${resolved} (not a Google Doc, ignoring)`);
-        return null;
-      }
-
-      logInfo("[redirect-resolve]", `${fullUrl} → ${resolved}`);
-      return resolved;
-    }
-    logInfo("[redirect-resolve]", `${fullUrl} — no redirect`);
-    return null;
-  } catch (err) {
-    logInfo("[redirect-resolve]", `${fullUrl} — failed: ${err instanceof Error ? err.message : err}`);
-    return null;
-  }
-}
+import { tryResolveRedirect } from "@/lib/url-utils";
 
 export async function GET(req: NextRequest) {
   return runWithRequestId("GET", req, async () => {

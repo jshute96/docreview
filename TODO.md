@@ -2,7 +2,7 @@ required cleanup:
 * decide whether to keep last-view-time pinning on Reply/Resolve
   * is it doing anything useful?  docs' diff viewer is ignoring it.
   * clean up UI for edit-last-viwed-timestamp
-* remove redirect-resolve logging
+* remove Redirect logging
 
 P0:
 
@@ -64,6 +64,7 @@ Easy:
 * rendering glitch when toggling filters makes scroll bar appear
 * "No comments on this doc" still shows if we try to load and fail.
 * dialog boxes move around too much, because they resize but stay centered
+* when the open/ link resolves links redirect-service links, it blocks loading the page until resolve is done. Maybe something should show up.
 
 ## gaps
 * no way to get suggestions cheaply or incrementally
