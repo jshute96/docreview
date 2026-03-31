@@ -281,8 +281,8 @@ table but syncs from different APIs:
 | **API source** | Drive API (`comments.list`, `comments.get`) | Docs API (`documents.get` with `SUGGESTIONS_INLINE`) |
 | **DB type** | `COMMENT` | `SUGGESTION` |
 | **ID format** | `googleCommentId` — Drive comment ID (`AAAB...`) | `googleSuggestionId` — Docs API ID (`suggest.xxx`) |
-| **Replies** | Full thread with reply count, author tracking, @mentions | Not tracked — Docs API doesn't expose them |
-| **Status fields** | `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, etc. from Drive | All default to `false` (no Drive data available) |
+| **Replies** | Full thread with reply count, author tracking, @mentions | Not tracked by Docs API; available when Chrome extension provides DOM data |
+| **Status fields** | `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, etc. from Drive | Default to `false` from Docs API; populated by extension merge when available |
 | **Resolution** | Resolved/reopened via Drive API | Accepted/rejected — disappears from doc body |
 | **Navigation** | `?disco=` with `googleCommentId` | `?disco=` with `googleCommentId` when available (see below) |
 

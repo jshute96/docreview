@@ -100,7 +100,8 @@ stripped before storage.
 | `mentionedMe` | false | — | false |
 
 **Extension source:** When extension suggestions are merged into the DB, the merge also
-populates `isThreadAuthor` and `isReplyAuthor` from the `isMine` flag, and `resolved`
+populates `isThreadAuthor` and `isReplyAuthor` from the `isMine` flag, `mentionedMe` and
+`mentionedMeUnreplied` by checking reply HTML for the user's email address, and `resolved`
 from the accepted/rejected status.
 
 **Future:** `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, and `resolved` could
@@ -251,11 +252,15 @@ timestamp (falling back to the current time if that is null). This is a rough
 approximation — the suggestion may have been created before or after that timestamp.
 `driveModifiedAt` remains `null` and shows "—" in the UI.
 
-### No isThreadAuthor / isReplyAuthor
+### Limited isThreadAuthor / isReplyAuthor / mentionedMe
 
-Authorship and reply participation come from Drive API comment data. Suggestion records
-have `isThreadAuthor: false` and `isReplyAuthor: false` by default. The "Mine" and "Replied"
-filters have no effect on suggestions.
+Authorship, reply participation, and @mention flags for suggestions default to `false`
+from the Docs API (which provides no comment metadata). When the Chrome extension is
+available, the extension merge populates these from DOM-scraped data: `isThreadAuthor`
+and `isReplyAuthor` from the `isMine` flag on the suggestion and its replies, and
+`mentionedMe`/`mentionedMeUnreplied` by checking reply HTML for the user's email.
+Without the extension, "Mine", "Replied", and "@mentioned" filters have no effect on
+suggestions.
 
 ### Suggestion text content
 

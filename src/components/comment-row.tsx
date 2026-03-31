@@ -508,22 +508,22 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         // so near-miss clicks don't accidentally expand/collapse the row
         <div className="flex items-center gap-1 self-stretch pl-0 pr-1" onClick={(e) => e.stopPropagation()}>
           <StarButton starred={comment.isStarred} onToggle={toggleStar} />
-          {!isSuggestion && comment.isThreadAuthor && (
+          {comment.isThreadAuthor && (
             <span title="You started this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
               Mine
             </span>
           )}
-          {!isSuggestion && comment.isReplyAuthor && !comment.isThreadAuthor && (
+          {comment.isReplyAuthor && !comment.isThreadAuthor && (
             <span title="You replied in this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700">
               Replied
             </span>
           )}
-          {!isSuggestion && comment.assignedToMe && (
+          {comment.assignedToMe && (
             <span title="Comment assigned to you" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-amber-600 text-white">
               Assigned
             </span>
           )}
-          {!isSuggestion && comment.mentionedMe && (
+          {comment.mentionedMe && (
             <span title="You were @mentioned in this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700">
               @Mentioned
             </span>

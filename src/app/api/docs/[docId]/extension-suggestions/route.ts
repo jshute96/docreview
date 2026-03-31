@@ -11,7 +11,7 @@ import { mergeExtensionSuggestions, type ExtensionSuggestionInput } from "@/lib/
  * Google Docs tab via the Chrome extension.
  *
  * Body: { suggestions: ExtensionSuggestionInput[] }
- * Returns: { success, result: { merged, inserted, skipped, resolved }, comments }
+ * Returns: { success, result: { merged, inserted, updated, resolved }, comments }
  */
 export async function POST(
   req: NextRequest,
@@ -19,10 +19,11 @@ export async function POST(
 ) {
   return runWithRequestId("POST", req, async () => {
     const session = await getValidSession();
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const userId = session.user.id;
+    const userEmail = session.user.email;
     const { docId } = await params;
 
     const doc = await prisma.doc.findFirst({ where: { docId, userId } });
@@ -40,13 +41,13 @@ export async function POST(
     logInfo(`[Suggestions:Ext] POST /extension-suggestions for ${googleDocId}: ${suggestions.length} suggestions`);
 
     try {
-      const result = await mergeExtensionSuggestions(docId, googleDocId, suggestions);
+      const result = await mergeExtensionSuggestions(docId, googleDocId, suggestions, userEmail);
       return NextResponse.json({
         success: true,
         result: {
           merged: result.merged,
           inserted: result.inserted,
-          skipped: result.skipped,
+          updated: result.updated,
           resolved: result.resolved,
         },
         comments: result.comments,

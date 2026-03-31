@@ -203,6 +203,39 @@ export function deriveCommentFlags(
   return { isThreadAuthor, isReplyAuthor, iResolvedIt, isRead };
 }
 
+/**
+ * Compute mentionedMeUnreplied from per-reply mention and authorship flags.
+ * Shared by parseDriveComment (Drive API data) and computeMentionFlags
+ * (extension DOM data) — keep them in sync.
+ *
+ * Logic: find the last reply that @mentions the user. If no reply after that
+ * is authored by the user, the mention is "unreplied". If only the top-level
+ * comment mentions the user (no reply mentions), unreplied means the user
+ * has never replied at all.
+ */
+export function computeMentionedMeUnreplied(
+  topLevelMentioned: boolean,
+  replyMentionedFlags: boolean[],
+  replyAuthorMeFlags: boolean[],
+): boolean {
+  const anyReplyMention = replyMentionedFlags.some(Boolean);
+  if (!topLevelMentioned && !anyReplyMention) return false;
+
+  let lastMentionIdx = -1;
+  for (let i = replyMentionedFlags.length - 1; i >= 0; i--) {
+    if (replyMentionedFlags[i]) { lastMentionIdx = i; break; }
+  }
+  if (lastMentionIdx === -1 && topLevelMentioned) {
+    // Only the top-level comment mentions the user
+    return !replyAuthorMeFlags.some(Boolean);
+  }
+  if (lastMentionIdx >= 0) {
+    const hasMyReplyAfter = replyAuthorMeFlags.slice(lastMentionIdx + 1).some(Boolean);
+    return !hasMyReplyAfter;
+  }
+  return false;
+}
+
 // Raw Drive API comment shape — loose type covering the superset of fields
 // that fetchCommentData may request.  Used only by the parsing helpers below.
 type RawDriveComment = {
@@ -258,19 +291,9 @@ function parseDriveComment(c: RawDriveComment, emailLower?: string): DriveCommen
       : false
   );
 
-  let mentionedMeUnreplied = false;
-  if (mentionedMe || replyMentionedMeFlags.some(Boolean)) {
-    let lastMentionIdx = -1;
-    for (let i = replyMentionedMeFlags.length - 1; i >= 0; i--) {
-      if (replyMentionedMeFlags[i]) { lastMentionIdx = i; break; }
-    }
-    if (lastMentionIdx === -1 && mentionedMe) {
-      mentionedMeUnreplied = !replyAuthorMeFlags.some(Boolean);
-    } else if (lastMentionIdx >= 0) {
-      const hasMyReplyAfter = replyAuthorMeFlags.slice(lastMentionIdx + 1).some(Boolean);
-      mentionedMeUnreplied = !hasMyReplyAfter;
-    }
-  }
+  const mentionedMeUnreplied = computeMentionedMeUnreplied(
+    mentionedMe, replyMentionedMeFlags, replyAuthorMeFlags,
+  );
 
   const effectiveMentionedMe = assignedToMe ? false : mentionedMe;
   const effectiveReplyMentionedMeFlags = assignedToMe
