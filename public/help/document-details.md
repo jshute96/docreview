@@ -65,9 +65,11 @@ All threads are pre-fetched when the page loads, so expanding a comment is insta
 
 Suggestions (tracked changes) appear in the same table as comments. They show the proposed insertion, deletion, or edit text. Suggestions have some limitations compared to comments:
 
-- You can't reply to suggestions or navigate to them in the document.
+- You can't reply to suggestions directly from Docreview.
 - Creation and modification dates are approximate.
 - The "Mine" and "Replied" filters don't apply to suggestions.
+
+When the Chrome extension is active and a doc tab is open, you can **Refresh** a suggestion to re-read its current state from the document. The Refresh button is greyed out when the extension isn't available or the suggestion doesn't have a disco ID for navigation.
 
 You can still archive, mute, star, and filter suggestions like regular comments.
 

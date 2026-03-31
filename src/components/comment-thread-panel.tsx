@@ -34,10 +34,14 @@ interface CommentThreadPanelProps {
   loading: boolean;
   resolved?: boolean;
   commentUrl?: string;
+  openLabel?: string;
+  openTitle?: string;
   openTarget?: string;
   onOpenClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
   onRefresh?: () => void;
   refreshing?: boolean;
+  refreshDisabled?: boolean;
+  refreshTitle?: string;
   onReply?: (content: string) => Promise<void>;
   onResolve?: (content: string) => Promise<void>;
   onReopen?: (content: string) => Promise<void>;
@@ -67,10 +71,14 @@ export function CommentThreadPanel({
   loading,
   resolved,
   commentUrl,
+  openLabel,
+  openTitle,
   openTarget,
   onOpenClick,
   onRefresh,
   refreshing,
+  refreshDisabled,
+  refreshTitle,
   onReply,
   onResolve,
   onReopen,
@@ -321,9 +329,9 @@ export function CommentThreadPanel({
         )}
         <span className="text-zinc-300 mx-1">|</span>
         {commentUrl && (
-          <Button variant="outline" size="sm" className="h-7 px-3 text-xs" title="Open the document at this comment" asChild>
+          <Button variant="outline" size="sm" className="h-7 px-3 text-xs" title={openTitle ?? "Open the document at this comment"} asChild>
             <a href={commentUrl} target={openTarget ?? "_blank"} onClick={onOpenClick}>
-              Open
+              {openLabel ?? "Open"}
             </a>
           </Button>
         )}
@@ -332,9 +340,9 @@ export function CommentThreadPanel({
             variant="outline"
             size="sm"
             className="h-7 px-3 text-xs"
-            title="Refresh this thread"
+            title={refreshTitle ?? "Refresh this thread"}
             onClick={onRefresh}
-            disabled={refreshing}
+            disabled={refreshing || refreshDisabled}
           >
             <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? "animate-spin" : ""}`} />
             Refresh

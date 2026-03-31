@@ -221,12 +221,16 @@ function injectDiscoIdHelpers() {
   // replies with author/timestamp/text.
   // Call from the Google Docs page console for debugging: getSuggestions()
   //
+  // Optional targetId: when provided, only parses the suggestion with that
+  // disco ID (skips text/reply extraction for all others). Used by the
+  // per-suggestion refresh path to avoid unnecessary DOM work.
+  //
   // When the comments pane is open, the same suggestion appears in both the
   // anchored sidebar (docos-anchoreddocoview) and the pane (docos-streamdocoview).
   // We deduplicate by disco ID, preferring the anchored version for open
   // suggestions (richer DOM) and the stream version for resolved ones (only
   // place they appear).
-  function getSuggestions() {
+  function getSuggestions(targetId) {
     var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
     var seenIds = {};
     var results = [];
@@ -287,6 +291,10 @@ function injectDiscoIdHelpers() {
       if (label.indexOf('Suggestions') !== 0) continue;
 
       var id = getDiscoId(item) || '(no ID)';
+
+      // When targeting a specific suggestion, skip items that don't match.
+      // This avoids parsing text/replies for every suggestion in the document.
+      if (targetId && id !== targetId) continue;
 
       // Deduplicate: skip if we already have this suggestion from a richer source.
       // Prefer anchored entries for open suggestions (more DOM detail),

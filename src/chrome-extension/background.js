@@ -413,7 +413,7 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
       }
       var tabId = await findDocTab(msg.docId);
       if (!tabId) {
-        sendResponse({ success: false, error: 'no doc tab open' });
+        sendResponse({ success: false, error: 'Doc tab not open' });
         return;
       }
       try {
@@ -431,6 +431,42 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
         sendResponse({ success: true, suggestions: suggestions || [] });
       } catch (err) {
         console.warn('[background] getSuggestions failed:', err.message);
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true; // async response
+  }
+
+  // From Docreview bridge: extract a single suggestion by disco ID from an open Google Docs tab.
+  if (msg.type === 'getSuggestion' && msg.docId && msg.discoId) {
+    console.log('[background] getSuggestion from docreview:', msg.docId, msg.discoId);
+    (async function() {
+      var config = await chrome.storage.sync.get({ enableDocs: DEFAULTS.enableDocs });
+      if (!config.enableDocs) {
+        sendResponse({ success: false, error: 'Google Docs integration is disabled' });
+        return;
+      }
+      var tabId = await findDocTab(msg.docId);
+      if (!tabId) {
+        sendResponse({ success: false, error: 'Doc tab not open' });
+        return;
+      }
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: injectDiscoIdHelpers,
+          world: 'MAIN'
+        });
+        var results = await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: function(targetId) { return window.__docreviewDisco.getSuggestions(targetId); },
+          args: [msg.discoId],
+          world: 'MAIN'
+        });
+        var matches = results && results[0] && results[0].result;
+        sendResponse({ success: true, suggestion: (matches && matches[0]) || null });
+      } catch (err) {
+        console.warn('[background] getSuggestion failed:', err.message);
         sendResponse({ success: false, error: err.message });
       }
     })();

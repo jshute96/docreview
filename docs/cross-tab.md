@@ -112,6 +112,7 @@ broadcastChange({ type: "docs", docId: doc.docId }, contextId);
 | `comment-row.tsx` toggleRead | Mark comment read / unread |
 | `comment-row.tsx` toggleStar | Star / unstar a comment |
 | `bridge-to-extension.ts` commentSynced listener | Chrome extension detected comment activity on a Google Docs page and server sync completed (includes inline `threads` data) |
+| `doc-detail.tsx` handleSuggestionRefresh | Per-suggestion refresh from extension DOM scrape (commentType=SUGGESTION, no threads — receiver skips thread fetch) |
 
 ## Receivers
 
@@ -127,10 +128,11 @@ Three components listen via `useCrossTabListener`:
 - **Responds to:** selectively by event type
 - **`docs` event:** If `docIds` is present and doesn't match this page's doc, the event is **ignored**. Otherwise, refetches the doc and labels in parallel.
 - **`labels` event:** Always refetches the doc and labels in parallel.
-- **`comments` event:** Only acts if `docId` matches this page's doc. Events for other docs are **ignored**. Always refetches the doc metadata (DB-only, for comment counts and archive status). For thread display data, uses one of three paths:
-  1. **Inline threads** (from `threads` field): merges directly into the thread map — no API call. Currently only the Chrome extension sync path provides this.
-  2. **Targeted fetch** (`googleCommentId` present, not a suggestion): fetches `GET /api/docs/{docId}/threads?commentId=X` — one `comments.get` Drive call.
-  3. **Full fetch** (no ID, or suggestion type): fetches `GET /api/docs/{docId}/threads` — full `comments.list` Drive call.
+- **`comments` event:** Only acts if `docId` matches this page's doc. Events for other docs are **ignored**. Always refetches the doc metadata (DB-only, for comment counts and archive status). For thread display data, uses one of four paths:
+  1. **Suggestion type** (`commentType === "SUGGESTION"`): skips thread fetch entirely — suggestion thread data comes from the extension's DOM scrape, not Drive, so there's nothing to re-fetch. Only the DB record matters.
+  2. **Inline threads** (from `threads` field): merges directly into the thread map — no API call. Currently only the Chrome extension sync path provides this.
+  3. **Targeted fetch** (`googleCommentId` present, not a suggestion): fetches `GET /api/docs/{docId}/threads?commentId=X` — one `comments.get` Drive call.
+  4. **Full fetch** (no ID): fetches `GET /api/docs/{docId}/threads` — full `comments.list` Drive call.
 
 ### add-doc-page-client.tsx (add document page)
 - **Handler:** `refetchLabels`

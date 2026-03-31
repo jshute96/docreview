@@ -526,6 +526,8 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Comment navigation (Docreview → Google Docs) works for comments on non-first tabs
 - [ ] Comment selection sync works across tabs
 - [ ] This all works on multi-level nested tabs too
+- [ ] Refresh on the comments/ page syncs suggestions
+- [ ] Refresh one suggestion from its thread on the comments/ page
 
 ---
 

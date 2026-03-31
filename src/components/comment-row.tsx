@@ -12,7 +12,8 @@ import { FriendlyDate } from "@/components/friendly-date";
 import { StarButton } from "@/components/star-button";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
-import { navigateToComment, supportsCommentNavigation } from "@/lib/bridge-to-extension";
+import { navigateToComment, supportsCommentNavigation, getSuggestionFromDoc, getExtensionStatus, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
+import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
 import { docTarget } from "@/lib/tab-targets";
 
 interface CommentRowProps {
@@ -32,6 +33,7 @@ interface CommentRowProps {
   collapseSignal?: number;
   isSelected?: boolean;
   onSelectInDoc?: () => void;
+  onSuggestionRefresh?: (discoId: string, thread: CommentThread, content: SuggestionContent, raw: ExtensionSuggestion) => void;
 }
 
 function splitContent(raw: string): { author: string | null; text: string } {
@@ -40,7 +42,7 @@ function splitContent(raw: string): { author: string | null; text: string } {
   return { author: raw.slice(0, sep), text: raw.slice(sep + 2) };
 }
 
-export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal, isSelected, onSelectInDoc }: CommentRowProps) {
+export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal, isSelected, onSelectInDoc, onSuggestionRefresh }: CommentRowProps) {
   const isSuggestion = comment.type === "SUGGESTION";
   const currentModifiedMs = comment.driveModifiedAt
     ? new Date(comment.driveModifiedAt).getTime()
@@ -175,6 +177,29 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to refresh comment");
+    } finally {
+      setRefreshingThread(false);
+    }
+  }
+
+  // Refresh a suggestion by re-scraping its data from the Google Docs DOM via the extension.
+  async function refreshSuggestion() {
+    if (!comment.googleCommentId) return;
+    setRefreshingThread(true);
+    try {
+      const suggestion = await getSuggestionFromDoc(googleDocId, comment.googleCommentId);
+      if (!suggestion) {
+        toast.error("Suggestion not found in the document");
+        return;
+      }
+      const thread = extensionToThread(suggestion);
+      const refreshedContent = extensionToSuggestionContent(suggestion);
+      setThreads([thread]);
+      if (onSuggestionRefresh) {
+        onSuggestionRefresh(comment.googleCommentId, thread, refreshedContent, suggestion);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to refresh suggestion");
     } finally {
       setRefreshingThread(false);
     }
@@ -447,6 +472,20 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     )
   ) : null;
 
+  // Suggestion refresh is only possible when we have a disco ID and the extension
+  // is available with Docs integration enabled. Compute disabled state and tooltip.
+  // Whether a doc tab is actually open is only known at refresh time (runtime error).
+  const extStatus = getExtensionStatus();
+  const extensionAvailable = supportsCommentNavigation();
+  const suggestionRefreshDisabled = !hasDiscoLink || !extensionAvailable;
+  const suggestionRefreshTitle = !extStatus
+    ? "Cannot Refresh suggestions: Docreview Chrome extension not loaded"
+    : !extStatus.enableDocs
+    ? "Cannot Refresh suggestions: Docs integration is disabled in the Docreview Chrome extension"
+    : !hasDiscoLink
+    ? "Cannot Refresh: Suggestion synced from Drive has no comment ID"
+    : "Refresh this suggestion";
+
   return (
     <>
     <tr
@@ -508,7 +547,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             asChild
           >
             <a href={commentUrl()} target={docTarget(googleDocId)} onClick={handleOpenClick}>
-              Open
+              {openLabel}
             </a>
           </Button>
           <Button
@@ -581,10 +620,14 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   loading={loadingThreads}
                   resolved={comment.resolved}
                   commentUrl={commentUrl()}
+                  openLabel={openLabel}
+                  openTitle={openTitle}
                   openTarget={docTarget(googleDocId)}
                   onOpenClick={handleOpenClick}
-                  onRefresh={isSuggestion ? undefined : refreshThread}
-                  refreshing={isSuggestion ? undefined : refreshingThread}
+                  onRefresh={isSuggestion ? refreshSuggestion : refreshThread}
+                  refreshing={refreshingThread}
+                  refreshDisabled={isSuggestion ? suggestionRefreshDisabled : undefined}
+                  refreshTitle={isSuggestion ? suggestionRefreshTitle : undefined}
                   onReply={isSuggestion ? undefined : handleReply}
                   onResolve={isSuggestion ? undefined : handleResolve}
                   onReopen={isSuggestion ? undefined : handleReopen}

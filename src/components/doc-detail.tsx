@@ -15,7 +15,7 @@ import { ROLE_COLORS } from "@/lib/role-colors";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
-import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, getSuggestionsFromDoc } from "@/lib/bridge-to-extension";
+import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, getSuggestionsFromDoc, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -167,6 +167,40 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
     setThreadMap((prev) => ({ ...prev, [id]: thread }));
   }, []);
 
+  // Push extension suggestions to the server for DB merge, then replace the
+  // matching entries in the local comments list with the updated DB records.
+  async function mergeExtensionSuggestions(suggestions: ExtensionSuggestion[], contextId?: string) {
+    const cid = contextId ?? generateContextId();
+    const res = await apiFetch(`/api/docs/${doc.docId}/extension-suggestions`, {
+      method: "POST",
+      body: JSON.stringify({ suggestions }),
+      contextId: cid,
+    });
+    if (!res.ok) {
+      console.log("[doc-detail] extension suggestions: server merge failed", res.status); // eslint-disable-line no-console
+      return;
+    }
+    const data = await res.json();
+    if (data.comments && Array.isArray(data.comments)) {
+      setComments(prev => {
+        const returnedIds = new Set((data.comments as Comment[]).map((c: Comment) => c.commentId));
+        const withoutReturned = prev.filter(c => !returnedIds.has(c.commentId));
+        return [...withoutReturned, ...(data.comments as Comment[])];
+      });
+    }
+  }
+
+  const handleSuggestionRefresh = useCallback((discoId: string, thread: CommentThread, content: SuggestionContent, raw: ExtensionSuggestion) => {
+    setThreadMap((prev) => ({ ...prev, [discoId]: thread }));
+    setSuggestionContent((prev) => ({ ...prev, [discoId]: content }));
+    const contextId = generateContextId();
+    mergeExtensionSuggestions([raw], contextId).then(() => {
+      broadcastChange({ type: "comments", docId: doc.docId, commentType: "SUGGESTION" }, contextId);
+    }).catch((err) => {
+      console.log("[doc-detail] suggestion refresh: server merge error", err);
+    });
+  }, [doc.docId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function fetchThreads(contextId?: string) {
     try {
       const res = await apiFetch(`/api/docs/${doc.docId}/threads`, { contextId });
@@ -225,31 +259,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
     setThreadMap(prev => ({ ...prev, ...newThreads }));
     setSuggestionContent(prev => ({ ...prev, ...newSuggContent }));
 
-    // Push to server for DB merge
+    // Push to server for DB merge and update the comments list
     try {
-      console.log("[doc-detail] extension suggestions: pushing to server for merge");
-      const contextId = generateContextId();
-      const res = await apiFetch(`/api/docs/${doc.docId}/extension-suggestions`, {
-        method: "POST",
-        body: JSON.stringify({ suggestions }),
-        contextId,
-      });
-      if (!res.ok) {
-        console.log("[doc-detail] extension suggestions: server merge failed", res.status);
-        return;
-      }
-      const data = await res.json();
-      console.log("[doc-detail] extension suggestions: server merge result", data.result);
-
-      // Merge returned DB records into the comments list
-      if (data.comments && Array.isArray(data.comments)) {
-        console.log("[doc-detail] extension suggestions: got", data.comments.length, "DB records back");
-        setComments(prev => {
-          const dbSuggestionIds = new Set((data.comments as Comment[]).map((c: Comment) => c.commentId));
-          const nonSuggestions = prev.filter(c => !dbSuggestionIds.has(c.commentId));
-          return [...nonSuggestions, ...(data.comments as Comment[])];
-        });
-      }
+      await mergeExtensionSuggestions(suggestions);
     } catch (err) {
       console.log("[doc-detail] extension suggestions: server merge error", err);
     }
@@ -311,21 +323,26 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
         ]);
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
       } else if (event.type === "comments" && (event.docId === initialDoc.docId || event.docId === initialDoc.googleDocId)) {
-        const targetedCommentId = (event.commentType !== "SUGGESTION") ? event.googleCommentId : undefined;
+        const isSuggestionEvent = event.commentType === "SUGGESTION";
+        const targetedCommentId = !isSuggestionEvent ? event.googleCommentId : undefined;
         // When the sync response included thread data, use it directly instead
         // of making a redundant Drive API call. Falls back to fetching when no
         // thread data (suggestions, missing ID, or non-extension triggers).
         const inlineThreads = targetedCommentId && event.threads
           ? event.threads as ThreadMap : undefined;
-        console.log("[cross-tab] doc-detail: refreshing (comments event" + (targetedCommentId ? `, comment=${targetedCommentId}` : "") + (inlineThreads ? ", inline" : "") + ")"); // eslint-disable-line no-console
+        console.log("[cross-tab] doc-detail: refreshing (comments event" + (isSuggestionEvent ? ", suggestion" : "") + (targetedCommentId ? `, comment=${targetedCommentId}` : "") + (inlineThreads ? ", inline" : "") + ")"); // eslint-disable-line no-console
         // Fetch doc (and threads if not inline) in parallel, then apply both
         // state updates together so React batches them into one render. This
         // prevents expanded threads from flashing a loading state — the
         // initialThread sync effect updates fetchedModifiedMs before the
         // staleness check sees the new driveModifiedAt. Also freezes sort order
         // so updated comments don't jump (same as in-app reply).
+        //
+        // Suggestion events skip the thread fetch — suggestion thread data comes
+        // from the extension's DOM scrape, not Drive, so there's nothing to
+        // re-fetch. Only the DB record (via /api/docs) matters.
         const docPromise = apiFetch(`/api/docs/${initialDoc.docId}`, { contextId, reason });
-        const threadsPromise = inlineThreads
+        const threadsPromise = inlineThreads || isSuggestionEvent
           ? Promise.resolve(null)
           : apiFetch(
               targetedCommentId
@@ -1144,6 +1161,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
                   onSelectInDoc={supportsCommentNavigation() && comment.googleCommentId
                     ? () => selectCommentInDoc(googleDocId, comment.googleCommentId!)
                     : undefined}
+                  onSuggestionRefresh={comment.type === "SUGGESTION" ? handleSuggestionRefresh : undefined}
                 />
               ))}
             </tbody>

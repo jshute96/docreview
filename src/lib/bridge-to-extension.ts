@@ -226,6 +226,24 @@ export async function getSuggestionsFromDoc(docId: string): Promise<ExtensionSug
   }
 }
 
+/**
+ * Ask the extension to extract a single suggestion by disco ID from an open Google Docs tab.
+ * Returns the suggestion or null if not found / extension unavailable.
+ */
+export async function getSuggestionFromDoc(docId: string, discoId: string): Promise<ExtensionSuggestion | null> {
+  const result = await sendExtensionMessage<{ success: boolean; suggestion?: ExtensionSuggestion | null; error?: string }>(
+    { type: "getSuggestion", docId, discoId },
+    5000,
+  );
+  if (result.success) {
+    if (result.suggestion) {
+      console.log("[extension] getSuggestion:", discoId, "found");
+    }
+    return result.suggestion ?? null;
+  }
+  throw new Error(result.error ?? "Extension error");
+}
+
 /** Callback type for comment selection events from Google Doc tabs. */
 export type CommentSelectionHandler = (docId: string, discoId: string | null, selected: boolean) => void;
 

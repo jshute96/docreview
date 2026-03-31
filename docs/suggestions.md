@@ -203,6 +203,13 @@ in the doc tab's MAIN world and returns the results. These are then:
 "5:06 AM Yesterday"). These are parsed into `Date` objects for the created/modified columns
 where possible; unparseable strings are displayed as-is in the thread panel.
 
+**Per-suggestion refresh:** The expanded suggestion panel has a Refresh button that
+re-scrapes a single suggestion by disco ID from the doc tab via `getSuggestionFromDoc()`.
+The button is disabled (greyed out with tooltip) when the suggestion has no disco ID or
+the extension isn't available. On success, the thread and suggestion content update locally
+for immediate display, and the suggestion is pushed to the server for DB merge via
+`mergeExtensionSuggestions()` (same endpoint as the page-level extension sync).
+
 **Limitations:** Only works when a doc tab is open. Only sees suggestions visible in the DOM
 (anchored sidebar for open suggestions; resolved ones require that the comments pane was
 opened at least once during the session — they remain loaded after the pane is closed).
