@@ -64,6 +64,30 @@ describe("parseGoogleDocId", () => {
       "1TGgHwuXMrUvTWsbvBUZn3jjOGUHJ7i0rrocWSdwyvgs"
     );
   });
+
+  it("unwraps Google redirect URL and extracts doc ID", () => {
+    expect(
+      parseGoogleDocId(
+        "https://www.google.com/url?q=https://docs.google.com/document/d/1aBcDeFgHiJkLmNoPqRsTuVwXyZ/edit&sa=D&source=docs&ust=1774893510554844&usg=AOvVaw0zrv3Q"
+      )
+    ).toBe("1aBcDeFgHiJkLmNoPqRsTuVwXyZ");
+  });
+
+  it("unwraps Google redirect URL pointing to a shortener (returns null)", () => {
+    expect(
+      parseGoogleDocId(
+        "https://www.google.com/url?q=http://goto.google.com/basic-data-skills&sa=D&source=docs"
+      )
+    ).toBeNull();
+  });
+
+  it("unwraps Google redirect URL with drive.google.com/open?id=", () => {
+    expect(
+      parseGoogleDocId(
+        "https://www.google.com/url?q=https://drive.google.com/open?id%3D1TGgHwuXMrUvTWsbvBUZn3jjOGUHJ7i0rrocWSdwyvgs&sa=D"
+      )
+    ).toBe("1TGgHwuXMrUvTWsbvBUZn3jjOGUHJ7i0rrocWSdwyvgs");
+  });
 });
 
 describe("deriveCommentFlags", () => {

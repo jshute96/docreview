@@ -50,6 +50,15 @@
     <li><a href="http://bit.ly/3xYz123">bit.ly (http)</a> <span class="expect">— should show</span></li>
   </ul>
 
+  <h2>Google redirect wrappers (should show)</h2>
+  <ul>
+    <li><a href="https://www.google.com/url?q=https://docs.google.com/document/d/1abc123/edit">Google redirect to Doc</a> <span class="expect">— should show</span></li>
+    <li><a href="https://www.google.com/url?q=https://docs.google.com/spreadsheets/d/1abc123/edit&sa=D&source=docs">Google redirect to Sheet</a> <span class="expect">— should show</span></li>
+    <li><a href="https://www.google.com/url?q=https://drive.google.com/open?id%3D1abc123&sa=D">Google redirect to Drive open</a> <span class="expect">— should show</span></li>
+    <li><a href="https://www.google.com/url?q=http://goto.google.com/some-shortcut&sa=D&source=docs">Google redirect to internal shortener</a> <span class="expect">— should show (menu appears; /open will try to resolve)</span></li>
+    <li><a href="https://www.google.com/url?q=http://google.com">Google redirect to non-docs link</a> <span class="expect">— should show (but won't be valid)</span></li>
+  </ul>
+
   <h2>Non-matching links (should NOT show)</h2>
   <ul>
     <li><a href="https://www.google.com/">Google homepage</a> <span class="expect">— should not show</span></li>

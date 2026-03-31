@@ -668,6 +668,8 @@ var DOCREVIEW_LINK_PATTERNS = [
   '*://docs.google.com/presentation/d/*',
   '*://drive.google.com/file/d/*',
   '*://drive.google.com/open?*',
+  '*://google.com/url?*',
+  '*://www.google.com/url?*',
   '*://bit.ly/*',
   '*://tinyurl.com/*',
   '*://t.co/*'

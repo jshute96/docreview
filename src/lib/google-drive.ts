@@ -33,8 +33,21 @@ export function invalidGrantResponse(err: unknown): NextResponse | null {
 const BARE_DOC_ID_RE = /^[a-zA-Z0-9_-]{20,}$/;
 
 export function parseGoogleDocId(url: string): string | null {
-  const trimmed = url.trim();
+  let trimmed = url.trim();
   if (BARE_DOC_ID_RE.test(trimmed)) return trimmed;
+
+  // Unwrap Google redirect URLs (e.g. google.com/url?q=<actual-url>&sa=D&...)
+  // Google wraps outbound links in Docs/Sheets through this redirect service.
+  try {
+    const parsed = new URL(trimmed);
+    if (
+      (parsed.hostname === "google.com" || parsed.hostname.endsWith(".google.com")) &&
+      parsed.pathname === "/url" &&
+      parsed.searchParams.has("q")
+    ) {
+      trimmed = parsed.searchParams.get("q")!;
+    }
+  } catch { /* not a valid URL, continue */ }
 
   // Try /d/ID pattern
   const dMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
