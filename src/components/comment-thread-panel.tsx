@@ -374,7 +374,7 @@ export function CommentThreadPanel({
     <div className={`mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4${isSelected ? " ring-2 ring-blue-400" : ""}`}>
       {headerContent}
       {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- click to select comment in Google Doc */}
-      <div className={`divide-y divide-zinc-200${onSelectInDoc ? " cursor-pointer" : ""}`} onClick={onSelectInDoc} title={onSelectInDoc ? "Click to select this comment in the document" : undefined}>
+      <div className={`divide-y divide-zinc-200${onSelectInDoc ? " cursor-pointer" : ""}`} onClick={onSelectInDoc}>
         {threads.map((thread, threadIndex) => (
           <div
             key={thread.id}
