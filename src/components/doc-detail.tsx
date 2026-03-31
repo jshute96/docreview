@@ -476,6 +476,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
       if (suggestionContent !== undefined) setSuggestionContent(suggestionContent);
       if (documentText !== undefined) setDocumentText(documentText);
       broadcastChange({ type: "comments", docId: doc.docId }, contextId);
+      // Refresh suggestions from the extension after the server data is applied,
+      // so the richer extension data (replies, author, status) overwrites the
+      // server's Docs API data. This also merges extension records into the DB.
+      await fetchExtensionSuggestions();
       toast.success("Comments synced");
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to sync comments");

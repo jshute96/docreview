@@ -768,14 +768,21 @@ async function syncDocsSuggestions(
   }
 
   // Identify suggestions to resolve (no longer in the document).
-  // Gmail-first rows without a googleSuggestionId are also resolved here —
-  // if Drive couldn't match them to a live suggestion, they should be hidden.
+  // Rows with a googleSuggestionId are resolved if their ID isn't in the live set.
+  // Rows without a googleSuggestionId (extension-only or Gmail-first) are checked
+  // by content hash against live suggestions — if a live suggestion has the same
+  // hash, the row likely represents it and should not be resolved.
   const activeSuggestions = await prisma.comment.findMany({
     where: { docId: doc.docId, type: "SUGGESTION", resolved: false },
   });
-  const toResolve = activeSuggestions.filter(
-    s => !s.googleSuggestionId || !liveIds.has(s.googleSuggestionId)
-  );
+  const liveHashes = new Set(docsSuggestions.map(s =>
+    computeSuggestionHash(s.suggestionType, s.deletedText, s.insertedText)
+  ));
+  const toResolve = activeSuggestions.filter(s => {
+    if (s.googleSuggestionId) return !liveIds.has(s.googleSuggestionId);
+    // Extension-only / Gmail-first row: check content hash against live suggestions
+    return !s.suggestionContentHash || !liveHashes.has(s.suggestionContentHash);
+  });
 
   if (toCreate.length > 0) {
     const newTs = toCreate.map(c => c.driveCreatedAt instanceof Date ? c.driveCreatedAt : null);

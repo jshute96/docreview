@@ -343,9 +343,12 @@ the same pattern via `handleSourceRefresh`.
 **Per-doc refresh:** The `POST /api/docs/[docId]/refresh` response includes the full updated doc
 with its comments array, plus thread details, suggestion content, document text, and
 `viewedByMeTime`. `DocDetail` destructures all of this from the response and updates state
-directly — no follow-up `/comments` or `/content` fetches needed. The owner and modified date
-in the header reflect the latest Drive data without a page reload. Titles are fetched
-separately via the browser's title cache.
+directly — no follow-up `/comments` or `/content` fetches needed. After applying the server
+response, the client also runs `fetchExtensionSuggestions()` to re-scrape suggestion data
+from the Chrome extension (if available), overwriting the server's Docs API data with the
+richer extension data (replies, author, status). The owner and modified date in the header
+reflect the latest Drive data without a page reload. Titles are fetched separately via the
+browser's title cache.
 
 The main POST response includes summary counts (`added`, `updated`, `deleted`, `unarchived`,
 `commentsCreated`, `commentsUpdated`, `suggestionsCreated`, `suggestionsUpdated`,

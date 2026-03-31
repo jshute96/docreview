@@ -129,11 +129,15 @@ body. After upserting live suggestions, any suggestion row in the DB that is not
 live set is marked `resolved: true` and archived. The resolution check uses two criteria:
 
 - Rows with a `googleSuggestionId`: resolved if not in the live set (normal case)
-- Rows without a `googleSuggestionId` (Gmail-first rows): always resolved, since Drive
-  couldn't match them to a live suggestion
+- Rows without a `googleSuggestionId` (extension-only or Gmail-first rows): checked by
+  content hash against live suggestions. If a live suggestion has the same hash, the row
+  is kept (it likely represents that suggestion). Only resolved if no live suggestion
+  matches by hash.
 
-This means Gmail-first rows that Drive can't correlate are self-correcting — they get
-resolved on the next Drive refresh.
+This means extension-only rows (which have a disco ID but no `googleSuggestionId`) are
+not wrongly resolved when their suggestion is still live. Gmail-first rows that Drive
+can't correlate are still self-correcting — they get resolved once the suggestion
+disappears from the document and no hash match remains.
 
 ### Event ordering
 
@@ -150,8 +154,8 @@ When the suggestion is later accepted, the next refresh resolves it normally. Cl
 
 **Gmail first → suggestion already resolved before Drive syncs:** Gmail inserts a row
 with `resolved: false`. Drive sync doesn't find the suggestion in the doc, so the hash
-lookup is never attempted. Resolution check: no `googleSuggestionId` → resolved. Clean
-after one refresh.
+lookup is never attempted. Resolution check: no `googleSuggestionId` and no hash match
+among live suggestions → resolved. Clean after one refresh.
 
 ### Hash mismatch scenarios
 

@@ -125,7 +125,9 @@ export async function mergeExtensionSuggestions(
     });
 
     if (candidates.length === 1) {
-      // 3. Unique match — merge extension data into existing Drive-created row
+      // 3. Unique match — merge extension data into existing Drive-created row.
+      // We only merge when there's exactly one candidate to avoid pairing the
+      // wrong disco ID with the wrong googleSuggestionId.
       const existing = candidates[0];
       logInfo(`[Suggestions:Ext] ${googleDocId}: merged ${s.id} into ${existing.commentId} by hash`);
 
@@ -149,12 +151,11 @@ export async function mergeExtensionSuggestions(
       if (isResolved && !existing.resolved) resolved++;
       merged++;
     } else {
-      // 4. No match, or multiple matches — insert new row.
-      // Multiple matches are ambiguous for merging, but we insert anyway since
-      // the extension data (disco ID, author, status) is higher quality than
-      // Drive-only records. Duplicates self-correct on the next Drive refresh.
+      // 4. No match, or multiple matches — insert new row (extension-first).
+      // Multiple matches are ambiguous — we can't confidently pair a disco ID
+      // with a specific googleSuggestionId, so we insert a separate row.
       if (candidates.length > 1) {
-        logWarning(`[Suggestions:Ext] ${googleDocId}: ${candidates.length} hash matches for ${s.id} — inserting anyway`);
+        logWarning(`[Suggestions:Ext] ${googleDocId}: ${candidates.length} hash matches for ${s.id} — inserting separate row`);
       } else {
         logInfo(`[Suggestions:Ext] ${googleDocId}: inserted ${s.id} ${actionType} (extension-first)`);
       }
