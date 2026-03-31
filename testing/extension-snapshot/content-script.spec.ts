@@ -256,6 +256,103 @@ test.describe('Google Drive — list view content script injection', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Google Drive — grid view
+// ---------------------------------------------------------------------------
+
+test.describe('Google Drive — grid view content script injection', () => {
+  const snapshot = '/google-drive-grid.html';
+  const opts = {
+    pathname: '/drive/folders/1A8RM25Uj8nwwDNcuou2pGnYvwePIg',
+    href: 'https://drive.google.com/drive/folders/1A8RM25Uj8nwwDNcuou2pGnYvwePIg',
+    injectFn: 'injectDrive' as const,
+  };
+
+  test('injects .dr-link into qualifying gridcell items', async ({ page }) => {
+    await page.goto(snapshot);
+
+    const qualifyingBefore = await page.evaluate(() => {
+      let count = 0;
+      document.querySelectorAll('[role="gridcell"][data-id]').forEach((item) => {
+        const ariaLabel = item.getAttribute('aria-label') || '';
+        if (/\bfolder\b/i.test(ariaLabel.split('Located in')[0])) return;
+        const docId = item.getAttribute('data-id');
+        if (docId && docId.length > 20 && item.querySelector('svg, img')) count++;
+      });
+      return count;
+    });
+
+    expect(qualifyingBefore).toBeGreaterThan(0);
+
+    await injectContentScript(page, opts);
+
+    const drLinkCount = await page.locator('.dr-link').count();
+    expect(drLinkCount).toBeGreaterThan(0);
+    expect(drLinkCount).toBeLessThanOrEqual(qualifyingBefore);
+  });
+
+  test('idempotency — running twice produces no duplicates', async ({ page }) => {
+    await page.goto(snapshot);
+    await injectContentScript(page, opts);
+
+    const countAfterFirst = await page.locator('.dr-link').count();
+    expect(countAfterFirst).toBeGreaterThan(0);
+
+    await injectContentScript(page, opts);
+
+    expect(await page.locator('.dr-link').count()).toBe(countAfterFirst);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Google Drive — grid view (My Drive with folders + files)
+// ---------------------------------------------------------------------------
+
+test.describe('Google Drive — grid view (My Drive) content script injection', () => {
+  const snapshot = '/google-drive-grid2.html';
+  const opts = {
+    pathname: '/drive/my-drive',
+    href: 'https://drive.google.com/drive/my-drive',
+    injectFn: 'injectDrive' as const,
+  };
+
+  test('injects .dr-link into file gridcells but not folders', async ({ page }) => {
+    await page.goto(snapshot);
+
+    const { files, folders } = await page.evaluate(() => {
+      let files = 0, folders = 0;
+      document.querySelectorAll('[role="gridcell"][data-id]').forEach((item) => {
+        const ariaLabel = item.getAttribute('aria-label') || '';
+        if (/\bfolder\b/i.test(ariaLabel.split('Located in')[0])) { folders++; return; }
+        const docId = item.getAttribute('data-id');
+        if (docId && docId.length > 20 && item.querySelector('svg, img')) files++;
+      });
+      return { files, folders };
+    });
+
+    expect(files).toBeGreaterThan(0);
+    expect(folders).toBeGreaterThan(0);
+
+    await injectContentScript(page, opts);
+
+    const drLinkCount = await page.locator('.dr-link').count();
+    expect(drLinkCount).toBeGreaterThan(0);
+    expect(drLinkCount).toBeLessThanOrEqual(files);
+  });
+
+  test('idempotency — running twice produces no duplicates', async ({ page }) => {
+    await page.goto(snapshot);
+    await injectContentScript(page, opts);
+
+    const countAfterFirst = await page.locator('.dr-link').count();
+    expect(countAfterFirst).toBeGreaterThan(0);
+
+    await injectContentScript(page, opts);
+
+    expect(await page.locator('.dr-link').count()).toBe(countAfterFirst);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Gmail — inbox list chips
 // ---------------------------------------------------------------------------
 

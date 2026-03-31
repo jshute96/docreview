@@ -64,6 +64,7 @@ scripts/data-export.json
 .chrome-test-extension-profile/
 
 testing/test_users.json
+testing/extension-snapshot/snapshots
 testing/extension-snapshot/snapshots/
 testing/app-live/.auth/
 test-results/

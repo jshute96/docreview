@@ -87,7 +87,8 @@
       "Bash(scripts/run-test.sh:*)",
       "WebFetch(domain:playwright.dev)",
       "Bash(bash scripts/query_database.sh:*)",
-      "Bash(bash scripts/query_test_database.sh:*)"
+      "Bash(bash scripts/query_test_database.sh:*)",
+      "Bash(python3:*)"
     ],
     "defaultMode": "acceptEdits"
   },

@@ -55,11 +55,12 @@ Source: `src/chrome-extension/content.js`
 1. Navigate away and back without a full reload.
 2. **Expect**: Same number of `.dr-link` elements — no duplicates. The `.querySelector('.dr-link')` guard on each row prevents re-injection.
 
-### Google Drive — grid view [manual]
+### Google Drive — grid view [auto]
 
 1. Switch Drive to grid/boxes view (click the Grid radio button).
 2. Wait for the content script to inject.
-3. **Expect**: Icons injected into `[role="gridcell"]` elements that have qualifying `[data-id]` attributes.
+3. **Expect**: A `.dr-link` icon appears next to each file's type icon in every `[role="gridcell"]` that has a `[data-id]` with length > 20. Folders (detected by "Folder" in the aria-label before "Located in") are skipped.
+4. **Verify**: Count `.dr-link` elements matches qualifying gridcells. Icons are positioned inside the icon area (same container as the file type icon), not in the title area. Take a screenshot.
 
 ### Google Drive — MutationObserver persistence [manual]
 

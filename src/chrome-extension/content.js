@@ -162,7 +162,13 @@
     // <div role="row"> that wraps folder gridcells in the suggested folders section.
     var rows = document.querySelectorAll('tr[role="row"]');
     rows.forEach(function(row) {
-      var nameArea = row.querySelector('[data-column-id="16"]') || row;
+      // List view rows have a [data-column-id="16"] name column (empirically
+      // observed — the column ID is not guaranteed stable across Drive updates).
+      // Grid view rows inside <tr> elements don't have it. Use this to
+      // distinguish the two layouts so we can apply fixed-width wrapper styling
+      // only in list view (where column alignment matters).
+      var nameColumn = row.querySelector('[data-column-id="16"]');
+      var nameArea = nameColumn || row;
 
       if (nameArea.querySelector('.dr-link')) return;
 
@@ -178,37 +184,87 @@
       if (docId && docId.length > 20) {
         var anchor = nameArea.querySelector('svg, img');
         if (anchor) {
-          var btn = createIconButton(docId, 16);
-          var parent = anchor.parentElement;
-          if (window.getComputedStyle(parent).display !== 'flex') {
-            parent.style.display = 'flex';
-            parent.style.alignItems = 'center';
+          if (nameColumn) {
+            // List view: use a fixed-width wrapper so the injected icon doesn't
+            // shift subsequent columns out of alignment.
+            // Find the "icon branch" — the ancestor of the icon that is a direct
+            // child of the container with the doc ID.
+            var iconBranch = anchor;
+            while (iconBranch.parentElement && iconBranch.parentElement !== idEl) {
+              iconBranch = iconBranch.parentElement;
+            }
+
+            if (iconBranch.parentElement === idEl) {
+              var btn = createIconButton(docId, 16);
+              btn.style.marginRight = '0'; // override default 4px — wrapper handles spacing
+              if (window.getComputedStyle(idEl).display !== 'flex') {
+                idEl.style.display = 'flex';
+                idEl.style.alignItems = 'center';
+              }
+              var btnWrapper = document.createElement('div');
+              btnWrapper.className = 'dr-icon-wrapper';
+              btnWrapper.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:28px;flex-shrink:0;';
+              btnWrapper.appendChild(btn);
+              idEl.insertBefore(btnWrapper, iconBranch);
+            }
+          } else {
+            // Fallback for tr[role="row"] without a name column (unexpected layout).
+            var btn = createIconButton(docId, 16);
+            var parent = anchor.parentElement;
+            if (window.getComputedStyle(parent).display !== 'flex') {
+              parent.style.display = 'flex';
+              parent.style.alignItems = 'center';
+            }
+            parent.insertBefore(btn, anchor);
           }
-          parent.insertBefore(btn, anchor);
         }
       }
     });
 
-    // Grid view: cells with role="gridcell"
-    // Skip folders (data-selection-key="2") — they can't be opened in Docreview.
-    // Files use data-selection-key="1".
-    var gridItems = document.querySelectorAll('[role="gridcell"][data-selection-key="1"]');
+    // Grid view: cells with role="gridcell". The gridcell elements live inside
+    // <div role="row"> wrappers (not <tr>). The data-selection-key value varies
+    // across Drive views (0 or 1 for files, 2 for folders in some views), so we
+    // select all gridcells with a data-id and filter out folders by aria-label.
+    var gridItems = document.querySelectorAll('[role="gridcell"][data-id]');
     gridItems.forEach(function(item) {
+      // Folder aria-labels have "Folder" (or "Shared folder") as the type before
+      // "Located in", e.g. "Notes Folder Located in My Drive...". Match only
+      // in the type position — not in the location path (e.g. "Located in Test folder").
+      var ariaLabel = item.getAttribute('aria-label') || '';
+      var beforeLocated = ariaLabel.split('Located in')[0];
+      if (/\bfolder\b/i.test(beforeLocated)) return;
+
       if (item.querySelector('.dr-link')) return;
 
-      var idEl = item.querySelector('[data-id]');
-      var docId = idEl ? idEl.getAttribute('data-id') : null;
+      var docId = item.getAttribute('data-id');
 
       if (docId && docId.length > 20) {
-        var anchor = item.querySelector('svg, img');
-        if (anchor) {
-          var btn = createIconButton(docId, 16);
-          var parent = anchor.parentElement;
-          if (window.getComputedStyle(parent).display !== 'flex') {
-            parent.style.display = 'flex';
-            parent.style.alignItems = 'center';
+        // Insert the icon inside the icon area (first child div with matching
+        // data-id), next to the file type icon — mirroring the list view
+        // approach. This keeps the icon in the same visibility/layout context
+        // as the file type icon.
+        var iconArea = item.querySelector('div[data-id="' + docId + '"]');
+        if (iconArea) {
+          var anchor = iconArea.querySelector('svg, img');
+          if (anchor) {
+            // Walk up from the icon to find the "icon branch" — the ancestor
+            // that is a direct child of the icon area container.
+            var iconBranch = anchor;
+            while (iconBranch.parentElement && iconBranch.parentElement !== iconArea) {
+              iconBranch = iconBranch.parentElement;
+            }
+            if (iconBranch.parentElement === iconArea) {
+              var btn = createIconButton(docId, 16);
+              // The grid card has a full-size absolutely-positioned background
+              // overlay that covers non-positioned content. Drive's own icon
+              // container uses position:relative to render above it. We must
+              // do the same for our icon.
+              btn.style.position = 'relative';
+              iconArea.style.display = 'flex';
+              iconArea.style.alignItems = 'center';
+              iconArea.insertBefore(btn, iconBranch);
+            }
           }
-          parent.insertBefore(btn, anchor);
         }
       }
     });
