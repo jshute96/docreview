@@ -222,6 +222,7 @@ type RawDriveComment = {
     createdTime?: string | null;
     action?: string | null;
     author?: { me?: boolean | null; displayName?: string | null } | null;
+    assigneeEmailAddress?: string | null;
     mentionedEmailAddresses?: string[] | null;
   }> | null;
 };
@@ -231,9 +232,20 @@ function parseDriveComment(c: RawDriveComment, emailLower?: string): DriveCommen
   const replies = c.replies ?? [];
   const flags = deriveCommentFlags(c.author, replies);
 
-  const assignedToMe = emailLower
-    ? c.assigneeEmailAddress?.toLowerCase() === emailLower
-    : false;
+  // Determine current assignee from the initial assignment (top-level field)
+  // plus the most recent reassignment reply. Note: the Drive API only populates
+  // assigneeEmailAddress when the assignee is the authenticated user, so we
+  // can't detect when a comment is reassigned away from us — the new assignee's
+  // email is hidden. In practice this means assignedToMe can only detect "was
+  // ever assigned to me", not "is currently assigned to me".
+  let assigneeEmail = c.assigneeEmailAddress?.toLowerCase();
+  for (let i = replies.length - 1; i >= 0; i--) {
+    if (replies[i].assigneeEmailAddress) {
+      assigneeEmail = replies[i].assigneeEmailAddress!.toLowerCase();
+      break;
+    }
+  }
+  const assignedToMe = emailLower ? assigneeEmail === emailLower : false;
   const mentionedMe = emailLower
     ? (c.mentionedEmailAddresses ?? []).some((e) => e.toLowerCase() === emailLower)
     : false;
@@ -336,7 +348,7 @@ function buildCommentFields(options: FetchCommentDataOptions): string {
   // Reply fields
   const replyParts = ["action", `author(${authorFields})`];
   if (threads) replyParts.push("content", "htmlContent", "createdTime");
-  if (sync) replyParts.push("mentionedEmailAddresses");
+  if (sync) replyParts.push("assigneeEmailAddress", "mentionedEmailAddresses");
   // Comment fields
   const commentParts = [
     "id", "resolved", "createdTime", "modifiedTime",

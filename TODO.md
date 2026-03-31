@@ -110,6 +110,7 @@ Easy:
   * should give current anchor location or unanchored state (it only has original location)
   * should have a way to get emoji reactions on comments
   * should have a way to set assigneeEmailAddress from the API
+  * assignee is only reported if it's me. I can see if I was ever assigned, but can't tell if it was assigned to someone else after.
 
 ## Possible V2 features
 * build doc veiwer and diff viewer, take over from doc's lame differ
