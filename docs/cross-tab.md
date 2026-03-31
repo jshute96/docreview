@@ -129,7 +129,7 @@ Three components listen via `useCrossTabListener`:
 - **`docs` event:** If `docIds` is present and doesn't match this page's doc, the event is **ignored**. Otherwise, refetches the doc and labels in parallel.
 - **`labels` event:** Always refetches the doc and labels in parallel.
 - **`comments` event:** Only acts if `docId` matches this page's doc. Events for other docs are **ignored**. Always refetches the doc metadata (DB-only, for comment counts and archive status). For thread display data, uses one of four paths:
-  1. **Suggestion type** (`commentType === "SUGGESTION"`): skips thread fetch entirely — suggestion thread data comes from the extension's DOM scrape, not Drive, so there's nothing to re-fetch. Only the DB record matters.
+  1. **Suggestion type** (`commentType === "SUGGESTION"`): skips Drive thread fetch — suggestion thread data comes from the extension's DOM scrape, not Drive. After updating DB records, re-scrapes the extension for richer data (replies, author, accepted/rejected status). If the event includes a disco ID (`googleCommentId`), fetches just that suggestion via `getSuggestionFromDoc`; otherwise falls back to `fetchExtensionSuggestions` for all. The extension data is merged into the DB via `mergeExtensionSuggestions`.
   2. **Inline threads** (from `threads` field): merges directly into the thread map — no API call. Currently only the Chrome extension sync path provides this.
   3. **Targeted fetch** (`googleCommentId` present, not a suggestion): fetches `GET /api/docs/{docId}/threads?commentId=X` — one `comments.get` Drive call.
   4. **Full fetch** (no ID): fetches `GET /api/docs/{docId}/threads` — full `comments.list` Drive call.

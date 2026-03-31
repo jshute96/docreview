@@ -15,7 +15,7 @@ import { ROLE_COLORS } from "@/lib/role-colors";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
-import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, getSuggestionsFromDoc, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
+import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, getSuggestionsFromDoc, getSuggestionFromDoc, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -195,7 +195,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
     setSuggestionContent((prev) => ({ ...prev, [discoId]: content }));
     const contextId = generateContextId();
     mergeExtensionSuggestions([raw], contextId).then(() => {
-      broadcastChange({ type: "comments", docId: doc.docId, commentType: "SUGGESTION" }, contextId);
+      broadcastChange({ type: "comments", docId: doc.docId, commentType: "SUGGESTION", googleCommentId: discoId }, contextId);
     }).catch((err) => {
       console.log("[doc-detail] suggestion refresh: server merge error", err);
     });
@@ -324,13 +324,16 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
       } else if (event.type === "comments" && (event.docId === initialDoc.docId || event.docId === initialDoc.googleDocId)) {
         const isSuggestionEvent = event.commentType === "SUGGESTION";
-        const targetedCommentId = !isSuggestionEvent ? event.googleCommentId : undefined;
+        // googleCommentId serves different roles depending on event type:
+        // for comments it targets a single Drive thread fetch; for suggestions
+        // it targets a single extension scrape.
+        const googleCommentId = event.googleCommentId;
         // When the sync response included thread data, use it directly instead
-        // of making a redundant Drive API call. Falls back to fetching when no
-        // thread data (suggestions, missing ID, or non-extension triggers).
-        const inlineThreads = targetedCommentId && event.threads
+        // of making a redundant Drive API call. Suggestion events and events
+        // without inline threads fall through to their own handling below.
+        const inlineThreads = !isSuggestionEvent && googleCommentId && event.threads
           ? event.threads as ThreadMap : undefined;
-        console.log("[cross-tab] doc-detail: refreshing (comments event" + (isSuggestionEvent ? ", suggestion" : "") + (targetedCommentId ? `, comment=${targetedCommentId}` : "") + (inlineThreads ? ", inline" : "") + ")"); // eslint-disable-line no-console
+        console.log("[cross-tab] doc-detail: refreshing (comments event" + (isSuggestionEvent ? ", suggestion" : "") + (googleCommentId ? `, id=${googleCommentId}` : "") + (inlineThreads ? ", inline" : "") + ")"); // eslint-disable-line no-console
         // Fetch doc (and threads if not inline) in parallel, then apply both
         // state updates together so React batches them into one render. This
         // prevents expanded threads from flashing a loading state — the
@@ -338,15 +341,15 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
         // staleness check sees the new driveModifiedAt. Also freezes sort order
         // so updated comments don't jump (same as in-app reply).
         //
-        // Suggestion events skip the thread fetch — suggestion thread data comes
-        // from the extension's DOM scrape, not Drive, so there's nothing to
-        // re-fetch. Only the DB record (via /api/docs) matters.
+        // Suggestion events skip the Drive thread fetch — thread data comes
+        // from the extension's DOM scrape. After the doc fetch, the extension
+        // is re-scraped for richer data (replies, author, accepted/rejected).
         const docPromise = apiFetch(`/api/docs/${initialDoc.docId}`, { contextId, reason });
         const threadsPromise = inlineThreads || isSuggestionEvent
           ? Promise.resolve(null)
           : apiFetch(
-              targetedCommentId
-                ? `/api/docs/${initialDoc.docId}/threads?commentId=${encodeURIComponent(targetedCommentId)}`
+              googleCommentId
+                ? `/api/docs/${initialDoc.docId}/threads?commentId=${encodeURIComponent(googleCommentId)}`
                 : `/api/docs/${initialDoc.docId}/threads`,
               { contextId },
             );
@@ -361,9 +364,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
             setThreadMap(prev => ({ ...prev, ...inlineThreads }));
           } else if (threadsRes?.ok) {
             const threadData = await threadsRes.json();
-            if (targetedCommentId) {
+            if (googleCommentId) {
               if (Object.keys(threadData.threads).length === 0) {
-                setThreadMap(prev => { const next = { ...prev }; delete next[targetedCommentId]; return next; });
+                setThreadMap(prev => { const next = { ...prev }; delete next[googleCommentId]; return next; });
               } else {
                 setThreadMap(prev => ({ ...prev, ...threadData.threads }));
               }
@@ -375,6 +378,26 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
           setDoc(updated);
           setComments(updated.comments);
           setSortActive(false);
+          // After updating DB records, re-scrape the extension for richer data
+          // (replies, author, accepted/rejected status) — fire-and-forget so the
+          // cross-tab handler isn't blocked by the extension round-trip.
+          if (isSuggestionEvent && googleCommentId) {
+            void (async () => {
+              try {
+                const raw = await getSuggestionFromDoc(googleDocId, googleCommentId);
+                if (!raw) return;
+                setThreadMap(prev => ({ ...prev, [googleCommentId]: extensionToThread(raw) }));
+                setSuggestionContent(prev => ({ ...prev, [googleCommentId]: extensionToSuggestionContent(raw) }));
+                await mergeExtensionSuggestions([raw]);
+              } catch { /* best-effort */ }
+            })();
+          } else if (isSuggestionEvent) {
+            // Unexpected — suggestion events should always carry a disco ID
+            // (extracted by the extension on mousedown, or included in the
+            // per-suggestion refresh broadcast). Fall back to scraping all.
+            console.warn("[cross-tab] doc-detail: suggestion event without disco ID, fetching all"); // eslint-disable-line no-console
+            void fetchExtensionSuggestions();
+          }
         } else if (docRes.status === 404 || docRes.status === 410) {
           setNotFound(true);
         }

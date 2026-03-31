@@ -205,8 +205,9 @@ Looks up doc by Google doc ID, calls `syncComments()` with optional hints. With 
 3. Extension bridge posts to `BroadcastChannel` (using a separate short-lived instance so the receiving tab also gets it — the shared singleton suppresses self-delivery by spec).
 4. All docreview tabs receive via `useCrossTabListener`.
 5. When inline `threads` data is present (single-comment sync), the client uses it directly — no additional Drive API call.
-6. When no thread data is available (suggestions, missing ID, or non-extension triggers), falls back to fetching from `GET /api/docs/{docId}/threads`.
-7. If no docreview tab is open, nothing to notify — database is already updated for next visit.
+6. When no thread data is available (non-suggestion event, missing ID, or non-extension triggers), falls back to fetching from `GET /api/docs/{docId}/threads`.
+7. For suggestion events, after updating DB records, re-scrapes the extension for richer data (replies, author, accepted/rejected status). With a disco ID, fetches just that suggestion via `getSuggestionFromDoc`; without, falls back to `fetchExtensionSuggestions` for all.
+8. If no docreview tab is open, nothing to notify — database is already updated for next visit.
 
 ## Debugging
 
