@@ -44,7 +44,8 @@ suggestion IDs (`suggest.xxx`). Each is upserted into the Comment table:
 
 - **Create** (new): `type: "SUGGESTION"`, `googleSuggestionId` set to the `suggest.xxx` ID,
   `suggestionType` set, `resolved: false`, `status: "INBOX"` if `doc.role === "AUTHOR"`,
-  otherwise `"ARCHIVED"`. No timestamps — Docs API doesn't provide them.
+  otherwise `"ARCHIVED"`. `driveCreatedAt` and `driveModifiedAt` are set to
+  `doc.lastModifiedInDrive` (Docs API doesn't provide per-suggestion timestamps).
 - **Update** (existing): only `suggestionType` is updated (preserves user-set status).
 
 After upserting, any `suggest.xxx` records **no longer in the Docs API response** are
@@ -93,7 +94,7 @@ stripped before storage.
 | `suggestionType` | INSERT/DELETE/EDIT | mappable from Add/Delete/Replace | Either |
 | `resolved` | lifecycle (false→true) | — | Drive authoritative |
 | `driveCreatedAt` | `doc.lastModifiedInDrive` (approx) | `time` (minute precision) | Gmail preferred (more accurate) |
-| `driveModifiedAt` | null | — | null |
+| `driveModifiedAt` | `doc.lastModifiedInDrive` (approx) | `time` (minute precision) | Gmail preferred; extension updates with last reply timestamp |
 | `replyCount` | 0 (always) | `replies.length` | Gmail (Drive has no data) |
 | `isThreadAuthor` | false | — | false |
 | `isReplyAuthor` | false | — | false |
@@ -102,7 +103,11 @@ stripped before storage.
 **Extension source:** When extension suggestions are merged into the DB, the merge also
 populates `isThreadAuthor` and `isReplyAuthor` from the `isMine` flag, `mentionedMe` and
 `mentionedMeUnreplied` by checking reply HTML for the user's email address, and `resolved`
-from the accepted/rejected status.
+from the accepted/rejected status. The extension merge also applies comment-like inbox
+status rules (see docs/inbox-states.md): new suggestions get status based on mention,
+doc role, and participation; existing suggestions are promoted to INBOX on new activity
+when relevant (e.g., new replies mentioning me, or new activity on a suggestion I'm
+involved in). MUTED suggestions are only promoted when a new reply @-mentions me.
 
 **Future:** `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, and `resolved` could
 potentially be derived from parsed Gmail notifications but are left for later.
@@ -110,11 +115,12 @@ potentially be derived from parsed Gmail notifications but are left for later.
 ### Merge scenarios
 
 **Drive syncs first (typical):** Creates row with `googleSuggestionId` + content hash.
-Gmail merge later finds by content hash, fills in `googleCommentId`, `replyCount`, and
+Gmail merge later finds by content hash, fills in `googleCommentId`, `replyCount`,
 overwrites `driveCreatedAt` with the Gmail notification timestamp (more accurate than
-Drive's `doc.lastModifiedInDrive` approximation). If the suggestion is `ARCHIVED`, Gmail
-merge promotes it to `INBOX` (a notification means interesting activity). `MUTED`
-suggestions are left alone.
+Drive's `doc.lastModifiedInDrive` approximation), and updates `driveModifiedAt` from
+the last reply timestamp if newer. If the suggestion is `ARCHIVED`, Gmail merge promotes
+it to `INBOX` (a notification means interesting activity). `MUTED` suggestions are left
+alone.
 
 **Gmail arrives first:** Inserts row with `googleCommentId`, content hash, `suggestionType`,
 `driveCreatedAt` from Gmail time, `replyCount`, and `status: "INBOX"`. Drive sync later finds by content hash
@@ -250,7 +256,9 @@ The Docs API does not return `createdTime` or `modifiedTime` for suggestions. Wh
 suggestion is first synced, `driveCreatedAt` is set to the doc's `lastModifiedInDrive`
 timestamp (falling back to the current time if that is null). This is a rough
 approximation — the suggestion may have been created before or after that timestamp.
-`driveModifiedAt` remains `null` and shows "—" in the UI.
+`driveModifiedAt` is initialized to the same value; the Modified column shows "—" when
+it equals `driveCreatedAt`. Gmail merge and extension sync update `driveModifiedAt` with
+actual reply timestamps when available.
 
 ### Limited isThreadAuthor / isReplyAuthor / mentionedMe
 

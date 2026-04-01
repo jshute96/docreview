@@ -458,12 +458,28 @@ async function syncDriveComments(
 }
 
 /**
- * Builds a new comment record and determines its initial status.
- * Status rules (first match wins, see docs/inbox-states.md):
+ * Shared initial status computation for new comments and suggestions.
+ * Rules (first match wins, see docs/inbox-states.md):
  *   @-mention or assigned-to-me → INBOX (even if resolved)
- *   I'm the doc author → INBOX (if not resolved)
- *   I participated (authored or replied) → INBOX (if not resolved)
- *   Otherwise: ARCHIVED
+ *   resolved → ARCHIVED
+ *   doc author or participant → INBOX
+ *   otherwise → ARCHIVED
+ */
+export function computeInitialInboxStatus(opts: {
+  mentionedOrAssigned: boolean;
+  resolved: boolean;
+  isDocAuthor: boolean;
+  isThreadAuthor: boolean;
+  isReplyAuthor: boolean;
+}): "INBOX" | "ARCHIVED" {
+  if (opts.mentionedOrAssigned) return "INBOX";
+  if (opts.resolved) return "ARCHIVED";
+  if (opts.isDocAuthor || opts.isThreadAuthor || opts.isReplyAuthor) return "INBOX";
+  return "ARCHIVED";
+}
+
+/**
+ * Builds a new comment record and determines its initial status.
  */
 function buildNewComment(
   doc: Doc,
@@ -471,13 +487,13 @@ function buildNewComment(
 ): { record: Prisma.CommentCreateManyInput; unarchive: boolean; nonResolveActivity: boolean } {
   const mentionedInThread = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
   const mentionedOrAssigned = mentionedInThread || c.assignedToMe;
-  const status: "INBOX" | "ARCHIVED" = mentionedOrAssigned
-    ? "INBOX"
-    : c.resolved
-      ? "ARCHIVED"
-      : (doc.role === "AUTHOR" || c.isThreadAuthor || c.isReplyAuthor)
-        ? "INBOX"
-        : "ARCHIVED";
+  const status = computeInitialInboxStatus({
+    mentionedOrAssigned,
+    resolved: c.resolved,
+    isDocAuthor: doc.role === "AUTHOR",
+    isThreadAuthor: c.isThreadAuthor,
+    isReplyAuthor: c.isReplyAuthor,
+  });
 
   const record: Prisma.CommentCreateManyInput = {
     docId: doc.docId,
@@ -595,6 +611,8 @@ async function updateExistingComment(
  *   @-mention or assignment in new reply → INBOX (overrides MUTED)
  *   I resolved it → ARCHIVED
  *   New activity + (mentioned/assigned/doc author/participant) → INBOX
+ *
+ * Keep in sync with computeSuggestionStatusUpdate() in extension-suggestion-merge.ts.
  */
 function computeCommentStatus(
   doc: Doc,
@@ -738,6 +756,7 @@ async function syncDocsSuggestions(
     }
 
     if (!existing) {
+      const sugCreatedAt = doc.lastModifiedInDrive ?? new Date();
       toCreate.push({
         docId: doc.docId,
         googleSuggestionId: s.id,
@@ -746,7 +765,8 @@ async function syncDocsSuggestions(
         suggestionContentHash: contentHash,
         resolved: false,
         status: doc.role === "AUTHOR" ? "INBOX" : "ARCHIVED",
-        driveCreatedAt: doc.lastModifiedInDrive ?? new Date(),
+        driveCreatedAt: sugCreatedAt,
+        driveModifiedAt: sugCreatedAt,
       });
       if (doc.role === "AUTHOR") shouldUnarchive = true;
       hasNonResolveActivity = true;

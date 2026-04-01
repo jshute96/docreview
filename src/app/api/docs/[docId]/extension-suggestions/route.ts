@@ -41,7 +41,7 @@ export async function POST(
     logInfo(`[Suggestions:Ext] POST /extension-suggestions for ${googleDocId}: ${suggestions.length} suggestions`);
 
     try {
-      const result = await mergeExtensionSuggestions(docId, googleDocId, suggestions, userEmail);
+      const result = await mergeExtensionSuggestions(docId, googleDocId, suggestions, userEmail, doc);
       return NextResponse.json({
         success: true,
         result: {

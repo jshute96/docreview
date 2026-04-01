@@ -32,6 +32,17 @@ I am not longer interested in acting like the author.
   2. Otherwise (Reviewer), new suggestions start as Archived.
   3. Exception: if a Gmail notification arrives for the suggestion, it goes to Inbox
      (notification = interesting activity), unless it was Muted.
+  4. Exception: when the extension enriches a suggestion with participation data
+     (e.g., I created it), the comment rules below are applied to correct the
+     initial status.
+
+* For suggestion resolution (accepted/rejected):
+  1. If I accepted/rejected someone else's suggestion, it goes to Archived.
+  2. If it's my suggestion and it was accepted with no discussion replies, it goes
+     to Archived (nothing interesting to see — a silent accept).
+  3. If it's my suggestion and it was rejected, no status change (may need follow-up).
+  4. If it's my suggestion and it had discussion replies, no status change regardless
+     of accept/reject (there was a conversation worth reviewing).
 
 * For new comments, and new replies on a comment (First matching rule wins):
   1. If I resolved a comment that was in Inbox, it goes to Archived.

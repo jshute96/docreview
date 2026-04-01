@@ -68,6 +68,12 @@ export async function mergeSuggestionsFromGmail(
       // Gmail notification = interesting activity → promote ARCHIVED to INBOX
       // but respect MUTED (user explicitly silenced this thread).
       const promoteStatus = candidates[0].status === "ARCHIVED" ? "INBOX" : undefined;
+      // Use the last reply's timestamp as driveModifiedAt if available,
+      // keeping the later of the existing value and the new one.
+      const lastReply = suggestion.replies[suggestion.replies.length - 1];
+      const lastReplyTime = lastReply?.time ? new Date(lastReply.time) : null;
+      const existingModified = candidates[0].driveModifiedAt?.getTime() ?? 0;
+      const newModified = lastReplyTime && lastReplyTime.getTime() > existingModified ? lastReplyTime : undefined;
       await prisma.$transaction(async (tx) => {
         await tx.comment.update({
           where: { commentId: candidates[0].commentId },
@@ -75,10 +81,11 @@ export async function mergeSuggestionsFromGmail(
             googleCommentId: suggestion.discussionId || null,
             replyCount: Math.max(suggestion.replies.length, candidates[0].replyCount),
             ...(gmailTime ? { driveCreatedAt: gmailTime } : {}),
+            ...(newModified ? { driveModifiedAt: newModified } : {}),
             ...(promoteStatus ? { status: promoteStatus } : {}),
           },
         });
-        await bumpLastCommentActivity(docId, [gmailTime], tx);
+        await bumpLastCommentActivity(docId, [gmailTime, newModified], tx);
       });
       merged++;
     } else if (candidates.length === 0) {
@@ -96,6 +103,7 @@ export async function mergeSuggestionsFromGmail(
             resolved: false,
             status: "INBOX",
             driveCreatedAt: sugCreatedAt,
+            driveModifiedAt: sugCreatedAt,
             replyCount: suggestion.replies.length,
           },
         });

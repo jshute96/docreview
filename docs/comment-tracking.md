@@ -184,9 +184,28 @@ Tracks whether there's substantive activity beyond comment resolutions:
 - Comment resolved with exactly 1 new reply (the resolve itself) → no
 
 **New suggestion** (not previously in DB):
-- Created with `status: "INBOX"` only when `doc.role === "AUTHOR"`; otherwise `"ARCHIVED"`.
-- Gmail-first inserts always use `"INBOX"` (notification = interesting activity).
+- **Docs API path**: `status: "INBOX"` when `doc.role === "AUTHOR"`; otherwise `"ARCHIVED"`.
+  The Docs API has no participation/mention data, so only doc role is checked.
+- **Extension path**: applies comment-like rules — `@-mention → INBOX`, `resolved → ARCHIVED`,
+  `doc author or participant → INBOX`, otherwise `ARCHIVED`.
+- **Extension enrichment**: when the extension first enriches a Docs API-created suggestion
+  (adding the disco ID), the initial status is re-evaluated with the now-available
+  participation data. This corrects cases like "my suggestion on a REVIEWER doc" from
+  ARCHIVED to INBOX.
+- **Gmail-first inserts**: always `"INBOX"` (notification = interesting activity).
 - Gmail merge promotes `ARCHIVED` suggestions to `INBOX`; `MUTED` stays `MUTED`.
+- Extension merge applies activity-based status transitions on existing suggestions
+  (same rules as comments: new reply @-mention breaks MUTED, new activity + relevance
+  promotes ARCHIVED → INBOX).
+
+**Suggestion resolution** (extension sync only — Docs API marks resolved but has no
+authorship data):
+- I accepted/rejected someone else's suggestion → `ARCHIVED`.
+- My suggestion, accepted with no discussion replies → `ARCHIVED` (silent accept,
+  nothing interesting to see).
+- My suggestion, rejected → stays in current status (may need follow-up).
+- My suggestion, accepted/rejected with discussion replies → stays in current status
+  (conversation worth reviewing).
 - Unarchive (doc level) only when `doc.role === "AUTHOR"` (new suggestions on my docs).
 - Always counts as non-resolve activity.
 

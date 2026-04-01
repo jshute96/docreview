@@ -18,9 +18,9 @@ import { prisma } from "@/lib/prisma";
 import { logInfo, logWarning } from "@/lib/log";
 import { computeSuggestionHash, gmailActionToSuggestionType } from "@/lib/suggestion-hash";
 import { computeMentionedMeUnreplied } from "@/lib/google-drive";
-import { bumpLastCommentActivity } from "@/lib/sync-comments";
+import { bumpLastCommentActivity, computeInitialInboxStatus } from "@/lib/sync-comments";
 import { parseExtensionTimestamp } from "@/lib/extension-suggestions";
-import type { Comment } from "@prisma/client";
+import type { Comment, Doc } from "@prisma/client";
 
 /** Shape of a single extension suggestion as received from the API request body. */
 export interface ExtensionSuggestionInput {
@@ -60,19 +60,79 @@ function replyMentionsEmail(reply: ExtensionSuggestionInput["replies"][number], 
 }
 
 /**
- * Compute mentionedMe and mentionedMeUnreplied from extension reply data.
- * Delegates unreplied-mention logic to shared computeMentionedMeUnreplied().
+ * Compute mentionedMe, mentionedMeUnreplied, and per-reply flags from extension
+ * reply data. Per-reply flags are needed for new-reply-mention detection on
+ * existing suggestions (parallels comment sync's replyMentionedMeFlags).
  */
 function computeMentionFlags(
   replies: ExtensionSuggestionInput["replies"],
   emailLower: string,
-): { mentionedMe: boolean; mentionedMeUnreplied: boolean } {
+): { mentionedMe: boolean; mentionedMeUnreplied: boolean; replyMentionFlags: boolean[]; replyAuthorMeFlags: boolean[] } {
   const replyMentionFlags = replies.map((r) => !r.action && replyMentionsEmail(r, emailLower));
   const replyAuthorMeFlags = replies.map((r) => r.isMine);
   const mentionedMe = replyMentionFlags.some(Boolean);
   // Suggestions have no top-level @mention (the body is a text change, not a comment)
   const mentionedMeUnreplied = computeMentionedMeUnreplied(false, replyMentionFlags, replyAuthorMeFlags);
-  return { mentionedMe, mentionedMeUnreplied };
+  return { mentionedMe, mentionedMeUnreplied, replyMentionFlags, replyAuthorMeFlags };
+}
+
+/**
+ * Compute updated status for an existing suggestion based on new activity,
+ * following the same rules as comments (see docs/inbox-states.md).
+ * Returns undefined when status should not change.
+ *
+ * Keep in sync with computeCommentStatus() in sync-comments.ts — the rules
+ * here parallel the comment update logic but are adapted for extension data
+ * (no assignedToMe, MUTED fast-path is inline).
+ */
+function computeSuggestionStatusUpdate(
+  doc: Doc,
+  existing: Pick<Comment, "status" | "replyCount">,
+  commentData: { resolved: boolean; isThreadAuthor: boolean; isReplyAuthor: boolean; mentionedMe: boolean; replyCount: number },
+  mention: { replyMentionFlags: boolean[]; replyAuthorMeFlags: boolean[] },
+  iResolvedIt: boolean,
+  lastResolveReply: ExtensionSuggestionInput["replies"][number] | undefined,
+): "INBOX" | "ARCHIVED" | undefined {
+  const hasNewReplies = commentData.replyCount > existing.replyCount;
+  const newReplyMentionsMe = hasNewReplies &&
+    mention.replyMentionFlags.slice(existing.replyCount).some(Boolean);
+
+  // New reply @-mentions me → INBOX (overrides MUTED)
+  if (newReplyMentionsMe) return "INBOX";
+
+  // MUTED without new mention → preserve (don't check further).
+  // Must be before resolve rules so muted suggestions stay muted even on
+  // accept/reject (consistent with comment behavior where the MUTED fast-path
+  // fires before computeCommentStatus).
+  if (existing.status === "MUTED") return undefined;
+
+  // I accepted/rejected someone else's suggestion → ARCHIVED (parallels iResolvedIt)
+  if (commentData.resolved && iResolvedIt && !commentData.isThreadAuthor) return "ARCHIVED";
+
+  // My suggestion was accepted with no discussion replies → ARCHIVED (silent accept,
+  // nothing interesting to see). Rejections or threads with replies stay — may need
+  // follow-up. Applies regardless of who accepted it.
+  if (commentData.resolved && commentData.isThreadAuthor && lastResolveReply?.action === "accept") {
+    // Archive if the only reply is the accept action itself (no discussion)
+    if (commentData.replyCount <= 1) return "ARCHIVED";
+  }
+
+  // Check for new activity
+  if (!hasNewReplies) return undefined;
+
+  // With new activity, apply relevance rules
+  if (commentData.mentionedMe) return "INBOX";
+  if (doc.role === "AUTHOR") return "INBOX";
+  if (commentData.isThreadAuthor) {
+    // Only INBOX if someone else replied (not just my own self-replies)
+    const newReplies = mention.replyAuthorMeFlags.slice(existing.replyCount);
+    if (newReplies.some((me) => !me)) return "INBOX";
+  } else if (commentData.isReplyAuthor) {
+    // I participated on someone else's suggestion — any activity → INBOX
+    return "INBOX";
+  }
+
+  return undefined;
 }
 
 /**
@@ -84,6 +144,7 @@ export async function mergeExtensionSuggestions(
   googleDocId: string,
   suggestions: ExtensionSuggestionInput[],
   userEmail: string,
+  doc: Doc,
 ): Promise<ExtensionMergeResult> {
   const t0 = Date.now();
   let merged = 0;
@@ -107,9 +168,10 @@ export async function mergeExtensionSuggestions(
     const mention = computeMentionFlags(s.replies, emailLower);
 
     // Common fields for all DB writes
+    const isResolved = s.status === "accepted" || s.status === "rejected";
     const commentData = {
       replyCount: s.replies.length,
-      resolved: s.status === "accepted" || s.status === "rejected",
+      resolved: isResolved,
       isThreadAuthor: s.isMine,
       isReplyAuthor: s.replies.some(r => r.isMine),
       mentionedMe: mention.mentionedMe,
@@ -117,8 +179,12 @@ export async function mergeExtensionSuggestions(
       driveCreatedAt: createdAt,
       driveModifiedAt: lastReplyTs ?? createdAt,
     };
+    // I accepted/rejected it myself — parallels iResolvedIt for comments
+    // (uses last accept/reject reply, not any, in case of reopen+re-resolve)
+    const lastResolveReply = [...s.replies].reverse().find(r => r.action === "accept" || r.action === "reject");
+    const iResolvedIt = isResolved && lastResolveReply?.isMine === true;
 
-    logInfo(`[Suggestions:Ext] ${googleDocId}: processing ${s.id} ${actionType} "${s.oldText.substring(0, 20)}"→"${s.newText.substring(0, 20)}" status=${s.status} hash=${contentHash.substring(0, 12)}…`);
+    logInfo(`[Suggestions:Ext] ${googleDocId}: processing ${s.id} ${actionType} old=${s.oldText.length}chars new=${s.newText.length}chars status=${s.status} hash=${contentHash.substring(0, 12)}…`);
 
     // 1. Check if this disco ID already exists — update metadata
     const existingById = await prisma.comment.findFirst({
@@ -127,10 +193,14 @@ export async function mergeExtensionSuggestions(
     if (existingById) {
       logInfo(`[Suggestions:Ext] ${googleDocId}: ${s.id} already exists as ${existingById.commentId} — updating metadata`);
       if (commentData.resolved && !existingById.resolved) resolved++;
+      const newStatus = computeSuggestionStatusUpdate(doc, existingById, commentData, mention, iResolvedIt, lastResolveReply);
       await prisma.$transaction(async (tx) => {
         await tx.comment.update({
           where: { commentId: existingById.commentId },
-          data: commentData,
+          data: {
+            ...commentData,
+            ...(newStatus ? { status: newStatus } : {}),
+          },
         });
         await bumpLastCommentActivity(docId, [commentData.driveCreatedAt, commentData.driveModifiedAt], tx);
       });
@@ -153,12 +223,28 @@ export async function mergeExtensionSuggestions(
         const existing = candidates[0];
         logInfo(`[Suggestions:Ext] ${googleDocId}: merged ${s.id} into ${existing.commentId} by hash`);
         if (commentData.resolved && !existing.resolved) resolved++;
+        // This is the first time the extension enriches a Docs API-created row
+        // (adding the disco ID). The Docs API had no participation data, so the
+        // initial status may be wrong (e.g., ARCHIVED for a suggestion I created
+        // on a REVIEWER doc). Re-evaluate with the now-available data.
+        let newStatus = computeSuggestionStatusUpdate(doc, existing, commentData, mention, iResolvedIt, lastResolveReply);
+        if (!newStatus && existing.status === "ARCHIVED") {
+          const shouldBe = computeInitialInboxStatus({
+            mentionedOrAssigned: commentData.mentionedMe,
+            resolved: commentData.resolved,
+            isDocAuthor: doc.role === "AUTHOR",
+            isThreadAuthor: commentData.isThreadAuthor,
+            isReplyAuthor: commentData.isReplyAuthor,
+          });
+          if (shouldBe === "INBOX") newStatus = "INBOX";
+        }
         await prisma.$transaction(async (tx) => {
           await tx.comment.update({
             where: { commentId: existing.commentId },
             data: {
               googleCommentId: s.id,
               ...commentData,
+              ...(newStatus ? { status: newStatus } : {}),
             },
           });
           await bumpLastCommentActivity(docId, [commentData.driveCreatedAt, commentData.driveModifiedAt], tx);
@@ -173,6 +259,13 @@ export async function mergeExtensionSuggestions(
         } else {
           logInfo(`[Suggestions:Ext] ${googleDocId}: inserted ${s.id} ${actionType} (extension-first)`);
         }
+        const status = computeInitialInboxStatus({
+          mentionedOrAssigned: commentData.mentionedMe,
+          resolved: commentData.resolved,
+          isDocAuthor: doc.role === "AUTHOR",
+          isThreadAuthor: commentData.isThreadAuthor,
+          isReplyAuthor: commentData.isReplyAuthor,
+        });
         await prisma.$transaction(async (tx) => {
           await tx.comment.create({
             data: {
@@ -181,7 +274,7 @@ export async function mergeExtensionSuggestions(
               type: "SUGGESTION",
               suggestionType: actionType,
               suggestionContentHash: contentHash,
-              status: "INBOX",
+              status,
               ...commentData,
             },
           });
