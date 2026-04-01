@@ -32,8 +32,7 @@ export default async function DocsPage() {
   return (
     <div className="min-h-screen bg-zinc-50">
       {/* Hide page until useCachedMetadata populates titles from localStorage, preventing a flash of untitled docs */}
-      <style id="hide-until-titles" dangerouslySetInnerHTML={{ __html: `body{visibility:hidden}` }} />
-      <script dangerouslySetInnerHTML={{ __html: `setTimeout(function(){var s=document.getElementById("hide-until-titles");if(s)s.remove()},2000)` }} />
+      <script dangerouslySetInnerHTML={{ __html: `(function(){var s=document.createElement('style');s.id='hide-until-titles';s.innerHTML='body{visibility:hidden}';document.head.appendChild(s);setTimeout(function(){if(s.parentNode)s.remove()},2000);})()` }} />
       {/* Pre-read cached metadata from localStorage for these doc IDs (runs before React hydrates) */}
       <script dangerouslySetInnerHTML={{ __html: `try{var ids=${JSON.stringify(googleDocIds)};var u=${JSON.stringify(userId)};var c={};for(var i=0;i<ids.length;i++){var k="docr:"+u+":meta:"+ids[i];try{var e=JSON.parse(localStorage.getItem(k));if(e&&e.value)c[ids[i]]=e}catch(x){}}window.__docrMetaCache=c}catch(x){}` }} />
       <div className="mx-auto max-w-6xl px-4 py-8">
