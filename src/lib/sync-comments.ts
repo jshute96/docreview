@@ -459,10 +459,10 @@ async function syncDriveComments(
 
 /**
  * Builds a new comment record and determines its initial status.
- * Status rules (first match wins):
- *   Rule 2: @-mention → INBOX (even if resolved)
- *   Rule 4: I'm the doc author → INBOX (if not resolved)
- *   Rule 5/6: I participated (authored or replied) → INBOX (if not resolved)
+ * Status rules (first match wins, see docs/inbox-states.md):
+ *   @-mention or assigned-to-me → INBOX (even if resolved)
+ *   I'm the doc author → INBOX (if not resolved)
+ *   I participated (authored or replied) → INBOX (if not resolved)
  *   Otherwise: ARCHIVED
  */
 function buildNewComment(
@@ -470,7 +470,8 @@ function buildNewComment(
   c: DriveComment,
 ): { record: Prisma.CommentCreateManyInput; unarchive: boolean; nonResolveActivity: boolean } {
   const mentionedInThread = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
-  const status: "INBOX" | "ARCHIVED" = mentionedInThread
+  const mentionedOrAssigned = mentionedInThread || c.assignedToMe;
+  const status: "INBOX" | "ARCHIVED" = mentionedOrAssigned
     ? "INBOX"
     : c.resolved
       ? "ARCHIVED"
@@ -498,8 +499,8 @@ function buildNewComment(
   // Doc-level unarchive: new INBOX comment triggers unarchive, but not if
   // already read (my own activity shouldn't resurface an archived doc).
   const unarchive = status === "INBOX" && !c.isRead;
-  // Track non-resolve activity: unresolved comments or @-mentions (even on resolved)
-  const nonResolveActivity = (!c.resolved || mentionedInThread) && !c.isRead;
+  // Track non-resolve activity: unresolved comments or @-mentions/assignments (even on resolved)
+  const nonResolveActivity = (!c.resolved || mentionedOrAssigned) && !c.isRead;
 
   return { record, unarchive, nonResolveActivity };
 }
@@ -520,13 +521,15 @@ async function updateExistingComment(
     (existing.resolved && !c.resolved) ||
     !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
 
-  // Rule 2: @-mention in new replies breaks out of MUTED (spec: "only case
-  // when a comment moves out of Muted state").
+  // @-mention or assignment in new replies breaks out of MUTED
+  // (see docs/inbox-states.md rule 2).
   const newReplyMentionsMe = hasNewReplies &&
     (c.replyMentionedMeFlags ?? []).slice(existing.replyCount).some(Boolean);
+  const newReplyAssignsMe = hasNewReplies &&
+    (c.replyAssignedToMeFlags ?? []).slice(existing.replyCount).some(Boolean);
 
-  // MUTED fast-path: update metadata but preserve MUTED status unless @-mentioned
-  if (existing.status === "MUTED" && !newReplyMentionsMe) {
+  // MUTED fast-path: update metadata but preserve MUTED status unless @-mentioned or assigned
+  if (existing.status === "MUTED" && !newReplyMentionsMe && !newReplyAssignsMe) {
     const { changed, data } = buildCommentUpdate(existing, c);
     let comment = existing;
     if (changed) {
@@ -555,10 +558,10 @@ async function updateExistingComment(
   }
 
   // Determine the target status using spec rules (first matching rule wins)
-  const status = computeCommentStatus(doc, c, existing, previousStatus, hasNewActivity, hasNewReplies, newReplyMentionsMe);
+  const status = computeCommentStatus(doc, c, existing, previousStatus, hasNewActivity, hasNewReplies, newReplyMentionsMe, newReplyAssignsMe);
 
-  if (newReplyMentionsMe) {
-    // @-mention always counts as activity even if isRead
+  if (newReplyMentionsMe || newReplyAssignsMe) {
+    // @-mention or assignment always counts as activity even if isRead
     nonResolveActivity = true;
   }
 
@@ -587,12 +590,11 @@ async function updateExistingComment(
 }
 
 /**
- * Determines a comment's target status based on spec rules (first match wins):
- *   Rule 2: @-mention in new reply → INBOX (overrides MUTED)
- *   Rule 1: I resolved it → ARCHIVED
- *   Rule 4: I'm the doc author → INBOX
- *   Rule 5: I started the thread, someone else replied → INBOX
- *   Rule 6: I participated on someone else's thread → INBOX
+ * Determines a comment's target status based on spec rules (first match wins,
+ * see docs/inbox-states.md for the authoritative rule list):
+ *   @-mention or assignment in new reply → INBOX (overrides MUTED)
+ *   I resolved it → ARCHIVED
+ *   New activity + (mentioned/assigned/doc author/participant) → INBOX
  */
 function computeCommentStatus(
   doc: Doc,
@@ -602,11 +604,17 @@ function computeCommentStatus(
   hasNewActivity: boolean,
   hasNewReplies: boolean,
   newReplyMentionsMe: boolean,
+  newReplyAssignsMe: boolean,
 ): "INBOX" | "ARCHIVED" | "MUTED" {
-  if (newReplyMentionsMe) return "INBOX";
+  if (newReplyMentionsMe || newReplyAssignsMe) return "INBOX";
   if (c.resolved && c.iResolvedIt) return "ARCHIVED";
 
   if (hasNewActivity) {
+    // I was mentioned or assigned anywhere in the thread — new activity brings
+    // it back to INBOX (even if I previously archived it). MUTED comments never
+    // reach here (handled by the fast-path in updateExistingComment).
+    const mentionedInThread = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
+    if (mentionedInThread || c.assignedToMe) return "INBOX";
     if (doc.role === "AUTHOR") return "INBOX";
     if (c.isThreadAuthor && hasNewReplies) {
       // Only INBOX if someone else replied (not just my own self-replies)

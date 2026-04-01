@@ -127,7 +127,7 @@ describe("GET /api/docs/[docId]/threads", () => {
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
     const thread = { id: "c1", author: "Alice", fromMe: false, content: "Hi", createdTime: "", resolved: false, replies: [] };
     mockFetchThreadDetail.mockResolvedValue({
-      comment: { id: "c1", resolved: false, isThreadAuthor: true, isReplyAuthor: false, iResolvedIt: false, isRead: false, assignedToMe: false, mentionedMe: false, mentionedMeUnreplied: false, driveCreatedAt: null, driveModifiedAt: null, replyCount: 0, replyAuthorMeFlags: [], replyMentionedMeFlags: [] },
+      comment: { id: "c1", resolved: false, isThreadAuthor: true, isReplyAuthor: false, iResolvedIt: false, isRead: false, assignedToMe: false, mentionedMe: false, mentionedMeUnreplied: false, driveCreatedAt: null, driveModifiedAt: null, replyCount: 0, replyAuthorMeFlags: [], replyMentionedMeFlags: [], replyAssignedToMeFlags: [] },
       thread,
     });
 

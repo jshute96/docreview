@@ -182,6 +182,7 @@ export interface DriveComment {
   replyCount: number;
   replyAuthorMeFlags: boolean[];
   replyMentionedMeFlags: boolean[];
+  replyAssignedToMeFlags: boolean[];
 }
 
 // Derives ownership/participation flags from a Drive comment's author and replies.
@@ -290,6 +291,11 @@ function parseDriveComment(c: RawDriveComment, emailLower?: string): DriveCommen
           )
       : false
   );
+  const replyAssignedToMeFlags = replies.map((r) =>
+    emailLower
+      ? r.assigneeEmailAddress?.toLowerCase() === emailLower
+      : false
+  );
 
   const mentionedMeUnreplied = computeMentionedMeUnreplied(
     mentionedMe, replyMentionedMeFlags, replyAuthorMeFlags,
@@ -312,6 +318,7 @@ function parseDriveComment(c: RawDriveComment, emailLower?: string): DriveCommen
     replyCount: replies.length,
     replyAuthorMeFlags,
     replyMentionedMeFlags: effectiveReplyMentionedMeFlags,
+    replyAssignedToMeFlags,
   };
 }
 

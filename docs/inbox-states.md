@@ -35,13 +35,14 @@ I am not longer interested in acting like the author.
 
 * For new comments, and new replies on a comment (First matching rule wins):
   1. If I resolved a comment that was in Inbox, it goes to Archived.
-  2. If a new comment or reply includes an @-mention of me, it goes to Inbox. 
+  2. If a new comment or reply includes an @-mention of me or assigns it to me, it goes to Inbox. 
      * This is the only case when a comment moves out of Muted state.
   3. If the comment thread is Muted, no state change.
-  3. If I am Author on the doc, all new comments and replies go to Inbox
-  4. If I started the comment thread, it goes to Inbox (on initial creation, and if anyone else replies or resolves it)
+  4. If I was previously mentioned or assigned anywhere in the thread and there is new activity, it goes to Inbox.
+  5. If I am Author on the doc, all new comments and replies go to Inbox
+  6. If I started the comment thread, it goes to Inbox (on initial creation, and if anyone else replies or resolves it)
      * If I reply on a comment thread I started, that doesn't go to Inbox.
-  5. If I replied, on a thread I did not start, it goes to Inbox.
+  7. If I replied, on a thread I did not start, it goes to Inbox.
 
 ## Smart Unarchive
 

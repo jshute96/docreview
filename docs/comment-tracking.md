@@ -40,7 +40,7 @@ filter and sort controls.
 |------------|---------|
 | `INBOX`    | Needs attention — unresolved or updated by someone else |
 | `ARCHIVED` | Resolved; you resolved it yourself, or it was already resolved on first sync |
-| `MUTED`    | Hidden from the Inbox count; user-set, only overridden by sync when @-mentioned |
+| `MUTED`    | Hidden from the Inbox count; user-set, only overridden by sync when @-mentioned or assigned in a new reply |
 
 ---
 
@@ -48,7 +48,7 @@ filter and sort controls.
 
 When a comment thread is seen for the first time (first matching rule wins):
 
-- **@-mention of me** anywhere in the thread → `INBOX` (even if resolved)
+- **@-mention of me or assigned to me** anywhere in the thread → `INBOX` (even if resolved)
 - **Already resolved** (`resolved = true`) → `ARCHIVED`
 - **Unresolved** and I'm the doc author (`doc.role === "AUTHOR"`) → `INBOX`
 - **Unresolved** and I'm involved (`isThreadAuthor || isReplyAuthor`) → `INBOX`
@@ -56,8 +56,8 @@ When a comment thread is seen for the first time (first matching rule wins):
 
 Only comments relevant to the current user start in Inbox. Already-resolved threads
 don't need action, and unresolved threads on docs where I'm just a reviewer with no
-participation are archived until something involves me. @-mentions override all other
-rules — if someone mentions me, I see it regardless.
+participation are archived until something involves me. @-mentions and assignments
+override all other rules — if someone mentions or assigns me, I see it regardless.
 
 ---
 
@@ -90,26 +90,30 @@ against the existing record. If nothing changed, the update is skipped entirely.
 unnecessary writes and makes the granular log counts (e.g., "3 updated comment threads") accurate.
 Date fields are compared via `.getTime()` with null-handling.
 
-**@-mention in new reply**: If any new reply mentions the current user (via
-`mentionedEmailAddresses`), the comment moves to `INBOX` — even if it was `MUTED`. This
-is the only case where a comment exits MUTED state.
+**@-mention or assignment in new reply**: If any new reply mentions or assigns the current
+user, the comment moves to `INBOX` — even if it was `MUTED`. This is the only case where
+a comment exits MUTED state.
 
-**MUTED** (without @-mention): If status is `MUTED` and no new reply mentions me, it is
-left unchanged. Muted threads stay hidden regardless of new Drive activity. Drive-side
-fields (`resolved`, `isReplyAuthor`, `driveCreatedAt`, `driveModifiedAt`, `replyCount`)
-are still updated when they differ, so the detail page reflects current state.
+**MUTED** (without new @-mention or assignment): If status is `MUTED` and no new reply
+mentions or assigns me, it is left unchanged. Muted threads stay hidden regardless of new
+Drive activity. Drive-side fields (`resolved`, `isReplyAuthor`, `driveCreatedAt`,
+`driveModifiedAt`, `replyCount`) are still updated when they differ, so the detail page
+reflects current state.
 
-**For all other statuses (INBOX, ARCHIVED, or MUTED with @-mention)**, apply this logic
-(first matching rule wins):
+**For all other statuses (INBOX, ARCHIVED, or MUTED with @-mention/assignment)**, apply
+this logic (first matching rule wins):
 
 1. Compare `resolved`, `isReplyAuthor`, `status`, `driveCreatedAt`,
    `driveModifiedAt`, and `replyCount` against the existing record. `isRead` is only
    compared when `driveModifiedAt` has changed (preserving manual toggles). Skip the
    update if all match.
-2. If a **new reply @-mentions me** → `INBOX` (overrides all other rules, including MUTED).
+2. If a **new reply @-mentions or assigns me** → `INBOX` (overrides all other rules,
+   including MUTED).
 3. If `resolved = true` AND I was the one who resolved it → set status to `ARCHIVED`.
 4. Otherwise, if there is **new activity** (new replies, thread re-opened, or modification
    detected via `driveModifiedAt`), apply relevance-based rules:
+   - **I was @-mentioned or assigned** anywhere in the thread → `INBOX` (even if I
+     previously archived it; MUTED comments don't reach here)
    - **I'm the doc author** → `INBOX` (rule 4: all activity is relevant)
    - **I started the thread** and there are new replies → `INBOX` only if at least one
      reply is from someone else. Self-replies on my own thread don't wake it up (rule 5
@@ -131,7 +135,8 @@ Activity only surfaces in Inbox when it's relevant to you — not all activity o
 
 - The comment never appears in the Inbox count.
 - Sync never changes its status, even if Drive reports new activity — **except** when a
-  new reply @-mentions the current user. This is the only case where MUTED is overridden.
+  new reply @-mentions or assigns the current user. This is the only case where MUTED is
+  overridden.
 - The user can explicitly un-mute to restore tracking.
 
 This is useful for comment threads that are noisy or irrelevant, where you don't want to be
@@ -185,8 +190,9 @@ Tracks whether there's substantive activity beyond comment resolutions:
 - Unarchive (doc level) only when `doc.role === "AUTHOR"` (new suggestions on my docs).
 - Always counts as non-resolve activity.
 
-**MUTED threads**: never trigger unarchive, unless an @-mention breaks the thread out of
-MUTED (at which point the MUTED→INBOX transition triggers unarchive like any other).
+**MUTED threads**: never trigger unarchive, unless an @-mention or assignment breaks the
+thread out of MUTED (at which point the MUTED→INBOX transition triggers unarchive like
+any other).
 
 ### Manual comment→doc propagation
 

@@ -108,6 +108,7 @@ function driveComment(overrides: Record<string, unknown> = {}) {
     replyCount: 0,
     replyAuthorMeFlags: [] as boolean[],
     replyMentionedMeFlags: [] as boolean[],
+    replyAssignedToMeFlags: [] as boolean[],
     ...overrides,
   };
 }
@@ -674,6 +675,120 @@ describe("syncComments @-mention detection", () => {
     const { shouldUnarchive, hasNonResolveActivity } = await syncComments(doc, driveAuth);
     expect(shouldUnarchive).toBe(true);
     expect(hasNonResolveActivity).toBe(true);
+  });
+});
+
+// --------------- assigned-to-me detection ---------------
+
+describe("syncComments assigned-to-me detection", () => {
+  it("new comment assigned to me → INBOX even on REVIEWER doc with no participation", async () => {
+    mockFetchCommentData.mockResolvedValue({ comments: [
+      driveComment({ assignedToMe: true, isReplyAuthor: false }),
+    ] });
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const createCall = mockComment.createMany.mock.calls[0][0];
+    expect(createCall.data[0].status).toBe("INBOX");
+  });
+
+  it("new resolved comment assigned to me → INBOX (assignment overrides resolved)", async () => {
+    mockFetchCommentData.mockResolvedValue({ comments: [
+      driveComment({ assignedToMe: true, resolved: true }),
+    ] });
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const createCall = mockComment.createMany.mock.calls[0][0];
+    expect(createCall.data[0].status).toBe("INBOX");
+  });
+
+  it("existing MUTED comment → INBOX when new reply assigns me", async () => {
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED",
+      resolved: false, replyCount: 1, driveModifiedAt: modDate,
+    }]);
+    mockFetchCommentData.mockResolvedValue({ comments: [
+      driveComment({
+        assignedToMe: true,
+        replyCount: 2,
+        replyAuthorMeFlags: [false, false],
+        replyAssignedToMeFlags: [false, true],
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
+      }),
+    ] });
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const updateCall = mockComment.update.mock.calls[0][0];
+    expect(updateCall.data.status).toBe("INBOX");
+  });
+
+  it("existing MUTED comment stays MUTED when assigned but no new assignment reply", async () => {
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED",
+      resolved: false, replyCount: 1, driveModifiedAt: modDate,
+    }]);
+    mockFetchCommentData.mockResolvedValue({ comments: [
+      driveComment({
+        assignedToMe: true,
+        replyCount: 2,
+        replyAuthorMeFlags: [false, false],
+        replyAssignedToMeFlags: [false, false],
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
+      }),
+    ] });
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const updateCall = mockComment.update.mock.calls[0][0];
+    expect(updateCall.data.status).toBe("MUTED");
+  });
+
+  it("assignment in new reply breaking MUTED triggers shouldUnarchive", async () => {
+    const doc = makeDoc({ role: "REVIEWER", status: "ARCHIVED" });
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED",
+      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+    }]);
+    mockFetchCommentData.mockResolvedValue({ comments: [
+      driveComment({
+        assignedToMe: true,
+        replyCount: 1,
+        replyAuthorMeFlags: [false],
+        replyAssignedToMeFlags: [true],
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
+      }),
+    ] });
+
+    const { shouldUnarchive, hasNonResolveActivity } = await syncComments(doc, driveAuth);
+    expect(shouldUnarchive).toBe(true);
+    expect(hasNonResolveActivity).toBe(true);
+  });
+
+  it("existing ARCHIVED comment where I was assigned, new activity → INBOX", async () => {
+    const modDate = new Date("2024-06-10T10:00:00Z");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
+      resolved: false, replyCount: 1, driveModifiedAt: modDate,
+    }]);
+    mockFetchCommentData.mockResolvedValue({ comments: [
+      driveComment({
+        assignedToMe: true,
+        replyCount: 2,
+        replyAuthorMeFlags: [false, false],
+        replyAssignedToMeFlags: [false, false], // not a new assignment, just new activity
+        driveModifiedAt: new Date("2024-06-10T11:00:00Z"),
+      }),
+    ] });
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    const updateCall = mockComment.update.mock.calls[0][0];
+    expect(updateCall.data.status).toBe("INBOX");
   });
 });
 
