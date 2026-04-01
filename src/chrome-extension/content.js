@@ -384,6 +384,10 @@
       } catch(e) {}
       setupCommentSelectionRelay();
     }
+    // Detect when the doc's stream view is ready so Docreview tabs can
+    // auto-fetch suggestions. Independent of commentSync — works as long
+    // as Docs integration is enabled.
+    setupDocReadyDetection();
     new MutationObserver(function() { injectDocs(); injectAccessDenied(); }).observe(document.body, { childList: true, subtree: true });
   } else if (driveEnabled) {
     injectDrive();

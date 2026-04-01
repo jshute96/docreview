@@ -203,7 +203,9 @@ This provides richer data than either the Docs API or Gmail:
 
 **Display flow:** On the comments page, after pinging the extension, `fetchExtensionSuggestions()`
 calls `getSuggestionsFromDoc(docId)` via the bridge. The extension executes `getSuggestions()`
-in the doc tab's MAIN world and returns the results. These are then:
+in the doc tab's MAIN world and returns the results. If the doc isn't open yet (no suggestions
+returned), the extension will send a `docReady` event when the doc's stream view appears later,
+triggering an automatic one-time fetch without requiring a manual Refresh. These are then:
 1. Converted to `CommentThread` and `SuggestionContent` entries for thread panel display
    (reply text, HTML content, author info — data not available from the DB)
 2. POSTed to `POST /api/docs/[docId]/extension-suggestions` for DB merge via content-hash

@@ -6,7 +6,7 @@ See `src/chrome-extension/README.md` for user-facing documentation.
 
 The extension has three main scripts that run in different contexts:
 
-- **`content.js` + `content-comments.js`** — Content scripts injected into Google Docs, Drive, and Gmail pages. Run in Chrome's isolated content script world (shares the DOM but has a separate `window`). `content.js` injects Docreview icons into pages; `content-comments.js` detects comment activity and relays selection changes on Google Docs.
+- **`content.js` + `content-comments.js`** — Content scripts injected into Google Docs, Drive, and Gmail pages. Run in Chrome's isolated content script world (shares the DOM but has a separate `window`). `content.js` injects Docreview icons into pages; `content-comments.js` detects comment activity, relays selection changes, and sends doc-ready notifications on Google Docs.
 
 - **`background.js` + helpers** — Service worker (Manifest V3), split across four files loaded via `importScripts`. Runs in the extension's background context, independent of any page. `background.js` handles the message router, toolbar clicks, context menus, and comment navigation. `background-injected.js` contains functions injected into page context (disco ID helpers, comment selection/navigation). `background-tabs.js` manages doc tab tracking. `background-comments.js` handles comment sync state and debounce. Communicates with content scripts via `chrome.runtime.onMessage` / `chrome.tabs.sendMessage`.
 
@@ -33,7 +33,7 @@ Google Docs page                    Docreview page
 - **Gmail**: Injects icons into attachment chips and "Open in Docreview" links into Docs notification emails. The link resolves its target URL at click time rather than injection time (to handle Gmail's SPA navigation correctly).
 - **Access-denied pages**: Injects an "Add in Docreview" link on Docs and Drive access-denied pages.
 
-**`content-comments.js`** — Comment-specific content script logic for Google Docs pages. Detects comment activity (reply, resolve, accept/reject suggestion, new comment) via mouseup and keyboard listeners, and notifies the background worker to trigger a server-side comment sync. Also relays comment selection changes from the MAIN world to the background worker.
+**`content-comments.js`** — Comment-specific content script logic for Google Docs pages. Detects comment activity (reply, resolve, accept/reject suggestion, new comment) via mouseup and keyboard listeners, and notifies the background worker to trigger a server-side comment sync. Relays comment selection changes from the MAIN world to the background worker. Also detects when the doc's `#docos-stream-view` appears and sends a `docReady` notification so the comments page can auto-fetch suggestions.
 
 **`background.js`** — Service worker main file. Handles toolbar clicks, context menu actions, and messages from content scripts. Loads helper files via `importScripts`: `background-injected.js`, `background-comments.js`, `background-tabs.js`. Dynamically registers the `bridge-to-docreview.js` content script for the configured `baseUrl`.
 
@@ -46,6 +46,7 @@ Message handlers:
 - `focusDocTab` — Focuses an existing Google Docs tab without creating a new one.
 - `navigateToComment` — Tracks Google Docs tabs per document and injects navigation scripts via `executeScript` in MAIN world.
 - `commentSelection` — Forwards comment selection/deselection events from Google Doc tabs to open Docreview tabs for cross-tab highlight sync.
+- `docReady` — Forwards doc-ready notifications from Google Doc tabs to open Docreview tabs. Sent when the doc's `#docos-stream-view` is populated with listitems (debounced 250ms to let incremental population finish). The comments page uses this to auto-fetch suggestions after a doc opens.
 - `selectComment` — Selects a comment in a Google Doc tab (via injected script) without focusing the tab, triggered by clicking a comment thread in Docreview.
 - `getSuggestions` — Extracts suggestion data from an open Google Docs tab by executing `getSuggestions()` in MAIN world. Returns suggestion type, old/new text, status, author, isMine flag, and full reply threads. Used by the comments page to display richer suggestion data than the Docs API provides.
 - `openDocInDocreview` — Opens a doc from Gmail in Docreview, using `chrome.scripting.executeScript` with `allFrames: true` to search all frames (including sandboxed AMP iframes).
@@ -63,7 +64,7 @@ Context menus:
 **`bridge-to-docreview.js`** — Content script dynamically registered for Docreview app pages.
 
 - Relays `window.postMessage` calls from the web app to the background worker via `chrome.runtime.sendMessage`, and posts responses back.
-- Handles unsolicited messages from the background worker (e.g., `commentSynced` after a server-side comment sync, `commentSelection` for cross-tab highlight sync) and relays them to the page.
+- Handles unsolicited messages from the background worker (e.g., `commentSynced` after a server-side comment sync, `commentSelection` for cross-tab highlight sync, `docReady` when a doc's stream view appears) and relays them to the page.
 - Each page instance generates a unique `pageId` to scope cancellation.
 - Runs in Chrome's isolated content script world; communication with the page is via `postMessage` only.
 

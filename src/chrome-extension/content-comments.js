@@ -214,6 +214,86 @@ function setupCommentActivityDetection(getCommentSyncEnabled) {
   }, true);
 }
 
+// Notify the background worker when a Google Docs page is ready for
+// suggestion scraping. Watches for #docos-stream-view to appear in the
+// DOM — that's the container Google Docs creates for comments/suggestions.
+// Fires once per page load so Docreview tabs can auto-fetch suggestions
+// when a doc opens.
+function setupDocReadyDetection() {
+  var path = location.pathname;
+  var m = path.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (!m) return;
+  var googleDocId = m[1];
+  var fired = false;
+
+  function fire() {
+    if (fired) return;
+    fired = true;
+    console.log('[docreview] doc ready (stream view populated):', googleDocId);
+    try {
+      chrome.runtime.sendMessage({ type: 'docReady', docId: googleDocId });
+    } catch(e) {}
+  }
+
+  // Debounced fire — wait for the stream view to stop receiving new items
+  // before notifying. Google Docs may populate listitems incrementally, so
+  // we wait until mutations settle (250ms of quiet) to avoid scraping a
+  // partially-loaded list.
+  var debounceTimer = null;
+  function debouncedFire() {
+    if (fired) return;
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(fire, 250);
+  }
+
+  // Check if a stream view has listitems (actual comments/suggestions).
+  // The #docos-stream-view element appears before Google populates it,
+  // so we need to wait for child listitems to know it's scrapable.
+  function hasItems() {
+    var stream = document.querySelector('#docos-stream-view');
+    return stream && stream.querySelector('[role="listitem"]');
+  }
+
+  // If already populated (e.g., tab was open before we loaded), fire immediately
+  if (hasItems()) { fire(); return; }
+
+  // Two-phase observer: first watch document.body for #docos-stream-view to
+  // appear, then watch inside the stream view for listitems to be added.
+  var streamObserver = null;
+
+  function watchStream(stream) {
+    if (streamObserver) return;
+    if (stream.querySelector('[role="listitem"]')) { debouncedFire(); return; }
+    streamObserver = new MutationObserver(function() {
+      if (!stream.querySelector('[role="listitem"]')) return;
+      // Items exist — debounce to let incremental population finish
+      debouncedFire();
+      // Keep observing until fire() actually fires, in case more items
+      // arrive and reset the debounce timer
+      if (fired) {
+        streamObserver.disconnect();
+        streamObserver = null;
+      }
+    });
+    streamObserver.observe(stream, { childList: true, subtree: true });
+  }
+
+  var bodyObserver = new MutationObserver(function() {
+    var stream = document.querySelector('#docos-stream-view');
+    if (!stream) return;
+    bodyObserver.disconnect();
+    watchStream(stream);
+  });
+  bodyObserver.observe(document.body, { childList: true, subtree: true });
+
+  // Also check immediately in case the stream view exists but is empty
+  var stream = document.querySelector('#docos-stream-view');
+  if (stream) {
+    bodyObserver.disconnect();
+    watchStream(stream);
+  }
+}
+
 // Relay comment selection changes from MAIN world to the background worker.
 // The MAIN world selection tracker (inside injectDiscoIdHelpers) posts
 // messages when a comment is selected/deselected; we forward them with

@@ -528,6 +528,7 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] This all works on multi-level nested tabs too
 - [ ] Refresh on the comments/ page syncs suggestions
 - [ ] Refresh one suggestion from its thread on the comments/ page
+- [ ] Opening a doc auto-fetches suggestions (in comments/ page) when doc's stream view is ready
 
 ---
 

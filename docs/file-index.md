@@ -40,7 +40,7 @@ One-line descriptions of every source file, grouped by layer.
 | `background-tabs.js` | Doc tab tracking — maps docId → tabId for in-page comment navigation |
 | `background-comments.js` | Comment sync state — pre-extracted comment IDs, debounce logic, server sync |
 | `content.js` | Content script — injects Docreview icons into Docs titlebar, Drive file lists, Gmail notification emails |
-| `content-comments.js` | Comment activity detection (Docs only) — detects comment/suggestion actions, relays selection changes |
+| `content-comments.js` | Comment activity detection (Docs only) — detects comment/suggestion actions, relays selection changes, sends docReady when stream view is populated |
 | `defaults.js` | Shared default config (base URL) loaded by all other scripts |
 | `options.html` | Settings page HTML — single URL input with Save/Cancel |
 | `options.js` | Settings page logic — reads/writes `chrome.storage.sync` |

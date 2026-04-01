@@ -270,6 +270,35 @@ function setupCommentSelectionListener() {
 
 setupCommentSelectionListener();
 
+/** Callback type for docReady events — fired when a Google Doc's stream view appears. */
+export type DocReadyHandler = (docId: string) => void;
+
+let docReadyHandler: DocReadyHandler | null = null;
+
+/** Register a callback for docReady events from Google Doc tabs. */
+export function setDocReadyHandler(handler: DocReadyHandler | null): void {
+  docReadyHandler = handler;
+}
+
+/**
+ * Listen for docReady messages from the Chrome extension bridge.
+ * When a Google Doc's comment stream view appears (meaning suggestions are
+ * scrapable), the extension sends this event so the comments page can
+ * auto-fetch suggestions without waiting for a manual Refresh.
+ */
+function setupDocReadyListener() {
+  if (typeof window === "undefined") return;
+  window.addEventListener("message", (event: MessageEvent) => {
+    if (event.data?.source !== "docreview-extension") return;
+    if (event.data.type !== "docReady" || !event.data.docId) return;
+    // eslint-disable-next-line no-console -- extension bridge diagnostic, not server-side app code
+    console.log("[bridge-to-extension] docReady received for", event.data.docId, docReadyHandler ? "(handler registered)" : "(no handler)");
+    docReadyHandler?.(event.data.docId);
+  });
+}
+
+setupDocReadyListener();
+
 /**
  * Listen for commentSynced messages from the Chrome extension bridge.
  * When the extension detects comment activity on a Google Docs page and the

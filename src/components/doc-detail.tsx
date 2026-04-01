@@ -15,7 +15,7 @@ import { ROLE_COLORS } from "@/lib/role-colors";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
-import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, getSuggestionsFromDoc, getSuggestionFromDoc, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
+import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, setDocReadyHandler, getSuggestionsFromDoc, getSuggestionFromDoc, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -233,6 +233,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   // Ping extension on mount so supportsCommentNavigation() has cached status
   // before the user clicks "Open" on a comment. After ping completes, also
   // try to fetch suggestion data from an open doc tab.
+  const extensionSuggestionsLoaded = useRef(false);
   useEffect(() => {
     void pingExtension().then(() => {
       void fetchExtensionSuggestions();
@@ -246,6 +247,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
   async function fetchExtensionSuggestions() {
     const suggestions = await getSuggestionsFromDoc(googleDocId);
     if (!suggestions || suggestions.length === 0) return;
+    extensionSuggestionsLoaded.current = true;
     console.log("[doc-detail] extension suggestions: got", suggestions.length, "from doc tab");
 
     // Keep extension thread data and suggestion content for display —
@@ -266,6 +268,22 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
       console.log("[doc-detail] extension suggestions: server merge error", err);
     }
   }
+
+  // When the extension reports that a Google Doc's stream view has appeared
+  // (meaning suggestions are scrapable), auto-fetch suggestions if we haven't
+  // successfully loaded them yet. This covers the case where the user clicks
+  // "Open" to open the doc — by the time the doc is ready, this fires
+  // automatically instead of requiring a manual Refresh.
+  useEffect(() => {
+    setDocReadyHandler((docId) => {
+      console.log("[doc-detail] docReady received for", docId, "| this doc:", googleDocId, "| already loaded:", extensionSuggestionsLoaded.current);
+      if (docId !== googleDocId) return;
+      if (extensionSuggestionsLoaded.current) return;
+      console.log("[doc-detail] docReady: auto-fetching suggestions");
+      void fetchExtensionSuggestions();
+    });
+    return () => setDocReadyHandler(null);
+  }, [googleDocId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track which comment is currently selected in the Google Doc tab.
   // When the extension reports a selection change, we highlight the

@@ -248,6 +248,27 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     return;
   }
 
+  // From Docs content script: doc's stream view is ready (suggestions scrapable).
+  // Relay to all open Docreview tabs so the comments page can auto-fetch suggestions.
+  if (msg.type === 'docReady' && msg.docId) {
+    console.log('[background] docReady from doc:', msg.docId);
+    chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl }, function(config) {
+      chrome.tabs.query({ url: config.baseUrl + '/*' }, function(tabs) {
+        if (!tabs || tabs.length === 0) return;
+        console.log('[background] forwarding docReady to', tabs.length, 'docreview tab(s)');
+        tabs.forEach(function(tab) {
+          chrome.tabs.sendMessage(tab.id, {
+            type: 'docReady',
+            docId: msg.docId
+          }, function() {
+            if (chrome.runtime.lastError) { /* ignore */ }
+          });
+        });
+      });
+    });
+    return;
+  }
+
   // From Docs content script: track this tab for comment navigation reuse.
   if (msg.type === 'trackDocTab' && sender.tab) {
     chrome.storage.sync.get({ enableDocs: DEFAULTS.enableDocs }, function(config) {

@@ -42,6 +42,12 @@
       sendResponse({ received: true });
       return true;
     }
+    if (msg.type === 'docReady') {
+      console.log('[bridge-to-docreview] relaying docReady for', msg.docId);
+      window.postMessage({ source: 'docreview-extension', type: 'docReady', docId: msg.docId }, '*');
+      sendResponse({ received: true });
+      return true;
+    }
   });
 
   // Relay messages from the Docreview web app to the background worker.
