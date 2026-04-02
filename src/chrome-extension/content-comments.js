@@ -1,8 +1,9 @@
 // Comment activity detection and selection relay for Google Docs pages.
 //
 // setupCommentActivityDetection: Detects when the user adds, replies to,
-// resolves, or accepts/rejects a comment/suggestion, and notifies the
-// background worker so it can sync the change back to Docreview's database.
+// resolves, edits, deletes, or accepts/rejects a comment/suggestion, and
+// notifies the background worker so it can sync the change back to
+// Docreview's database.
 //
 // setupCommentSelectionRelay: Relays comment selection changes from the
 // MAIN world (injected disco ID helpers) to the background worker so it
@@ -27,6 +28,37 @@ function setupCommentActivityDetection(getCommentSyncEnabled) {
       }
     }
     return false;
+  }
+
+  // Check whether an edit/delete action targets a reply rather than the
+  // top-level comment. Google Docs marks the root comment's replyview with
+  // class "docos-replyview-first"; reply replyviews lack this class.
+  function isReplyAction(el) {
+    for (var p = el; p && p !== document.body; p = p.parentElement) {
+      if (p.getAttribute('role') === 'listitem') break;
+      if (p.classList && p.classList.contains('docos-replyview')) {
+        return !p.classList.contains('docos-replyview-first');
+      }
+    }
+    return false;
+  }
+
+  // Check if el is the Delete confirm button inside a delete confirmation
+  // dialog. Returns null if not, or 'delete'/'delete reply' based on the
+  // dialog text ("Delete this comment thread?" vs "Delete this comment?").
+  function getDeleteConfirmAction(el) {
+    if (el.getAttribute('role') !== 'button') return null;
+    if (el.textContent.trim() !== 'Delete') return null;
+    for (var p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      if (p.getAttribute('role') === 'dialog') {
+        var text = p.textContent || '';
+        if (text.indexOf('Delete this comment thread') !== -1) return 'delete';
+        if (text.indexOf('Delete this comment') !== -1) return 'delete reply';
+        return null;
+      }
+      if (p.getAttribute('role') === 'listitem') break;
+    }
+    return null;
   }
 
   // Mark a listitem ancestor of `el` with data-docreview-extract and send
@@ -65,11 +97,18 @@ function setupCommentActivityDetection(getCommentSyncEnabled) {
     preExtractedOnMousedown = false;
     var target = e.target;
     for (var el = target; el && el !== document.body; el = el.parentElement) {
-      var aria = el.getAttribute('aria-label');
-      if (!aria) continue;
-      if (aria === 'Reply to comment' || aria === 'Post Comment' ||
-          aria === 'Mark as resolved and hide discussion' ||
-          aria === 'Accept suggestion' || aria === 'Reject suggestion') {
+      // Delete confirm button in dialog — no aria-label; detect via
+      // role + text + dialog ancestor.
+      var isTracked = !!getDeleteConfirmAction(el);
+      if (!isTracked) {
+        var aria = el.getAttribute('aria-label');
+        isTracked = aria === 'Reply to comment' || aria === 'Post Comment' ||
+            aria === 'Mark as resolved and hide discussion' ||
+            aria === 'Accept suggestion' || aria === 'Reject suggestion' ||
+            aria === 'Save changes';
+        if (!aria) continue;
+      }
+      if (isTracked) {
         preExtractedOnMousedown = markListitemForExtraction(el);
         return;
       }
@@ -171,6 +210,16 @@ function setupCommentActivityDetection(getCommentSyncEnabled) {
     var target = e.target;
     // Walk up a few levels to find the button (clicks may land on child elements)
     for (var el = target; el && el !== document.body; el = el.parentElement) {
+      // Delete confirm button in dialog — no aria-label; detect via
+      // role + text + dialog ancestor. The dialog text distinguishes
+      // thread delete ("Delete this comment thread?") from reply
+      // delete ("Delete this comment?").
+      var deleteAction = getDeleteConfirmAction(el);
+      if (deleteAction) {
+        var kind = isSuggestionThread(el) ? 'suggestion' : 'comment';
+        notifyCommentActivity(deleteAction, kind);
+        return;
+      }
       var aria = el.getAttribute('aria-label');
       if (!aria) continue;
       // Reply / Comment submit button (can appear on both comments and suggestions)
@@ -190,6 +239,15 @@ function setupCommentActivityDetection(getCommentSyncEnabled) {
       // Accept / Reject suggestion — always a suggestion
       if (aria === 'Accept suggestion' || aria === 'Reject suggestion') {
         notifyCommentActivity(aria === 'Accept suggestion' ? 'accept' : 'reject', 'suggestion');
+        return;
+      }
+      // Save changes (after editing a comment/reply via "..." > Edit)
+      if (aria === 'Save changes') {
+        if (!el.classList.contains('jfk-button-disabled')) {
+          var reply = isReplyAction(el);
+          var kind = isSuggestionThread(el) ? 'suggestion' : 'comment';
+          notifyCommentActivity(reply ? 'edit reply' : 'edit', kind);
+        }
         return;
       }
       // Stop walking after a few levels to avoid scanning the whole tree

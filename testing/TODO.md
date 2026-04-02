@@ -433,7 +433,12 @@ Update this list when adding or changing user-facing behaviors.
 
 ### Comment Activity Auto-Sync
 - [ ] Detects: new comment, reply, resolve, accept suggestion, reject suggestion
+- [ ] Detects: edit comment (via "..." > Edit > Save), edit reply
+- [ ] Detects: delete comment thread (via "..." > Delete > confirm), delete reply
+- [ ] Delete fires on confirm dialog button, not the menu item
+- [ ] Delete or edit comment text, adding or removing @mentions - thread state updates
 - [ ] Syncs changes back to Docreview without manual refresh
+- [ ] Deleted comment: server returns empty threads (no 502 / stack trace)
 - [ ] Debounces rapid actions (1s cooldown, leading + trailing)
 - [ ] Updates all open Docreview tabs via cross-tab broadcast
 - [ ] Server uses hints for optimized sync (single-comment fetch when possible)

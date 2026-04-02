@@ -35,16 +35,32 @@ export async function GET(
 
     if (commentId && checkOnly) {
       const drive = createDriveService(driveAuth);
-      const commentRes = await drive.comments.get({
-        fileId: doc.googleDocId,
-        commentId,
-        fields: "modifiedTime",
-      });
-      return NextResponse.json({ modifiedTime: commentRes.data.modifiedTime });
+      try {
+        const commentRes = await drive.comments.get({
+          fileId: doc.googleDocId,
+          commentId,
+          fields: "modifiedTime",
+        });
+        return NextResponse.json({ modifiedTime: commentRes.data.modifiedTime });
+      } catch (err: any) {
+        if (err.code === 404) {
+          return NextResponse.json({ modifiedTime: null });
+        }
+        throw err;
+      }
     }
 
     if (commentId) {
-      const data = await fetchThreadDetail(driveAuth, doc.googleDocId, commentId, session.user.email ?? undefined);
+      let data;
+      try {
+        data = await fetchThreadDetail(driveAuth, doc.googleDocId, commentId, session.user.email ?? undefined);
+      } catch (err: any) {
+        if (err.code === 404) {
+          // Comment was deleted — return empty threads so the UI updates cleanly
+          return NextResponse.json({ threads: {} });
+        }
+        throw err;
+      }
       const threads: ThreadMap = {};
       if (data?.thread) threads[data.thread.id] = data.thread;
       return NextResponse.json({ threads });

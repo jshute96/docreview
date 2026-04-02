@@ -414,11 +414,6 @@ function injectDiscoIdHelpers() {
         replies: replies
       };
       results.push(entry);
-      console.log('[' + results.length + '] ' + status + ' ' + suggestionType + ' ' + id +
-        (entry.isMine ? ' (mine)' : '') +
-        '  ' + JSON.stringify(oldText ? oldText.substring(0, 30) : '') +
-        ' → ' + JSON.stringify(newText ? newText.substring(0, 30) : '') +
-        (replies.length ? '  (' + replies.length + ' replies)' : ''));
     }
     return results;
   }

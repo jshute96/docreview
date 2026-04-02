@@ -33,7 +33,7 @@ Google Docs page                    Docreview page
 - **Gmail**: Injects icons into attachment chips and "Open in Docreview" links into Docs notification emails. The link resolves its target URL at click time rather than injection time (to handle Gmail's SPA navigation correctly).
 - **Access-denied pages**: Injects an "Add in Docreview" link on Docs and Drive access-denied pages.
 
-**`content-comments.js`** — Comment-specific content script logic for Google Docs pages. Detects comment activity (reply, resolve, accept/reject suggestion, new comment) via mouseup and keyboard listeners, and notifies the background worker to trigger a server-side comment sync. Relays comment selection changes from the MAIN world to the background worker. Also detects when the doc's `#docos-stream-view` appears and sends a `docReady` notification so the comments page can auto-fetch suggestions.
+**`content-comments.js`** — Comment-specific content script logic for Google Docs pages. Detects comment activity (reply, resolve, edit, delete, accept/reject suggestion, new comment) via mouseup and keyboard listeners, and notifies the background worker to trigger a server-side comment sync. Relays comment selection changes from the MAIN world to the background worker. Also detects when the doc's `#docos-stream-view` appears and sends a `docReady` notification so the comments page can auto-fetch suggestions.
 
 **`background.js`** — Service worker main file. Handles toolbar clicks, context menu actions, and messages from content scripts. Loads helper files via `importScripts`: `background-injected.js`, `background-comments.js`, `background-tabs.js`. Dynamically registers the `bridge-to-docreview.js` content script for the configured `baseUrl`.
 
@@ -146,7 +146,7 @@ See `docs/notes-on-comment-navigation.md` for detailed research notes on the Goo
 
 ## Comment activity auto-sync
 
-When the user acts on a comment in Google Docs (reply, resolve, accept/reject suggestion, new comment), the extension automatically syncs the change back to Docreview's database without requiring a manual Refresh.
+When the user acts on a comment in Google Docs (reply, resolve, edit, delete, accept/reject suggestion, new comment), the extension automatically syncs the change back to Docreview's database without requiring a manual Refresh.
 
 ### Detection (content-comments.js)
 
@@ -154,6 +154,8 @@ The content script uses two event listeners in capture phase: `mousedown` to ext
 - `[aria-label="Reply to comment"]` / `[aria-label="Post Comment"]` — Reply or Comment submit button (checked for `jfk-button-disabled` to avoid false positives)
 - `[aria-label="Mark as resolved and hide discussion"]` — Resolve button
 - `[aria-label="Accept suggestion"]` / `[aria-label="Reject suggestion"]` — Suggestion actions
+- Delete confirm button — the "..." > Delete menuitem opens a confirmation dialog ("Delete this comment thread?" or "Delete this comment?"); detection fires on the Delete button inside that `[role="dialog"]`, not the menuitem. The dialog text distinguishes thread delete (`'delete'`) from reply delete (`'delete reply'`).
+- `[aria-label="Save changes"]` — Save button after editing a comment/reply via "..." > Edit (checked for `jfk-button-disabled`). Uses the `docos-replyview-first` CSS class to distinguish top-level comment (`'edit'`) from reply (`'edit reply'`).
 
 Also catches `Ctrl+Enter` / `Cmd+Enter` inside `.docos-input-textarea` (keyboard shortcut for submitting replies/comments).
 
