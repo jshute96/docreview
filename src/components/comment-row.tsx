@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import type { Comment } from "@prisma/client";
@@ -34,6 +34,7 @@ interface CommentRowProps {
   isSelected?: boolean;
   onSelectInDoc?: () => void;
   onSuggestionRefresh?: (discoId: string, thread: CommentThread, content: SuggestionContent, raw: ExtensionSuggestion) => void;
+  userName?: string;
 }
 
 function splitContent(raw: string): { author: string | null; text: string } {
@@ -42,7 +43,7 @@ function splitContent(raw: string): { author: string | null; text: string } {
   return { author: raw.slice(0, sep), text: raw.slice(sep + 2) };
 }
 
-export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal, isSelected, onSelectInDoc, onSuggestionRefresh }: CommentRowProps) {
+export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal, isSelected, onSelectInDoc, onSuggestionRefresh, userName }: CommentRowProps) {
   const isSuggestion = comment.type === "SUGGESTION";
   const currentModifiedMs = comment.driveModifiedAt
     ? new Date(comment.driveModifiedAt).getTime()
@@ -448,15 +449,33 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       ? "suggested add"
       : comment.suggestionType === "DELETE"
       ? "suggested delete"
+      : comment.suggestionType === "OTHER"
+      ? "suggested format change"
       : "suggested edit";
   const SuggestionLabel = suggestionLabel.charAt(0).toUpperCase() + suggestionLabel.slice(1);
 
+  // For non-text suggestions (formatting, links, etc.), show the description instead of text diff.
+  const hasTextContent = suggestionContent && (suggestionContent.insertedText || suggestionContent.deletedText);
+  const suggestionDescription = suggestionContent?.description;
+
+  // Plain-text suggestion summary — used as the thread entry content (expanded view)
+  // and as the base for the collapsed row summary. Single source of truth.
+  const suggestionContentText = !isSuggestion ? "" :
+    !hasTextContent && suggestionDescription
+      ? `Suggestion: ${suggestionDescription}`
+      : !suggestionContent && comment.resolved
+        ? `Resolved ${suggestionLabel}`
+        : !hasTextContent
+          ? SuggestionLabel
+          : comment.suggestionType === "EDIT"
+            ? `${SuggestionLabel}: ${suggestionContent!.deletedText} → ${suggestionContent!.insertedText}`
+            : comment.suggestionType === "DELETE"
+              ? `${SuggestionLabel}: ${suggestionContent!.deletedText}`
+              : `${SuggestionLabel}: ${suggestionContent!.insertedText}`;
+
+  // Collapsed row summary — rich styling for text-change suggestions, plain for non-text.
   const suggestionSummary = isSuggestion ? (
-    !suggestionContent && comment.resolved ? (
-      <span className="text-zinc-400 italic">Resolved {suggestionLabel}</span>
-    ) : !suggestionContent ? (
-      <span className="text-zinc-500">{SuggestionLabel}</span>
-    ) : (
+    hasTextContent && suggestionContent ? (
       <span>
         <span className="text-zinc-500">{SuggestionLabel}: </span>
         {(comment.suggestionType === "EDIT" || comment.suggestionType === "DELETE") && (
@@ -469,8 +488,49 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
           <span className="text-zinc-600">{highlightText(suggestionContent.insertedText, searchFilter ?? "")}</span>
         )}
       </span>
+    ) : (
+      <span>
+        <span className="text-zinc-500">{highlightText(suggestionContentText, searchFilter ?? "")}</span>
+        {!hasTextContent && suggestionContent?.anchorText && (
+          <span className="text-zinc-400"> on &ldquo;{highlightText(suggestionContent.anchorText, searchFilter ?? "")}&rdquo;</span>
+        )}
+      </span>
     )
   ) : null;
+
+  // For suggestions, enrich the first thread entry to render like a comment:
+  // inject quotedFileContent (anchor text) and set content to the suggestion description.
+  // If no thread exists, synthesize a minimal one from DB data.
+  const defaultAuthor = comment.isThreadAuthor && userName ? userName : "Unknown author";
+  const isSynthesizedThread = isSuggestion && threads.length === 0;
+  const suggestionThreads = useMemo(() => {
+    if (!isSuggestion) return threads;
+    const anchorText = suggestionContent?.anchorText;
+    const quotedFileContent = anchorText
+      ? { mimeType: "text/plain", value: anchorText }
+      : null;
+
+    if (threads.length > 0) {
+      const first = threads[0];
+      return [{
+        ...first,
+        author: first.author || defaultAuthor,
+        content: suggestionContentText || first.content,
+        ...(quotedFileContent ? { quotedFileContent } : {}),
+      }, ...threads.slice(1)];
+    }
+    // No thread — synthesize one so the panel renders the suggestion like a comment
+    return [{
+      id: comment.googleCommentId ?? comment.googleSuggestionId ?? comment.commentId,
+      author: defaultAuthor,
+      fromMe: comment.isThreadAuthor,
+      content: suggestionContentText,
+      createdTime: comment.driveCreatedAt ? new Date(comment.driveCreatedAt).toISOString() : "",
+      resolved: comment.resolved,
+      replies: [],
+      ...(quotedFileContent ? { quotedFileContent } : {}),
+    }];
+  }, [isSuggestion, threads, suggestionContent?.anchorText, suggestionContentText, defaultAuthor, comment.googleCommentId, comment.googleSuggestionId, comment.commentId, comment.isThreadAuthor, comment.driveCreatedAt, comment.resolved]);
 
   // Suggestion refresh is only possible when we have a disco ID and the extension
   // is available with Docs integration enabled. Compute disabled state and tooltip.
@@ -616,7 +676,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
           >
             <div className={`min-h-0${expanded && !isExiting ? "" : " overflow-hidden"}`}>
               <CommentThreadPanel
-                  threads={threads}
+                  threads={isSuggestion ? suggestionThreads : threads}
                   loading={loadingThreads}
                   resolved={comment.resolved}
                   commentUrl={commentUrl()}
@@ -645,16 +705,21 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   onSelectInDoc={onSelectInDoc ? doSelectInDoc : undefined}
                   buttonsRowRef={buttonsRowRef}
                   headerContent={isSuggestion ? (
-                    <div className={`mb-3 text-sm${suggestionContent ? " whitespace-pre-wrap" : ""}`}>
-                      {suggestionSummary}
-                      <p className="mt-1 text-xs text-zinc-300 font-mono">
-                        {comment.googleSuggestionId && <span>suggest: {comment.googleSuggestionId} </span>}
-                        {comment.googleCommentId && <span>disco: {comment.googleCommentId}</span>}
-                        {!comment.googleSuggestionId && !comment.googleCommentId && <span>(no IDs)</span>}
-                      </p>
-                    </div>
+                    <p className="mb-1 text-xs text-zinc-300 font-mono">
+                      {comment.googleSuggestionId && <span>suggest: {comment.googleSuggestionId} </span>}
+                      {comment.googleCommentId && <span>disco: {comment.googleCommentId}</span>}
+                      {!comment.googleSuggestionId && !comment.googleCommentId && <span>(no IDs)</span>}
+                    </p>
                   ) : undefined}
-                  emptyMessage={isSuggestion ? "Cannot show reply threads. Process suggestions in the doc." : undefined}
+                  footerContent={isSynthesizedThread ? (
+                    <p className="mt-0 mb-3 text-xs text-zinc-400 italic">{
+                      !extensionAvailable
+                        ? "Cannot show reply threads or suggestion details. Open the doc to process suggestions."
+                        : !hasDiscoLink
+                          ? "Suggestion synced from Drive is not linked to a comment ID in the doc."
+                          : "Open the doc to load suggestion details using the Docreview Chrome extension."
+                    }</p>
+                  ) : undefined}
                 />
             </div>
           </div>

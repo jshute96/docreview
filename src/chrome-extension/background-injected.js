@@ -310,9 +310,12 @@ function injectDiscoIdHelpers() {
       }
       seenIds[id] = true;
 
-      // Parse suggestion type and old/new text from styled description spans
+      // Parse suggestion type and old/new text from styled description spans.
+      // Text-change suggestions have types "Replace", "Add", or "Delete".
+      // Non-text suggestions (formatting, links, etc.) have descriptions like
+      // "Format: Bold", "Add link: ...", "Add space", etc. — captured as description.
       var descDiv = item.querySelector('.docos-replyview-body div[style*="font-size:13px"]');
-      var suggestionType = '', oldText = '', newText = '';
+      var suggestionType = '', oldText = '', newText = '', description = '';
       if (descDiv) {
         var actionSpan = descDiv.querySelector('span[style*="font-weight:bold"]');
         if (actionSpan) suggestionType = actionSpan.textContent.trim().replace(':', '');
@@ -324,6 +327,10 @@ function injectDiscoIdHelpers() {
           newText = italicSpans[0].textContent.replace(/[\u201c\u201d]/g, '');
         } else if (suggestionType === 'Delete' && italicSpans.length >= 1) {
           oldText = italicSpans[0].textContent.replace(/[\u201c\u201d]/g, '');
+        } else if (suggestionType) {
+          // Non-text suggestion (e.g. "Format", "Add link", "Add space").
+          // Capture the full description text from the div.
+          description = descDiv.textContent.trim();
         }
       }
 
@@ -408,6 +415,7 @@ function injectDiscoIdHelpers() {
         status: status,
         oldText: oldText,
         newText: newText,
+        description: description,
         author: author,
         isMine: !!(myName && author === myName),
         timestamp: timestamp,

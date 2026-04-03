@@ -11,9 +11,11 @@ import { Prisma } from "@prisma/client";
 /**
  * model name (lowercase) → fields to obscure.
  *
- * IMPORTANT: "name" is used by Label but also exists on User. This is safe
- * because no query includes the User relation. If that ever changes, either
- * exclude User from recursive decoding or rename the overlap.
+ * IMPORTANT: "name" is used by Label but also exists on User. The recursive
+ * decoder uses ALL_OBSCURED (a flat set of all field names) and cannot
+ * distinguish models, so querying User via the Prisma client will incorrectly
+ * decode User.name. Use $queryRaw for User queries that include name, or fix
+ * decodeResult to be model-aware. See TODO in comments/[docId]/page.tsx.
  */
 const OBSCURED_FIELDS: Record<string, string[]> = {
   doc: ["title", "notes"],

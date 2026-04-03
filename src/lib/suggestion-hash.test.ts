@@ -65,7 +65,7 @@ describe("gmailActionToSuggestionType", () => {
     expect(gmailActionToSuggestionType("Replace")).toBe("EDIT");
   });
 
-  it("falls back to EDIT for unknown actions", () => {
-    expect(gmailActionToSuggestionType("Unknown")).toBe("EDIT");
+  it("falls back to OTHER for unknown actions", () => {
+    expect(gmailActionToSuggestionType("Unknown")).toBe("OTHER");
   });
 });

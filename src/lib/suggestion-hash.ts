@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import type { SuggestionType } from "@prisma/client";
 
 // Computes a content hash for a suggestion to enable matching across data sources
 // (Docs API and Gmail notifications). The hash is based on the action type and text
@@ -7,7 +8,7 @@ import { createHash } from "crypto";
 // Gmail uses "Add"/"Delete"/"Replace"; Docs API uses "INSERT"/"DELETE"/"EDIT".
 // Callers must normalize to the canonical form before calling.
 export function computeSuggestionHash(
-  actionType: "INSERT" | "DELETE" | "EDIT",
+  actionType: SuggestionType,
   deletedText: string,
   insertedText: string,
 ): string {
@@ -19,11 +20,11 @@ export function computeSuggestionHash(
 // Maps Gmail notification action strings to canonical suggestion types.
 export function gmailActionToSuggestionType(
   action: string,
-): "INSERT" | "DELETE" | "EDIT" {
+): SuggestionType {
   switch (action) {
     case "Add": return "INSERT";
     case "Delete": return "DELETE";
     case "Replace": return "EDIT";
-    default: return "EDIT"; // fallback
+    default: return "OTHER";
   }
 }

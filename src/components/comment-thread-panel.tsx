@@ -59,6 +59,8 @@ interface CommentThreadPanelProps {
   onSelectInDoc?: () => void;
   /** Content rendered above the first thread entry (e.g., suggestion summary). */
   headerContent?: React.ReactNode;
+  /** Content rendered below threads, above buttons (e.g., hint for synthesized suggestion threads). */
+  footerContent?: React.ReactNode;
   /** Message shown when threads is empty. Defaults to "No comments on this document." */
   emptyMessage?: string;
   /** Ref to the buttons row, used by CommentRow for auto-scroll positioning
@@ -95,6 +97,7 @@ export function CommentThreadPanel({
   isSelected,
   onSelectInDoc,
   headerContent,
+  footerContent,
   emptyMessage,
   buttonsRowRef,
 }: CommentThreadPanelProps) {
@@ -247,6 +250,7 @@ export function CommentThreadPanel({
         />
         </>
       )}
+      {footerContent}
       <div ref={buttonsRowRef} className={`${onReply ? "mt-2 " : ""}flex items-center gap-2 whitespace-nowrap`}>
         {onReply && (resolved ? (
           <Button
@@ -365,6 +369,7 @@ export function CommentThreadPanel({
       <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
         {headerContent}
         <p className="text-sm text-zinc-400">{emptyMessage ?? "No comments on this document."}</p>
+        {footerContent}
         {replyBox}
       </div>
     );
@@ -380,9 +385,6 @@ export function CommentThreadPanel({
             key={thread.id}
             className={`py-3 first:pt-0 last:pb-0 ${thread.resolved ? "opacity-60" : ""}`}
           >
-            {/* When headerContent is provided (suggestions), the first thread entry's
-                author/content is redundant with the header — skip it, show only replies. */}
-            {!(headerContent && threadIndex === 0) && (
             <div className={thread.fromMe ? "bg-green-50 -mx-4 px-4 pt-2 pb-1 mb-2" : ""}>
               {threadIndex === 0 && thread.quotedFileContent?.value && (
                 <div className="mb-2">
@@ -418,7 +420,6 @@ export function CommentThreadPanel({
               </div>
               <CommentContent htmlContent={thread.htmlContent} content={thread.content} searchFilter={searchFilter ?? ""} className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap" />
             </div>
-            )}
 
             {thread.replies.map((reply, i) => (
               <div key={i} className={`mt-2 ml-8 ${reply.fromMe ? "bg-green-50 -mr-4 pr-4 pt-2 pb-1" : ""}`}>

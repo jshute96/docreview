@@ -58,7 +58,7 @@ export function extensionToThread(s: ExtensionSuggestion): CommentThread {
     s.suggestionType === "Replace" ? `Replace "${s.oldText}" with "${s.newText}"` :
     s.suggestionType === "Add" ? `Add "${s.newText}"` :
     s.suggestionType === "Delete" ? `Delete "${s.oldText}"` :
-    s.suggestionType;
+    s.description || s.suggestionType;
   return {
     id: s.id,
     author: s.author,
@@ -82,5 +82,6 @@ export function extensionToSuggestionContent(s: ExtensionSuggestion): Suggestion
   return {
     insertedText: s.newText,
     deletedText: s.oldText,
+    ...(s.description ? { description: s.description } : {}),
   };
 }

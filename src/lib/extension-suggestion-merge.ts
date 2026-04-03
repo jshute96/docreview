@@ -25,10 +25,11 @@ import type { Comment, Doc } from "@prisma/client";
 /** Shape of a single extension suggestion as received from the API request body. */
 export interface ExtensionSuggestionInput {
   id: string;              // disco ID
-  suggestionType: string;  // "Replace", "Add", "Delete"
+  suggestionType: string;  // "Replace", "Add", "Delete", or non-text types like "Format"
   status: string;          // "open", "accepted", "rejected"
   oldText: string;
   newText: string;
+  description: string;     // Full description for non-text suggestions (e.g. "Format: Bold")
   author: string;
   isMine: boolean;
   timestamp: string;

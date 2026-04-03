@@ -133,6 +133,13 @@ Update this list when adding or changing user-facing behaviors.
 ### Suggestions Display
 - [ ] Suggestions appear in same table as comments
 - [ ] Show proposed insertion, deletion, or edit text
+- [ ] Non-text suggestions show "Suggestion: description" with anchor text blockquote
+- [ ] Non-text suggestions show "on ..." suffix in collapsed row
+- [ ] Expanded suggestion renders like a comment: anchor blockquote, author+date, content (green if mine)
+- [ ] Unknown author shows "Unknown author" in expanded view
+- [ ] User's own name shown (not "Unknown author") for own suggestions when userName available
+- [ ] Synthesized thread hint: "process in doc" when no extension, "synced from Drive" when no disco ID, "open the doc" when extension available
+- [ ] Search filter matches suggestion descriptions and anchor text
 - [ ] Can archive, mute, star, filter like comments
 
 ### Bulk Actions
@@ -381,8 +388,18 @@ Update this list when adding or changing user-facing behaviors.
 
 ### From Docs API (suggestions)
 - [ ] Suggestion IDs, inserted text, deleted text
-- [ ] Suggestion type: insert, delete, edit
+- [ ] Suggestion type: insert, delete, edit, other (formatting/links)
 - [ ] Pending/accepted/rejected status
+- [ ] Non-text suggestions (bold, italic, link, etc.) detected via suggestedTextStyleChanges
+- [ ] Formatting suggestions show description (e.g. "Bold", "Add link: ...") and anchor text
+- [ ] Formatting suggestions classified as OTHER, not EDIT
+
+### Cross-source suggestion matching
+- [ ] Content hash matches across Drive sync, Gmail sync, and extension sync for text suggestions
+- [ ] Content hash matches across all three sources for OTHER (formatting) suggestions (all use empty strings)
+- [ ] Drive-created suggestion matched by hash when Gmail notification arrives (no googleSuggestionId yet)
+- [ ] Extension-created suggestion matched by hash when Drive sync runs
+- [ ] Multiple formatting suggestions on same doc: hash collision doesn't cause incorrect merges (primary match uses IDs)
 
 ---
 

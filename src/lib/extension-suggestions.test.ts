@@ -77,6 +77,7 @@ const baseSuggestion: ExtensionSuggestion = {
   status: "open",
   oldText: "old",
   newText: "new",
+  description: "",
   author: "Test User",
   isMine: false,
   timestamp: "6:29 PM Feb 21",
@@ -103,6 +104,16 @@ describe("extensionToThread", () => {
     expect(t.content).toBe('Delete "removed"');
   });
 
+  it("uses description for non-text suggestion types", () => {
+    const t = extensionToThread({ ...baseSuggestion, suggestionType: "Format", oldText: "", newText: "", description: "Format: Bold" });
+    expect(t.content).toBe("Format: Bold");
+  });
+
+  it("falls back to suggestionType when no description", () => {
+    const t = extensionToThread({ ...baseSuggestion, suggestionType: "Format", oldText: "", newText: "", description: "" });
+    expect(t.content).toBe("Format");
+  });
+
   it("includes replies with action field", () => {
     const s = { ...baseSuggestion, replies: [
       { author: "A", isMine: false, timestamp: "1:00 PM Mar 1", text: "comment", html: "<b>comment</b>" },
@@ -126,5 +137,17 @@ describe("extensionToSuggestionContent", () => {
     const sc = extensionToSuggestionContent(baseSuggestion);
     expect(sc.insertedText).toBe("new");
     expect(sc.deletedText).toBe("old");
+  });
+
+  it("includes description for non-text suggestions", () => {
+    const sc = extensionToSuggestionContent({ ...baseSuggestion, suggestionType: "Format", oldText: "", newText: "", description: "Format: Bold, Italic" });
+    expect(sc.description).toBe("Format: Bold, Italic");
+    expect(sc.insertedText).toBe("");
+    expect(sc.deletedText).toBe("");
+  });
+
+  it("omits description when empty", () => {
+    const sc = extensionToSuggestionContent(baseSuggestion);
+    expect(sc.description).toBeUndefined();
   });
 });

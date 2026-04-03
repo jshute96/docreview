@@ -65,9 +65,10 @@ interface DocDetailProps {
   doc: DocWithComments;
   allLabels: Label[];
   userId: string;
+  userName?: string;
 }
 
-export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }: DocDetailProps) {
+export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, userName }: DocDetailProps) {
   const [doc, setDoc] = useState(initialDoc);
   const [labels, setLabelsRaw] = useState<Label[]>(initialLabels);
   const { titles: cachedTitles, owners: cachedOwners } = useCachedMetadata(userId, [doc]);
@@ -754,7 +755,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
       const key = commentKey(c);
       const text = commentContent[key] ?? "";
       const sug = suggestionContent[key];
-      const sugText = sug ? `${sug.deletedText} ${sug.insertedText}` : "";
+      const sugText = sug ? `${sug.deletedText} ${sug.insertedText} ${sug.description ?? ""} ${sug.anchorText ?? ""}` : "";
       const threads = threadText[key] ?? "";
       const combined = `${text} ${sugText} ${threads}`;
       return matcher(combined);
@@ -1207,6 +1208,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId }:
                     ? () => selectCommentInDoc(googleDocId, comment.googleCommentId!)
                     : undefined}
                   onSuggestionRefresh={comment.type === "SUGGESTION" ? handleSuggestionRefresh : undefined}
+                  userName={userName}
                 />
               ))}
             </tbody>

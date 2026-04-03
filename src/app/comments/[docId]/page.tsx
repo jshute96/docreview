@@ -12,7 +12,7 @@ export default async function DocDetailPage({ params }: PageProps) {
   const session = await requireAuth();
   const userId = session.user.id;
 
-  const [doc, allLabels] = await Promise.all([
+  const [doc, allLabels, userRows] = await Promise.all([
     prisma.doc.findUnique({
       where: { docId },
       include: docWithCommentsInclude,
@@ -21,9 +21,15 @@ export default async function DocDetailPage({ params }: PageProps) {
       where: { userId },
       orderBy: { position: "asc" },
     }),
+    // Raw query to read user name — bypasses the obscure extension which
+    // incorrectly decodes User.name (the "name" field is in the obscured set
+    // for Label, and the recursive decoder can't distinguish models).
+    // TODO: fix prisma-obscure.ts to be model-aware, then use prisma.user.findUnique.
+    prisma.$queryRaw<{ name: string | null }[]>`SELECT name FROM users WHERE user_id = ${userId} LIMIT 1`,
   ]);
 
   if (!doc || doc.userId !== userId) notFound();
+  const userName = userRows[0]?.name ?? undefined;
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -32,7 +38,7 @@ export default async function DocDetailPage({ params }: PageProps) {
       {/* Pre-read cached metadata from localStorage for this doc (runs before React hydrates) */}
       <script dangerouslySetInnerHTML={{ __html: `try{var k="docr:"+${JSON.stringify(userId)}+":meta:"+${JSON.stringify(doc.googleDocId)};var e=JSON.parse(localStorage.getItem(k));window.__docrMetaCache=e&&e.value?{${JSON.stringify(doc.googleDocId)}:e}:{}}catch(x){}` }} />
       <div className="px-4 py-8">
-        <DocDetail doc={stripServerOnly(doc) as DocWithComments} allLabels={allLabels} userId={userId} />
+        <DocDetail doc={stripServerOnly(doc) as DocWithComments} allLabels={allLabels} userId={userId} userName={userName} />
       </div>
     </div>
   );

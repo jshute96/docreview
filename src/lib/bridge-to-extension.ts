@@ -184,10 +184,11 @@ export function selectCommentInDoc(docId: string, discoId: string): void {
 /** Shape of a suggestion returned by the extension's getSuggestions() DOM scraper. */
 export interface ExtensionSuggestion {
   id: string;              // disco ID (AAAB format)
-  suggestionType: string;  // "Replace", "Add", "Delete"
+  suggestionType: string;  // "Replace", "Add", "Delete", or non-text types like "Format", "Add link"
   status: string;          // "open", "accepted", "rejected"
   oldText: string;
   newText: string;
+  description: string;     // Full description for non-text suggestions (e.g. "Format: Bold")
   author: string;
   isMine: boolean;
   timestamp: string;       // relative timestamp from DOM, e.g. "6:29 PM Feb 21"

@@ -129,6 +129,8 @@ function gmailSuggestionTexts(s: Suggestion): { deletedText: string; insertedTex
     case "Replace":
       return { deletedText: s.oldText ?? "", insertedText: s.newText ?? "" };
     default:
-      return { deletedText: s.oldText ?? "", insertedText: s.newText ?? s.text };
+      // Non-text suggestions (formatting, links, etc.) — use empty strings
+      // to match the hash computed by Drive sync and extension sync.
+      return { deletedText: "", insertedText: "" };
   }
 }

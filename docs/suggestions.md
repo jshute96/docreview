@@ -8,6 +8,8 @@ Google Docs has two distinct annotation features:
   or by selecting text and clicking the comment icon.
 - **Suggestions** — tracked changes where a collaborator proposes an edit (insertion,
   deletion, or replacement). Created by switching the doc to "Suggesting" mode and typing.
+  Suggestions can also be non-text changes like formatting (bold, italic, font), link
+  additions, or spacing changes.
 
 Docreview tracks both. This document covers how suggestions work and how they are synced.
 
@@ -91,7 +93,7 @@ stripped before storage.
 | `googleCommentId` | — | `discussionId` (AAA*) | Gmail only |
 | `suggestionContentHash` | computed from text | computed from text | Either (should match) |
 | `type` | SUGGESTION | SUGGESTION | Either |
-| `suggestionType` | INSERT/DELETE/EDIT | mappable from Add/Delete/Replace/Other | Either |
+| `suggestionType` | INSERT/DELETE/EDIT/OTHER | mappable from Add/Delete/Replace/Other | Either |
 | `resolved` | lifecycle (false→true) | — | Drive authoritative |
 | `driveCreatedAt` | `doc.lastModifiedInDrive` (approx) | `time` (minute precision) | Gmail preferred (more accurate) |
 | `driveModifiedAt` | `doc.lastModifiedInDrive` (approx) | `time` (minute precision) | Gmail preferred; extension updates with last reply timestamp |
@@ -278,6 +280,29 @@ Suggestion text (inserted and deleted strings) is fetched on page load via `fetc
 which makes a single `documents.get` call with `SUGGESTIONS_INLINE` and `includeTabsContent: true`
 to extract both suggestion content and document body text from all tabs. Results are keyed by
 `suggest.xxx` (`googleSuggestionId`) and display correctly for all suggestion records.
+
+### Non-text suggestions (formatting, links, etc.)
+
+Not all suggestions involve text changes. Formatting suggestions (bold, italic, font changes),
+link additions/removals, and other style changes modify text properties without inserting or
+deleting text. These are detected via two paths:
+
+1. **Docs API**: `fetchDocData` requests `suggestedTextStyleChanges` on text runs. For
+   suggestion IDs that appear only in style changes (not in `suggestedInsertionIds` or
+   `suggestedDeletionIds`), a human-readable `description` is generated from the style
+   change flags (e.g., "Bold", "Add link: https://...", "Font: Arial"). Note that
+   `SUGGESTIONS_INLINE` mode represents formatting changes as delete + insert of identical
+   text with different styling — these are detected by comparing inserted vs deleted text.
+2. **Chrome extension**: `getSuggestions()` captures the full description text from the DOM
+   for suggestions whose type is not Replace/Add/Delete (e.g., "Format: Bold, Italic").
+
+The description flows through `SuggestionContent.description` and is displayed in the UI
+instead of the old/new text diff. The anchor text (the text being reformatted) is captured
+from `run.content` and displayed in a blockquote, matching the comment anchor text style.
+
+Non-text suggestions use `suggestionType: OTHER` in the DB with empty `insertedText` and
+`deletedText`. Their content hashes all collide (`OTHER||`), but primary matching uses
+`googleSuggestionId` or `googleCommentId`, so this is acceptable.
 
 ### Permissions and View-Only Access
 

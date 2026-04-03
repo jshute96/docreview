@@ -3,6 +3,7 @@ import { docs as createDocs, type docs_v1 } from "@googleapis/docs";
 import { OAuth2Client } from "google-auth-library";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { SuggestionType } from "@prisma/client";
 import { OFFLINE_MODE, OfflineModeError } from "@/lib/offline";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { withProgressLogging } from "./promise-utils";
@@ -468,14 +469,20 @@ export async function fetchCommentData(
 
 export interface DriveSuggestion {
   id: string;
-  suggestionType: "INSERT" | "DELETE" | "EDIT";
+  suggestionType: SuggestionType;
   insertedText: string;
   deletedText: string;
+  /** Human-readable description for non-text suggestions (e.g. "Format: Bold", "Add link: ..."). */
+  description?: string;
 }
 
 export interface SuggestionContent {
   insertedText: string;
   deletedText: string;
+  /** Human-readable description for non-text suggestions (e.g. "Format: Bold", "Add link: ..."). */
+  description?: string;
+  /** The text that a non-text suggestion applies to (e.g. the text being reformatted). */
+  anchorText?: string;
 }
 
 /** Result of fetchDocData — always returns all fields from a single documents.get call. */
@@ -486,6 +493,44 @@ export interface DocDataResult {
   suggestionContent: Record<string, SuggestionContent>;
   /** DriveSuggestion[] — for DB sync (type classification + content hashing). */
   suggestions: DriveSuggestion[];
+}
+
+/**
+ * Generate a human-readable description from a Docs API SuggestedTextStyle change.
+ * Handles all 11 fields from the TextStyleSuggestionState API object:
+ * bold, italic, underline, strikethrough, smallCaps, baselineOffset,
+ * fontSize, weightedFontFamily, foregroundColor, backgroundColor, link.
+ * Returns null if the change can't be described.
+ */
+function describeTextStyleChange(change: docs_v1.Schema$SuggestedTextStyle): string | null {
+  const state = change.textStyleSuggestionState;
+  const style = change.textStyle;
+  if (!state || !style) return null;
+
+  const parts: string[] = [];
+
+  // Link changes imply underline/color changes — show just the link.
+  if (state.linkSuggested) {
+    const url = style.link?.url;
+    parts.push(url ? `Add link: ${url}` : "Remove link");
+    return parts.join(", ");
+  }
+
+  if (state.boldSuggested) parts.push(style.bold ? "Bold" : "Remove bold");
+  if (state.italicSuggested) parts.push(style.italic ? "Italic" : "Remove italic");
+  if (state.underlineSuggested) parts.push(style.underline ? "Underline" : "Remove underline");
+  if (state.strikethroughSuggested) parts.push(style.strikethrough ? "Strikethrough" : "Remove strikethrough");
+  if (state.smallCapsSuggested) parts.push(style.smallCaps ? "Small caps" : "Remove small caps");
+  if (state.baselineOffsetSuggested) {
+    const offset = style.baselineOffset;
+    parts.push(offset === "SUPERSCRIPT" ? "Superscript" : offset === "SUBSCRIPT" ? "Subscript" : "Normal baseline");
+  }
+  if (state.fontSizeSuggested) parts.push("Font size");
+  if (state.weightedFontFamilySuggested) parts.push("Font");
+  if (state.foregroundColorSuggested) parts.push("Text color");
+  if (state.backgroundColorSuggested) parts.push("Highlight");
+
+  return parts.length > 0 ? parts.join(", ") : "Format change";
 }
 
 /**
@@ -508,7 +553,7 @@ export async function fetchDocData(
   // Use includeTabsContent to get content from ALL tabs, not just the first.
   // When true, document.body is empty and content lives in document.tabs[].
   const tabsFields =
-    "tabs(documentTab(body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds)))))))";
+    "tabs(documentTab(body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds,suggestedTextStyleChanges)))))))";
   const tabsFieldsNoSuggestions =
     "tabs(documentTab(body(content(paragraph(elements(textRun(content)))))))";
 
@@ -583,6 +628,12 @@ export async function fetchDocData(
   const deletionIds = new Set<string>();
   const insertions: Record<string, string> = {};
   const deletions: Record<string, string> = {};
+  // Track formatting-only suggestions (suggestedTextStyleChanges without text changes).
+  // Maps suggestion ID → array of style-change descriptions from each text run.
+  const styleDescriptions: Record<string, string[]> = {};
+  // Maps suggestion ID → anchor text (the text the style change applies to).
+  // A single style suggestion may span multiple text runs.
+  const styleAnchorText: Record<string, string> = {};
 
   for (const el of allContent) {
     for (const pe of el.paragraph?.elements ?? []) {
@@ -599,8 +650,21 @@ export async function fetchDocData(
         deletionIds.add(id);
         deletions[id] = (deletions[id] ?? "") + text;
       }
+      // Collect formatting suggestions from suggestedTextStyleChanges.
+      for (const [id, change] of Object.entries(run.suggestedTextStyleChanges ?? {})) {
+        const desc = describeTextStyleChange(change);
+        if (desc) {
+          styleDescriptions[id] ??= [];
+          if (!styleDescriptions[id].includes(desc)) styleDescriptions[id].push(desc);
+        }
+        // Accumulate anchor text across runs for this suggestion
+        styleAnchorText[id] = (styleAnchorText[id] ?? "") + text;
+      }
     }
   }
+
+  // Trim trailing newlines from anchor text (same as insertions/deletions)
+  for (const id in styleAnchorText) styleAnchorText[id] = styleAnchorText[id].replace(/\n$/, "");
 
   const documentText = textParts.join("");
   for (const id in insertions) insertions[id] = insertions[id].replace(/\n$/, "");
@@ -616,13 +680,48 @@ export async function fetchDocData(
     const hasDelete = deletionIds.has(id);
     const insertedText = insertions[id] ?? "";
     const deletedText = deletions[id] ?? "";
-    suggestionContent[id] = { insertedText, deletedText };
+    const description = styleDescriptions[id]?.join(", ");
+    const anchorText = styleAnchorText[id];
+
+    // SUGGESTIONS_INLINE represents formatting changes as delete-old + insert-new with
+    // identical text content. Detect this: same text on both sides + has style changes
+    // → it's a formatting change (OTHER), not a text edit.
+    const isFormattingOnly = hasInsert && hasDelete && insertedText === deletedText && description;
+    if (isFormattingOnly) {
+      suggestionContent[id] = { insertedText: "", deletedText: "", description, anchorText: insertedText };
+      suggestions.push({
+        id,
+        suggestionType: "OTHER",
+        insertedText: "",
+        deletedText: "",
+        description,
+      });
+    } else {
+      suggestionContent[id] = { insertedText, deletedText, ...(description ? { description } : {}), ...(anchorText ? { anchorText } : {}) };
+      suggestions.push({
+        id,
+        suggestionType: hasInsert && hasDelete ? "EDIT" : hasInsert ? "INSERT" : "DELETE",
+        insertedText,
+        deletedText,
+        ...(description ? { description } : {}),
+      });
+    }
+  }
+
+  // Add formatting-only suggestions (style changes with no text insertion/deletion)
+  for (const id in styleDescriptions) {
+    if (allIds.has(id)) continue; // already handled above
+    const description = styleDescriptions[id].join(", ");
+    const anchorText = styleAnchorText[id];
+    suggestionContent[id] = { insertedText: "", deletedText: "", description, ...(anchorText ? { anchorText } : {}) };
     suggestions.push({
       id,
-      suggestionType: hasInsert && hasDelete ? "EDIT" : hasInsert ? "INSERT" : "DELETE",
-      insertedText,
-      deletedText,
+      suggestionType: "OTHER",
+      insertedText: "",
+      deletedText: "",
+      description,
     });
+    allIds.add(id);
   }
 
   logInfo(`[Docs] documents.get ${googleDocId} (${documentText.length} chars, ${allIds.size} suggestions) (${Date.now() - t0}ms)`);
