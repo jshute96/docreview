@@ -289,7 +289,7 @@ export async function mergeExtensionSuggestions(
   // Fetch final state of all suggestion records for this doc
   const comments = await prisma.comment.findMany({
     where: { docId, type: "SUGGESTION" },
-    orderBy: { driveCreatedAt: "desc" },
+    orderBy: [{ googleSuggestionId: "asc" }, { googleCommentId: "asc" }],
   });
 
   logInfo(`[Suggestions:Ext] ${googleDocId}: done — ${merged} merged, ${inserted} inserted, ${updated} updated, ${resolved} resolved (${Date.now() - t0}ms)`);

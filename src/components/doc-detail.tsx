@@ -513,9 +513,12 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       setSortActive(true);
       // Use thread/content data returned by the refresh endpoint instead of
       // making separate /comments + /content fetches.
-      if (threads !== undefined) setThreadMap(threads);
+      // Merge Drive data into existing maps — don't replace, because the extension
+      // provides richer suggestion threads and descriptions that Drive doesn't have.
+      // Extension sync runs right after and will refresh its entries too.
+      if (threads !== undefined) setThreadMap(prev => ({ ...prev, ...threads }));
       if (vbmt !== undefined) setViewedByMeTime(vbmt);
-      if (suggestionContent !== undefined) setSuggestionContent(suggestionContent);
+      if (suggestionContent !== undefined) setSuggestionContent(prev => ({ ...prev, ...suggestionContent }));
       if (documentText !== undefined) setDocumentText(documentText);
       broadcastChange({ type: "comments", docId: doc.docId }, contextId);
       // Refresh suggestions from the extension after the server data is applied,
@@ -1183,7 +1186,6 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white">
               {filteredComments.map((comment) => (
                 <CommentRow
                   key={comment.commentId}
@@ -1211,7 +1213,6 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                   userName={userName}
                 />
               ))}
-            </tbody>
           </table>
         </div>
       )}

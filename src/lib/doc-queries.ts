@@ -28,10 +28,10 @@ export const docWithCountsInclude = {
   },
 };
 
-/** Prisma include clause: fetches labels + full comments ordered by creation time */
+/** Prisma include clause: fetches labels + full comments ordered by Google ID */
 export const docWithCommentsInclude = {
   labels: labelInclude,
-  comments: { orderBy: { driveCreatedAt: "asc" as const } },
+  comments: { orderBy: [{ googleSuggestionId: "asc" as const }, { googleCommentId: "asc" as const }] },
 };
 
 /**

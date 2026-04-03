@@ -547,7 +547,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     : "Refresh this suggestion";
 
   return (
-    <>
+    <tbody className="bg-white">
     <tr
       ref={rowRef}
       className={`${rowBg} ${rowCls}${hasContentRow || expanded || isExiting ? "" : " border-b border-zinc-100"}`}
@@ -726,6 +726,6 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         </td>
       </tr>
     )}
-    </>
+    </tbody>
   );
 }
