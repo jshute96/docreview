@@ -393,6 +393,11 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Non-text suggestions (bold, italic, link, etc.) detected via suggestedTextStyleChanges
 - [ ] Formatting suggestions show description (e.g. "Bold", "Add link: ...") and anchor text
 - [ ] Formatting suggestions classified as OTHER, not EDIT
+- [ ] Suggestions inside tables are detected and synced correctly
+- [ ] Suggestions inside table of contents are detected and synced correctly
+- [ ] Document text includes content from inside tables (for anchor text matching)
+- [ ] Document text includes content from table of contents (for anchor text matching)
+- [ ] Comment anchor text (quotedFileContent) matches even when the quoted text is inside a table
 
 ### Cross-source suggestion matching
 - [ ] Content hash matches across Drive sync, Gmail sync, and extension sync for text suggestions

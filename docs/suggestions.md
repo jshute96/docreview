@@ -40,9 +40,9 @@ store suggestions**. All suggestion data comes from the Docs API.
 ## Sync Approach (Docs API)
 
 Every Refresh calls `fetchSuggestions`, which calls `documents.get` with
-`suggestionsViewMode: "SUGGESTIONS_INLINE"` and `includeTabsContent: true`, then walks
-the body content of every tab (including nested child tabs) to collect all pending
-suggestion IDs (`suggest.xxx`). Each is upserted into the Comment table:
+`suggestionsViewMode: "SUGGESTIONS_INLINE"` and `includeTabsContent: true`, then
+recursively walks the structural elements of every tab (including nested child tabs,
+tables, and table-of-contents blocks) to collect all pending suggestion IDs (`suggest.xxx`). Each is upserted into the Comment table:
 
 - **Create** (new): `type: "SUGGESTION"`, `googleSuggestionId` set to the `suggest.xxx` ID,
   `suggestionType` set, `resolved: false`, `status: "INBOX"` if `doc.role === "AUTHOR"`,

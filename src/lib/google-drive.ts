@@ -552,10 +552,28 @@ export async function fetchDocData(
 
   // Use includeTabsContent to get content from ALL tabs, not just the first.
   // When true, document.body is empty and content lives in document.tabs[].
+  //
+  // The fields spec must explicitly include table and tableOfContents paths
+  // so we get text from inside tables and TOCs. The Docs API fields syntax
+  // doesn't support recursion, so we nest to a fixed depth (tables inside
+  // tables are rare but possible — 2 levels covers practical documents).
+  const textRunFields = "textRun(content,suggestedInsertionIds,suggestedDeletionIds,suggestedTextStyleChanges)";
+  const textRunFieldsNoSuggestions = "textRun(content)";
+  const paraFields = (tr: string) => `paragraph(elements(${tr}))`;
+  // Build nested content fields: paragraph + table(tableRows/tableCells/content(...)) + tableOfContents(content(...))
+  // Each level of nesting includes paragraph, table, and tableOfContents.
+  function contentFields(tr: string, depth: number): string {
+    const parts = [paraFields(tr)];
+    if (depth > 0) {
+      parts.push(`table(tableRows(tableCells(content(${contentFields(tr, depth - 1)}))))`);
+      parts.push(`tableOfContents(content(${contentFields(tr, depth - 1)}))`);
+    }
+    return parts.join(",");
+  }
   const tabsFields =
-    "tabs(documentTab(body(content(paragraph(elements(textRun(content,suggestedInsertionIds,suggestedDeletionIds,suggestedTextStyleChanges)))))))";
+    `tabs(documentTab(body(content(${contentFields(textRunFields, 2)}))))`;
   const tabsFieldsNoSuggestions =
-    "tabs(documentTab(body(content(paragraph(elements(textRun(content)))))))";
+    `tabs(documentTab(body(content(${contentFields(textRunFieldsNoSuggestions, 2)}))))`;
 
   let res;
   try {
@@ -635,33 +653,48 @@ export async function fetchDocData(
   // A single style suggestion may span multiple text runs.
   const styleAnchorText: Record<string, string> = {};
 
-  for (const el of allContent) {
-    for (const pe of el.paragraph?.elements ?? []) {
-      const run = pe.textRun;
-      if (!run?.content) continue;
-      textParts.push(run.content);
-      const text = run.content;
+  // Recursively traverse structural elements — paragraphs contain text runs,
+  // tables and tableOfContents contain nested structural elements.
+  function traverseElements(elements: docs_v1.Schema$StructuralElement[]): void {
+    for (const el of elements) {
+      if (el.paragraph) {
+        for (const pe of el.paragraph.elements ?? []) {
+          const run = pe.textRun;
+          if (!run?.content) continue;
+          textParts.push(run.content);
+          const text = run.content;
 
-      for (const id of run.suggestedInsertionIds ?? []) {
-        insertionIds.add(id);
-        insertions[id] = (insertions[id] ?? "") + text;
-      }
-      for (const id of run.suggestedDeletionIds ?? []) {
-        deletionIds.add(id);
-        deletions[id] = (deletions[id] ?? "") + text;
-      }
-      // Collect formatting suggestions from suggestedTextStyleChanges.
-      for (const [id, change] of Object.entries(run.suggestedTextStyleChanges ?? {})) {
-        const desc = describeTextStyleChange(change);
-        if (desc) {
-          styleDescriptions[id] ??= [];
-          if (!styleDescriptions[id].includes(desc)) styleDescriptions[id].push(desc);
+          for (const id of run.suggestedInsertionIds ?? []) {
+            insertionIds.add(id);
+            insertions[id] = (insertions[id] ?? "") + text;
+          }
+          for (const id of run.suggestedDeletionIds ?? []) {
+            deletionIds.add(id);
+            deletions[id] = (deletions[id] ?? "") + text;
+          }
+          // Collect formatting suggestions from suggestedTextStyleChanges.
+          for (const [id, change] of Object.entries(run.suggestedTextStyleChanges ?? {})) {
+            const desc = describeTextStyleChange(change);
+            if (desc) {
+              styleDescriptions[id] ??= [];
+              if (!styleDescriptions[id].includes(desc)) styleDescriptions[id].push(desc);
+            }
+            // Accumulate anchor text across runs for this suggestion
+            styleAnchorText[id] = (styleAnchorText[id] ?? "") + text;
+          }
         }
-        // Accumulate anchor text across runs for this suggestion
-        styleAnchorText[id] = (styleAnchorText[id] ?? "") + text;
+      } else if (el.table) {
+        for (const row of el.table.tableRows ?? []) {
+          for (const cell of row.tableCells ?? []) {
+            traverseElements(cell.content ?? []);
+          }
+        }
+      } else if (el.tableOfContents) {
+        traverseElements(el.tableOfContents.content ?? []);
       }
     }
   }
+  traverseElements(allContent);
 
   // Trim trailing newlines from anchor text (same as insertions/deletions)
   for (const id in styleAnchorText) styleAnchorText[id] = styleAnchorText[id].replace(/\n$/, "");
