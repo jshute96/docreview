@@ -178,6 +178,62 @@ describe("parseGmailNotification", () => {
       expect(result.documentUrl).toContain("docs.google.com/document/d/1xMvTIcXaNHyf2HQlKU8lBYhmZ-RJMh7Db-rWgVsgUZk");
     });
   });
+
+  describe("comment resolved notification", () => {
+    const raw = readFileSync(join(EXAMPLES_DIR, "comment_resolved.eml"), "utf-8");
+    const result = parseGmailNotification(raw) as CommentNotification;
+
+    it("captures 'Marked as resolved' with action field", () => {
+      const thread = result.comments[0];
+      const lastReply = thread.replies[thread.replies.length - 1];
+      expect(lastReply.text).toBe("Marked as resolved");
+      expect(lastReply.action).toBe("resolved");
+      expect(lastReply.isNew).toBe(true);
+    });
+
+    it("does not set action on regular replies", () => {
+      const regularReply = result.comments[0].replies[0];
+      expect(regularReply.action).toBeUndefined();
+    });
+  });
+
+  describe("suggestion with Other action type", () => {
+    const raw = readFileSync(join(EXAMPLES_DIR, "suggestion_format_change.eml"), "utf-8");
+    const result = parseGmailNotification(raw) as CommentNotification;
+
+    it("parses non-standard suggestion as Other with label in text", () => {
+      expect(result.suggestions).toHaveLength(1);
+      const s = result.suggestions[0];
+      expect(s.action).toBe("Other");
+      expect(s.text).toBe("Format: bold, font");
+    });
+  });
+
+  describe("suggestion accept/reject replies", () => {
+    const raw = readFileSync(join(EXAMPLES_DIR, "suggestion_accept_reject.eml"), "utf-8");
+    const result = parseGmailNotification(raw) as CommentNotification;
+
+    it("captures accepted suggestion reply with action field", () => {
+      const addSuggestion = result.suggestions.find(s => s.action === "Add")!;
+      const accepted = addSuggestion.replies.find(r => r.action === "accepted");
+      expect(accepted).toBeDefined();
+      expect(accepted!.text).toBe("Accepted suggestion");
+    });
+
+    it("captures rejected suggestion reply with action field", () => {
+      const rejectedSuggestion = result.suggestions.find(s =>
+        s.replies.some(r => r.action === "rejected")
+      )!;
+      const rejected = rejectedSuggestion.replies.find(r => r.action === "rejected")!;
+      expect(rejected.text).toBe("Rejected suggestion");
+    });
+
+    it("does not set action on regular suggestion replies", () => {
+      const addSuggestion = result.suggestions.find(s => s.action === "Add")!;
+      const regularReply = addSuggestion.replies.find(r => r.text === "rr")!;
+      expect(regularReply.action).toBeUndefined();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -23,6 +23,7 @@ export interface CommentReply {
   time_str: string;      // original formatted string from email, e.g. "6:34 PM, Mar 7 (UTC)"
   time?: string;          // ISO 8601 if we could parse time_str; undefined otherwise
   text: string;
+  action?: "accepted" | "rejected" | "resolved"; // set when this post is a status change, not a comment
   isNew: boolean;
   avatarUrl?: string;
 }
@@ -40,7 +41,7 @@ export interface Suggestion {
   author: string;
   time_str: string;      // original formatted string from email
   time?: string;          // ISO 8601 if parseable
-  action: string; // "Delete", "Add", "Replace"
+  action: string; // "Delete", "Add", "Replace", "Other"
   text: string;
   oldText?: string; // for Replace
   newText?: string; // for Replace
@@ -96,6 +97,26 @@ export interface ParsedEmail {
   htmlBody: string;
 }
 
+/** Decode RFC 2047 encoded-words in email headers (e.g., =?UTF-8?B?...?=). */
+function decodeRfc2047(value: string): string {
+  // Collapse whitespace between adjacent encoded-words (RFC 2047 §6.2)
+  const collapsed = value.replace(/\?=\s+=\?/g, "?==?");
+  return collapsed.replace(/=\?([^?]+)\?([BbQq])\?([^?]+)\?=/g, (_match, charset, encoding, encoded) => {
+    const enc = encoding.toUpperCase();
+    if (enc === "B") {
+      return Buffer.from(encoded, "base64").toString(charset.toLowerCase());
+    }
+    if (enc === "Q") {
+      // Q-encoding: underscores → spaces, =XX → byte
+      const decoded = encoded
+        .replace(/_/g, " ")
+        .replace(/=([0-9A-Fa-f]{2})/g, (_: string, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+      return Buffer.from(decoded, "latin1").toString(charset.toLowerCase());
+    }
+    return _match;
+  });
+}
+
 function parseEmail(raw: string): ParsedEmail {
   // Split headers from body at first blank line (handle both \r\n and \n)
   const blankLineMatch = raw.match(/\r?\n\r?\n/);
@@ -112,7 +133,7 @@ function parseEmail(raw: string): ParsedEmail {
     const colonIdx = line.indexOf(":");
     if (colonIdx > 0) {
       const key = line.substring(0, colonIdx).trim().toLowerCase();
-      const value = line.substring(colonIdx + 1).trim();
+      const value = decodeRfc2047(line.substring(colonIdx + 1).trim());
       headers.set(key, value);
     }
   }
@@ -399,8 +420,11 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
         replies: posts,
       });
     } else if (isSuggestion) {
-      // Suggestion action text
+      // Suggestion action text — two formats:
+      // Add/Delete/Replace: <span style="font-weight:bold">Action:</span> <span ...>"text"</span>
+      // Other (Format, add link, etc.): <span style="font-weight:bold">Label:</span> details text</div>
       const suggestionDiv = section.match(/font-weight:bold">(.*?)<\/span>\s*<span[^>]*>(.*?)<\/span>(?:\s*with\s*<span[^>]*>(.*?)<\/span>)?/s);
+      const otherDiv = !suggestionDiv ? section.match(/font-weight:bold">(.*?)<\/span>\s*(.*?)<\/div>/s) : null;
       let suggestionAction = "";
       let text = "";
       let oldText: string | undefined;
@@ -418,6 +442,13 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
           newText = stripQuotes(stripTags(decodeHtmlEntities(suggestionDiv[3])));
           text = `${oldText} → ${newText}`;
         }
+      } else if (otherDiv) {
+        // For non-standard actions (Format, add link, etc.), normalize to "Other"
+        // and put the original label + details in text
+        const label = stripTags(otherDiv[1]).replace(/:$/, "");
+        const details = stripTags(decodeHtmlEntities(otherDiv[2])).trim();
+        suggestionAction = "Other";
+        text = details ? `${label}: ${details}` : label;
       }
 
       const post = posts[0];
@@ -458,6 +489,12 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
   };
 }
 
+const STATUS_ACTIONS: Record<string, CommentReply["action"]> = {
+  "Accepted suggestion": "accepted",
+  "Rejected suggestion": "rejected",
+  "Marked as resolved": "resolved",
+};
+
 function parsePostsInSection(section: string, emailDateStr: string): CommentReply[] {
   const posts: CommentReply[] = [];
 
@@ -473,9 +510,13 @@ function parsePostsInSection(section: string, emailDateStr: string): CommentRepl
 
     const isNew = rest.includes(">New<");
 
-    // Extract the comment text from .notranslate div
+    // Extract the comment text from .notranslate div, or status actions from <i> tags
     const textMatch = rest.match(/class="notranslate"[^>]*>(.*?)<\/div>/s);
-    const text = textMatch ? stripTags(decodeHtmlEntities(textMatch[1])).trim() : "";
+    const statusMatch = !textMatch ? rest.match(/<i>(Accepted suggestion|Rejected suggestion|Marked as resolved)<\/i>/) : null;
+    const text = textMatch ? stripTags(decodeHtmlEntities(textMatch[1])).trim()
+      : statusMatch ? statusMatch[1]
+      : "";
+    const action = statusMatch ? STATUS_ACTIONS[statusMatch[1]] : undefined;
 
     // Avatar URL
     const avatarMatch = section.substring(Math.max(0, match.index - 500), match.index + match[0].length)
@@ -483,7 +524,7 @@ function parsePostsInSection(section: string, emailDateStr: string): CommentRepl
     const avatarUrl = avatarMatch ? avatarMatch[1] : undefined;
 
     if (author && (text || rest.includes("font-weight:bold"))) {
-      posts.push({ author, time_str, ...(time ? { time } : {}), text, isNew, avatarUrl });
+      posts.push({ author, time_str, ...(time ? { time } : {}), text, ...(action ? { action } : {}), isNew, avatarUrl });
     }
   }
 

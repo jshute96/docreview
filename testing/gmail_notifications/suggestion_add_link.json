@@ -1,0 +1,38 @@
+{
+  "type": "comment",
+  "subject": "Dave's doc to share - Add link: with url “http://google.com” ",
+  "from": "\"Jeff Shute (Google Docs)\" <comments-noreply@docs.google.com>",
+  "to": "docreview.dave@gmail.com",
+  "date_str": "Thu, 02 Apr 2026 22:38:43 -0700",
+  "date": "2026-04-03T05:38:43.000Z",
+  "documentId": "1CKGt0L8l4qSqzJt4lae3C78F1_Gm1gNqI1q01ycn6VM",
+  "documentTitle": "Dave's doc to share",
+  "documentUrl": "https://docs.google.com/document/d/1CKGt0L8l4qSqzJt4lae3C78F1_Gm1gNqI1q01ycn6VM/edit?disco=AAAB29lXu6U&usp=comment_email_document&ts=69cf5263&tab=t.0",
+  "xDocumentId": "xDgAAADgqa2PuooodQzUdxOuOlZKpwLQMdX9R6Q",
+  "feedbackId": "MailTypeComment:EditorsNotification",
+  "recipientUserId": "116797062718942056712",
+  "comments": [],
+  "suggestions": [
+    {
+      "author": "Jeff Shute",
+      "time_str": "5:33 AM, Apr 3 (UTC)",
+      "time": "2026-04-03T05:33:00.000Z",
+      "action": "Other",
+      "text": "Add link: with url “http://google.com”",
+      "isNew": true,
+      "discussionId": "AAAB29lXu6U",
+      "openUrl": "https://docs.google.com/document/d/1CKGt0L8l4qSqzJt4lae3C78F1_Gm1gNqI1q01ycn6VM/edit?disco=AAAB29lXu6U&usp=suggestion_email_discussion&ts=69cf5263&usp_dm=false",
+      "replyTo": "",
+      "replies": [
+        {
+          "author": "Jeff Shute",
+          "time_str": "5:33 AM, Apr 3 (UTC)",
+          "time": "2026-04-03T05:33:00.000Z",
+          "text": "@docreview.dave@gmail.com",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        }
+      ]
+    }
+  ]
+}

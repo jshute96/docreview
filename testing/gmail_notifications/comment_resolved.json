@@ -1,0 +1,114 @@
+{
+  "type": "comment",
+  "subject": "Shared from home 1 - added comment from work",
+  "from": "\"Jeff Shute (Google Docs)\" <comments-noreply@docs.google.com>",
+  "to": "docreview.dave@gmail.com",
+  "date_str": "Mon, 23 Mar 2026 20:39:00 -0700",
+  "date": "2026-03-24T03:39:00.000Z",
+  "documentId": "1xMvTIcXaNHyf2HQlKU8lBYhmZ-RJMh7Db-rWgVsgUZk",
+  "documentTitle": "Shared from home 1",
+  "documentUrl": "https://docs.google.com/document/d/1xMvTIcXaNHyf2HQlKU8lBYhmZ-RJMh7Db-rWgVsgUZk/edit?disco=AAABzm2gN3U&usp=comment_email_document&ts=69c20754&tab=t.0",
+  "xDocumentId": "xDgAAACeXFbFAKkfYES60nz3DMy3j43FTKeTohQ",
+  "feedbackId": "MailTypeComment:EditorsNotification",
+  "recipientUserId": "116797062718942056712",
+  "comments": [
+    {
+      "quotedText": "Test",
+      "discussionId": "AAABzm2gN3U",
+      "openUrl": "https://docs.google.com/document/d/1xMvTIcXaNHyf2HQlKU8lBYhmZ-RJMh7Db-rWgVsgUZk/edit?disco=AAABzm2gN3U&usp=comment_email_discussion&ts=69c20754&usp_dm=false",
+      "replyTo": "",
+      "replies": [
+        {
+          "author": "Jeff Shute",
+          "time_str": "4:47 PM, Feb 23 (UTC)",
+          "time": "2026-02-23T16:47:00.000Z",
+          "text": "added comment from work",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjXaJwPby7coKCGOD7JVqaxWTkdajIbsukHGacPuCCeA3OkJAzw=s50-c-k-no"
+        },
+        {
+          "author": "Jeff Shute",
+          "time_str": "6:28 AM, Mar 7 (UTC)",
+          "time": "2026-03-07T06:28:00.000Z",
+          "text": "reply",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjXaJwPby7coKCGOD7JVqaxWTkdajIbsukHGacPuCCeA3OkJAzw=s50-c-k-no"
+        },
+        {
+          "author": "Dave",
+          "time_str": "6:39 AM, Mar 7 (UTC)",
+          "time": "2026-03-07T06:39:00.000Z",
+          "text": "hello",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocIqvyihLhlu7EAe6OmyCV7RO2oyNqECfq3phRYNw2oiTFJqEw=s50-c-k-no"
+        },
+        {
+          "author": "Dave",
+          "time_str": "6:42 AM, Mar 7 (UTC)",
+          "time": "2026-03-07T06:42:00.000Z",
+          "text": "hi",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocIqvyihLhlu7EAe6OmyCV7RO2oyNqECfq3phRYNw2oiTFJqEw=s50-c-k-no"
+        },
+        {
+          "author": "Jeff Shute",
+          "time_str": "6:43 AM, Mar 7 (UTC)",
+          "time": "2026-03-07T06:43:00.000Z",
+          "text": "abc",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        },
+        {
+          "author": "Dave",
+          "time_str": "6:43 AM, Mar 7 (UTC)",
+          "time": "2026-03-07T06:43:00.000Z",
+          "text": "def",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocIqvyihLhlu7EAe6OmyCV7RO2oyNqECfq3phRYNw2oiTFJqEw=s50-c-k-no"
+        },
+        {
+          "author": "Jeff Shute",
+          "time_str": "4:52 AM, Mar 22 (UTC)",
+          "time": "2026-03-22T04:52:00.000Z",
+          "text": "No",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        },
+        {
+          "author": "Jeff Shute",
+          "time_str": "2:59 AM, Mar 24 (UTC)",
+          "time": "2026-03-24T02:59:00.000Z",
+          "text": "yes",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        },
+        {
+          "author": "Jeff Shute",
+          "time_str": "3:01 AM, Mar 24 (UTC)",
+          "time": "2026-03-24T03:01:00.000Z",
+          "text": "rrrr",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        },
+        {
+          "author": "Jeff Shute",
+          "time_str": "3:33 AM, Mar 24 (UTC)",
+          "time": "2026-03-24T03:33:00.000Z",
+          "text": "abcd",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        },
+        {
+          "author": "Jeff Shute",
+          "time_str": "3:33 AM, Mar 24 (UTC)",
+          "time": "2026-03-24T03:33:00.000Z",
+          "text": "Marked as resolved",
+          "action": "resolved",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        }
+      ]
+    }
+  ],
+  "suggestions": []
+}

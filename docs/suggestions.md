@@ -91,7 +91,7 @@ stripped before storage.
 | `googleCommentId` | — | `discussionId` (AAA*) | Gmail only |
 | `suggestionContentHash` | computed from text | computed from text | Either (should match) |
 | `type` | SUGGESTION | SUGGESTION | Either |
-| `suggestionType` | INSERT/DELETE/EDIT | mappable from Add/Delete/Replace | Either |
+| `suggestionType` | INSERT/DELETE/EDIT | mappable from Add/Delete/Replace/Other | Either |
 | `resolved` | lifecycle (false→true) | — | Drive authoritative |
 | `driveCreatedAt` | `doc.lastModifiedInDrive` (approx) | `time` (minute precision) | Gmail preferred (more accurate) |
 | `driveModifiedAt` | `doc.lastModifiedInDrive` (approx) | `time` (minute precision) | Gmail preferred; extension updates with last reply timestamp |

@@ -21,10 +21,15 @@ Each example has two files:
 Current examples:
 - `comment_notification` — comment replies and suggestions on a shared doc
 - `comment_notification2` — multiple comment threads, @mentions, assigned comments, suggestion replies
+- `comment_on_suggestion` — comment thread on a suggestion
+- `comment_resolved` — comment thread with "Marked as resolved" action
 - `assigned_to_me_in_unshared_doc` — assigned comment on an unshared doc
 - `mentioned_me_in_unshared_doc` — @mention comment on an unshared doc
 - `invitation_to_edit` — sharing invitation with edit permission
 - `share_request` — access request from another user
+- `suggestion_accept_reject` — format suggestion with reply thread
+- `suggestion_add_link` — "add link" suggestion (Other action type) with @mention reply
+- `suggestion_format_change` — comment, suggestion with accept/reject replies, resolved suggestions
 
 ## Adding a new example
 
