@@ -493,6 +493,43 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     })();
     return true; // async response
   }
+
+  // From Docreview bridge: extract comment data from an open Google Docs tab.
+  // Returns the full list of comments scraped from the DOM, including status,
+  // author, body text, and reply threads.
+  if (msg.type === 'getComments' && msg.docId) {
+    console.log('[background] getComments from docreview:', msg.docId);
+    (async function() {
+      var config = await chrome.storage.sync.get({ enableDocs: DEFAULTS.enableDocs });
+      if (!config.enableDocs) {
+        sendResponse({ success: false, error: 'Google Docs integration is disabled' });
+        return;
+      }
+      var tabId = await findDocTab(msg.docId);
+      if (!tabId) {
+        sendResponse({ success: false, error: 'Doc tab not open' });
+        return;
+      }
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: injectDiscoIdHelpers,
+          world: 'MAIN'
+        });
+        var results = await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: function() { return window.__docreviewDisco.getComments(); },
+          world: 'MAIN'
+        });
+        var comments = results && results[0] && results[0].result;
+        sendResponse({ success: true, comments: comments || [] });
+      } catch (err) {
+        console.warn('[background] getComments failed:', err.message);
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true; // async response
+  }
 });
 
 // --- Comment navigation ---

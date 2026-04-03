@@ -230,60 +230,63 @@ function injectDiscoIdHelpers() {
   // We deduplicate by disco ID, preferring the anchored version for open
   // suggestions (richer DOM) and the stream version for resolved ones (only
   // place they appear).
+  // Helper: extract reply body from either anchored or stream view.
+  // Returns { text, html }. Anchored view uses .docos-replyview-body;
+  // stream view uses .docos-replyview-body-container (the -body div
+  // exists but is empty).
+  function getReplyBody(replyEl) {
+    var body = replyEl.querySelector('.docos-replyview-body');
+    var text = body ? body.textContent.trim() : '';
+    var html = body ? body.innerHTML.trim() : '';
+    if (!text) {
+      var container = replyEl.querySelector('.docos-replyview-body-container');
+      if (container) {
+        text = container.innerText.trim();
+        html = container.innerHTML.trim();
+      }
+    }
+    return { text: text, html: html };
+  }
+
+  // Helper: extract author name from a reply entry.
+  function getReplyAuthor(replyEl) {
+    var d = replyEl.querySelector('.docos-author');
+    return d ? d.textContent.trim() : '';
+  }
+
+  // Helper: extract timestamp from a reply entry.
+  // Anchored view stores it in a div with class containing "authortimestamp";
+  // stream view uses a div with class containing "timestamp" (e.g.,
+  // docos-streamdocoview-timestamp). Look for the first unstyled <span>
+  // inside either container.
+  function getReplyTimestamp(replyEl) {
+    var ts = replyEl.querySelector('[class*="authortimestamp"]') ||
+             replyEl.querySelector('[class*="timestamp"]');
+    if (!ts) return '';
+    var spans = ts.querySelectorAll('span');
+    for (var i = 0; i < spans.length; i++) {
+      var t = spans[i].textContent.trim();
+      if (t && !spans[i].getAttribute('style')) return t;
+    }
+    return '';
+  }
+
+  // Get the logged-in user's display name from the Google Account button
+  // (e.g., "Google Account: Dave (docreview.dave@gmail.com)").
+  function getMyName() {
+    var accountBtn = document.querySelector('[aria-label*="Google Account"]');
+    if (accountBtn) {
+      var nameMatch = (accountBtn.getAttribute('aria-label') || '').match(/Google Account:\s*([^(]+)\s*\(/);
+      if (nameMatch) return nameMatch[1].trim();
+    }
+    return '';
+  }
+
   function getSuggestions(targetId) {
     var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
     var seenIds = {};
     var results = [];
-
-    // Get the logged-in user's display name from the Google Account button
-    // (e.g., "Google Account: Dave (docreview.dave@gmail.com)").
-    var myName = '';
-    var accountBtn = document.querySelector('[aria-label*="Google Account"]');
-    if (accountBtn) {
-      var nameMatch = (accountBtn.getAttribute('aria-label') || '').match(/Google Account:\s*([^(]+)\s*\(/);
-      if (nameMatch) myName = nameMatch[1].trim();
-    }
-
-    // Helper: extract reply body from either anchored or stream view.
-    // Returns { text, html }. Anchored view uses .docos-replyview-body;
-    // stream view uses .docos-replyview-body-container (the -body div
-    // exists but is empty).
-    function getReplyBody(replyEl) {
-      var body = replyEl.querySelector('.docos-replyview-body');
-      var text = body ? body.textContent.trim() : '';
-      var html = body ? body.innerHTML.trim() : '';
-      if (!text) {
-        var container = replyEl.querySelector('.docos-replyview-body-container');
-        if (container) {
-          text = container.innerText.trim();
-          html = container.innerHTML.trim();
-        }
-      }
-      return { text: text, html: html };
-    }
-
-    // Helper: extract author name from a reply entry.
-    function getReplyAuthor(replyEl) {
-      var d = replyEl.querySelector('.docos-author');
-      return d ? d.textContent.trim() : '';
-    }
-
-    // Helper: extract timestamp from a reply entry.
-    // Anchored view stores it in a div with class containing "authortimestamp";
-    // stream view uses a div with class containing "timestamp" (e.g.,
-    // docos-streamdocoview-timestamp). Look for the first unstyled <span>
-    // inside either container.
-    function getReplyTimestamp(replyEl) {
-      var ts = replyEl.querySelector('[class*="authortimestamp"]') ||
-               replyEl.querySelector('[class*="timestamp"]');
-      if (!ts) return '';
-      var spans = ts.querySelectorAll('span');
-      for (var i = 0; i < spans.length; i++) {
-        var t = spans[i].textContent.trim();
-        if (t && !spans[i].getAttribute('style')) return t;
-      }
-      return '';
-    }
+    var myName = getMyName();
 
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
@@ -426,6 +429,128 @@ function injectDiscoIdHelpers() {
     return results;
   }
 
+  // List all visible comments (non-suggestion items) with detailed info:
+  // disco ID, status (open/resolved), author, timestamp, comment body text,
+  // and replies with author/timestamp/text.
+  // Call from the Google Docs page console for debugging: getComments()
+  //
+  // Optional targetId: when provided, only parses the comment with that
+  // disco ID (skips text/reply extraction for all others).
+  //
+  // When the comments pane is open, the same comment appears in both the
+  // anchored sidebar (docos-anchoreddocoview) and the pane (docos-streamdocoview).
+  // We deduplicate by disco ID, preferring the anchored version for open
+  // comments (richer DOM) and the stream version for resolved ones (only
+  // place they appear).
+  function getComments(targetId) {
+    var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
+    var seenIds = {};
+    var results = [];
+    var myName = getMyName();
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var label = item.getAttribute('aria-label') || '';
+      // Skip suggestions — this function is for comments only
+      if (label.indexOf('Suggestions') === 0) continue;
+
+      var id = getDiscoId(item) || '(no ID)';
+
+      if (targetId && id !== targetId) continue;
+
+      // Deduplicate: prefer anchored version (richer DOM) when both are present
+      var isAnchored = item.classList.contains('docos-anchoreddocoview');
+      if (seenIds[id]) {
+        if (isAnchored) {
+          results = results.filter(function(r) { return r.id !== id; });
+        } else {
+          continue;
+        }
+      }
+      seenIds[id] = true;
+
+      // Determine status: open or resolved.
+      var status = 'open';
+      if (item.classList.contains('docos-docoview-resolved')) {
+        status = 'resolved';
+      }
+
+      // Extract author and timestamp from the first entry.
+      var firstEntry = item.querySelector('.docos-replyview-first');
+      var author = '', timestamp = '';
+      if (firstEntry) {
+        author = getReplyAuthor(firstEntry);
+        timestamp = getReplyTimestamp(firstEntry);
+      }
+      if (!author || !timestamp) {
+        var contentDiv = item.querySelector('[class*="streamdocoview-content"]');
+        if (contentDiv) {
+          if (!author) {
+            var cd = contentDiv.querySelector('.docos-author');
+            if (cd) author = cd.textContent.trim();
+          }
+          if (!timestamp) {
+            var ct = contentDiv.querySelector('[class*="timestamp"]');
+            if (ct) {
+              var ctSpans = ct.querySelectorAll('span');
+              for (var cs = 0; cs < ctSpans.length; cs++) {
+                var cst = ctSpans[cs].textContent.trim();
+                if (cst && !ctSpans[cs].getAttribute('style')) { timestamp = cst; break; }
+              }
+            }
+          }
+        }
+        if (!author) {
+          var authorMatch = label.match(/Author ([^.]+)\./);
+          if (authorMatch) author = authorMatch[1];
+        }
+      }
+
+      // Extract comment body text from the first entry
+      var text = '', html = '';
+      if (firstEntry) {
+        var bodyResult = getReplyBody(firstEntry);
+        text = bodyResult.text;
+        html = bodyResult.html;
+      }
+
+      // Extract replies (all docos-replyview entries after the first one)
+      var replyEntries = item.querySelectorAll('.docos-replyview');
+      var replies = [];
+      for (var r = 0; r < replyEntries.length; r++) {
+        if (replyEntries[r].classList.contains('docos-replyview-first')) continue;
+        var rBody = getReplyBody(replyEntries[r]);
+        if (!rBody.text) continue;
+        var rAuthor = getReplyAuthor(replyEntries[r]);
+        // System status entries (resolve/reopen actions)
+        var rAction = undefined;
+        if (rBody.text.indexOf('Marked as resolved') === 0) rAction = 'resolve';
+        else if (rBody.text.indexOf('Re-opened') === 0) rAction = 'reopen';
+        replies.push({
+          author: rAuthor,
+          isMine: !!(myName && rAuthor === myName),
+          timestamp: getReplyTimestamp(replyEntries[r]),
+          text: rAction ? '' : rBody.text,
+          html: !rAction && rBody.html !== rBody.text ? rBody.html : undefined,
+          action: rAction
+        });
+      }
+
+      var entry = {
+        id: id,
+        status: status,
+        author: author,
+        isMine: !!(myName && author === myName),
+        timestamp: timestamp,
+        text: text,
+        html: html !== text ? html : undefined,
+        replies: replies
+      };
+      results.push(entry);
+    }
+    return results;
+  }
+
   // Get the disco ID of the currently selected/active comment.
   function getActiveCommentId() {
     var active = document.querySelector('#docos-stream-view [role="listitem"].docos-docoview-active');
@@ -519,6 +644,7 @@ function injectDiscoIdHelpers() {
   window.__docreviewDisco = {
     getDiscoId: getDiscoId,
     listComments: listComments,
+    getComments: getComments,
     getSuggestions: getSuggestions,
     getActiveCommentId: getActiveCommentId,
     fullClick: fullClick,
@@ -530,6 +656,7 @@ function injectDiscoIdHelpers() {
   };
   // Expose debugging functions directly on window for convenience
   window.listComments = listComments;
+  window.getComments = getComments;
   window.getSuggestions = getSuggestions;
   window.getActiveCommentId = getActiveCommentId;
 

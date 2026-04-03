@@ -48,6 +48,7 @@ Message handlers:
 - `commentSelection` — Forwards comment selection/deselection events from Google Doc tabs to open Docreview tabs for cross-tab highlight sync.
 - `docReady` — Forwards doc-ready notifications from Google Doc tabs to open Docreview tabs. Sent when the doc's `#docos-stream-view` is populated with listitems (debounced 250ms to let incremental population finish). The comments page uses this to auto-fetch suggestions after a doc opens.
 - `selectComment` — Selects a comment in a Google Doc tab (via injected script) without focusing the tab, triggered by clicking a comment thread in Docreview.
+- `getComments` — Extracts comment data from an open Google Docs tab by executing `getComments()` in MAIN world. Returns status, author, isMine flag, body text/html, and full reply threads. For debugging.
 - `getSuggestions` — Extracts suggestion data from an open Google Docs tab by executing `getSuggestions()` in MAIN world. Returns suggestion type, old/new text, status, author, isMine flag, and full reply threads. Used by the comments page to display richer suggestion data than the Docs API provides.
 - `openDocInDocreview` — Opens a doc from Gmail in Docreview, using `chrome.scripting.executeScript` with `allFrames: true` to search all frames (including sandboxed AMP iframes).
 
@@ -219,6 +220,7 @@ Looks up doc by Google doc ID, calls `syncComments()` with optional hints. With 
 Available from the **Google Docs page console** (injected at page load):
 
 - **`listComments()`** — dumps all visible comments/suggestions with disco IDs, types, authors, and text. Returns an array of `{ id, type, author, text }` and logs each entry.
+- **`getComments()`** — dumps all visible comments (non-suggestion items) with detailed info: disco ID, status (open/resolved), author, isMine flag, timestamp, comment body text/html, and reply threads with author/timestamp/text/html and resolve/reopen actions. Deduplicates across anchored sidebar and comments pane. Accepts optional `targetId` to parse only one comment. Returns an array.
 - **`getSuggestions()`** — dumps all visible suggestions with detailed info: disco ID, suggestion type (Replace/Add/Delete), old/new text, status (open/accepted/rejected), author, isMine flag, timestamp, and reply threads with author/timestamp/text/html. Deduplicates across anchored sidebar and comments pane. When the comments pane is open, also includes resolved (accepted/rejected) suggestions. Returns an array and logs a summary per entry.
 - **`getActiveCommentId()`** — returns the disco ID of the currently selected comment (the one with `docos-docoview-active` class). Click a comment first to select it.
 
