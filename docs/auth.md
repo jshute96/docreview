@@ -140,7 +140,7 @@ Every API route that calls Google wraps its catch block with `invalidGrantRespon
 | File | Role |
 |------|------|
 | `src/auth.ts` | NextAuth config: providers, session strategy, token persistence on sign-in |
-| `src/app/api/auth/[...nextauth]/route.ts` | Mounts NextAuth HTTP handlers (GET/POST) |
+| `src/app/api/auth/[nextauth]/route.ts` | Mounts NextAuth HTTP handlers (GET/POST); rewrite in `next.config.ts` maps multi-segment auth paths |
 | `src/app/login/page.tsx` | Login page UI (Google OAuth button, offline mode) |
 | `src/lib/google-drive.ts` | `getDriveClient()` reads tokens from DB, auto-refreshes, persists new tokens; also used by Gmail scanner |
 | `src/lib/gmail.ts` | Gmail notification scanner — reuses `getDriveClient()` OAuth2 client for Gmail API access |

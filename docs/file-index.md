@@ -73,7 +73,7 @@ One-line descriptions of every source file, grouped by layer.
 
 | File | Description |
 |------|-------------|
-| `auth/[...nextauth]/route.ts` | NextAuth catch-all handler (GET+POST) |
+| `auth/[nextauth]/route.ts` | NextAuth handler (GET+POST); rewrite in `next.config.ts` maps multi-segment auth paths |
 | `docs/route.ts` | `GET` list docs (with filters); `POST` load sync from Drive (accepts selectedGoogleDocIds, labelIds, notes) |
 | `docs/gmail-refresh/route.ts` | `POST` incremental Gmail refresh — scans Gmail since last timestamp, performs upsert and sync via shared logic in `refresh.ts` |
 | `docs/gmail-refresh/route.test.ts` | Tests for incremental Gmail refresh flow, deletion detection, and timestamp updates |

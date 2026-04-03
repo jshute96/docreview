@@ -205,7 +205,7 @@ No Google API (Prisma only).
 
 ## Authentication
 
-### `/api/auth/[...nextauth]` — NextAuth handlers
+### `/api/auth/[nextauth]` — NextAuth handlers
 
 GET, POST. Standard NextAuth.js OAuth and session management endpoints.
 
