@@ -1012,23 +1012,22 @@ describe("syncComments suggestion resolution", () => {
     expect(mockFetchDocData).not.toHaveBeenCalled();
   });
 
-  it("resolves suggestion with null googleSuggestionId (legacy data)", async () => {
+  it("does not resolve suggestions without googleSuggestionId", async () => {
     const doc = makeDoc();
     mockFetchCommentData.mockResolvedValue({ comments: [] });
     mockFetchDocData.mockResolvedValue({ suggestions: [], suggestionContent: {}, documentText: null });
     mockComment.findMany
       .mockResolvedValueOnce([])  // batch fetch comments
       .mockResolvedValueOnce([])  // existingSuggestions
-      .mockResolvedValueOnce([{
-        commentId: "cr1", googleSuggestionId: null, resolved: false, status: "INBOX",
-      }]);
+      .mockResolvedValueOnce([]); // activeSuggestions — query filters to googleSuggestionId != null
 
     await syncComments(doc, driveAuth);
 
-    // Suggestion without googleSuggestionId should be resolved (INBOX → ARCHIVED)
-    const updateManyCall = mockComment.updateMany.mock.calls[0][0];
-    expect(updateManyCall.data.resolved).toBe(true);
-    expect(updateManyCall.data.status).toBe("ARCHIVED");
+    // The Prisma query for active suggestions filters to googleSuggestionId != null,
+    // so rows without one are never candidates for resolution.
+    const findManyCall = mockComment.findMany.mock.calls[2][0];
+    expect(findManyCall.where.googleSuggestionId).toEqual({ not: null });
+    expect(mockComment.updateMany).not.toHaveBeenCalled();
   });
 });
 

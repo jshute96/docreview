@@ -134,19 +134,14 @@ a new record. This may create duplicates for the same suggestion — see below.
 ### Resolution and cleanup
 
 When the Docs API is scanned, only pending (unresolved) suggestions appear in the document
-body. After upserting live suggestions, any suggestion row in the DB that is not in the
-live set is marked `resolved: true` and archived. The resolution check uses two criteria:
+body. After upserting live suggestions, any suggestion row **with a `googleSuggestionId`**
+that is not in the live set is marked `resolved: true` and archived.
 
-- Rows with a `googleSuggestionId`: resolved if not in the live set (normal case)
-- Rows without a `googleSuggestionId` (extension-only or Gmail-first rows): checked by
-  content hash against live suggestions. If a live suggestion has the same hash, the row
-  is kept (it likely represents that suggestion). Only resolved if no live suggestion
-  matches by hash.
-
-This means extension-only rows (which have a disco ID but no `googleSuggestionId`) are
-not wrongly resolved when their suggestion is still live. Gmail-first rows that Drive
-can't correlate are still self-correcting — they get resolved once the suggestion
-disappears from the document and no hash match remains.
+Rows without a `googleSuggestionId` (extension-only or Gmail-first rows) are **never
+resolved by the Docs API sync**. The Docs API cannot reliably determine whether these
+suggestions are gone — content hash matching is too fragile (normalization differences,
+formatting suggestions with colliding hashes). These rows are resolved when the Chrome
+extension reports `accepted`/`rejected` status from the DOM.
 
 ### Event ordering
 
@@ -163,27 +158,28 @@ When the suggestion is later accepted, the next refresh resolves it normally. Cl
 
 **Gmail first → suggestion already resolved before Drive syncs:** Gmail inserts a row
 with `resolved: false`. Drive sync doesn't find the suggestion in the doc, so the hash
-lookup is never attempted. Resolution check: no `googleSuggestionId` and no hash match
-among live suggestions → resolved. Clean after one refresh.
+lookup is never attempted. The row has no `googleSuggestionId`, so the Docs API sync
+leaves it alone. It will be resolved when the extension reports accepted/rejected status.
 
 ### Hash mismatch scenarios
 
-If text normalization differences prevent a hash match, duplicate rows can occur.
-All cases self-correct:
+If text normalization differences prevent a hash match, duplicate rows can occur:
 
 **Drive first, Gmail can't match:** Drive row A has `googleSuggestionId`. Gmail inserts
-row B with `googleCommentId` and a different hash. Next refresh: row B has no
-`googleSuggestionId` → resolved and archived. Row A remains the live record. If the
-suggestion is later accepted, row A is also resolved. Both rows end up resolved.
+row B with `googleCommentId` and a different hash. Row B has no `googleSuggestionId`, so
+the Docs API sync never resolves it. It will be resolved when the extension reports
+accepted/rejected status, or remain as a stale duplicate if the extension never sees it.
+Row A is resolved normally when the suggestion leaves the document.
 
 **Gmail first, Drive can't match:** Gmail inserts row B. Drive creates row A with
-`googleSuggestionId`. Resolution check resolves row B (no `googleSuggestionId`). Same
-outcome as above.
+`googleSuggestionId`. Row B remains unresolved by the Docs API sync (no
+`googleSuggestionId`). Same outcome as above.
 
 **Consequence of hash mismatch:** The Drive row never gets a `googleCommentId`, so it
 won't have a `?disco=` deep link. This is inherent — we can't merge what we can't
-correlate. The user may briefly see a duplicate suggestion in INBOX, but it disappears
-after the next refresh when the unmatched row is resolved.
+correlate. The user may see a duplicate suggestion. Without the extension, the
+Gmail/extension-only row won't be auto-resolved — this is acceptable because incorrectly
+resolving live suggestions (the previous behavior) was worse than leaving stale duplicates.
 
 ---
 
