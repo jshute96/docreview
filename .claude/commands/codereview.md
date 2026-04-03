@@ -16,8 +16,9 @@ The subagent should:
 While the review agent runs in the background, also do your own review:
 - Check if any docs in `docs/*.md` or elsewhere need updating for this change.
 - Update docs if necessary.
+- If new user-facing behavior was added that should be tested e2e, make sure it's listed in `testing/TODO.md`.
 
 $ARGUMENTS
 
 Do NOT poll, sleep, or check on the background agent — you will be automatically notified when it finishes.
-Once notified, read its output file with the Read tool and surface anything we should fix.
+Once notified, read its output file with the Read tool and surface anything we should fix.  When summarizing the findings from the subagent, say what its findings were.
