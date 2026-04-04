@@ -258,7 +258,7 @@ export function BulkEditDialog({
         </DialogHeader>
 
         <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
-          <div className="flex flex-col gap-6 px-6 pt-4 pb-0 shrink-0">
+          <div className="flex flex-col gap-4 px-6 pt-4 pb-0 shrink-0">
             <div className="flex gap-8">
               <div>
                 <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-900">
@@ -327,8 +327,8 @@ export function BulkEditDialog({
               </div>
             </div>
 
-            <div>
-              <div className="mb-2 flex items-center justify-between">
+            <div className="-mt-3">
+              <div className="mb-0 flex items-center justify-between">
                 <label className="text-xs font-medium uppercase tracking-wide text-zinc-900">
                   Labels
                 </label>
@@ -381,6 +381,7 @@ export function BulkEditDialog({
             </div>
           </div>
 
+          <div className="mx-6 mt-4 mb-1 text-xs font-medium uppercase tracking-wide text-zinc-900">Documents</div>
           <div
             tabIndex={-1}
             onKeyDown={(e) => {
