@@ -412,6 +412,12 @@ function injectDiscoIdHelpers() {
         });
       }
 
+      // Detect orphaned suggestions where the original anchored text was deleted.
+      // The aria-label includes "The original content is deleted." for these items.
+      // Note: the docos-docoview-tesla-conflict class and orphaned header div appear
+      // on ALL stream-view items when the Comments panel is open, so they're unreliable.
+      var originalContentDeleted = (label.toLowerCase().indexOf('original content is deleted') !== -1);
+
       var entry = {
         id: id,
         suggestionType: suggestionType,
@@ -422,7 +428,8 @@ function injectDiscoIdHelpers() {
         author: author,
         isMine: !!(myName && author === myName),
         timestamp: timestamp,
-        replies: replies
+        replies: replies,
+        originalContentDeleted: originalContentDeleted
       };
       results.push(entry);
     }
@@ -536,6 +543,10 @@ function injectDiscoIdHelpers() {
         });
       }
 
+      // Detect orphaned comments where the original anchored text was deleted.
+      // The aria-label includes "The original content is deleted." for these items.
+      var originalContentDeleted = (label.toLowerCase().indexOf('original content is deleted') !== -1);
+
       var entry = {
         id: id,
         status: status,
@@ -544,7 +555,8 @@ function injectDiscoIdHelpers() {
         timestamp: timestamp,
         text: text,
         html: html !== text ? html : undefined,
-        replies: replies
+        replies: replies,
+        originalContentDeleted: originalContentDeleted
       };
       results.push(entry);
     }

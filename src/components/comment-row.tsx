@@ -703,6 +703,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   documentText={isSuggestion ? undefined : documentText}
                   isSelected={isSelected}
                   onSelectInDoc={onSelectInDoc ? doSelectInDoc : undefined}
+                  isSuggestion={isSuggestion}
                   buttonsRowRef={buttonsRowRef}
                   headerContent={isSuggestion ? (
                     <p className="mb-1 text-xs text-zinc-300 font-mono">

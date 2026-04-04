@@ -222,6 +222,19 @@ the extension isn't available. On success, the thread and suggestion content upd
 for immediate display, and the suggestion is pushed to the server for DB merge via
 `mergeExtensionSuggestions()` (same endpoint as the page-level extension sync).
 
+**Orphaned suggestions:** When the text a suggestion was anchored to is deleted from the
+document, Google Docs marks it as orphaned — the Comments panel shows "Original content
+deleted" above these items. The extension detects this via the aria-label (which includes
+"The original content is deleted." for orphaned items) and sets `originalContentDeleted: true`
+on the suggestion. This propagates through `extensionToThread()` to `CommentThread` and is
+displayed as a warning on the comments page: "Original content deleted. This suggestion is
+not visible in the document." This takes priority over the weaker heuristic that compares
+`quotedFileContent` against the current document text.
+
+Note: the `docos-docoview-tesla-conflict` CSS class and the orphaned header div appear on
+ALL stream-view items when the Comments panel is open, so they are unreliable for detection.
+The aria-label is the only reliable signal.
+
 **Limitations:** Only works when a doc tab is open. Only sees suggestions visible in the DOM
 (anchored sidebar for open suggestions; resolved ones require that the comments pane was
 opened at least once during the session — they remain loaded after the pane is closed).

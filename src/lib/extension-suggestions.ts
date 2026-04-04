@@ -74,6 +74,7 @@ export function extensionToThread(s: ExtensionSuggestion): CommentThread {
       createdTime: r.timestamp,
       action: r.action,
     })),
+    ...(s.originalContentDeleted ? { originalContentDeleted: true } : {}),
   };
 }
 

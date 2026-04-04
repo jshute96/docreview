@@ -192,6 +192,7 @@ export interface ExtensionSuggestion {
   author: string;
   isMine: boolean;
   timestamp: string;       // relative timestamp from DOM, e.g. "6:29 PM Feb 21"
+  originalContentDeleted?: boolean; // true when the anchored text has been deleted from the document
   replies: {
     author: string;
     isMine: boolean;

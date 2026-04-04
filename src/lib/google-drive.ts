@@ -785,6 +785,7 @@ export interface CommentThread {
   resolved: boolean;
   replies: ThreadReply[];
   quotedFileContent?: { mimeType: string; value: string } | null;
+  originalContentDeleted?: boolean; // true when the anchored text has been deleted (detected by extension)
 }
 
 /** Map of Google comment/suggestion IDs to their thread data. */

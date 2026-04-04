@@ -132,6 +132,7 @@ Update this list when adding or changing user-facing behaviors.
 
 ### Suggestions Display
 - [ ] Suggestions appear in same table as comments
+- [ ] Orphaned suggestions (original content deleted) show "Original content deleted" warning (using state from the extension)
 - [ ] Show proposed insertion, deletion, or edit text
 - [ ] Non-text suggestions show "Suggestion: description" with anchor text blockquote
 - [ ] Non-text suggestions show "on ..." suffix in collapsed row

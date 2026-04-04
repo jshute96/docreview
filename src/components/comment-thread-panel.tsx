@@ -63,6 +63,8 @@ interface CommentThreadPanelProps {
   footerContent?: React.ReactNode;
   /** Message shown when threads is empty. Defaults to "No comments on this document." */
   emptyMessage?: string;
+  /** Whether this is a suggestion (vs a comment). Used for display labels. */
+  isSuggestion?: boolean;
   /** Ref to the buttons row, used by CommentRow for auto-scroll positioning
    *  when this comment is selected from the Google Doc tab. */
   buttonsRowRef?: React.RefObject<HTMLDivElement | null>;
@@ -99,6 +101,7 @@ export function CommentThreadPanel({
   headerContent,
   footerContent,
   emptyMessage,
+  isSuggestion,
   buttonsRowRef,
 }: CommentThreadPanelProps) {
   const [replyText, setReplyText] = useState("");
@@ -397,7 +400,7 @@ export function CommentThreadPanel({
                       <p className="text-xs text-zinc-500 whitespace-pre-wrap">{thread.quotedFileContent.value}</p>
                     )}
                   </div>
-                  {documentText !== undefined && (() => {
+                  {!thread.originalContentDeleted && documentText !== undefined && (() => {
                     // Drive API may truncate long quoted text with "..." or "…" — match on the prefix
                     const raw = thread.quotedFileContent!.value;
                     const trimmed = raw.replace(/\.{3}$|…$/, "");
@@ -405,12 +408,19 @@ export function CommentThreadPanel({
                   })() && (
                     <p
                       className="mt-1 text-xs text-amber-600"
-                      title="The quoted text is a snapshot from when the comment was created. If the text has been deleted, the comment thread may not be visible when viewing the document."
+                      title={`The quoted text is a snapshot from when the ${isSuggestion ? "suggestion" : "comment"} was created. If the text has been deleted, the ${isSuggestion ? "suggestion" : "comment"} thread may not be visible when viewing the document.`}
                     >
-                      This text no longer exists in the document. This comment might not be visible.
+                      This text no longer exists in the document. This {isSuggestion ? "suggestion" : "comment"} might not be visible.
                     </p>
                   )}
                 </div>
+              )}
+              {/* "Original content deleted" from the extension — a definitive signal
+                  that the anchored text was deleted. Takes priority over the text-match heuristic. */}
+              {threadIndex === 0 && thread.originalContentDeleted && (
+                <p className="mb-2 text-xs text-amber-600">
+                  Original content deleted. This {isSuggestion ? "suggestion" : "comment"} is not visible in the document.
+                </p>
               )}
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-zinc-900">
