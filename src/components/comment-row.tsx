@@ -12,7 +12,7 @@ import { FriendlyDate } from "@/components/friendly-date";
 import { StarButton } from "@/components/star-button";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
-import { navigateToComment, supportsCommentNavigation, getSuggestionFromDoc, getExtensionStatus, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
+import { navigateToComment, supportsCommentNavigation, getSuggestionFromDoc, getCommentFromDoc, getExtensionStatus, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
 import { docTarget } from "@/lib/tab-targets";
 
@@ -133,9 +133,19 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     navigateToComment(googleDocId, comment.googleCommentId ?? "", driveUrl, comment.resolved);
   }
 
+  // Preserve originalContentDeleted from previous thread state when replacing
+  // threads with Drive API data (which doesn't carry this extension-only flag).
+  function preserveDeletedFlag(prev: CommentThread[], next: CommentThread[]): CommentThread[] {
+    const prevDeleted = prev[0]?.originalContentDeleted;
+    if (prevDeleted && next.length > 0 && !next[0].originalContentDeleted) {
+      return [{ ...next[0], originalContentDeleted: true }, ...next.slice(1)];
+    }
+    return next;
+  }
+
   function applyThreadUpdate(data: { threads: ThreadMap; comment: Comment }) {
     const threadList = Object.values(data.threads);
-    setThreads(threadList);
+    setThreads(prev => preserveDeletedFlag(prev, threadList));
     if (onThreadUpdate && threadList.length > 0) {
       onThreadUpdate(threadId, threadList[0]);
     }
@@ -153,7 +163,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       const threadList: CommentThread[] = Object.values(data.threads);
-      setThreads(threadList);
+      setThreads(prev => preserveDeletedFlag(prev, threadList));
       if (onThreadUpdate && threadList.length > 0) {
         onThreadUpdate(threadId, threadList[0]);
       }
@@ -176,6 +186,17 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       if (!res.ok) throw new Error("Failed");
       applyThreadUpdate(await res.json());
       broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
+      // After Drive thread refresh, check the extension for originalContentDeleted
+      // (Drive API doesn't know about orphaned comments)
+      if (comment.googleCommentId) {
+        void getCommentFromDoc(googleDocId, comment.googleCommentId).then((ci) => {
+          if (!ci) return;
+          setThreads(prev => {
+            if (!prev[0] || prev[0].originalContentDeleted === ci.originalContentDeleted) return prev;
+            return [{ ...prev[0], originalContentDeleted: ci.originalContentDeleted || undefined }, ...prev.slice(1)];
+          });
+        });
+      }
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to refresh comment");
     } finally {

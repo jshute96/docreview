@@ -204,31 +204,6 @@ export interface ExtensionSuggestion {
 }
 
 /**
- * Ask the extension to extract suggestion data from an open Google Docs tab.
- * Returns the array of suggestions scraped from the DOM, or null if the
- * extension isn't available or no doc tab is open.
- */
-export async function getSuggestionsFromDoc(docId: string): Promise<ExtensionSuggestion[] | null> {
-  try {
-    const result = await sendExtensionMessage<{ success: boolean; suggestions?: ExtensionSuggestion[]; error?: string }>(
-      { type: "getSuggestions", docId },
-      5000,
-    );
-    if (result.success && result.suggestions) {
-      console.log("[extension] getSuggestions:", result.suggestions.length, "from doc tab");
-      return result.suggestions;
-    }
-    if (!result.success) {
-      console.log("[extension] getSuggestions: not available —", result.error ?? "unknown");
-    }
-    return null;
-  } catch {
-    // Extension not installed or bridge not loaded — expected when extension is absent
-    return null;
-  }
-}
-
-/**
  * Ask the extension to extract a single suggestion by disco ID from an open Google Docs tab.
  * Returns the suggestion or null if not found / extension unavailable.
  */
@@ -244,6 +219,62 @@ export async function getSuggestionFromDoc(docId: string, discoId: string): Prom
     return result.suggestion ?? null;
   }
   throw new Error(result.error ?? "Extension error");
+}
+
+/**
+ * Ask the extension to extract minimal info for a single comment by disco ID.
+ * Returns the comment info or null if not found / extension unavailable.
+ */
+export async function getCommentFromDoc(docId: string, discoId: string): Promise<ExtensionCommentInfo | null> {
+  try {
+    const result = await sendExtensionMessage<{
+      success: boolean;
+      comment?: ExtensionCommentInfo | null;
+      error?: string;
+    }>({ type: "getComment", docId, discoId }, 5000);
+    if (result.success) {
+      return result.comment ?? null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Minimal comment info returned by the extension — just the fields not available from Drive API. */
+export interface ExtensionCommentInfo {
+  id: string;                     // disco ID (AAAB format)
+  originalContentDeleted: boolean;
+}
+
+/**
+ * Ask the extension to extract suggestions (full) and comment info (minimal)
+ * from an open Google Docs tab in a single call.
+ * Returns null if the extension isn't available or no doc tab is open.
+ */
+export async function getCommentsAndSuggestionsFromDoc(docId: string): Promise<{
+  suggestions: ExtensionSuggestion[];
+  comments: ExtensionCommentInfo[];
+} | null> {
+  try {
+    const result = await sendExtensionMessage<{
+      success: boolean;
+      suggestions?: ExtensionSuggestion[];
+      comments?: ExtensionCommentInfo[];
+      error?: string;
+    }>({ type: "getCommentsAndSuggestions", docId }, 5000);
+    if (result.success) {
+      console.log("[extension] getCommentsAndSuggestions:", result.suggestions?.length ?? 0, "suggestions,", result.comments?.length ?? 0, "comments");
+      return {
+        suggestions: result.suggestions ?? [],
+        comments: result.comments ?? [],
+      };
+    }
+    console.log("[extension] getCommentsAndSuggestions: not available —", result.error ?? "unknown");
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /** Callback type for comment selection events from Google Doc tabs. */

@@ -344,9 +344,10 @@ the same pattern via `handleSourceRefresh`.
 with its comments array, plus thread details, suggestion content, document text, and
 `viewedByMeTime`. `DocDetail` destructures all of this from the response and updates state
 directly — no follow-up `/comments` or `/content` fetches needed. After applying the server
-response, the client also runs `fetchExtensionSuggestions()` to re-scrape suggestion data
-from the Chrome extension (if available), overwriting the server's Docs API data with the
-richer extension data (replies, author, status). The owner and modified date in the header
+response, the client also runs `fetchExtensionCommentsAndSuggestions()` to fetch both suggestion data and
+comment info from the Chrome extension (if available). Suggestion data overwrites the
+server's Docs API data with richer extension data (replies, author, status). Comment info
+merges `originalContentDeleted` flags into the thread map for orphaned comment detection. The owner and modified date in the header
 reflect the latest Drive data without a page reload. Titles are fetched separately via the
 browser's title cache.
 

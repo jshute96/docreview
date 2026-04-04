@@ -419,7 +419,8 @@ export function CommentThreadPanel({
                   that the anchored text was deleted. Takes priority over the text-match heuristic. */}
               {threadIndex === 0 && thread.originalContentDeleted && !(isSuggestion && resolved) && (
                 <p className="mb-2 text-xs text-amber-600">
-                  Original content deleted. This {isSuggestion ? "suggestion" : "comment"} is not visible in the document.
+                  Original content deleted. This {resolved && thread.quotedFileContent?.value
+                    ? "text" : isSuggestion ? "suggestion" : "comment"} is not visible in the document.
                 </p>
               )}
               <div className="flex items-center gap-2">

@@ -530,6 +530,82 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     })();
     return true; // async response
   }
+
+  // From Docreview bridge: extract a single comment by disco ID from an open Google Docs tab.
+  if (msg.type === 'getComment' && msg.docId && msg.discoId) {
+    console.log('[background] getComment from docreview:', msg.docId, msg.discoId);
+    (async function() {
+      var config = await chrome.storage.sync.get({ enableDocs: DEFAULTS.enableDocs });
+      if (!config.enableDocs) {
+        sendResponse({ success: false, error: 'Google Docs integration is disabled' });
+        return;
+      }
+      var tabId = await findDocTab(msg.docId);
+      if (!tabId) {
+        sendResponse({ success: false, error: 'Doc tab not open' });
+        return;
+      }
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: injectDiscoIdHelpers,
+          world: 'MAIN'
+        });
+        var results = await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: function(targetId) { return window.__docreviewDisco.getComments(targetId); },
+          args: [msg.discoId],
+          world: 'MAIN'
+        });
+        var matches = results && results[0] && results[0].result;
+        sendResponse({ success: true, comment: (matches && matches[0]) || null });
+      } catch (err) {
+        console.warn('[background] getComment failed:', err.message);
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true; // async response
+  }
+
+  // From Docreview bridge: extract both suggestions (full) and comments (minimal:
+  // id + originalContentDeleted) from an open Google Docs tab in a single call.
+  if (msg.type === 'getCommentsAndSuggestions' && msg.docId) {
+    console.log('[background] getCommentsAndSuggestions from docreview:', msg.docId);
+    (async function() {
+      var config = await chrome.storage.sync.get({ enableDocs: DEFAULTS.enableDocs });
+      if (!config.enableDocs) {
+        sendResponse({ success: false, error: 'Google Docs integration is disabled' });
+        return;
+      }
+      var tabId = await findDocTab(msg.docId);
+      if (!tabId) {
+        sendResponse({ success: false, error: 'Doc tab not open' });
+        return;
+      }
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: injectDiscoIdHelpers,
+          world: 'MAIN'
+        });
+        var results = await chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          func: function() { return window.__docreviewDisco.getCommentsAndSuggestions(); },
+          world: 'MAIN'
+        });
+        var data = results && results[0] && results[0].result;
+        sendResponse({
+          success: true,
+          suggestions: (data && data.suggestions) || [],
+          comments: (data && data.comments) || []
+        });
+      } catch (err) {
+        console.warn('[background] getCommentsAndSuggestions failed:', err.message);
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true; // async response
+  }
 });
 
 // --- Comment navigation ---

@@ -563,6 +563,22 @@ function injectDiscoIdHelpers() {
     return results;
   }
 
+  // Combined fetch: full suggestions + minimal comment info (id + originalContentDeleted).
+  // Used by the Docreview page to get both in a single round-trip.
+  function getCommentsAndSuggestions() {
+    var suggestions = getSuggestions();
+    var fullComments = getComments();
+    // Strip comments down to just the fields the web app needs
+    var comments = [];
+    for (var i = 0; i < fullComments.length; i++) {
+      comments.push({
+        id: fullComments[i].id,
+        originalContentDeleted: fullComments[i].originalContentDeleted
+      });
+    }
+    return { suggestions: suggestions, comments: comments };
+  }
+
   // Get the disco ID of the currently selected/active comment.
   function getActiveCommentId() {
     var active = document.querySelector('#docos-stream-view [role="listitem"].docos-docoview-active');
@@ -658,6 +674,7 @@ function injectDiscoIdHelpers() {
     listComments: listComments,
     getComments: getComments,
     getSuggestions: getSuggestions,
+    getCommentsAndSuggestions: getCommentsAndSuggestions,
     getActiveCommentId: getActiveCommentId,
     fullClick: fullClick,
     isCommentsPaneOpen: isCommentsPaneOpen,
@@ -666,10 +683,16 @@ function injectDiscoIdHelpers() {
     findCommentByDiscoId: findCommentByDiscoId,
     waitForResolvedComments: waitForResolvedComments
   };
+  // Singular wrappers for debugging: return one item by disco ID, not an array.
+  function getComment(id) { return getComments(id)[0] || null; }
+  function getSuggestion(id) { return getSuggestions(id)[0] || null; }
+
   // Expose debugging functions directly on window for convenience
   window.listComments = listComments;
   window.getComments = getComments;
+  window.getComment = getComment;
   window.getSuggestions = getSuggestions;
+  window.getSuggestion = getSuggestion;
   window.getActiveCommentId = getActiveCommentId;
 
   // Track comment selection/deselection across all #docos-stream-view elements.

@@ -200,16 +200,23 @@ This provides richer data than either the Docs API or Gmail:
 | Timestamps | Approximate | Minute precision | Relative from DOM |
 | Disco ID (for navigation) | No | Yes | Yes |
 
-**Display flow:** On the comments page, after pinging the extension, `fetchExtensionSuggestions()`
-calls `getSuggestionsFromDoc(docId)` via the bridge. The extension executes `getSuggestions()`
-in the doc tab's MAIN world and returns the results. If the doc isn't open yet (no suggestions
-returned), the extension will send a `docReady` event when the doc's stream view appears later,
-triggering an automatic one-time fetch without requiring a manual Refresh. These are then:
+**Display flow:** On the comments page, after pinging the extension, `fetchExtensionCommentsAndSuggestions()`
+calls `getCommentsAndSuggestionsFromDoc(docId)` via the bridge. This makes a single call to
+the extension which executes both `getSuggestions()` and `getComments()` in the doc tab's
+MAIN world. For suggestions, the full data is returned; for comments, only `id` and
+`originalContentDeleted` are returned (since the Drive API provides everything else).
+If the doc isn't open yet (no data returned), the extension will send a `docReady` event
+when the doc's stream view appears later, triggering an automatic one-time fetch without
+requiring a manual Refresh. The suggestion results are then:
 1. Converted to `CommentThread` and `SuggestionContent` entries for thread panel display
    (reply text, HTML content, author info — data not available from the DB)
 2. POSTed to `POST /api/docs/[docId]/extension-suggestions` for DB merge via content-hash
    matching (same algorithm as Gmail merge). The returned DB records replace the suggestion
    entries in the comments list.
+
+The comment `originalContentDeleted` flags are merged into the existing thread map entries
+so the "Original content deleted" warning appears for orphaned comments (see
+docs/comment-tracking.md).
 
 **Timestamps:** The extension returns relative timestamps from the DOM (e.g., "6:29 PM Feb 21",
 "5:06 AM Yesterday"). These are parsed into `Date` objects for the created/modified columns
@@ -221,6 +228,12 @@ The button is disabled (greyed out with tooltip) when the suggestion has no disc
 the extension isn't available. On success, the thread and suggestion content update locally
 for immediate display, and the suggestion is pushed to the server for DB merge via
 `mergeExtensionSuggestions()` (same endpoint as the page-level extension sync).
+
+**Per-comment refresh:** When a comment thread is refreshed (via the Refresh button on
+an expanded comment), the Drive API thread data is fetched first. After that completes,
+`getCommentFromDoc()` checks the extension for the comment's `originalContentDeleted`
+status and merges it into the thread data. The `originalContentDeleted` flag is preserved
+across Drive API refreshes (which don't carry it) to avoid flickering.
 
 **Orphaned suggestions:** When the text a suggestion was anchored to is deleted from the
 document, Google Docs marks it as orphaned — the Comments panel shows "Original content

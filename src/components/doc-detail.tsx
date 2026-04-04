@@ -15,7 +15,7 @@ import { ROLE_COLORS } from "@/lib/role-colors";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { CommentRow } from "@/components/comment-row";
-import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, setDocReadyHandler, getSuggestionsFromDoc, getSuggestionFromDoc, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
+import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, setDocReadyHandler, getCommentsAndSuggestionsFromDoc, getSuggestionFromDoc, type ExtensionSuggestion, type ExtensionCommentInfo } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -59,6 +59,17 @@ import { docTarget } from "@/lib/tab-targets";
 function commentKey(c: Comment): string {
   if (c.type === "SUGGESTION") return c.googleSuggestionId ?? c.googleCommentId ?? "";
   return c.googleCommentId ?? "";
+}
+
+/** Merge new thread data into an existing map, preserving extension-only originalContentDeleted flags. */
+function mergeThreads(prev: ThreadMap, incoming: ThreadMap): ThreadMap {
+  const merged = { ...prev, ...incoming };
+  for (const id of Object.keys(incoming)) {
+    if (prev[id]?.originalContentDeleted && !incoming[id].originalContentDeleted) {
+      merged[id] = { ...merged[id], originalContentDeleted: true };
+    }
+  }
+  return merged;
 }
 
 interface DocDetailProps {
@@ -207,7 +218,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       const res = await apiFetch(`/api/docs/${doc.docId}/threads`, { contextId });
       if (res.ok) {
         const data = await res.json();
-        setThreadMap(prev => ({ ...prev, ...(data.threads ?? {}) }));
+        setThreadMap(prev => mergeThreads(prev, data.threads ?? {}));
         if (data.viewedByMeTime !== undefined) setViewedByMeTime(data.viewedByMeTime);
       }
     } catch { /* threads are optional */ }
@@ -237,37 +248,73 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
   const extensionSuggestionsLoaded = useRef(false);
   useEffect(() => {
     void pingExtension().then(() => {
-      void fetchExtensionSuggestions();
+      void fetchExtensionCommentsAndSuggestions();
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch suggestions from the Google Docs DOM via the extension, then:
-  //   1. Push them to the server for DB merge (hash matching, insert/update)
+  // Fetch suggestions and comment info from the Google Docs DOM via the extension:
+  //   1. Push suggestions to the server for DB merge (hash matching, insert/update)
   //   2. Merge the returned DB records into the comments list
   //   3. Keep extension thread/content data for reply display (not in DB)
-  async function fetchExtensionSuggestions() {
-    const suggestions = await getSuggestionsFromDoc(googleDocId);
-    if (!suggestions || suggestions.length === 0) return;
-    extensionSuggestionsLoaded.current = true;
-    console.log("[doc-detail] extension suggestions: got", suggestions.length, "from doc tab");
+  //   4. Merge comment originalContentDeleted flags into the thread map
+  async function fetchExtensionCommentsAndSuggestions() {
+    const data = await getCommentsAndSuggestionsFromDoc(googleDocId);
+    if (!data) return;
+    const { suggestions, comments: commentInfos } = data;
 
-    // Keep extension thread data and suggestion content for display —
-    // the DB doesn't store reply text, so we hold it in the thread map
-    const newThreads: ThreadMap = {};
-    const newSuggContent: Record<string, SuggestionContent> = {};
-    for (const s of suggestions) {
-      newThreads[s.id] = extensionToThread(s);
-      newSuggContent[s.id] = extensionToSuggestionContent(s);
-    }
-    setThreadMap(prev => ({ ...prev, ...newThreads }));
-    setSuggestionContent(prev => ({ ...prev, ...newSuggContent }));
+    if (suggestions.length > 0) {
+      extensionSuggestionsLoaded.current = true;
+      console.log("[doc-detail] extension: got", suggestions.length, "suggestions from doc tab"); // eslint-disable-line no-console
 
-    // Push to server for DB merge and update the comments list
-    try {
-      await mergeExtensionSuggestions(suggestions);
-    } catch (err) {
-      console.log("[doc-detail] extension suggestions: server merge error", err);
+      // Keep extension thread data and suggestion content for display —
+      // the DB doesn't store reply text, so we hold it in the thread map
+      const newThreads: ThreadMap = {};
+      const newSuggContent: Record<string, SuggestionContent> = {};
+      for (const s of suggestions) {
+        newThreads[s.id] = extensionToThread(s);
+        newSuggContent[s.id] = extensionToSuggestionContent(s);
+      }
+      setThreadMap(prev => ({ ...prev, ...newThreads }));
+      setSuggestionContent(prev => ({ ...prev, ...newSuggContent }));
+
+      // Push to server for DB merge and update the comments list
+      try {
+        await mergeExtensionSuggestions(suggestions);
+      } catch (err) {
+        console.log("[doc-detail] extension suggestions: server merge error", err); // eslint-disable-line no-console
+      }
     }
+
+    // Merge originalContentDeleted from extension into comment thread entries
+    if (commentInfos.length > 0) {
+      mergeCommentInfos(commentInfos);
+    }
+  }
+
+  /** Merge extension comment info (originalContentDeleted) into existing thread map entries. */
+  function mergeCommentInfos(commentInfos: ExtensionCommentInfo[]) {
+    setThreadMap(prev => {
+      const updates: ThreadMap = {};
+      for (const ci of commentInfos) {
+        const existing = prev[ci.id];
+        const flag = ci.originalContentDeleted || undefined;
+        if (existing) {
+          if (existing.originalContentDeleted !== flag) {
+            updates[ci.id] = { ...existing, originalContentDeleted: flag };
+          }
+        } else if (flag) {
+          // No thread data yet — create a minimal placeholder so the flag is available
+          // when the Drive thread data arrives and merges with it
+          updates[ci.id] = {
+            id: ci.id, author: "", fromMe: false, content: "",
+            createdTime: "", resolved: false, replies: [],
+            originalContentDeleted: true,
+          };
+        }
+      }
+      if (Object.keys(updates).length === 0) return prev;
+      return { ...prev, ...updates };
+    });
   }
 
   // When the extension reports that a Google Doc's stream view has appeared
@@ -281,7 +328,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       if (docId !== googleDocId) return;
       if (extensionSuggestionsLoaded.current) return;
       console.log("[doc-detail] docReady: auto-fetching suggestions");
-      void fetchExtensionSuggestions();
+      void fetchExtensionCommentsAndSuggestions();
     });
     return () => setDocReadyHandler(null);
   }, [googleDocId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -387,7 +434,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
               if (Object.keys(threadData.threads).length === 0) {
                 setThreadMap(prev => { const next = { ...prev }; delete next[googleCommentId]; return next; });
               } else {
-                setThreadMap(prev => ({ ...prev, ...threadData.threads }));
+                setThreadMap(prev => mergeThreads(prev, threadData.threads));
               }
             } else {
               setThreadMap(threadData.threads ?? {});
@@ -415,7 +462,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
             // (extracted by the extension on mousedown, or included in the
             // per-suggestion refresh broadcast). Fall back to scraping all.
             console.warn("[cross-tab] doc-detail: suggestion event without disco ID, fetching all"); // eslint-disable-line no-console
-            void fetchExtensionSuggestions();
+            void fetchExtensionCommentsAndSuggestions();
           }
         } else if (docRes.status === 404 || docRes.status === 410) {
           setNotFound(true);
@@ -516,7 +563,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       // Merge Drive data into existing maps — don't replace, because the extension
       // provides richer suggestion threads and descriptions that Drive doesn't have.
       // Extension sync runs right after and will refresh its entries too.
-      if (threads !== undefined) setThreadMap(prev => ({ ...prev, ...threads }));
+      if (threads !== undefined) setThreadMap(prev => mergeThreads(prev, threads));
       if (vbmt !== undefined) setViewedByMeTime(vbmt);
       if (suggestionContent !== undefined) setSuggestionContent(prev => ({ ...prev, ...suggestionContent }));
       if (documentText !== undefined) setDocumentText(documentText);
@@ -524,7 +571,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       // Refresh suggestions from the extension after the server data is applied,
       // so the richer extension data (replies, author, status) overwrites the
       // server's Docs API data. This also merges extension records into the DB.
-      await fetchExtensionSuggestions();
+      await fetchExtensionCommentsAndSuggestions();
       toast.success("Comments synced");
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to sync comments");
