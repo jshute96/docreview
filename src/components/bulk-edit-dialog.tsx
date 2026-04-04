@@ -373,6 +373,7 @@ export function BulkEditDialog({
                 ref={notesRef}
                 value={appendNotes}
                 onChange={(e) => setAppendNotes(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 placeholder="Append notes..."
                 rows={1}
                 className={`${TEXTAREA_CLASSES} max-h-[150px] w-full`}

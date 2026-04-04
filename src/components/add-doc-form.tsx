@@ -451,6 +451,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
             ref={notesRef}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
+            onFocus={(e) => e.target.select()}
             placeholder="Add notes..."
             rows={1}
             className={`${TEXTAREA_CLASSES} w-full max-h-[200px]`}
