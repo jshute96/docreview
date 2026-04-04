@@ -417,7 +417,7 @@ export function CommentThreadPanel({
               )}
               {/* "Original content deleted" from the extension — a definitive signal
                   that the anchored text was deleted. Takes priority over the text-match heuristic. */}
-              {threadIndex === 0 && thread.originalContentDeleted && (
+              {threadIndex === 0 && thread.originalContentDeleted && !(isSuggestion && resolved) && (
                 <p className="mb-2 text-xs text-amber-600">
                   Original content deleted. This {isSuggestion ? "suggestion" : "comment"} is not visible in the document.
                 </p>
