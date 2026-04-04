@@ -229,7 +229,9 @@ deleted" above these items. The extension detects this via the aria-label (which
 on the suggestion. This propagates through `extensionToThread()` to `CommentThread` and is
 displayed as a warning on the comments page: "Original content deleted. This suggestion is
 not visible in the document." This takes priority over the weaker heuristic that compares
-`quotedFileContent` against the current document text.
+`quotedFileContent` against the current document text. When the extension merge inserts a
+new suggestion row with `originalContentDeleted`, it is treated like a resolved suggestion
+for initial status — archived by default (unless @-mentioned).
 
 Note: the `docos-docoview-tesla-conflict` CSS class and the orphaned header div appear on
 ALL stream-view items when the Comments panel is open, so they are unreliable for detection.

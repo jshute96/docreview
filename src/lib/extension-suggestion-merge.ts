@@ -33,6 +33,7 @@ export interface ExtensionSuggestionInput {
   author: string;
   isMine: boolean;
   timestamp: string;
+  originalContentDeleted?: boolean; // true when the anchored text has been deleted from the document
   replies: {
     author: string;
     isMine: boolean;
@@ -266,7 +267,7 @@ export async function mergeExtensionSuggestions(
         }
         const status = computeInitialInboxStatus({
           mentionedOrAssigned: commentData.mentionedMe,
-          resolved: commentData.resolved,
+          resolved: commentData.resolved || !!s.originalContentDeleted,
           isDocAuthor: doc.role === "AUTHOR",
           isThreadAuthor: commentData.isThreadAuthor,
           isReplyAuthor: commentData.isReplyAuthor,
