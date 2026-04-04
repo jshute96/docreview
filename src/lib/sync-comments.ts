@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { fetchCommentData, fetchDocData, fetchThreadDetail, getDriveClient } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { computeSuggestionHash } from "@/lib/suggestion-hash";
-import type { Doc, Comment, Prisma, CommentStatus } from "@prisma/client";
+import type { Doc, Comment, Prisma, CommentStatus, DocStatus } from "@prisma/client";
 import type { DriveComment, DriveSuggestion, CommentThread, ThreadDetailResult } from "@/lib/google-drive";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
@@ -46,7 +46,6 @@ interface SyncResult {
   suggestionsUpdated: number;
   suggestionsResolved: number;
   shouldUnarchive: boolean;
-  hasNonResolveActivity: boolean;
   isDeleted?: boolean;
   permissionDenied?: boolean;
   transientError?: boolean;
@@ -58,7 +57,7 @@ interface SyncResult {
 const EMPTY_RESULT: SyncResult = {
   commentsCreated: 0, commentsUpdated: 0,
   suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-  shouldUnarchive: false, hasNonResolveActivity: false,
+  shouldUnarchive: false,
 };
 
 // --- Helpers ---
@@ -231,10 +230,6 @@ export async function syncComments(
         commentsCreated: result.created ? 1 : 0,
         commentsUpdated: result.updated ? 1 : 0,
         shouldUnarchive: result.shouldUnarchive,
-        // shouldUnarchive is only true for non-resolve activity (new replies,
-        // status transitions) — resolve-only changes don't trigger unarchive.
-        // So aliasing it here is safe.
-        hasNonResolveActivity: result.shouldUnarchive,
         thread: result.thread,
       };
     } catch (err: any) {
@@ -274,7 +269,7 @@ export async function syncComments(
 
   let commentResult: CommentSyncResult;
   if (skipComments) {
-    commentResult = { commentsCreated: 0, commentsUpdated: 0, commentsDeleted: 0, shouldUnarchive: false, hasNonResolveActivity: false };
+    commentResult = { commentsCreated: 0, commentsUpdated: 0, commentsDeleted: 0, shouldUnarchive: false };
   } else {
     commentResult = await syncDriveComments(doc, comments);
   }
@@ -314,7 +309,6 @@ export async function syncComments(
     commentsUpdated: commentResult.commentsUpdated,
     ...suggestionResult,
     shouldUnarchive: commentResult.shouldUnarchive || suggestionResult.shouldUnarchive,
-    hasNonResolveActivity: commentResult.hasNonResolveActivity || suggestionResult.hasNonResolveActivity,
   };
 }
 
@@ -378,7 +372,6 @@ interface CommentSyncResult {
   commentsUpdated: number;
   commentsDeleted: number;
   shouldUnarchive: boolean;
-  hasNonResolveActivity: boolean;
 }
 
 /**
@@ -398,7 +391,6 @@ async function syncDriveComments(
   const toCreate: Prisma.CommentCreateManyInput[] = [];
   let updatedCount = 0;
   let shouldUnarchive = false;
-  let hasNonResolveActivity = false;
 
   // Batch-fetch all existing comments for this doc to avoid N+1 queries
   const existingComments = new Map(
@@ -411,15 +403,13 @@ async function syncDriveComments(
     const existing = existingComments.get(c.id) ?? null;
 
     if (!existing) {
-      const { record, unarchive, nonResolveActivity } = buildNewComment(doc, c);
+      const { record, unarchive } = buildNewComment(doc, c);
       toCreate.push(record);
       if (unarchive) shouldUnarchive = true;
-      if (nonResolveActivity) hasNonResolveActivity = true;
     } else {
       const result = await updateExistingComment(doc, c, existing);
       if (result.updated) updatedCount++;
       if (result.unarchive) shouldUnarchive = true;
-      if (result.nonResolveActivity) hasNonResolveActivity = true;
     }
   }
 
@@ -453,7 +443,6 @@ async function syncDriveComments(
     commentsUpdated: updatedCount,
     commentsDeleted: deleted,
     shouldUnarchive,
-    hasNonResolveActivity,
   };
 }
 
@@ -484,7 +473,7 @@ export function computeInitialInboxStatus(opts: {
 function buildNewComment(
   doc: Doc,
   c: DriveComment,
-): { record: Prisma.CommentCreateManyInput; unarchive: boolean; nonResolveActivity: boolean } {
+): { record: Prisma.CommentCreateManyInput; unarchive: boolean } {
   const mentionedInThread = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
   const mentionedOrAssigned = mentionedInThread || c.assignedToMe;
   const status = computeInitialInboxStatus({
@@ -515,10 +504,8 @@ function buildNewComment(
   // Doc-level unarchive: new INBOX comment triggers unarchive, but not if
   // already read (my own activity shouldn't resurface an archived doc).
   const unarchive = status === "INBOX" && !c.isRead;
-  // Track non-resolve activity: unresolved comments or @-mentions/assignments (even on resolved)
-  const nonResolveActivity = (!c.resolved || mentionedOrAssigned) && !c.isRead;
 
-  return { record, unarchive, nonResolveActivity };
+  return { record, unarchive };
 }
 
 /**
@@ -529,7 +516,7 @@ async function updateExistingComment(
   doc: Doc,
   c: DriveComment,
   existing: Comment,
-): Promise<{ comment: Comment; updated: boolean; unarchive: boolean; nonResolveActivity: boolean }> {
+): Promise<{ comment: Comment; updated: boolean; unarchive: boolean }> {
   const hasNewReplies = c.replyCount > existing.replyCount;
   const hasNewActivity =
     hasNewReplies ||
@@ -555,31 +542,13 @@ async function updateExistingComment(
         return updated;
       });
     }
-    return { comment, updated: changed, unarchive: false, nonResolveActivity: false };
+    return { comment, updated: changed, unarchive: false };
   }
 
   const previousStatus = existing.status as "INBOX" | "ARCHIVED" | "MUTED";
-  let nonResolveActivity = false;
-
-  // Track non-resolve activity for existing comments.
-  // Skip when isRead — my own activity shouldn't resurface an archived doc.
-  if (hasNewActivity && !c.isRead) {
-    const isBeingResolved = c.resolved && !existing.resolved;
-    const newReplyCount = c.replyCount - existing.replyCount;
-    if (isBeingResolved && newReplyCount <= 1) {
-      // Resolve-only: exactly 1 new reply (the resolve action) and comment is now resolved
-    } else {
-      nonResolveActivity = true;
-    }
-  }
 
   // Determine the target status using spec rules (first matching rule wins)
   const status = computeCommentStatus(doc, c, existing, previousStatus, hasNewActivity, hasNewReplies, newReplyMentionsMe, newReplyAssignsMe);
-
-  if (newReplyMentionsMe || newReplyAssignsMe) {
-    // @-mention or assignment always counts as activity even if isRead
-    nonResolveActivity = true;
-  }
 
   // Doc-level unarchive rules. All gated on !c.isRead.
   let unarchive = false;
@@ -602,7 +571,7 @@ async function updateExistingComment(
     });
   }
 
-  return { comment, updated: changed, unarchive, nonResolveActivity };
+  return { comment, updated: changed, unarchive };
 }
 
 /**
@@ -693,7 +662,6 @@ interface SuggestionSyncResult {
   suggestionsUpdated: number;
   suggestionsResolved: number;
   shouldUnarchive: boolean;
-  hasNonResolveActivity: boolean;
 }
 
 /**
@@ -738,7 +706,6 @@ async function syncDocsSuggestions(
   const toCreate: Prisma.CommentCreateManyInput[] = [];
   let updated = 0;
   let shouldUnarchive = false;
-  let hasNonResolveActivity = false;
 
   for (const s of docsSuggestions) {
     liveIds.add(s.id);
@@ -769,7 +736,6 @@ async function syncDocsSuggestions(
         driveModifiedAt: sugCreatedAt,
       });
       if (doc.role === "AUTHOR") shouldUnarchive = true;
-      hasNonResolveActivity = true;
     } else {
       // Update fields that may have changed or been missing (e.g., Gmail-first row
       // that needs googleSuggestionId filled in by Drive sync)
@@ -843,8 +809,25 @@ async function syncDocsSuggestions(
     suggestionsUpdated: updated,
     suggestionsResolved: resolved,
     shouldUnarchive,
-    hasNonResolveActivity,
   };
+}
+
+/**
+ * If sync results indicate a comment/suggestion moved to INBOX, move the
+ * parent doc to INBOX too (if it's currently ARCHIVED).
+ * Returns true if the doc was unarchived.
+ */
+export async function unarchiveDocIfNeeded(
+  docId: string,
+  docStatus: DocStatus,
+  shouldUnarchive: boolean,
+): Promise<boolean> {
+  if (docStatus === "ARCHIVED" && shouldUnarchive) {
+    await prisma.doc.update({ where: { docId }, data: { status: "INBOX" } });
+    logInfo(`[Sync] Unarchived doc ${docId} — comment/suggestion moved to INBOX`);
+    return true;
+  }
+  return false;
 }
 
 // --- Utilities ---

@@ -177,13 +177,16 @@ export async function upsertDocsAndSyncComments(
           const mergeResult = await mergeSuggestionsFromGmail(doc.docId, doc.googleDocId, email);
           result.suggestionsCreated += mergeResult.inserted;
           result.suggestionsUpdated += mergeResult.merged;
+          if (mergeResult.shouldUnarchive) {
+            result.shouldUnarchive = true;
+          }
         }
       }
       // Apply DB updates immediately so partial progress is visible on page reload
       if (result.isDeleted) {
         await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "NOT_FOUND" } });
         deleted++;
-      } else if (doc.status === "ARCHIVED" && result.shouldUnarchive && result.hasNonResolveActivity) {
+      } else if (doc.status === "ARCHIVED" && result.shouldUnarchive) {
         // Note: result.permissionDenied means comment-level 403 (comments.list or
         // Docs API suggestions), NOT file-level. files.get already succeeded for
         // these docs, so accessState stays OK (see docs/access-states.md).

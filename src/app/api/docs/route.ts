@@ -229,7 +229,7 @@ async function executeLoad(opts: {
       if (result.isDeleted) {
         await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "NOT_FOUND" } });
         deleted++;
-      } else if (doc.status === "ARCHIVED" && result.shouldUnarchive && result.hasNonResolveActivity) {
+      } else if (doc.status === "ARCHIVED" && result.shouldUnarchive) {
         await prisma.doc.update({ where: { docId: doc.docId }, data: { status: "INBOX" } });
         unarchived++;
       }

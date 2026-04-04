@@ -323,7 +323,10 @@ Update this list when adding or changing user-facing behaviors.
 
 ### Smart Unarchive
 - [ ] Archived doc returns to Inbox on: new inbox comment, new @mention, reshare via Gmail
-- [ ] Does NOT unarchive on: resolution-only activity, muted comments (unless @mentioned)
+- [ ] Extension-triggered comment sync unarchives doc when comment moves to Inbox
+- [ ] Extension suggestion merge unarchives doc when suggestion moves to Inbox
+- [ ] Gmail suggestion merge unarchives doc when suggestion is promoted/inserted as Inbox
+- [ ] Does NOT unarchive on: muted comments (unless @mentioned), my own activity (isRead)
 - [ ] Recency cutoff prevents stale docs from surfacing
 
 ---

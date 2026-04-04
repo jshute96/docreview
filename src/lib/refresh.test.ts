@@ -23,7 +23,6 @@ describe("upsertDocsAndSyncComments", () => {
       suggestionsUpdated: 0,
       suggestionsResolved: 0,
       shouldUnarchive: false,
-      hasNonResolveActivity: false,
     });
   });
 
@@ -98,7 +97,7 @@ describe("upsertDocsAndSyncComments", () => {
     );
   });
 
-  it("unarchives an ARCHIVED doc if syncComments returns shouldUnarchive and hasNonResolveActivity", async () => {
+  it("unarchives an ARCHIVED doc if syncComments returns shouldUnarchive", async () => {
     const driveDocs = [
       {
         googleDocId: "g1",
@@ -122,7 +121,6 @@ describe("upsertDocsAndSyncComments", () => {
       suggestionsUpdated: 0,
       suggestionsResolved: 0,
       shouldUnarchive: true,
-      hasNonResolveActivity: true,
     });
 
     await upsertDocsAndSyncComments(userId, userEmail, driveDocs as any, {
@@ -162,7 +160,6 @@ describe("upsertDocsAndSyncComments", () => {
       suggestionsUpdated: 0,
       suggestionsResolved: 0,
       shouldUnarchive: true,
-      hasNonResolveActivity: true,
     });
 
     // Last comment activity is 30 days ago
@@ -209,7 +206,6 @@ describe("upsertDocsAndSyncComments", () => {
       suggestionsUpdated: 0,
       suggestionsResolved: 0,
       shouldUnarchive: true,
-      hasNonResolveActivity: true,
     });
 
     // Last comment activity is 1 hour ago — recent

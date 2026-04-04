@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { logError, logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 import { mergeExtensionSuggestions, type ExtensionSuggestionInput } from "@/lib/extension-suggestion-merge";
+import { unarchiveDocIfNeeded } from "@/lib/sync-comments";
 
 /**
  * Merge extension-scraped suggestions into the database.
@@ -42,6 +43,7 @@ export async function POST(
 
     try {
       const result = await mergeExtensionSuggestions(docId, googleDocId, suggestions, userEmail, doc);
+      await unarchiveDocIfNeeded(doc.docId, doc.status, result.shouldUnarchive);
       return NextResponse.json({
         success: true,
         result: {

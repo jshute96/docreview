@@ -122,7 +122,8 @@ overwrites `driveCreatedAt` with the Gmail notification timestamp (more accurate
 Drive's `doc.lastModifiedInDrive` approximation), and updates `driveModifiedAt` from
 the last reply timestamp if newer. If the suggestion is `ARCHIVED`, Gmail merge promotes
 it to `INBOX` (a notification means interesting activity). `MUTED` suggestions are left
-alone.
+alone. Both promotion and insertion set `shouldUnarchive`, which moves the parent doc
+from ARCHIVED to INBOX via `unarchiveDocIfNeeded()`.
 
 **Gmail arrives first:** Inserts row with `googleCommentId`, content hash, `suggestionType`,
 `driveCreatedAt` from Gmail time, `replyCount`, and `status: "INBOX"`. Drive sync later finds by content hash

@@ -193,7 +193,7 @@ describe("POST /api/docs", () => {
     mockSyncComments.mockResolvedValue({
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
+      shouldUnarchive: false,
     });
 
     const res = await POST(postRequestWithBody({
@@ -234,7 +234,7 @@ describe("POST /api/docs", () => {
     mockSyncComments.mockResolvedValue({
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
+      shouldUnarchive: false,
     });
 
     const res = await POST(postRequestWithBody({
@@ -258,7 +258,7 @@ describe("POST /api/docs", () => {
     mockSyncComments.mockResolvedValue({
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
+      shouldUnarchive: false,
     });
 
     await POST(postRequestWithBody({
@@ -295,7 +295,7 @@ describe("POST /api/docs", () => {
         mockSyncComments.mockResolvedValue({
       commentsCreated: 1, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: true, hasNonResolveActivity: true
+      shouldUnarchive: true,
     });
 
     const res = await POST(postRequestWithBody({
@@ -336,7 +336,7 @@ describe("POST /api/docs", () => {
     mockSyncComments.mockResolvedValue({
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
+      shouldUnarchive: false,
     });
 
     const res = await POST(postRequestWithBody({
@@ -377,7 +377,7 @@ describe("POST /api/docs", () => {
     mockSyncComments.mockResolvedValue({
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
+      shouldUnarchive: false,
     });
 
     const res = await POST(postRequestWithBody({
@@ -428,7 +428,7 @@ describe("POST /api/docs", () => {
     mockSyncComments.mockResolvedValue({
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
+      shouldUnarchive: false,
     });
 
     const res = await POST(postRequestWithBody({
@@ -471,7 +471,7 @@ describe("POST /api/docs", () => {
     mockSyncComments.mockResolvedValue({
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
+      shouldUnarchive: false,
     });
 
     const res = await POST(postRequestWithBody({
@@ -511,7 +511,7 @@ describe("POST /api/docs", () => {
     mockSyncComments.mockResolvedValue({
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
+      shouldUnarchive: false,
     });
 
     const res = await POST(postRequestWithBody({
@@ -554,7 +554,7 @@ describe("POST /api/docs", () => {
     mockSyncComments.mockResolvedValue({
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
+      shouldUnarchive: false,
     });
 
     const res = await POST(postRequestWithBody({
@@ -596,7 +596,7 @@ describe("POST /api/docs", () => {
     mockSyncComments.mockResolvedValue({
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
+      shouldUnarchive: false,
     });
 
     const res = await POST(postRequestWithBody({
@@ -635,7 +635,7 @@ describe("POST /api/docs", () => {
     mockSyncComments.mockResolvedValue({
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
+      shouldUnarchive: false,
     });
 
     const res = await POST(postRequestWithBody({
@@ -646,44 +646,6 @@ describe("POST /api/docs", () => {
 
     const upsertCall = mockDoc.upsert.mock.calls[0][0];
     expect(upsertCall.create.status).toBe("ARCHIVED");
-  });
-
-  it("does not unarchive when shouldUnarchive=true but hasNonResolveActivity=false", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "u1" } });
-    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
-    mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockFetchDocsByIds.mockResolvedValue([
-      {
-        googleDocId: "g1",
-        title: "Archived Doc",
-        driveUrl: "https://docs.google.com/document/d/g1/edit",
-        mimeType: "application/vnd.google-apps.document",
-        role: "AUTHOR" as const,
-        lastModifiedInDrive: new Date("2024-06-01"),
-        createdTimeInDrive: new Date("2024-05-01"),
-
-
-      },
-    ]);
-
-    const archivedDoc = { docId: "d1", googleDocId: "g1", status: "ARCHIVED" };
-    mockDoc.findMany
-      .mockResolvedValueOnce([{ googleDocId: "g1" }]) // existingDocIds
-      .mockResolvedValueOnce([archivedDoc]); // activeDocs for comment sync
-    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
-    // shouldUnarchive is true but hasNonResolveActivity is false (resolve-only)
-    mockSyncComments.mockResolvedValue({
-      commentsCreated: 0, commentsUpdated: 0,
-      suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: true, hasNonResolveActivity: false
-    });
-
-    const res = await POST(postRequestWithBody({
-      source: "drive",
-      selectedGoogleDocIds: ["g1"],
-    }));
-    const data = await readSSEResult(res);
-    expect(data.unarchived).toBe(0);
   });
 
   it("load mode with empty selection fetches no docs", async () => {
@@ -699,7 +661,7 @@ describe("POST /api/docs", () => {
     mockSyncComments.mockResolvedValue({
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
-      shouldUnarchive: false, hasNonResolveActivity: false
+      shouldUnarchive: false,
     });
 
     const res = await POST(postRequestWithBody({

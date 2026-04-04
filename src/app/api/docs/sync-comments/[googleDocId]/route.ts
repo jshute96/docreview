@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getDriveClient, invalidGrantResponse } from "@/lib/google-drive";
-import { syncComments } from "@/lib/sync-comments";
+import { syncComments, unarchiveDocIfNeeded } from "@/lib/sync-comments";
 import { logError, logInfo } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 
@@ -52,6 +52,7 @@ export async function POST(
       ? { commentType, googleCommentId } : undefined;
     try {
       const result = await syncComments(doc, driveAuth, userEmail, undefined, hints);
+      await unarchiveDocIfNeeded(doc.docId, doc.status, result.shouldUnarchive);
       const mode = hints ? ` (${commentType}${googleCommentId ? ' single' : ''})` : '';
       logInfo(`[Comments] Synced comments for doc ${doc.docId}${mode} (${Date.now() - t0}ms)`, {
         created: result.commentsCreated + result.suggestionsCreated,

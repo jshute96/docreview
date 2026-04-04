@@ -149,12 +149,15 @@ reminded each refresh.
 When a doc has been archived by the user, it should only resurface if there's **new meaningful
 activity** during the current sync — not just because an old unresolved comment exists.
 
-During `syncComments`, two flags are tracked:
-- `shouldUnarchive` — whether comment-level changes warrant moving the doc back to INBOX
-- `hasNonResolveActivity` — whether there was any activity beyond just resolving comments
+During sync, the `shouldUnarchive` flag tracks whether comment/suggestion-level changes
+warrant moving the doc back to INBOX. An ARCHIVED doc moves back to INBOX when this flag
+is set.
 
-An ARCHIVED doc moves back to INBOX only when **both** flags are set. This prevents noise
-from resolved threads resurfacing a doc you've already dismissed.
+The `unarchiveDocIfNeeded()` helper in `sync-comments.ts` encapsulates this check and is
+called from three paths:
+1. **Bulk/single-doc refresh** (`refresh.ts`) — after `syncComments()` and Gmail suggestion merge
+2. **Extension comment sync** (`sync-comments/[googleDocId]/route.ts`) — after `syncComments()`
+3. **Extension suggestion merge** (`extension-suggestions/route.ts`) — after `mergeExtensionSuggestions()`
 
 **Recency cutoff (bulk refresh only):** During bulk refresh, an additional check gates
 unarchive on the doc's `lastCommentActivity` being newer than a cutoff derived from the
@@ -172,16 +175,11 @@ in inbox when first synced. See [Phase 3.5 — Smart Unarchive](./refresh.md#pha
 3. **Existing INBOX comment gets new replies** — even if the comment stays in INBOX, new
    replies on an already-INBOX comment trigger unarchive (unless I resolved it myself).
 4. **INBOX comment resolved by someone else** — the resolve is new activity that the user
-   should see, even though the comment moves to ARCHIVED.
-
-### hasNonResolveActivity
-
-Tracks whether there's substantive activity beyond comment resolutions:
-- New unresolved comment → yes
-- New replies that aren't just a resolve action → yes
-- Re-opened comment → yes
-- New suggestion → yes
-- Comment resolved with exactly 1 new reply (the resolve itself) → no
+   should see.
+5. **New suggestion with INBOX status** — a new suggestion (from Docs API, Gmail, or
+   extension) that gets INBOX status triggers unarchive.
+6. **Existing suggestion promoted to INBOX** — a suggestion moving from ARCHIVED to INBOX
+   (e.g., Gmail merge or extension merge detects new activity) triggers unarchive.
 
 **New suggestion** (not previously in DB):
 - **Docs API path**: `status: "INBOX"` when `doc.role === "AUTHOR"`; otherwise `"ARCHIVED"`.

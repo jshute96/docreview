@@ -66,7 +66,7 @@ describe("mergeSuggestionsFromGmail", () => {
   it("returns zeros when parse fails", async () => {
     mockParse.mockImplementation(() => { throw new Error("parse error"); });
     const result = await mergeSuggestionsFromGmail("d1", "gdoc1", email);
-    expect(result).toEqual({ merged: 0, inserted: 0 });
+    expect(result).toEqual({ merged: 0, inserted: 0, shouldUnarchive: false });
   });
 
   it("returns zeros when no suggestions in notification", async () => {
@@ -77,7 +77,7 @@ describe("mergeSuggestionsFromGmail", () => {
       comments: [], suggestions: [],
     });
     const result = await mergeSuggestionsFromGmail("d1", "gdoc1", email);
-    expect(result).toEqual({ merged: 0, inserted: 0 });
+    expect(result).toEqual({ merged: 0, inserted: 0, shouldUnarchive: false });
   });
 
   it("merges into existing Drive-created row by content hash", async () => {
@@ -97,7 +97,7 @@ describe("mergeSuggestionsFromGmail", () => {
     }]);
 
     const result = await mergeSuggestionsFromGmail("d1", "gdoc1", email);
-    expect(result).toEqual({ merged: 1, inserted: 0 });
+    expect(result).toEqual({ merged: 1, inserted: 0, shouldUnarchive: false });
     expect(mockComment.update).toHaveBeenCalledWith({
       where: { commentId: "cr1" },
       data: { googleCommentId: "AAAB0abc", replyCount: 0, driveCreatedAt: new Date("2026-03-20T15:00:00Z") },
@@ -116,7 +116,7 @@ describe("mergeSuggestionsFromGmail", () => {
     mockComment.findMany.mockResolvedValue([]); // no hash match
 
     const result = await mergeSuggestionsFromGmail("d1", "gdoc1", email);
-    expect(result).toEqual({ merged: 0, inserted: 1 });
+    expect(result).toEqual({ merged: 0, inserted: 1, shouldUnarchive: true });
 
     const createCall = mockComment.create.mock.calls[0][0];
     expect(createCall.data.googleCommentId).toBe("AAAB0abc");
@@ -138,7 +138,7 @@ describe("mergeSuggestionsFromGmail", () => {
     mockComment.findFirst.mockResolvedValue({ commentId: "cr1" });
 
     const result = await mergeSuggestionsFromGmail("d1", "gdoc1", email);
-    expect(result).toEqual({ merged: 0, inserted: 0 });
+    expect(result).toEqual({ merged: 0, inserted: 0, shouldUnarchive: false });
     expect(mockComment.update).not.toHaveBeenCalled();
     expect(mockComment.create).not.toHaveBeenCalled();
   });
@@ -159,7 +159,7 @@ describe("mergeSuggestionsFromGmail", () => {
     ]);
 
     const result = await mergeSuggestionsFromGmail("d1", "gdoc1", email);
-    expect(result).toEqual({ merged: 0, inserted: 0 });
+    expect(result).toEqual({ merged: 0, inserted: 0, shouldUnarchive: false });
   });
 
   it("merges replyCount from Gmail replies", async () => {
@@ -223,7 +223,7 @@ describe("mergeSuggestionsFromGmail", () => {
     }]);
 
     const result = await mergeSuggestionsFromGmail("d1", "gdoc1", email);
-    expect(result).toEqual({ merged: 1, inserted: 0 });
+    expect(result).toEqual({ merged: 1, inserted: 0, shouldUnarchive: true });
     const updateCall = mockComment.update.mock.calls[0][0];
     expect(updateCall.data.status).toBe("INBOX");
   });
@@ -242,7 +242,7 @@ describe("mergeSuggestionsFromGmail", () => {
     }]);
 
     const result = await mergeSuggestionsFromGmail("d1", "gdoc1", email);
-    expect(result).toEqual({ merged: 1, inserted: 0 });
+    expect(result).toEqual({ merged: 1, inserted: 0, shouldUnarchive: false });
     const updateCall = mockComment.update.mock.calls[0][0];
     expect(updateCall.data.status).toBeUndefined();
   });

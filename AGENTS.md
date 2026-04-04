@@ -105,6 +105,7 @@ using different APIs and different IDs.  See `docs/comment-tracking.md` and
 
 ### Code Logic
 - **Documentation**: Where code has subtle or surprising logic, add comments to explain the "why" and intended behavior.
+- **Enums over strings**: Use Prisma-generated enum types (`DocStatus`, `CommentStatus`, `DocRole`, etc.) in function signatures instead of `string`. This catches invalid values at compile time.
 
 ## Planning vs Implementation
 When the user asks you to implement something, start coding quickly. Do NOT

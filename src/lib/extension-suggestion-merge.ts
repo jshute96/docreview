@@ -48,6 +48,7 @@ export interface ExtensionMergeResult {
   inserted: number;
   updated: number;
   resolved: number;
+  shouldUnarchive: boolean;
   comments: Comment[];
 }
 
@@ -152,6 +153,7 @@ export async function mergeExtensionSuggestions(
   let inserted = 0;
   let updated = 0;
   let resolved = 0;
+  let shouldUnarchive = false;
 
   const emailLower = userEmail.toLowerCase();
 
@@ -195,6 +197,7 @@ export async function mergeExtensionSuggestions(
       logInfo(`[Suggestions:Ext] ${googleDocId}: ${s.id} already exists as ${existingById.commentId} — updating metadata`);
       if (commentData.resolved && !existingById.resolved) resolved++;
       const newStatus = computeSuggestionStatusUpdate(doc, existingById, commentData, mention, iResolvedIt, lastResolveReply);
+      if (newStatus === "INBOX" && existingById.status !== "INBOX") shouldUnarchive = true;
       await prisma.$transaction(async (tx) => {
         await tx.comment.update({
           where: { commentId: existingById.commentId },
@@ -239,6 +242,7 @@ export async function mergeExtensionSuggestions(
           });
           if (shouldBe === "INBOX") newStatus = "INBOX";
         }
+        if (newStatus === "INBOX" && existing.status !== "INBOX") shouldUnarchive = true;
         await prisma.$transaction(async (tx) => {
           await tx.comment.update({
             where: { commentId: existing.commentId },
@@ -267,6 +271,7 @@ export async function mergeExtensionSuggestions(
           isThreadAuthor: commentData.isThreadAuthor,
           isReplyAuthor: commentData.isReplyAuthor,
         });
+        if (status === "INBOX") shouldUnarchive = true;
         await prisma.$transaction(async (tx) => {
           await tx.comment.create({
             data: {
@@ -294,5 +299,5 @@ export async function mergeExtensionSuggestions(
 
   logInfo(`[Suggestions:Ext] ${googleDocId}: done — ${merged} merged, ${inserted} inserted, ${updated} updated, ${resolved} resolved (${Date.now() - t0}ms)`);
 
-  return { merged, inserted, updated, resolved, comments };
+  return { merged, inserted, updated, resolved, shouldUnarchive, comments };
 }

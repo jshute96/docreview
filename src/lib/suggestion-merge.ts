@@ -17,16 +17,16 @@ export async function mergeSuggestionsFromGmail(
   docId: string,
   googleDocId: string,
   email: ParsedEmail,
-): Promise<{ merged: number; inserted: number }> {
+): Promise<{ merged: number; inserted: number; shouldUnarchive: boolean }> {
   let parsed;
   try {
     parsed = parseGmailNotificationFromParsed(email);
   } catch {
-    return { merged: 0, inserted: 0 };
+    return { merged: 0, inserted: 0, shouldUnarchive: false };
   }
 
   if (parsed.type !== "comment" || parsed.suggestions.length === 0) {
-    return { merged: 0, inserted: 0 };
+    return { merged: 0, inserted: 0, shouldUnarchive: false };
   }
 
   // Fallback timestamp: email date header (when per-suggestion time isn't parseable)
@@ -34,6 +34,7 @@ export async function mergeSuggestionsFromGmail(
 
   let merged = 0;
   let inserted = 0;
+  let shouldUnarchive = false;
 
   for (const suggestion of parsed.suggestions) {
     const actionType = gmailActionToSuggestionType(suggestion.action);
@@ -87,6 +88,7 @@ export async function mergeSuggestionsFromGmail(
         });
         await bumpLastCommentActivity(docId, [gmailTime, newModified], tx);
       });
+      if (promoteStatus) shouldUnarchive = true;
       merged++;
     } else if (candidates.length === 0) {
       // No match — Gmail arrived before Drive sync. Insert with what we have.
@@ -109,6 +111,7 @@ export async function mergeSuggestionsFromGmail(
         });
         await bumpLastCommentActivity(docId, [sugCreatedAt], tx);
       });
+      shouldUnarchive = true;
       inserted++;
     } else {
       // Multiple matches — ambiguous, skip
@@ -116,7 +119,7 @@ export async function mergeSuggestionsFromGmail(
     }
   }
 
-  return { merged, inserted };
+  return { merged, inserted, shouldUnarchive };
 }
 
 // Extracts deleted/inserted text from a Gmail suggestion in the format needed for hashing.

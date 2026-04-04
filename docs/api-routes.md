@@ -142,6 +142,7 @@ scraped from the Google Docs DOM by the Chrome extension and merges it into the
 database using content-hash matching (same algorithm as Gmail merge). Returns
 `{ success, result: { merged, inserted, skipped, resolved }, comments }` where
 `comments` is the full list of suggestion records for the doc after merging.
+Auto-unarchives the parent doc if a suggestion moves to INBOX.
 
 No Google API (Prisma only).
 
@@ -149,7 +150,7 @@ No Google API (Prisma only).
 
 POST. Called by the Chrome extension when it detects comment activity on a doc.
 Accepts optional hints `{ commentType?, googleCommentId? }` to narrow the sync
-scope.
+scope. Auto-unarchives the parent doc if a comment or suggestion moves to INBOX.
 
 Google API: Drive, Docs.
 
