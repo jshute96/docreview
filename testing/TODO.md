@@ -134,7 +134,9 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Suggestions appear in same table as comments
 - [ ] Orphaned suggestions (original content deleted) show "Original content deleted" warning (using state from the extension)
 - [ ] Orphaned comments (original content deleted) show "Original content deleted" warning (using state from the extension)
+- [ ] When extension confirms comment is NOT orphaned but anchor text doesn't match document, show softer "original text has changed" message instead of "text no longer exists" warning
 - [ ] Show proposed insertion, deletion, or edit text
+- [ ] Text-change suggestions (INSERT/DELETE/EDIT) do not show anchor text blockquote
 - [ ] Non-text suggestions show "Suggestion: description" with anchor text blockquote
 - [ ] Non-text suggestions show "on ..." suffix in collapsed row
 - [ ] Expanded suggestion renders like a comment: anchor blockquote, author+date, content (green if mine)

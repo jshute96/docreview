@@ -389,40 +389,44 @@ export function CommentThreadPanel({
             className={`py-3 first:pt-0 last:pb-0 ${thread.resolved ? "opacity-60" : ""}`}
           >
             <div className={thread.fromMe ? "bg-green-50 -mx-4 px-4 pt-2 pb-1 mb-2" : ""}>
-              {threadIndex === 0 && thread.quotedFileContent?.value && (
-                <div className="mb-2">
-                  <div className="rounded border-l-2 border-zinc-300 bg-zinc-100 px-3 py-1.5">
-                    {/* Drive returns text/html for quotedFileContent but in practice
-                       the value appears to be plain text with no formatting markup. */}
-                    {thread.quotedFileContent.mimeType === "text/html" ? (
-                      <p className="text-xs text-zinc-500 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: thread.quotedFileContent.value }} />
-                    ) : (
-                      <p className="text-xs text-zinc-500 whitespace-pre-wrap">{thread.quotedFileContent.value}</p>
-                    )}
-                  </div>
-                  {!thread.originalContentDeleted && documentText !== undefined && (() => {
-                    // Drive API may truncate long quoted text with "..." or "…" — match on the prefix
-                    const raw = thread.quotedFileContent!.value;
-                    const trimmed = raw.replace(/\.{3}$|…$/, "");
-                    return !documentText.toLowerCase().includes(trimmed.toLowerCase());
-                  })() && (
-                    <p
-                      className="mt-1 text-xs text-amber-600"
-                      title={`The quoted text is a snapshot from when the ${isSuggestion ? "suggestion" : "comment"} was created. If the text has been deleted, the ${isSuggestion ? "suggestion" : "comment"} thread may not be visible when viewing the document.`}
-                    >
-                      This text no longer exists in the document. This {isSuggestion ? "suggestion" : "comment"} might not be visible.
-                    </p>
+              {threadIndex === 0 && (() => {
+                const typeLabel = isSuggestion ? "suggestion" : "comment";
+                // Compute anchor text warning (at most one):
+                // 1. Extension says content deleted → definitive orphaned warning
+                // 2. Quoted text not found in document + extension says not deleted → text changed
+                // 3. Quoted text not found in document + no extension data → uncertain warning
+                let anchorWarning: string | undefined;
+                let anchorWarningTitle: string | undefined;
+                if (thread.originalContentDeleted && !(isSuggestion && resolved)) {
+                  anchorWarning = `Original content deleted. This ${resolved && thread.quotedFileContent?.value ? "text" : typeLabel} is not visible in the document.`;
+                } else if (!thread.originalContentDeleted && thread.quotedFileContent?.value && documentText !== undefined) {
+                  const trimmed = thread.quotedFileContent.value.replace(/\.{3}$|…$/, "");
+                  if (!documentText.toLowerCase().includes(trimmed.toLowerCase())) {
+                    if (thread.originalContentDeleted === false) {
+                      anchorWarning = `This was the original text when the ${typeLabel} was created.`;
+                    } else {
+                      anchorWarning = `This text no longer exists in the document. This ${typeLabel} might not be visible.`;
+                      anchorWarningTitle = `The quoted text is a snapshot from when the ${typeLabel} was created. If the text has been deleted, the ${typeLabel} thread may not be visible when viewing the document.`;
+                    }
+                  }
+                }
+                return <>
+                  {thread.quotedFileContent?.value && (
+                    <div className="mb-2">
+                      <div className="rounded border-l-2 border-zinc-300 bg-zinc-100 px-3 py-1.5">
+                        {thread.quotedFileContent.mimeType === "text/html" ? (
+                          <p className="text-xs text-zinc-500 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: thread.quotedFileContent.value }} />
+                        ) : (
+                          <p className="text-xs text-zinc-500 whitespace-pre-wrap">{thread.quotedFileContent.value}</p>
+                        )}
+                      </div>
+                    </div>
                   )}
-                </div>
-              )}
-              {/* "Original content deleted" from the extension — a definitive signal
-                  that the anchored text was deleted. Takes priority over the text-match heuristic. */}
-              {threadIndex === 0 && thread.originalContentDeleted && !(isSuggestion && resolved) && (
-                <p className="mb-2 text-xs text-amber-600">
-                  Original content deleted. This {resolved && thread.quotedFileContent?.value
-                    ? "text" : isSuggestion ? "suggestion" : "comment"} is not visible in the document.
-                </p>
-              )}
+                  {anchorWarning && (
+                    <p className="mb-2 text-xs text-amber-600" title={anchorWarningTitle}>{anchorWarning}</p>
+                  )}
+                </>;
+              })()}
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-zinc-900">
                   {thread.author}

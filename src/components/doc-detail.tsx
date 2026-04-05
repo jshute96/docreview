@@ -61,13 +61,17 @@ function commentKey(c: Comment): string {
   return c.googleCommentId ?? "";
 }
 
-/** Merge new thread data into an existing map, preserving extension-only originalContentDeleted flags. */
+/** Merge new thread data into an existing map, preserving extension-sourced fields
+ *  (originalContentDeleted, tabName) that Drive API data doesn't carry. */
 function mergeThreads(prev: ThreadMap, incoming: ThreadMap): ThreadMap {
   const merged = { ...prev, ...incoming };
   for (const id of Object.keys(incoming)) {
-    if (prev[id]?.originalContentDeleted && !incoming[id].originalContentDeleted) {
-      merged[id] = { ...merged[id], originalContentDeleted: true };
-    }
+    const p = prev[id];
+    if (!p) continue;
+    const restore: Partial<CommentThread> = {};
+    if (p.originalContentDeleted !== undefined && incoming[id].originalContentDeleted === undefined) restore.originalContentDeleted = p.originalContentDeleted;
+    if (p.tabName && !incoming[id].tabName) restore.tabName = p.tabName;
+    if (Object.keys(restore).length > 0) merged[id] = { ...merged[id], ...restore };
   }
   return merged;
 }
@@ -297,18 +301,21 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       const updates: ThreadMap = {};
       for (const ci of commentInfos) {
         const existing = prev[ci.id];
-        const flag = ci.originalContentDeleted || undefined;
+        const orphaned = ci.originalContentDeleted; // false = checked & not deleted, true = deleted
+        const tabName = ci.tabName || undefined;
         if (existing) {
-          if (existing.originalContentDeleted !== flag) {
-            updates[ci.id] = { ...existing, originalContentDeleted: flag };
+          if (existing.originalContentDeleted !== orphaned ||
+              existing.tabName !== tabName) {
+            updates[ci.id] = { ...existing, originalContentDeleted: orphaned, tabName };
           }
-        } else if (flag) {
-          // No thread data yet — create a minimal placeholder so the flag is available
+        } else if (orphaned !== undefined || tabName) {
+          // No thread data yet — create a minimal placeholder so the fields are available
           // when the Drive thread data arrives and merges with it
           updates[ci.id] = {
             id: ci.id, author: "", fromMe: false, content: "",
             createdTime: "", resolved: false, replies: [],
-            originalContentDeleted: true,
+            ...(orphaned !== undefined ? { originalContentDeleted: orphaned } : {}),
+            tabName,
           };
         }
       }

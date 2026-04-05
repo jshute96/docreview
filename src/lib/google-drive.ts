@@ -786,6 +786,7 @@ export interface CommentThread {
   replies: ThreadReply[];
   quotedFileContent?: { mimeType: string; value: string } | null;
   originalContentDeleted?: boolean; // true when the anchored text has been deleted (detected by extension)
+  tabName?: string;                 // tab name from extension's stream view header (e.g., "Tab 1")
 }
 
 /** Map of Google comment/suggestion IDs to their thread data. */

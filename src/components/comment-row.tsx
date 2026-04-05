@@ -133,19 +133,21 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     navigateToComment(googleDocId, comment.googleCommentId ?? "", driveUrl, comment.resolved);
   }
 
-  // Preserve originalContentDeleted from previous thread state when replacing
-  // threads with Drive API data (which doesn't carry this extension-only flag).
-  function preserveDeletedFlag(prev: CommentThread[], next: CommentThread[]): CommentThread[] {
-    const prevDeleted = prev[0]?.originalContentDeleted;
-    if (prevDeleted && next.length > 0 && !next[0].originalContentDeleted) {
-      return [{ ...next[0], originalContentDeleted: true }, ...next.slice(1)];
-    }
+  // Preserve extension-sourced fields (originalContentDeleted, tabName)
+  // from previous thread state when replacing with Drive API data (which doesn't carry them).
+  function preserveExtensionFields(prev: CommentThread[], next: CommentThread[]): CommentThread[] {
+    if (next.length === 0 || !prev[0]) return next;
+    const p = prev[0];
+    const restore: Partial<CommentThread> = {};
+    if (p.originalContentDeleted !== undefined && next[0].originalContentDeleted === undefined) restore.originalContentDeleted = p.originalContentDeleted;
+    if (p.tabName && !next[0].tabName) restore.tabName = p.tabName;
+    if (Object.keys(restore).length > 0) return [{ ...next[0], ...restore }, ...next.slice(1)];
     return next;
   }
 
   function applyThreadUpdate(data: { threads: ThreadMap; comment: Comment }) {
     const threadList = Object.values(data.threads);
-    setThreads(prev => preserveDeletedFlag(prev, threadList));
+    setThreads(prev => preserveExtensionFields(prev, threadList));
     if (onThreadUpdate && threadList.length > 0) {
       onThreadUpdate(threadId, threadList[0]);
     }
@@ -163,16 +165,33 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       const threadList: CommentThread[] = Object.values(data.threads);
-      setThreads(prev => preserveDeletedFlag(prev, threadList));
+      setThreads(prev => preserveExtensionFields(prev, threadList));
       if (onThreadUpdate && threadList.length > 0) {
         onThreadUpdate(threadId, threadList[0]);
       }
       fetchedModifiedMs.current = currentModifiedMs;
+      // Check the extension for fields Drive API doesn't provide
+      if (comment.googleCommentId) {
+        mergeCommentInfo(await getCommentFromDoc(googleDocId, comment.googleCommentId));
+      }
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to load comment thread");
     } finally {
       setLoadingThreads(false);
     }
+  }
+
+  // Merge extension comment info (originalContentDeleted, tabName) into thread state.
+  function mergeCommentInfo(ci: Awaited<ReturnType<typeof getCommentFromDoc>>) {
+    if (!ci) return;
+    setThreads(prev => {
+      if (!prev[0]) return prev;
+      const orphaned = ci.originalContentDeleted; // false = checked & not deleted, true = deleted
+      const tabName = ci.tabName || undefined;
+      if (prev[0].originalContentDeleted === orphaned &&
+          prev[0].tabName === tabName) return prev;
+      return [{ ...prev[0], originalContentDeleted: orphaned, tabName }, ...prev.slice(1)];
+    });
   }
 
   async function refreshThread() {
@@ -186,16 +205,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       if (!res.ok) throw new Error("Failed");
       applyThreadUpdate(await res.json());
       broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
-      // After Drive thread refresh, check the extension for originalContentDeleted
-      // (Drive API doesn't know about orphaned comments)
+      // After Drive thread refresh, check the extension for fields it provides
+      // (originalContentDeleted, tabName — Drive API doesn't have these)
       if (comment.googleCommentId) {
-        void getCommentFromDoc(googleDocId, comment.googleCommentId).then((ci) => {
-          if (!ci) return;
-          setThreads(prev => {
-            if (!prev[0] || prev[0].originalContentDeleted === ci.originalContentDeleted) return prev;
-            return [{ ...prev[0], originalContentDeleted: ci.originalContentDeleted || undefined }, ...prev.slice(1)];
-          });
-        });
+        mergeCommentInfo(await getCommentFromDoc(googleDocId, comment.googleCommentId));
       }
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to refresh comment");
@@ -526,9 +539,13 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   const isSynthesizedThread = isSuggestion && threads.length === 0;
   const suggestionThreads = useMemo(() => {
     if (!isSuggestion) return threads;
-    const anchorText = suggestionContent?.anchorText;
+    // For non-text suggestions (formatting, links), show the anchor text (the text
+    // being formatted) as the quoted content blockquote. For text-change suggestions,
+    // the old/new text is already shown as the suggestion content — don't show
+    // redundant anchor text from the Drive API or Docs API.
+    const anchorText = hasTextContent ? undefined : suggestionContent?.anchorText;
     const quotedFileContent = anchorText
-      ? { mimeType: "text/plain", value: anchorText }
+      ? { mimeType: "text/plain" as const, value: anchorText }
       : null;
 
     if (threads.length > 0) {
@@ -537,7 +554,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         ...first,
         author: first.author || defaultAuthor,
         content: suggestionContentText || first.content,
-        ...(quotedFileContent ? { quotedFileContent } : {}),
+        quotedFileContent,
       }, ...threads.slice(1)];
     }
     // No thread — synthesize one so the panel renders the suggestion like a comment
@@ -549,9 +566,9 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       createdTime: comment.driveCreatedAt ? new Date(comment.driveCreatedAt).toISOString() : "",
       resolved: comment.resolved,
       replies: [],
-      ...(quotedFileContent ? { quotedFileContent } : {}),
+      quotedFileContent,
     }];
-  }, [isSuggestion, threads, suggestionContent?.anchorText, suggestionContentText, defaultAuthor, comment.googleCommentId, comment.googleSuggestionId, comment.commentId, comment.isThreadAuthor, comment.driveCreatedAt, comment.resolved]);
+  }, [isSuggestion, threads, hasTextContent, suggestionContent?.anchorText, suggestionContentText, defaultAuthor, comment.googleCommentId, comment.googleSuggestionId, comment.commentId, comment.isThreadAuthor, comment.driveCreatedAt, comment.resolved]);
 
   // Suggestion refresh is only possible when we have a disco ID and the extension
   // is available with Docs integration enabled. Compute disabled state and tooltip.

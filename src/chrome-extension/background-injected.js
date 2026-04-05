@@ -282,288 +282,214 @@ function injectDiscoIdHelpers() {
     return '';
   }
 
+  // Extract tab name from stream view header elements.
+  // Only exists in stream view items (docos-streamdocoview), not in
+  // anchored sidebar items (docos-anchoreddocoview).
+  // Google renders JS null as literal "null" text — filter that out.
+  function getTabName(item) {
+    var header = item.querySelector('.docos-streamdocoview-header-container');
+    if (!header) return undefined;
+    var prefixEl = header.querySelector('.streamdocoview-header-prefix-location');
+    var tabName = prefixEl ? prefixEl.textContent.trim() : '';
+    if (tabName === 'null') tabName = '';
+    return tabName || undefined;
+  }
+
+  // Shared parsing for both comments and suggestions: extract author, timestamp,
+  // replies, originalContentDeleted, and tabName from a listitem element.
+  // actionPatterns maps reply text prefixes to action names (e.g., 'Suggestion accepted' → 'accept').
+  function parseItemCommon(item, label, isAnchored, prevTabName, myName, actionPatterns) {
+    // Author and timestamp from the first entry.
+    // Anchored view uses .docos-replyview-first; stream view may not have that
+    // class, so fall back to the content container and aria-label.
+    var firstEntry = item.querySelector('.docos-replyview-first');
+    var author = '', timestamp = '';
+    if (firstEntry) {
+      author = getReplyAuthor(firstEntry);
+      timestamp = getReplyTimestamp(firstEntry);
+    }
+    if (!author || !timestamp) {
+      var contentDiv = item.querySelector('[class*="streamdocoview-content"]');
+      if (contentDiv) {
+        if (!author) {
+          var cd = contentDiv.querySelector('.docos-author');
+          if (cd) author = cd.textContent.trim();
+        }
+        if (!timestamp) {
+          var ct = contentDiv.querySelector('[class*="timestamp"]');
+          if (ct) {
+            var ctSpans = ct.querySelectorAll('span');
+            for (var cs = 0; cs < ctSpans.length; cs++) {
+              var cst = ctSpans[cs].textContent.trim();
+              if (cst && !ctSpans[cs].getAttribute('style')) { timestamp = cst; break; }
+            }
+          }
+        }
+      }
+      if (!author) {
+        var authorMatch = label.match(/Author ([^.]+)\./);
+        if (authorMatch) author = authorMatch[1];
+      }
+    }
+
+    // Replies (all docos-replyview entries after the first one)
+    var replyEntries = item.querySelectorAll('.docos-replyview');
+    var replies = [];
+    for (var r = 0; r < replyEntries.length; r++) {
+      if (replyEntries[r].classList.contains('docos-replyview-first')) continue;
+      var rBody = getReplyBody(replyEntries[r]);
+      if (!rBody.text) continue;
+      var rAuthor = getReplyAuthor(replyEntries[r]);
+      var rAction = undefined;
+      for (var pat in actionPatterns) {
+        if (rBody.text.indexOf(pat) === 0) { rAction = actionPatterns[pat]; break; }
+      }
+      replies.push({
+        author: rAuthor,
+        isMine: !!(myName && rAuthor === myName),
+        timestamp: getReplyTimestamp(replyEntries[r]),
+        text: rAction ? '' : rBody.text,
+        html: !rAction && rBody.html !== rBody.text ? rBody.html : undefined,
+        action: rAction
+      });
+    }
+
+    var originalContentDeleted = (label.toLowerCase().indexOf('original content is deleted') !== -1);
+    var tabName = isAnchored ? prevTabName : (getTabName(item) || prevTabName);
+
+    return {
+      firstEntry: firstEntry,
+      author: author,
+      isMine: !!(myName && author === myName),
+      timestamp: timestamp,
+      replies: replies,
+      originalContentDeleted: originalContentDeleted,
+      tabName: tabName
+    };
+  }
+
+  // Iterate #docos-stream-view listitems, deduplicate by disco ID, and call
+  // parseFn for each unique item. Anchored items (richer DOM) are preferred
+  // over stream items; stream items contribute tabName (only source).
+  // parseFn(item, label, common) should return the entry to store, or null to skip.
+  function iterateItems(filterLabel, targetId, parseFn) {
+    var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
+    var byId = {};
+    var myName = getMyName();
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var label = item.getAttribute('aria-label') || '';
+      if (!filterLabel(label)) continue;
+
+      var id = getDiscoId(item) || '(no ID)';
+      if (targetId && id !== targetId) continue;
+
+      // Deduplicate: prefer anchored entries (richer DOM) over stream entries,
+      // but always merge tabName from stream items (only source for tab name).
+      var isAnchored = item.classList.contains('docos-anchoreddocoview');
+      if (byId[id] && !isAnchored) {
+        byId[id].tabName = byId[id].tabName || getTabName(item);
+        continue;
+      }
+
+      var prevTabName = byId[id] ? byId[id].tabName : undefined;
+      var entry = parseFn(item, label, isAnchored, prevTabName, myName);
+      if (entry) {
+        entry.id = id;
+        byId[id] = entry;
+      }
+    }
+    return Object.values(byId);
+  }
+
+  var suggestionActions = { 'Suggestion accepted': 'accept', 'Suggestion rejected': 'reject' };
+  var commentActions = { 'Marked as resolved': 'resolve', 'Re-opened': 'reopen' };
+
   function getSuggestions(targetId) {
-    var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
-    var seenIds = {};
-    var results = [];
-    var myName = getMyName();
-
-    for (var i = 0; i < items.length; i++) {
-      var item = items[i];
-      var label = item.getAttribute('aria-label') || '';
-      if (label.indexOf('Suggestions') !== 0) continue;
-
-      var id = getDiscoId(item) || '(no ID)';
-
-      // When targeting a specific suggestion, skip items that don't match.
-      // This avoids parsing text/replies for every suggestion in the document.
-      if (targetId && id !== targetId) continue;
-
-      // Deduplicate: skip if we already have this suggestion from a richer source.
-      // Prefer anchored entries for open suggestions (more DOM detail),
-      // but accept stream entries for resolved ones (only source).
-      var isAnchored = item.classList.contains('docos-anchoreddocoview');
-      if (seenIds[id]) {
-        if (isAnchored) {
-          // Replace the stream version with this anchored version
-          results = results.filter(function(r) { return r.id !== id; });
-        } else {
-          continue; // already have anchored version
-        }
-      }
-      seenIds[id] = true;
-
-      // Parse suggestion type and old/new text from styled description spans.
-      // Text-change suggestions have types "Replace", "Add", or "Delete".
-      // Non-text suggestions (formatting, links, etc.) have descriptions like
-      // "Format: Bold", "Add link: ...", "Add space", etc. — captured as description.
-      var descDiv = item.querySelector('.docos-replyview-body div[style*="font-size:13px"]');
-      var suggestionType = '', oldText = '', newText = '', description = '';
-      if (descDiv) {
-        var actionSpan = descDiv.querySelector('span[style*="font-weight:bold"]');
-        if (actionSpan) suggestionType = actionSpan.textContent.trim().replace(':', '');
-        var italicSpans = descDiv.querySelectorAll('span[style*="font-style:italic"]');
-        if (suggestionType === 'Replace' && italicSpans.length >= 2) {
-          oldText = italicSpans[0].textContent.replace(/[\u201c\u201d]/g, '');
-          newText = italicSpans[1].textContent.replace(/[\u201c\u201d]/g, '');
-        } else if (suggestionType === 'Add' && italicSpans.length >= 1) {
-          newText = italicSpans[0].textContent.replace(/[\u201c\u201d]/g, '');
-        } else if (suggestionType === 'Delete' && italicSpans.length >= 1) {
-          oldText = italicSpans[0].textContent.replace(/[\u201c\u201d]/g, '');
-        } else if (suggestionType) {
-          // Non-text suggestion (e.g. "Format", "Add link", "Add space").
-          // Capture the full description text from the div.
-          description = descDiv.textContent.trim();
-        }
-      }
-
-      // Determine status: open, accepted, or rejected.
-      // Open suggestions have Accept/Reject buttons. Resolved ones have the
-      // docos-docoview-resolved class and a final reply with status text
-      // ("Suggestion accepted" or "Suggestion rejected").
-      var status = 'open';
-      if (item.classList.contains('docos-docoview-resolved') ||
-          !item.querySelector('[aria-label="Accept suggestion"]')) {
-        // Check the last reply's text for accepted/rejected
-        var innerText = item.innerText || '';
-        if (innerText.indexOf('Suggestion accepted') !== -1) {
-          status = 'accepted';
-        } else if (innerText.indexOf('Suggestion rejected') !== -1) {
-          status = 'rejected';
-        }
-      }
-
-      // Extract author and timestamp from the first (suggestion) entry.
-      // Anchored view uses .docos-replyview-first; stream view (especially
-      // for resolved suggestions) may not have that class, so fall back to
-      // the content container and aria-label for the author.
-      var firstEntry = item.querySelector('.docos-replyview-first');
-      var author = '', timestamp = '';
-      if (firstEntry) {
-        author = getReplyAuthor(firstEntry);
-        timestamp = getReplyTimestamp(firstEntry);
-      }
-      if (!author || !timestamp) {
-        var contentDiv = item.querySelector('[class*="streamdocoview-content"]');
-        if (contentDiv) {
-          if (!author) {
-            var cd = contentDiv.querySelector('.docos-author');
-            if (cd) author = cd.textContent.trim();
-          }
-          if (!timestamp) {
-            var ct = contentDiv.querySelector('[class*="timestamp"]');
-            if (ct) {
-              var ctSpans = ct.querySelectorAll('span');
-              for (var cs = 0; cs < ctSpans.length; cs++) {
-                var cst = ctSpans[cs].textContent.trim();
-                if (cst && !ctSpans[cs].getAttribute('style')) { timestamp = cst; break; }
-              }
-            }
+    return iterateItems(
+      function(label) { return label.indexOf('Suggestions') === 0; },
+      targetId,
+      function(item, label, isAnchored, prevTabName, myName) {
+        // Parse suggestion type and old/new text from styled description spans.
+        var descDiv = item.querySelector('.docos-replyview-body div[style*="font-size:13px"]');
+        var suggestionType = '', oldText = '', newText = '', description = '';
+        if (descDiv) {
+          var actionSpan = descDiv.querySelector('span[style*="font-weight:bold"]');
+          if (actionSpan) suggestionType = actionSpan.textContent.trim().replace(':', '');
+          var italicSpans = descDiv.querySelectorAll('span[style*="font-style:italic"]');
+          if (suggestionType === 'Replace' && italicSpans.length >= 2) {
+            oldText = italicSpans[0].textContent.replace(/[\u201c\u201d]/g, '');
+            newText = italicSpans[1].textContent.replace(/[\u201c\u201d]/g, '');
+          } else if (suggestionType === 'Add' && italicSpans.length >= 1) {
+            newText = italicSpans[0].textContent.replace(/[\u201c\u201d]/g, '');
+          } else if (suggestionType === 'Delete' && italicSpans.length >= 1) {
+            oldText = italicSpans[0].textContent.replace(/[\u201c\u201d]/g, '');
+          } else if (suggestionType) {
+            description = descDiv.textContent.trim();
           }
         }
-        // Last resort: author from aria-label
-        if (!author) {
-          var authorMatch = label.match(/Author ([^.]+)\./);
-          if (authorMatch) author = authorMatch[1];
+
+        // Status: open, accepted, or rejected.
+        var status = 'open';
+        if (item.classList.contains('docos-docoview-resolved') ||
+            !item.querySelector('[aria-label="Accept suggestion"]')) {
+          var innerText = item.innerText || '';
+          if (innerText.indexOf('Suggestion accepted') !== -1) status = 'accepted';
+          else if (innerText.indexOf('Suggestion rejected') !== -1) status = 'rejected';
         }
+
+        var common = parseItemCommon(item, label, isAnchored, prevTabName, myName, suggestionActions);
+        return {
+          suggestionType: suggestionType,
+          status: status,
+          oldText: oldText,
+          newText: newText,
+          description: description,
+          author: common.author,
+          isMine: common.isMine,
+          timestamp: common.timestamp,
+          replies: common.replies,
+          originalContentDeleted: common.originalContentDeleted,
+          tabName: common.tabName
+        };
       }
-
-      // Extract replies (all docos-replyview entries after the first/suggestion one)
-      var replyEntries = item.querySelectorAll('.docos-replyview');
-      var replies = [];
-      for (var r = 0; r < replyEntries.length; r++) {
-        if (replyEntries[r].classList.contains('docos-replyview-first')) continue;
-        var rBody = getReplyBody(replyEntries[r]);
-        if (!rBody.text) continue;
-        var rAuthor = getReplyAuthor(replyEntries[r]);
-        // System status entries become action replies (like resolve/reopen for comments).
-        // The body text may include "Show more"/"Show less" from collapsible UI elements,
-        // so use startsWith rather than exact match.
-        var rAction = undefined;
-        if (rBody.text.indexOf('Suggestion accepted') === 0) rAction = 'accept';
-        else if (rBody.text.indexOf('Suggestion rejected') === 0) rAction = 'reject';
-        replies.push({
-          author: rAuthor,
-          isMine: !!(myName && rAuthor === myName),
-          timestamp: getReplyTimestamp(replyEntries[r]),
-          text: rAction ? '' : rBody.text,
-          html: !rAction && rBody.html !== rBody.text ? rBody.html : undefined,
-          action: rAction
-        });
-      }
-
-      // Detect orphaned suggestions where the original anchored text was deleted.
-      // The aria-label includes "The original content is deleted." for these items.
-      // Note: the docos-docoview-tesla-conflict class and orphaned header div appear
-      // on ALL stream-view items when the Comments panel is open, so they're unreliable.
-      var originalContentDeleted = (label.toLowerCase().indexOf('original content is deleted') !== -1);
-
-      var entry = {
-        id: id,
-        suggestionType: suggestionType,
-        status: status,
-        oldText: oldText,
-        newText: newText,
-        description: description,
-        author: author,
-        isMine: !!(myName && author === myName),
-        timestamp: timestamp,
-        replies: replies,
-        originalContentDeleted: originalContentDeleted
-      };
-      results.push(entry);
-    }
-    return results;
+    );
   }
 
-  // List all visible comments (non-suggestion items) with detailed info:
-  // disco ID, status (open/resolved), author, timestamp, comment body text,
-  // and replies with author/timestamp/text.
-  // Call from the Google Docs page console for debugging: getComments()
-  //
-  // Optional targetId: when provided, only parses the comment with that
-  // disco ID (skips text/reply extraction for all others).
-  //
-  // When the comments pane is open, the same comment appears in both the
-  // anchored sidebar (docos-anchoreddocoview) and the pane (docos-streamdocoview).
-  // We deduplicate by disco ID, preferring the anchored version for open
-  // comments (richer DOM) and the stream version for resolved ones (only
-  // place they appear).
   function getComments(targetId) {
-    var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
-    var seenIds = {};
-    var results = [];
-    var myName = getMyName();
+    return iterateItems(
+      function(label) { return label.indexOf('Suggestions') !== 0; },
+      targetId,
+      function(item, label, isAnchored, prevTabName, myName) {
+        var status = item.classList.contains('docos-docoview-resolved') ? 'resolved' : 'open';
 
-    for (var i = 0; i < items.length; i++) {
-      var item = items[i];
-      var label = item.getAttribute('aria-label') || '';
-      // Skip suggestions — this function is for comments only
-      if (label.indexOf('Suggestions') === 0) continue;
+        var common = parseItemCommon(item, label, isAnchored, prevTabName, myName, commentActions);
 
-      var id = getDiscoId(item) || '(no ID)';
-
-      if (targetId && id !== targetId) continue;
-
-      // Deduplicate: prefer anchored version (richer DOM) when both are present
-      var isAnchored = item.classList.contains('docos-anchoreddocoview');
-      if (seenIds[id]) {
-        if (isAnchored) {
-          results = results.filter(function(r) { return r.id !== id; });
-        } else {
-          continue;
+        // Comment body text from the first entry
+        var text = '', html = '';
+        if (common.firstEntry) {
+          var bodyResult = getReplyBody(common.firstEntry);
+          text = bodyResult.text;
+          html = bodyResult.html;
         }
-      }
-      seenIds[id] = true;
 
-      // Determine status: open or resolved.
-      var status = 'open';
-      if (item.classList.contains('docos-docoview-resolved')) {
-        status = 'resolved';
+        return {
+          status: status,
+          author: common.author,
+          isMine: common.isMine,
+          timestamp: common.timestamp,
+          text: text,
+          html: html !== text ? html : undefined,
+          replies: common.replies,
+          originalContentDeleted: common.originalContentDeleted,
+          tabName: common.tabName
+        };
       }
-
-      // Extract author and timestamp from the first entry.
-      var firstEntry = item.querySelector('.docos-replyview-first');
-      var author = '', timestamp = '';
-      if (firstEntry) {
-        author = getReplyAuthor(firstEntry);
-        timestamp = getReplyTimestamp(firstEntry);
-      }
-      if (!author || !timestamp) {
-        var contentDiv = item.querySelector('[class*="streamdocoview-content"]');
-        if (contentDiv) {
-          if (!author) {
-            var cd = contentDiv.querySelector('.docos-author');
-            if (cd) author = cd.textContent.trim();
-          }
-          if (!timestamp) {
-            var ct = contentDiv.querySelector('[class*="timestamp"]');
-            if (ct) {
-              var ctSpans = ct.querySelectorAll('span');
-              for (var cs = 0; cs < ctSpans.length; cs++) {
-                var cst = ctSpans[cs].textContent.trim();
-                if (cst && !ctSpans[cs].getAttribute('style')) { timestamp = cst; break; }
-              }
-            }
-          }
-        }
-        if (!author) {
-          var authorMatch = label.match(/Author ([^.]+)\./);
-          if (authorMatch) author = authorMatch[1];
-        }
-      }
-
-      // Extract comment body text from the first entry
-      var text = '', html = '';
-      if (firstEntry) {
-        var bodyResult = getReplyBody(firstEntry);
-        text = bodyResult.text;
-        html = bodyResult.html;
-      }
-
-      // Extract replies (all docos-replyview entries after the first one)
-      var replyEntries = item.querySelectorAll('.docos-replyview');
-      var replies = [];
-      for (var r = 0; r < replyEntries.length; r++) {
-        if (replyEntries[r].classList.contains('docos-replyview-first')) continue;
-        var rBody = getReplyBody(replyEntries[r]);
-        if (!rBody.text) continue;
-        var rAuthor = getReplyAuthor(replyEntries[r]);
-        // System status entries (resolve/reopen actions)
-        var rAction = undefined;
-        if (rBody.text.indexOf('Marked as resolved') === 0) rAction = 'resolve';
-        else if (rBody.text.indexOf('Re-opened') === 0) rAction = 'reopen';
-        replies.push({
-          author: rAuthor,
-          isMine: !!(myName && rAuthor === myName),
-          timestamp: getReplyTimestamp(replyEntries[r]),
-          text: rAction ? '' : rBody.text,
-          html: !rAction && rBody.html !== rBody.text ? rBody.html : undefined,
-          action: rAction
-        });
-      }
-
-      // Detect orphaned comments where the original anchored text was deleted.
-      // The aria-label includes "The original content is deleted." for these items.
-      var originalContentDeleted = (label.toLowerCase().indexOf('original content is deleted') !== -1);
-
-      var entry = {
-        id: id,
-        status: status,
-        author: author,
-        isMine: !!(myName && author === myName),
-        timestamp: timestamp,
-        text: text,
-        html: html !== text ? html : undefined,
-        replies: replies,
-        originalContentDeleted: originalContentDeleted
-      };
-      results.push(entry);
-    }
-    return results;
+    );
   }
 
-  // Combined fetch: full suggestions + minimal comment info (id + originalContentDeleted).
+  // Combined fetch: full suggestions + minimal comment info.
   // Used by the Docreview page to get both in a single round-trip.
   function getCommentsAndSuggestions() {
     var suggestions = getSuggestions();
@@ -571,9 +497,11 @@ function injectDiscoIdHelpers() {
     // Strip comments down to just the fields the web app needs
     var comments = [];
     for (var i = 0; i < fullComments.length; i++) {
+      var c = fullComments[i];
       comments.push({
-        id: fullComments[i].id,
-        originalContentDeleted: fullComments[i].originalContentDeleted
+        id: c.id,
+        originalContentDeleted: c.originalContentDeleted,
+        tabName: c.tabName
       });
     }
     return { suggestions: suggestions, comments: comments };

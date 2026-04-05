@@ -88,7 +88,8 @@
       "WebFetch(domain:playwright.dev)",
       "Bash(bash scripts/query_database.sh:*)",
       "Bash(bash scripts/query_test_database.sh:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "mcp__playwright__browser_close"
     ],
     "defaultMode": "acceptEdits"
   },

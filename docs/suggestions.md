@@ -198,6 +198,7 @@ This provides richer data than either the Docs API or Gmail:
 | Status (open/accepted/rejected) | Pending only | No | Yes |
 | Reply threads with content | No | Count only | Yes (with HTML) |
 | Timestamps | Approximate | Minute precision | Relative from DOM |
+| Tab name | No | No | Yes |
 | Disco ID (for navigation) | No | Yes | Yes |
 
 **Display flow:** On the comments page, after pinging the extension, `fetchExtensionCommentsAndSuggestions()`
@@ -209,7 +210,7 @@ If the doc isn't open yet (no data returned), the extension will send a `docRead
 when the doc's stream view appears later, triggering an automatic one-time fetch without
 requiring a manual Refresh. The suggestion results are then:
 1. Converted to `CommentThread` and `SuggestionContent` entries for thread panel display
-   (reply text, HTML content, author info — data not available from the DB)
+   (reply text, HTML content, author info, tab name — data not available from the DB)
 2. POSTed to `POST /api/docs/[docId]/extension-suggestions` for DB merge via content-hash
    matching (same algorithm as Gmail merge). The returned DB records replace the suggestion
    entries in the comments list.
@@ -232,8 +233,9 @@ for immediate display, and the suggestion is pushed to the server for DB merge v
 **Per-comment refresh:** When a comment thread is refreshed (via the Refresh button on
 an expanded comment), the Drive API thread data is fetched first. After that completes,
 `getCommentFromDoc()` checks the extension for the comment's `originalContentDeleted`
-status and merges it into the thread data. The `originalContentDeleted` flag is preserved
-across Drive API refreshes (which don't carry it) to avoid flickering.
+status and `tabName`, and merges them into the thread data. These extension-sourced
+fields (`originalContentDeleted`, `tabName`) are preserved across Drive API refreshes
+(which don't carry them) to avoid flickering.
 
 **Orphaned suggestions:** When the text a suggestion was anchored to is deleted from the
 document, Google Docs marks it as orphaned — the Comments panel shows "Original content
@@ -324,6 +326,9 @@ deleting text. These are detected via two paths:
 The description flows through `SuggestionContent.description` and is displayed in the UI
 instead of the old/new text diff. The anchor text (the text being reformatted) is captured
 from `run.content` and displayed in a blockquote, matching the comment anchor text style.
+For text-change suggestions (INSERT/DELETE/EDIT), the anchor text blockquote is suppressed
+— the old/new text already conveys the same information. Only non-text suggestions show
+the anchor text blockquote.
 
 Non-text suggestions use `suggestionType: OTHER` in the DB with empty `insertedText` and
 `deletedText`. Their content hashes all collide (`OTHER||`), but primary matching uses

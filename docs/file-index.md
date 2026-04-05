@@ -36,7 +36,7 @@ One-line descriptions of every source file, grouped by layer.
 |------|-------------|
 | `manifest.json` | Manifest V3 config — permissions, host permissions, content script registration, service worker |
 | `background.js` | Service worker main — toolbar click, context menus, message handler, comment navigation, URL resolution, bridge registration |
-| `background-injected.js` | Functions injected into page context — disco ID helpers, comment selection/navigation, Gmail doc URL extraction |
+| `background-injected.js` | Functions injected into page context — disco ID helpers, comment selection/navigation, Gmail doc URL extraction, comment/suggestion data extraction with header info (tab name) |
 | `background-tabs.js` | Doc tab tracking — maps docId → tabId for in-page comment navigation |
 | `background-comments.js` | Comment sync state — pre-extracted comment IDs, debounce logic, server sync |
 | `content.js` | Content script — injects Docreview icons into Docs titlebar, Drive file lists, Gmail notification emails |
@@ -112,7 +112,7 @@ One-line descriptions of every source file, grouped by layer.
 | `doc-detail.tsx` | Single doc detail view (client) — metadata panel, comment filters, comment table; pre-fetches all threads on load for instant expand |
 | `filter-bar.tsx` | Doc list filter bar — tri-state buttons for type/author/starred/labels/active/comments + title regex |
 | `comment-filter-bar.tsx` | Comment list filter bar — toggles for my threads/comments, starred, show mode, suggestions, unread |
-| `comment-row.tsx` | Single comment row — expandable, shows content preview, thread panel, status actions |
+| `comment-row.tsx` | Single comment row — expandable, shows content preview, thread panel, status actions; preserves extension-sourced fields (tabName) across refreshes |
 | `comment-thread-panel.tsx` | Expanded thread view — shows all replies, reply textarea, resolve/reopen buttons |
 | `add-doc-form.tsx` | Shared add/update/re-add doc form body — URL validation (Add mode) or fixed doc (Re-add mode), label picker, notes; used by dialogs and standalone page |
 | `add-doc-dialog.tsx` | Dialog wrapper for adding/updating a doc — renders `add-doc-form` inside a dialog, dynamic title and button text |
@@ -184,7 +184,7 @@ Shadcn/ui components:
 |------|-------------|
 | `add-doc.ts` | Shared `addDoc()` for add and re-add routes — Drive metadata fetch with permission-denied fallback, transactional delete+create, comment sync; also exports `validateLabelOwnership()` and `validateDocInputs()` used across multiple routes |
 | `api-fetch.ts` | Client-side `apiFetch()` wrapper — intercepts 401 (expired Google token), shows deduplicated reauth toast, throws `ApiAuthError`; `isAuthError()` helper for catch blocks |
-| `google-drive.ts` | Google Drive/Docs API client — OAuth2 with token refresh, `invalidGrantResponse()` for API routes, changes feed (`changes.list`/`getStartPageToken`), file listing, `fetchDocsByIds` (batch metadata fetch by ID), comment fetching, `fetchAllThreads` (bulk thread fetch), `fetchSuggestions` (suggestion IDs + text content from Docs API), `fetchDocContent` (combined document text + suggestion extraction in one Docs API call), thread detail, reply/resolve; OAuth2 client also used by Gmail scanner |
+| `google-drive.ts` | Google Drive/Docs API client — OAuth2 with token refresh, `invalidGrantResponse()` for API routes, changes feed (`changes.list`/`getStartPageToken`), file listing, `fetchDocsByIds` (batch metadata fetch by ID), comment fetching, `fetchAllThreads` (bulk thread fetch), `fetchSuggestions` (suggestion IDs + text content from Docs API), `fetchDocContent` (combined document text + suggestion extraction in one Docs API call), thread detail (CommentThread includes tabName), reply/resolve; OAuth2 client also used by Gmail scanner |
 | `gmail.ts` | Gmail notification scanner — `scanGmailForDocIds(userId, since)` queries Gmail for doc sharing/comment emails after a `Date`, extracts doc IDs and share notes from body (no Drive calls); `scanGmailNotifications` wraps it with Drive metadata fetch; filters by `internalDate` for timestamp-level precision |
 | `gmail-parse.ts` | Gmail message parsing helpers — `parseShareNote` extracts sharer name/email/date/message from share notification emails; `extractShareMessage` structurally parses plaintext body (language-independent); `extractBodyText` decodes MIME payload; `extractDocId` finds doc IDs in email text |
 | `refresh.ts` | Combined refresh engine — `executeRefresh(userId, email, sources)` runs parallel Drive+Gmail discovery; `executeFullRefresh(userId, email)` and `refreshSelectedDocs(userId, email, docIds)` run exhaustive syncs via shared `refreshGoogleDocIds` helper |
@@ -192,8 +192,8 @@ Shadcn/ui components:
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates/deletes DB records, computes unarchive signals, stores suggestion content hashes; falls back to content hash lookup for Gmail-first suggestion rows |
 | `suggestion-hash.ts` | Content hash for suggestions — SHA-256 of normalized action type + deleted/inserted text, used for cross-source matching (Docs API ↔ Gmail) |
 | `suggestion-merge.ts` | Merges suggestion data from Gmail notifications into DB — matches by content hash, fills in `googleCommentId` and `replyCount`, or inserts new rows if Gmail arrives first |
-| `bridge-to-extension.ts` | Client-side bridge for communicating with the Chrome extension — handles pinging, URL resolution, in-page comment navigation, and fetching suggestion and comment data from open doc tabs |
-| `extension-suggestions.ts` | Converts extension-scraped suggestion data into display objects — timestamp parsing, CommentThread/SuggestionContent creation for thread panel display |
+| `bridge-to-extension.ts` | Client-side bridge for communicating with the Chrome extension — handles pinging, URL resolution, in-page comment navigation, and fetching suggestion and comment data (including tabName) from open doc tabs |
+| `extension-suggestions.ts` | Converts extension-scraped suggestion data into display objects — timestamp parsing, CommentThread/SuggestionContent creation (including tabName) for thread panel display |
 | `extension-suggestion-merge.ts` | Server-side merge of extension suggestions into DB — content-hash matching (same algorithm as Gmail merge), inserts or updates suggestion records with disco IDs and author data |
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
 | `doc-filters.ts` | Client-side doc filtering (tri-state logic for inbox/comments/author/starred/mimeType/labels/title regex) and sorting; accepts optional cached titles map for when `doc.title` is empty |

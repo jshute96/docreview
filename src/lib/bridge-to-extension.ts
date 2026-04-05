@@ -193,6 +193,7 @@ export interface ExtensionSuggestion {
   isMine: boolean;
   timestamp: string;       // relative timestamp from DOM, e.g. "6:29 PM Feb 21"
   originalContentDeleted?: boolean; // true when the anchored text has been deleted from the document
+  tabName?: string;          // tab name from stream view header (e.g., "Tab 1")
   replies: {
     author: string;
     isMine: boolean;
@@ -233,6 +234,7 @@ export async function getCommentFromDoc(docId: string, discoId: string): Promise
       error?: string;
     }>({ type: "getComment", docId, discoId }, 5000);
     if (result.success) {
+      console.log("[extension] getComment:", discoId, result.comment ? "found" : "not found");
       return result.comment ?? null;
     }
     return null;
@@ -241,10 +243,11 @@ export async function getCommentFromDoc(docId: string, discoId: string): Promise
   }
 }
 
-/** Minimal comment info returned by the extension — just the fields not available from Drive API. */
+/** Minimal comment info returned by the extension — fields not available from Drive API. */
 export interface ExtensionCommentInfo {
   id: string;                     // disco ID (AAAB format)
   originalContentDeleted: boolean;
+  tabName?: string;               // tab name from stream view header (e.g., "Tab 1")
 }
 
 /**

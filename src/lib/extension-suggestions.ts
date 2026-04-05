@@ -75,6 +75,7 @@ export function extensionToThread(s: ExtensionSuggestion): CommentThread {
       action: r.action,
     })),
     ...(s.originalContentDeleted ? { originalContentDeleted: true } : {}),
+    ...(s.tabName ? { tabName: s.tabName } : {}),
   };
 }
 
