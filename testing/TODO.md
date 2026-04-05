@@ -460,6 +460,19 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Sharing invitation emails get "Open in Docreview" link
 - [ ] Links resolve doc URL at click time (Gmail changes content without reloading, so injection-time URLs go stale)
 
+### Extension Comment/Suggestion Fetching
+- [ ] `getComment(discoId)` finds comment in anchored view without opening pane
+- [ ] `getComment(discoId)` opens pane and retries when comment not in anchored view (resolved/unanchored)
+- [ ] `getSuggestion(discoId)` finds suggestion in anchored view without opening pane
+- [ ] `getSuggestion(discoId)` opens pane and retries when suggestion not in anchored view
+- [ ] `getComments()` / `getSuggestions()` / `getCommentsAndSuggestions()` load all comments before returning
+- [ ] `loadAllComments()` no-ops when both lists already loaded
+- [ ] `loadAllComments()` opens pane, waits for stream items, closes pane when pane was closed
+- [ ] `loadAllComments()` waits without closing when pane was already open
+- [ ] `loadAllComments()` detects zero-state on doc with no comments (returns quickly, no 5s timeout)
+- [ ] `loadAllComments()` returns immediately on view-only doc (no comment infrastructure)
+- [ ] Refresh comment thread on comments/ page gets `originalContentDeleted` from extension
+
 ### Comment Activity Auto-Sync
 - [ ] Detects: new comment, reply, resolve, accept suggestion, reject suggestion
 - [ ] Detects: edit comment (via "..." > Edit > Save), edit reply
@@ -479,6 +492,8 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] First click opens new tab; subsequent clicks reuse same tab
 - [ ] Falls back to page reload if navigation script fails
 - [ ] Doesn't trample diff/version-history views in Google Docs (from recent changes button or view activity menu) — opens another tab instead
+- [ ] Navigation works on doc with no comments (no error from loadAllComments)
+- [ ] Navigation works on view-only doc (no hang from loadAllComments)
 
 ### Comment Selection Sync (bidirectional)
 - [ ] Selecting comment in Google Docs highlights it in Docreview
@@ -534,6 +549,10 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Document trashed: marked TRASHED, removed from Inbox
 - [ ] Partial refresh failure: summary shows error count, successful syncs still applied
 - [ ] Offline mode: all Drive/Docs/Gmail API calls gracefully skipped with logged warnings
+- [ ] View-only doc: comments page shows comments from Drive API (no extension data)
+- [ ] View-only doc: extension fetches (getComment, getSuggestion) return gracefully (no 5s hang)
+- [ ] Doc with no comments: comments page shows empty state
+- [ ] Doc with no comments: extension fetches return empty results quickly (zero-state detection)
 
 ---
 

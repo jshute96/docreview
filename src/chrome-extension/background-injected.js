@@ -580,9 +580,10 @@ function injectDiscoIdHelpers() {
   }
 
   // Wait for resolved comments to appear after opening the pane.
-  function waitForResolvedComments() {
+  // Optional deadline (ms timestamp); defaults to 5s from now.
+  function waitForResolvedComments(deadline) {
+    var maxTime = deadline || (Date.now() + 5000);
     return new Promise(function(resolve) {
-      var attempts = 0;
       var check = setInterval(function() {
         var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
         for (var i = 0; i < items.length; i++) {
@@ -592,9 +593,108 @@ function injectDiscoIdHelpers() {
             return;
           }
         }
-        if (++attempts > 25) { clearInterval(check); resolve(); }
+        if (Date.now() >= maxTime) { clearInterval(check); resolve(); }
       }, 200);
     });
+  }
+
+  // Ensure both comment lists are loaded (anchored + stream/resolved).
+  // Called by background.js message handlers before fetching comments/suggestions,
+  // and also available from the console for debugging: loadAllComments()
+  // Returns a promise that resolves when both lists are available (5s timeout).
+  // Concurrent calls share a single in-flight load (promise dedup).
+  //
+  // Logic:
+  //   - Waits for the stream view container if page is still loading
+  //   - If stream items (docos-streamdocoview) already exist, returns immediately
+  //   - If pane is closed: opens it, waits for stream items, closes it
+  //   - If pane is already open: waits for stream items without closing
+  var _loadAllPromise = null;
+  function loadAllComments() {
+    if (_loadAllPromise) return _loadAllPromise;
+    _loadAllPromise = _loadAllCommentsImpl().finally(function() { _loadAllPromise = null; });
+    return _loadAllPromise;
+  }
+  function _loadAllCommentsImpl() {
+    var TIMEOUT = 5000;
+    var POLL_MS = 200;
+    var deadline = Date.now() + TIMEOUT;
+
+    function timedOut() { return Date.now() >= deadline; }
+
+    function streamViewExists() {
+      return !!document.querySelector('#docos-stream-view');
+    }
+
+    function hasStreamItems() {
+      return !!document.querySelector('#docos-stream-view .docos-streamdocoview[role="listitem"]');
+    }
+
+    // Google Docs shows a zero-state element when the comments pane is opened
+    // on a doc with no comments. This only exists after the pane has been
+    // opened (not in the initial page DOM), so it's a reliable signal that
+    // loading is complete with zero results.
+    function hasZeroState() {
+      return !!document.querySelector('.docos-streampane-zero-state');
+    }
+
+    function paneLoadingComplete() {
+      return hasStreamItems() || hasZeroState();
+    }
+
+    function poll(condFn) {
+      return new Promise(function(resolve) {
+        if (condFn()) { resolve(true); return; }
+        var check = setInterval(function() {
+          if (condFn()) { clearInterval(check); resolve(true); }
+          else if (timedOut()) { clearInterval(check); resolve(false); }
+        }, POLL_MS);
+      });
+    }
+
+    return (async function() {
+      // Phase 1: Wait for Google Docs to create the stream view container
+      // (may not exist yet if page is still loading).
+      // View-only docs have no comment infrastructure at all (no stream view,
+      // no sidebar, no "Show all comments" button) — return immediately.
+      if (!streamViewExists()) {
+        if (!document.querySelector('.docs-docos-activity-sidebar') &&
+            !document.querySelector('[aria-label*="Show all comments"]')) {
+          return;
+        }
+        console.log('[docreview] loadAllComments: waiting for stream view');
+        if (!(await poll(streamViewExists))) {
+          console.log('[docreview] loadAllComments: stream view not found (page may still be loading)');
+          return;
+        }
+      }
+
+      // Phase 2: Already loaded (pane was previously opened)?
+      // Stream items appear for docs with comments; zero-state appears for empty docs.
+      if (paneLoadingComplete()) return;
+
+      // Phase 3: Load the second list by opening the comments pane
+      var wasOpen = isCommentsPaneOpen();
+      if (!wasOpen) {
+        console.log('[docreview] loadAllComments: opening comments pane');
+        await openCommentsPane();
+      } else {
+        console.log('[docreview] loadAllComments: pane already open, waiting for comments to load');
+      }
+
+      var loaded = await poll(paneLoadingComplete);
+
+      if (!wasOpen) {
+        closeCommentsPane();
+      }
+
+      if (!loaded) {
+        console.log('[docreview] loadAllComments: timeout waiting for comments pane to finish loading');
+        return;
+      }
+
+      console.log('[docreview] loadAllComments: done' + (hasStreamItems() ? '' : ' (no comments)') + (wasOpen ? ' (pane left open)' : ' (pane closed)'));
+    })();
   }
 
   window.__docreviewDisco = {
@@ -609,19 +709,32 @@ function injectDiscoIdHelpers() {
     openCommentsPane: openCommentsPane,
     closeCommentsPane: closeCommentsPane,
     findCommentByDiscoId: findCommentByDiscoId,
-    waitForResolvedComments: waitForResolvedComments
+    waitForResolvedComments: waitForResolvedComments,
+    loadAllComments: loadAllComments
   };
   // Singular wrappers for debugging: return one item by disco ID, not an array.
   function getComment(id) { return getComments(id)[0] || null; }
   function getSuggestion(id) { return getSuggestions(id)[0] || null; }
 
-  // Expose debugging functions directly on window for convenience
+  // Expose debugging functions directly on window for convenience.
+  // All are synchronous — they return data from the current DOM state.
+  // Call loadAllComments() first to ensure resolved/unanchored items are loaded.
   window.listComments = listComments;
   window.getComments = getComments;
   window.getComment = getComment;
   window.getSuggestions = getSuggestions;
   window.getSuggestion = getSuggestion;
   window.getActiveCommentId = getActiveCommentId;
+
+  // Async helper — fire-and-forget wrapper that logs start/finish.
+  window.loadAllComments = function() {
+    console.log('[docreview] loadAllComments: starting');
+    loadAllComments().then(function() {
+      console.log('[docreview] loadAllComments: finished');
+    }).catch(function(err) {
+      console.warn('[docreview] loadAllComments error:', err);
+    });
+  };
 
   // Track comment selection/deselection across all #docos-stream-view elements.
   // Google Docs has two with the same id: the anchored sidebar and the

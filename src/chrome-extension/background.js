@@ -445,7 +445,10 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
         });
         var results = await chrome.scripting.executeScript({
           target: { tabId: tabId },
-          func: function() { return window.__docreviewDisco.getSuggestions(); },
+          func: async function() {
+            await window.__docreviewDisco.loadAllComments();
+            return window.__docreviewDisco.getSuggestions();
+          },
           world: 'MAIN'
         });
         var suggestions = results && results[0] && results[0].result;
@@ -480,7 +483,13 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
         });
         var results = await chrome.scripting.executeScript({
           target: { tabId: tabId },
-          func: function(targetId) { return window.__docreviewDisco.getSuggestions(targetId); },
+          func: async function(targetId) {
+            var disco = window.__docreviewDisco;
+            var match = disco.getSuggestions(targetId);
+            if (match.length > 0) return match;
+            await disco.loadAllComments();
+            return disco.getSuggestions(targetId);
+          },
           args: [msg.discoId],
           world: 'MAIN'
         });
@@ -518,7 +527,10 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
         });
         var results = await chrome.scripting.executeScript({
           target: { tabId: tabId },
-          func: function() { return window.__docreviewDisco.getComments(); },
+          func: async function() {
+            await window.__docreviewDisco.loadAllComments();
+            return window.__docreviewDisco.getComments();
+          },
           world: 'MAIN'
         });
         var comments = results && results[0] && results[0].result;
@@ -553,7 +565,13 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
         });
         var results = await chrome.scripting.executeScript({
           target: { tabId: tabId },
-          func: function(targetId) { return window.__docreviewDisco.getComments(targetId); },
+          func: async function(targetId) {
+            var disco = window.__docreviewDisco;
+            var match = disco.getComments(targetId);
+            if (match.length > 0) return match;
+            await disco.loadAllComments();
+            return disco.getComments(targetId);
+          },
           args: [msg.discoId],
           world: 'MAIN'
         });
@@ -590,7 +608,10 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
         });
         var results = await chrome.scripting.executeScript({
           target: { tabId: tabId },
-          func: function() { return window.__docreviewDisco.getCommentsAndSuggestions(); },
+          func: async function() {
+            await window.__docreviewDisco.loadAllComments();
+            return window.__docreviewDisco.getCommentsAndSuggestions();
+          },
           world: 'MAIN'
         });
         var data = results && results[0] && results[0].result;
