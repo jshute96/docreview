@@ -254,7 +254,11 @@ export function CommentThreadPanel({
         </>
       )}
       {footerContent}
-      <div ref={buttonsRowRef} className={`${onReply ? "mt-2 " : ""}flex items-center gap-2 whitespace-nowrap`}>
+      {/* flex-wrap lets buttons wrap to a second row at narrow widths instead of
+         overflowing the container. Don't use whitespace-nowrap or min-w-fit here —
+         min-w-fit was tried earlier but it made the box stretch beyond 90% width
+         when suggestion text was long. */}
+      <div ref={buttonsRowRef} className={`${onReply ? "mt-2 " : ""}flex flex-wrap items-center gap-2`}>
         {onReply && (resolved ? (
           <Button
             variant="outline"
