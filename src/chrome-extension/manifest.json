@@ -3,6 +3,7 @@
   "name": "Docreview",
   "version": "1.0",
   "description": "Adds Docreview links to Google Docs, Drive, and Gmail",
+  "homepage_url": "https://github.com/jshute96/docreview",
   "permissions": ["storage", "activeTab", "contextMenus", "scripting", "tabs"],
   "host_permissions": [
     "https://docs.google.com/*",
