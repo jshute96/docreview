@@ -6,13 +6,12 @@
       box-sizing: border-box;
     }
     html {
-      width: 480px;
       margin: 0;
       padding: 0;
     }
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      padding: 16px;
+      padding: 24px;
       margin: 0;
     }
     label {
@@ -22,8 +21,8 @@
       margin-bottom: 4px;
       color: #333;
     }
-    input {
-      width: 100%;
+    input[type="url"] {
+      min-width: 600px;
       padding: 6px 8px;
       border: 1px solid #ccc;
       border-radius: 4px;
@@ -42,12 +41,29 @@
     button:hover {
       background: #6d28d9;
     }
-    button.secondary {
-      background: #e5e7eb;
-      color: #333;
+    .heading {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 0 0 12px 0;
     }
-    button.secondary:hover {
-      background: #d1d5db;
+    .heading img {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .heading h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+      color: #18181b;
+      letter-spacing: -0.025em;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #ddd;
+      margin: 0 0 16px 0;
     }
     .checkbox-group {
       margin-top: 12px;
@@ -76,7 +92,12 @@
     }
   </style>
 </head>
-<body>
+<body style="visibility:hidden">
+  <div class="heading">
+    <img src="icons/icon128.png" alt="">
+    <h1>Docreview Options</h1>
+  </div>
+  <hr>
   <label for="baseUrl">Docreview URL</label>
   <input type="url" id="baseUrl" placeholder="http://localhost:3000">
   <div class="checkbox-group">
@@ -104,9 +125,8 @@
       <li>Resolves shortened URLs by following redirects in a background tab using your browser cookies</li>
     </ul>
   </div>
-  <div style="margin-top:12px;display:flex;gap:8px;">
+  <div style="margin-top:12px;">
     <button id="save">Save</button>
-    <button id="cancel" class="secondary">Cancel</button>
   </div>
   <script src="defaults.js"></script>
   <script src="options.js"></script>

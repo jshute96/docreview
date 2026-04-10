@@ -42,8 +42,8 @@ One-line descriptions of every source file, grouped by layer.
 | `content.js` | Content script — injects Docreview icons into Docs titlebar, Drive file lists, Gmail notification emails |
 | `content-comments.js` | Comment activity detection (Docs only) — detects comment/suggestion actions, relays selection changes, sends docReady when stream view is populated |
 | `defaults.js` | Shared default config (base URL) loaded by all other scripts |
-| `options.html` | Settings page HTML — single URL input with Save/Cancel |
-| `options.js` | Settings page logic — reads/writes `chrome.storage.sync` |
+| `options.html` | Settings page HTML — URL input, per-service toggles, opens as full tab |
+| `options.js` | Settings page logic — reads/writes `chrome.storage.sync`, URL normalization, auto-size |
 | `bridge-to-docreview.js` | Content script for Docreview app pages — relays messages between the web page and background worker via `window.postMessage` |
 | `icons/` | Extension icons (16/48/128px PNGs converted from `public/docreview.svg`) |
 | `README.md` | User-facing docs — features, installation, configuration, architecture overview |
@@ -281,8 +281,9 @@ Shadcn/ui components:
 | `app-offline/labels.spec.ts` | Label management tests: create, assign, reorder, color change, delete, cancel — with DB verification |
 | `app-offline/labels-crosstab.spec.ts` | Cross-tab label sync: verifies label changes broadcast to all open pages and dialogs |
 | `extension-live/playwright.config.ts` | Config for extension + app tests (bundled Chromium with --load-extension) |
-| `extension-live/fixtures.ts` | Test fixtures: persistent context with extension, service worker, chrome API page |
+| `extension-live/fixtures.ts` | Test fixtures: persistent context with extension (--headless=new), service worker, chrome API page |
 | `extension-live/toolbar.spec.ts` | Toolbar icon click behavior: blank page opens docreview, non-doc shows error |
+| `extension-live/options.spec.ts` | Options page: UI, save/load, URL normalization, checkbox dependencies, URL behavior |
 | `app-live/playwright.config.ts` | Config for tests with real Google OAuth (setup project + storageState) |
 | `app-live/auth.setup.ts` | Setup project: reads session from test DB, sets cookie, saves auth state |
 | `app-live/login.spec.ts` | Bootstrap login test — run first to establish auth state |

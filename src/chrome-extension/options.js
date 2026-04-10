@@ -7,7 +7,12 @@ var enableDriveInput = document.getElementById('enableDrive');
 var enableGmailInput = document.getElementById('enableGmail');
 var enableResolveInput = document.getElementById('enableResolve');
 var saveButton = document.getElementById('save');
-var cancelButton = document.getElementById('cancel');
+// Auto-size URL input to fit its content (min 600px via CSS)
+function autoSizeUrl() {
+  baseUrlInput.style.width = '0';
+  baseUrlInput.style.width = Math.max(600, baseUrlInput.scrollWidth + 16) + 'px';
+}
+baseUrlInput.addEventListener('input', autoSizeUrl);
 
 // Comment sync checkbox is only enabled when docs is checked
 function updateCommentSyncState() {
@@ -34,11 +39,15 @@ chrome.storage.sync.get({
   enableGmailInput.checked = data.enableGmail;
   enableResolveInput.checked = data.enableResolve;
   updateCommentSyncState();
+  autoSizeUrl();
+  document.body.style.visibility = '';
 });
 
 // Save and close
 saveButton.addEventListener('click', function() {
-  var url = baseUrlInput.value.replace(/\/+$/, ''); // strip trailing slashes
+  var url = baseUrlInput.value.trim().replace(/\/+$/, ''); // strip whitespace then trailing slashes
+  baseUrlInput.value = url;
+  autoSizeUrl();
   chrome.storage.sync.set({
     baseUrl: url,
     enableDocs: enableDocsInput.checked,
@@ -47,11 +56,8 @@ saveButton.addEventListener('click', function() {
     enableGmail: enableGmailInput.checked,
     enableResolve: enableResolveInput.checked
   }, function() {
-    window.close();
+    saveButton.textContent = 'Saved';
+    setTimeout(function() { saveButton.textContent = 'Save'; }, 1500);
   });
 });
 
-// Cancel
-cancelButton.addEventListener('click', function() {
-  window.close();
-});

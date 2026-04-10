@@ -5,8 +5,7 @@
  * Chromium (system Chrome removed support for --load-extension). See:
  * https://playwright.dev/docs/chrome-extensions
  *
- * Extensions don't work in Chromium's headless shell, so the fixtures force
- * headed mode (headless: false). A DISPLAY is needed for CI.
+ * Uses --headless=new which supports extensions (unlike the old headless shell).
  */
 
 import { test as base, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
@@ -25,9 +24,13 @@ type ExtensionFixtures = {
 
 export const test = base.extend<ExtensionFixtures>({
   context: async ({}, use) => {
+    // Playwright's headless:true uses its own headless shell which doesn't
+    // support extensions. We use headless:false + --headless=new to get
+    // Chromium's native headless mode which does support extensions.
     const context = await chromium.launchPersistentContext('', {
       headless: false,
       args: [
+        '--headless=new',
         `--disable-extensions-except=${EXTENSION_DIR}`,
         `--load-extension=${EXTENSION_DIR}`,
       ],

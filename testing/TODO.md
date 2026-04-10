@@ -518,11 +518,26 @@ Update this list when adding or changing user-facing behaviors.
 
 **Note:** Browser UI like context menus can't be tested automatically. Test manually with `testing/extension_link_tests.html`.
 
-### Configuration
-- [ ] Server URL setting (syncs across Chrome devices)
-- [ ] Per-service toggles: Docs, Drive, Gmail
-- [ ] Comment activity sync toggle (sub-toggle of Docs)
-- [ ] URL resolver toggle with host whitelist
+### Options Page
+
+**Files:** `extension-live/options.spec.ts`
+
+- [x] Options menu item opens as a full browser tab (not a popup/dialog)
+- [ ] Server URL input defaults to 600px, grows with content
+- [x] Reload page reverts edits to all fields.
+- [x] Save button saves the changes.
+- [x] Save button shows "Saved" confirmation briefly
+- [x] Saved URL normalized to strip whitespace and trailing slashes, and display updates.
+- [x] Unchecking Docs auto-unchecks comment sync
+- [x] URL resolver toggle
+- [x] Settings persist via chrome.storage.sync (syncs across Chrome devices)
+- Saved settings reflected in extension behavior
+  - [x] Docreview URL
+  - [ ] Enable on Google Docs, Sheets, and Slides
+  - [ ] Notify on comment activity
+  - [ ] Enable on Google Drive
+  - [ ] Enable on Gmail
+  - [ ] Enable redirect-link resolver
 
 ---
 
