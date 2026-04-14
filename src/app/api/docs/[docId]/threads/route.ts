@@ -46,6 +46,9 @@ export async function GET(
         if (err.code === 404) {
           return NextResponse.json({ modifiedTime: null });
         }
+        if (err.code === 403 || err.status === 403) {
+          return NextResponse.json({ modifiedTime: null, forbidden: true });
+        }
         throw err;
       }
     }
@@ -58,6 +61,9 @@ export async function GET(
         if (err.code === 404) {
           // Comment was deleted — return empty threads so the UI updates cleanly
           return NextResponse.json({ threads: {} });
+        }
+        if (err.code === 403 || err.status === 403) {
+          return NextResponse.json({ threads: {}, forbidden: true });
         }
         throw err;
       }
@@ -86,13 +92,18 @@ export async function GET(
       threads,
       viewedByMeTime: fileRes.data.viewedByMeTime ?? null,
     });
-  } catch (err) {
+  } catch (err: any) {
     if (err instanceof OfflineModeError) {
       logWarning(`[API] Offline mode — skipping Drive thread fetch for doc ${docId}`);
       return NextResponse.json({ threads: {} });
     }
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
+    // 403 Forbidden — user doesn't have comment access to this doc
+    if (err.code === 403 || err.status === 403) {
+      logWarning(`[API] Forbidden — no comment access for doc ${docId}`);
+      return NextResponse.json({ threads: {}, forbidden: true });
+    }
     logError(`[API] Failed to fetch threads for doc ${docId}:`, err);
     return NextResponse.json(
       { error: "Failed to fetch comment threads from Drive" },

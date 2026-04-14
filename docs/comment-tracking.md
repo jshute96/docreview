@@ -75,6 +75,18 @@ reaching the deletion code, so a transient error can never wipe out all comments
 permission errors (403) also return early without triggering deletion, as the document
 still exists even if its comments are inaccessible.
 
+### Gmail-Sourced Comments (No Comment Permission)
+
+When Gmail notifications reference docs where the user lacks comment access
+(`noCommentsPermission` in the parsed email), `mergeCommentsFromGmail()` in
+`comment-merge.ts` inserts comment records from the email body. This is the only
+source of comment data for these docs — Drive's `comments.list` returns 403.
+
+Each comment is keyed by `discussionId` (the `disco=` URL parameter). Duplicate
+detection uses `findFirst` by docId + googleCommentId. Fields are populated from
+the email: author, timestamp, content (text or suggestion placeholder), reply count.
+The `source` field is set to `"gmail"` to distinguish from Drive-sourced comments.
+
 ---
 
 ## Status on Subsequent Syncs

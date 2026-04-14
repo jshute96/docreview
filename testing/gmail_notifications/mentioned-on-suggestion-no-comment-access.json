@@ -16,9 +16,9 @@
   "suggestions": [
     {
       "author": "Unknown author",
-      "time_str": "Tue, 14 Apr 2026 06:38:33 -0700",
+      "time_str": "1:38 PM, Apr 14 (UTC)",
       "time": "2026-04-14T13:38:33.000Z",
-      "action": "Other",
+      "action": "Edit",
       "text": "[Suggestion not visible]",
       "isNew": false,
       "hiddenCount": 4,

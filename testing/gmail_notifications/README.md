@@ -32,6 +32,7 @@ Current examples:
 - `suggestion_format_change` — comment, suggestion with accept/reject replies, resolved suggestions
 - `mentions-with-no-access` — @mentions and assigned comment on a doc the recipient can't access
 - `mentions-with-view-only` — @mentions and assigned comment on a doc the recipient has view-only access to
+- `mentioned-on-suggestion-no-comment-access` — @mention on a suggestion where the recipient has no commenting rights (suggestion details hidden)
 
 ## Adding a new example
 

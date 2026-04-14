@@ -578,6 +578,8 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] View-only doc: comments page shows comments from Drive API (no extension data)
 - [ ] View-only doc: extension fetches (getComment, getSuggestion) return gracefully (no 5s hang)
 - [ ] Doc with no comments: comments page shows empty state
+- [ ] No-comment-permission doc: comments page shows "Comments not visible on this document." (not "No comments")
+- [ ] No-comment-permission doc: Gmail-sourced comments appear in the comment list with placeholder suggestion details
 - [ ] Doc with no comments: extension fetches return empty results quickly (zero-state detection)
 
 ---

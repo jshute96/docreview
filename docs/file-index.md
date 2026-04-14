@@ -191,6 +191,7 @@ Shadcn/ui components:
 | `auth-utils.ts` | Centralized authentication helpers for Server Components and API routes |
 | `sync-comments.ts` | Comment sync engine — full-scan of Drive comments + Docs suggestions, creates/updates/deletes DB records, computes unarchive signals, stores suggestion content hashes; falls back to content hash lookup for Gmail-first suggestion rows |
 | `suggestion-hash.ts` | Content hash for suggestions — SHA-256 of normalized action type + deleted/inserted text, used for cross-source matching (Docs API ↔ Gmail) |
+| `comment-merge.ts` | Merges comment data from Gmail notifications into DB for docs with no comment permission — inserts comment records when Drive API can't list comments |
 | `suggestion-merge.ts` | Merges suggestion data from Gmail notifications into DB — matches by content hash, fills in `googleCommentId` and `replyCount`, or inserts new rows if Gmail arrives first |
 | `bridge-to-extension.ts` | Client-side bridge for communicating with the Chrome extension — handles pinging, URL resolution, in-page comment navigation, and fetching suggestion and comment data (including tabName) from open doc tabs |
 | `extension-suggestions.ts` | Converts extension-scraped suggestion data into display objects — timestamp parsing, CommentThread/SuggestionContent creation (including tabName) for thread panel display |

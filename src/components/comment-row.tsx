@@ -35,6 +35,7 @@ interface CommentRowProps {
   onSelectInDoc?: () => void;
   onSuggestionRefresh?: (discoId: string, thread: CommentThread, content: SuggestionContent, raw: ExtensionSuggestion) => void;
   userName?: string;
+  emptyMessage?: string;
 }
 
 function splitContent(raw: string): { author: string | null; text: string } {
@@ -43,7 +44,7 @@ function splitContent(raw: string): { author: string | null; text: string } {
   return { author: raw.slice(0, sep), text: raw.slice(sep + 2) };
 }
 
-export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal, isSelected, onSelectInDoc, onSuggestionRefresh, userName }: CommentRowProps) {
+export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal, isSelected, onSelectInDoc, onSuggestionRefresh, userName, emptyMessage }: CommentRowProps) {
   const isSuggestion = comment.type === "SUGGESTION";
   const currentModifiedMs = comment.driveModifiedAt
     ? new Date(comment.driveModifiedAt).getTime()
@@ -717,6 +718,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   threads={isSuggestion ? suggestionThreads : threads}
                   loading={loadingThreads}
                   resolved={comment.resolved}
+                  emptyMessage={emptyMessage}
                   commentUrl={commentUrl()}
                   openLabel={openLabel}
                   openTitle={openTitle}

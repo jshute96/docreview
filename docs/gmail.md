@@ -125,7 +125,11 @@ with different options — see [`refresh.md`](./refresh.md) for the full archite
    a strong signal the doc needs attention.
 7. **Deletions**: Drive `changes.list` deletions + `findDeletedDocIds` for missing Gmail docs
 8. **Comment sync** + **unarchive** for all upserted/updated docs
-9. **Save tokens**: Drive token if Drive succeeded (and no transient errors); Gmail timestamp if Gmail succeeded
+9. **Gmail comment merge**: for docs where Drive can't list comments (`noCommentsPermission`
+   in the email), `mergeCommentsFromGmail()` inserts comment records from the parsed email
+   body. Runs in both the upsert loop (step 8) and a second pass for docs that didn't go
+   through upsert (inaccessible/failed-fetch docs). Triggers unarchive with cutoff check.
+10. **Save tokens**: Drive token if Drive succeeded (and no transient errors); Gmail timestamp if Gmail succeeded
 
 ### Timestamp Lifecycle
 

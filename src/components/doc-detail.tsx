@@ -125,6 +125,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
   const [bulkMarkingRead, setBulkMarkingRead] = useState(false);
   const [bulkMarkingUnread, setBulkMarkingUnread] = useState(false);
   const [threadMap, setThreadMap] = useState<ThreadMap>({});
+  const [threadsForbidden, setThreadsForbidden] = useState(false);
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
   const [documentText, setDocumentText] = useState<string | undefined>(undefined);
   const [viewedByMeTime, setViewedByMeTime] = useState<string | null>(null);
@@ -224,6 +225,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
         const data = await res.json();
         setThreadMap(prev => mergeThreads(prev, data.threads ?? {}));
         if (data.viewedByMeTime !== undefined) setViewedByMeTime(data.viewedByMeTime);
+        setThreadsForbidden(data.forbidden ?? false);
       }
     } catch { /* threads are optional */ }
   }
@@ -1265,6 +1267,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                     : undefined}
                   onSuggestionRefresh={comment.type === "SUGGESTION" ? handleSuggestionRefresh : undefined}
                   userName={userName}
+                  emptyMessage={threadsForbidden ? "Comments not visible on this document." : undefined}
                 />
               ))}
           </table>

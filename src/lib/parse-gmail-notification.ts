@@ -350,6 +350,21 @@ export function headerDateToISO(dateStr: string): string | undefined {
   return d.toISOString();
 }
 
+const MONTH_ABBRS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Format an ISO 8601 timestamp as Google's comment time format: "H:MM AM/PM, Mon DD (UTC)". */
+export function formatAsCommentTime(iso: string): string {
+  const d = new Date(iso);
+  let hours = d.getUTCHours();
+  const minutes = d.getUTCMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  if (hours === 0) hours = 12;
+  else if (hours > 12) hours -= 12;
+  const month = MONTH_ABBRS[d.getUTCMonth()];
+  const day = d.getUTCDate();
+  return `${hours}:${String(minutes).padStart(2, "0")} ${ampm}, ${month} ${day} (UTC)`;
+}
+
 // ---------------------------------------------------------------------------
 // Comment notification parser
 // ---------------------------------------------------------------------------
@@ -480,9 +495,10 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
         replies = posts.slice(1);
       }
 
-      // Fall back to email date when no suggestion author post is available
-      const fallbackTimeStr = dateStr;
+      // Fall back to email date when no suggestion author post is available.
+      // Format fallback time_str to match Google's "H:MM AM/PM, Mon DD (UTC)" format.
       const fallbackTime = headerDateToISO(dateStr);
+      const fallbackTimeStr = fallbackTime ? formatAsCommentTime(fallbackTime) : dateStr;
 
       // Suggestions have fallback values in some fields for cases where the
       // message doesn't include them, because we don't have comment permission.
@@ -490,7 +506,7 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
         author: post?.author || "Unknown author",
         time_str: post?.time_str || fallbackTimeStr,
         ...((post?.time || fallbackTime) ? { time: post?.time || fallbackTime } : {}),
-        action: suggestionAction || (detailsHidden ? "Other" : ""),
+        action: suggestionAction || (detailsHidden ? "Edit" : ""),
         text: text || (detailsHidden ? "[Suggestion not visible]" : ""),
         oldText,
         newText,

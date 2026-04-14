@@ -6,7 +6,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { parseGmailNotification, parseCommentTime, headerDateToISO, decodeHtmlEntities } from "./parse-gmail-notification";
+import { parseGmailNotification, parseCommentTime, headerDateToISO, decodeHtmlEntities, formatAsCommentTime } from "./parse-gmail-notification";
 import type { CommentNotification, SharingNotification } from "./parse-gmail-notification";
 
 const EXAMPLES_DIR = join(__dirname, "../../testing/gmail_notifications");
@@ -253,6 +253,44 @@ describe("parseGmailNotification", () => {
     });
   });
 
+  describe("suggestion with no comment access (details hidden)", () => {
+    const raw = readFileSync(join(EXAMPLES_DIR, "mentioned-on-suggestion-no-comment-access.eml"), "utf-8");
+    const result = parseGmailNotification(raw) as CommentNotification;
+
+    it("sets noCommentsPermission on the notification", () => {
+      expect(result.noCommentsPermission).toBe(true);
+    });
+
+    it("creates a suggestion with placeholder values", () => {
+      expect(result.suggestions).toHaveLength(1);
+      const s = result.suggestions[0];
+      expect(s.author).toBe("Unknown author");
+      expect(s.action).toBe("Edit");
+      expect(s.text).toBe("[Suggestion not visible]");
+      expect(s.isNew).toBe(false);
+    });
+
+    it("formats fallback time_str like Google's comment time format", () => {
+      const s = result.suggestions[0];
+      // Email date: Tue, 14 Apr 2026 06:38:33 -0700 = 13:38 UTC
+      expect(s.time_str).toBe("1:38 PM, Apr 14 (UTC)");
+      expect(s.time).toBe("2026-04-14T13:38:33.000Z");
+    });
+
+    it("captures hiddenCount on the suggestion", () => {
+      expect(result.suggestions[0].hiddenCount).toBe(4);
+    });
+
+    it("preserves visible posts as replies (not consumed as suggestion author)", () => {
+      const s = result.suggestions[0];
+      expect(s.replies).toHaveLength(1);
+      const reply = s.replies[0];
+      expect(reply.author).toBe("Jeff Shute");
+      expect(reply.text).toBe("mention @docreview.dave@gmail.com");
+      expect(reply.isNew).toBe(true);
+    });
+  });
+
   describe("suggestion accept/reject replies", () => {
     const raw = readFileSync(join(EXAMPLES_DIR, "suggestion_accept_reject.eml"), "utf-8");
     const result = parseGmailNotification(raw) as CommentNotification;
@@ -349,6 +387,45 @@ describe("parseCommentTime", () => {
   it("infers year from the email Date header", () => {
     const emailDate2030 = "Mon, 01 Jul 2030 12:00:00 +0000";
     expect(parseCommentTime("3:00 PM, Jul 1 (UTC)", emailDate2030)).toBe("2030-07-01T15:00:00.000Z");
+  });
+});
+
+describe("formatAsCommentTime", () => {
+  it("formats a morning time", () => {
+    expect(formatAsCommentTime("2026-04-14T09:05:00.000Z")).toBe("9:05 AM, Apr 14 (UTC)");
+  });
+
+  it("formats an afternoon time", () => {
+    expect(formatAsCommentTime("2026-04-14T13:38:33.000Z")).toBe("1:38 PM, Apr 14 (UTC)");
+  });
+
+  it("formats midnight as 12 AM", () => {
+    expect(formatAsCommentTime("2026-04-14T00:00:00.000Z")).toBe("12:00 AM, Apr 14 (UTC)");
+  });
+
+  it("formats noon as 12 PM", () => {
+    expect(formatAsCommentTime("2026-04-14T12:00:00.000Z")).toBe("12:00 PM, Apr 14 (UTC)");
+  });
+
+  it("formats 12:30 AM (not 0:30)", () => {
+    expect(formatAsCommentTime("2026-04-14T00:30:00.000Z")).toBe("12:30 AM, Apr 14 (UTC)");
+  });
+
+  it("formats 12:30 PM (not 0:30 PM)", () => {
+    expect(formatAsCommentTime("2026-04-14T12:30:00.000Z")).toBe("12:30 PM, Apr 14 (UTC)");
+  });
+
+  it("pads single-digit minutes with zero", () => {
+    expect(formatAsCommentTime("2026-04-14T14:05:00.000Z")).toBe("2:05 PM, Apr 14 (UTC)");
+  });
+
+  it("does not pad single-digit hours", () => {
+    expect(formatAsCommentTime("2026-04-14T03:30:00.000Z")).toBe("3:30 AM, Apr 14 (UTC)");
+  });
+
+  it("uses 3-letter month abbreviations", () => {
+    expect(formatAsCommentTime("2026-01-01T10:00:00.000Z")).toBe("10:00 AM, Jan 1 (UTC)");
+    expect(formatAsCommentTime("2026-12-31T10:00:00.000Z")).toBe("10:00 AM, Dec 31 (UTC)");
   });
 });
 

@@ -12,6 +12,7 @@ import { scanGmailForDocIds, buildInaccessibleDocs, type GmailInaccessibleDoc } 
 import type { ParsedEmail } from "@/lib/parse-gmail-notification";
 import { syncComments, type SyncPrefetchedData } from "@/lib/sync-comments";
 import { mergeSuggestionsFromGmail } from "@/lib/suggestion-merge";
+import { mergeCommentsFromGmail } from "@/lib/comment-merge";
 import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "@/lib/status";
 import { logWarning, logInfo } from "@/lib/log";
 import { appendNotes, formatDate, pluralize } from "@/lib/utils";
@@ -178,6 +179,13 @@ export async function upsertDocsAndSyncComments(
           result.suggestionsCreated += mergeResult.inserted;
           result.suggestionsUpdated += mergeResult.merged;
           if (mergeResult.shouldUnarchive) {
+            result.shouldUnarchive = true;
+          }
+          // Merge comments from Gmail for docs where Drive can't list comments
+          // (noCommentsPermission). No-op for docs with full access.
+          const commentMergeResult = await mergeCommentsFromGmail(doc.docId, doc.googleDocId, email);
+          result.commentsCreated += commentMergeResult.inserted;
+          if (commentMergeResult.shouldUnarchive) {
             result.shouldUnarchive = true;
           }
         }
@@ -606,6 +614,44 @@ export async function executeRefresh(
     }
   }
 
+  // Merge comments from Gmail for docs that didn't go through upsertDocsAndSyncComments.
+  // This covers both newly inserted inaccessible docs AND existing docs whose Drive
+  // metadata fetch failed (they never reach syncComments, so Gmail is the only source).
+  let gmailMergeUnarchived = 0;
+  {
+    const processedGoogleDocIds = new Set(allDiscoveryDocs.map(d => d.googleDocId));
+    const unprocessedGmailIds = gmailDocIds.filter(id => !processedGoogleDocIds.has(id));
+    if (unprocessedGmailIds.length > 0) {
+      const dbDocs = await prisma.doc.findMany({
+        where: { userId, googleDocId: { in: unprocessedGmailIds } },
+        select: { docId: true, googleDocId: true, status: true },
+      });
+      for (const dbDoc of dbDocs) {
+        const emails = gmailEmailMeta.get(dbDoc.googleDocId);
+        if (!emails) continue;
+        let shouldUnarchive = false;
+        for (const email of emails) {
+          const r = await mergeCommentsFromGmail(dbDoc.docId, dbDoc.googleDocId, email);
+          if (r.shouldUnarchive) shouldUnarchive = true;
+        }
+        if (shouldUnarchive && dbDoc.status === "ARCHIVED") {
+          let recentEnough = true;
+          if (unarchiveCutoff) {
+            const fresh = await prisma.doc.findUnique({ where: { docId: dbDoc.docId }, select: { lastCommentActivity: true } });
+            if (!fresh?.lastCommentActivity || fresh.lastCommentActivity < unarchiveCutoff) {
+              recentEnough = false;
+              logInfo(`[Refresh] Skipping unarchive for ${dbDoc.googleDocId} — last comment activity ${fresh?.lastCommentActivity?.toISOString() ?? "null"} is before cutoff ${unarchiveCutoff.toISOString()}`);
+            }
+          }
+          if (recentEnough) {
+            await prisma.doc.update({ where: { docId: dbDoc.docId }, data: { status: "INBOX" } });
+            gmailMergeUnarchived++;
+          }
+        }
+      }
+    }
+  }
+
   const syncRes = await upsertDocsAndSyncComments(
     userId,
     userEmail,
@@ -674,7 +720,7 @@ export async function executeRefresh(
     pluralize(syncRes.added + inaccessibleAdded, "doc") + " added",
     pluralize(syncRes.updated, "doc") + " updated",
     pluralize(totalDeleted, "doc") + " deleted",
-    pluralize(syncRes.unarchived, "doc") + " unarchived",
+    pluralize(syncRes.unarchived + gmailMergeUnarchived, "doc") + " unarchived",
   ];
   const commentStr = `${pluralize(syncRes.commentsCreated, "new comment thread")}, ${pluralize(syncRes.commentsUpdated, "updated comment thread")}`;
   const suggestionStr = syncRes.suggestionsCreated > 0 || syncRes.suggestionsUpdated > 0
@@ -685,6 +731,6 @@ export async function executeRefresh(
     : "";
   const driveStr = driveChangesRead > 0 ? `${pluralize(driveChangesRead, "Drive change")} processed, ` : "";
   logInfo(`[Refresh] Complete in ${elapsed}ms: ${driveStr}${counts.join(", ")}, ${commentStr}${suggestionStr}${skipStr} (${pluralize(totalErrorCount, "error")})`);
-  return { ...syncRes, added: syncRes.added + inaccessibleAdded, deleted: totalDeleted, errorCount: totalErrorCount, driveChangesRead, totalDocuments: allDiscoveryDocs.length };
+  return { ...syncRes, added: syncRes.added + inaccessibleAdded, deleted: totalDeleted, unarchived: syncRes.unarchived + gmailMergeUnarchived, errorCount: totalErrorCount, driveChangesRead, totalDocuments: allDiscoveryDocs.length };
 }
 
