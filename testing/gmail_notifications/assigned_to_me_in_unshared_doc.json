@@ -11,12 +11,12 @@
   "xDocumentId": "xDgAAAPp2Sm78XY3b9Fef1Wy4whBld1Jnf7aGYA",
   "feedbackId": "MailTypeComment:EditorsNotification",
   "recipientUserId": "116797062718942056712",
+  "noCommentsPermission": true,
   "comments": [
     {
       "assignedTo": "you",
       "discussionId": "AAAB1mvjHho",
       "openUrl": "https://docs.google.com/document/d/117IKIeDuaMax6SGuwCp6cOtidbmXfT-GsCzJCNtf5xk/edit?disco=AAAB1mvjHho&usp=todo_email_discussion&ts=69b0f659&usp_dm=false",
-      "replyTo": "",
       "replies": [
         {
           "author": "Jeff Shute",

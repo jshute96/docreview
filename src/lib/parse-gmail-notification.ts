@@ -31,9 +31,10 @@ export interface CommentReply {
 export interface CommentThread {
   quotedText?: string;
   assignedTo?: string;
+  hiddenCount?: number;    // From "[2 comments hidden]" on docs where I can't see comments
   discussionId: string;
   openUrl: string;
-  replyTo: string;
+  replyTo?: string;
   replies: CommentReply[];
 }
 
@@ -46,9 +47,10 @@ export interface Suggestion {
   oldText?: string; // for Replace
   newText?: string; // for Replace
   isNew: boolean;
+  hiddenCount?: number;    // From "[2 comments hidden]" on docs where I can't see comments
   discussionId: string;
   openUrl: string;
-  replyTo: string;
+  replyTo?: string;
   replies: CommentReply[];
 }
 
@@ -65,6 +67,7 @@ export interface CommentNotification {
   xDocumentId?: string;
   feedbackId?: string;
   recipientUserId?: string;
+  noCommentsPermission?: boolean; // "You do not have commenting rights to ..."
   comments: CommentThread[];
   suggestions: Suggestion[];
 }
@@ -366,6 +369,9 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
   const ouidMatch = html.match(/ouid=(\d+)/);
   const recipientUserId = ouidMatch ? ouidMatch[1] : undefined;
 
+  // "You do not have commenting rights to ..."
+  const noCommentsPermission = /You do not have commenting rights to/.test(html);
+
   const dateStr = headers.get("date") || "";
   const dateISO = headerDateToISO(dateStr);
 
@@ -411,12 +417,17 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
       const assignedMatch = section.match(/<i>Assigned to you<\/i>/);
       const assignedTo = assignedMatch ? "you" : undefined;
 
+      // Check for "[N comments hidden]" tombstone
+      const hiddenMatch = section.match(/\[(\d+) comments? hidden\]/);
+      const hiddenCount = hiddenMatch ? parseInt(hiddenMatch[1], 10) : undefined;
+
       comments.push({
         quotedText,
         ...(assignedTo ? { assignedTo } : {}),
+        ...(hiddenCount ? { hiddenCount } : {}),
         discussionId: discoId,
         openUrl,
-        replyTo,
+        ...(replyTo ? { replyTo } : {}),
         replies: posts,
       });
     } else if (isSuggestion) {
@@ -451,21 +462,43 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
         text = details ? `${label}: ${details}` : label;
       }
 
-      const post = posts[0];
-      // Posts after the first are replies to the suggestion
-      const replies = posts.slice(1);
+      // Check for "[N comments hidden]" tombstone in suggestions too
+      const sugHiddenMatch = section.match(/\[(\d+) comments? hidden\]/);
+      const sugHiddenCount = sugHiddenMatch ? parseInt(sugHiddenMatch[1], 10) : undefined;
+
+      // When no suggestion details are visible (e.g. no commenting rights),
+      // all posts are replies — don't consume posts[0] as the suggestion author.
+      // Use placeholders so the suggestion has usable values.
+      const detailsHidden = !suggestionDiv && !otherDiv;
+      let post: CommentReply | undefined;
+      let replies: CommentReply[];
+      if (detailsHidden && posts.length > 0) {
+        post = undefined;
+        replies = posts;
+      } else {
+        post = posts[0];
+        replies = posts.slice(1);
+      }
+
+      // Fall back to email date when no suggestion author post is available
+      const fallbackTimeStr = dateStr;
+      const fallbackTime = headerDateToISO(dateStr);
+
+      // Suggestions have fallback values in some fields for cases where the
+      // message doesn't include them, because we don't have comment permission.
       suggestions.push({
-        author: post?.author || "",
-        time_str: post?.time_str || "",
-        ...(post?.time ? { time: post.time } : {}),
-        action: suggestionAction,
-        text,
+        author: post?.author || "Unknown author",
+        time_str: post?.time_str || fallbackTimeStr,
+        ...((post?.time || fallbackTime) ? { time: post?.time || fallbackTime } : {}),
+        action: suggestionAction || (detailsHidden ? "Other" : ""),
+        text: text || (detailsHidden ? "[Suggestion not visible]" : ""),
         oldText,
         newText,
         isNew: post?.isNew || false,
+        ...(sugHiddenCount ? { hiddenCount: sugHiddenCount } : {}),
         discussionId: discoId,
         openUrl,
-        replyTo,
+        ...(replyTo ? { replyTo } : {}),
         replies,
       });
     }
@@ -484,6 +517,7 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
     xDocumentId: headers.get("x-document-id") || undefined,
     feedbackId: headers.get("feedback-id") || undefined,
     recipientUserId,
+    ...(noCommentsPermission ? { noCommentsPermission } : {}),
     comments,
     suggestions,
   };

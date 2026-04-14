@@ -179,6 +179,50 @@ describe("parseGmailNotification", () => {
     });
   });
 
+  describe("noCommentsPermission flag", () => {
+    it("is set when recipient has no access", () => {
+      const raw = readFileSync(join(EXAMPLES_DIR, "mentions-with-no-access.eml"), "utf-8");
+      const result = parseGmailNotification(raw) as CommentNotification;
+      expect(result.noCommentsPermission).toBe(true);
+    });
+
+    it("is set when recipient has view-only access", () => {
+      const raw = readFileSync(join(EXAMPLES_DIR, "mentions-with-view-only.eml"), "utf-8");
+      const result = parseGmailNotification(raw) as CommentNotification;
+      expect(result.noCommentsPermission).toBe(true);
+    });
+
+    it("is not set on normal comment notifications", () => {
+      const raw = readFileSync(join(EXAMPLES_DIR, "comment_notification.eml"), "utf-8");
+      const result = parseGmailNotification(raw) as CommentNotification;
+      expect(result.noCommentsPermission).toBeUndefined();
+    });
+  });
+
+  describe("hiddenCount on comment threads", () => {
+    it("captures hidden comment count from tombstone", () => {
+      const raw = readFileSync(join(EXAMPLES_DIR, "mentions-with-no-access.eml"), "utf-8");
+      const result = parseGmailNotification(raw) as CommentNotification;
+      const threadWithHidden = result.comments.find(c => c.hiddenCount);
+      expect(threadWithHidden).toBeDefined();
+      expect(threadWithHidden!.hiddenCount).toBe(2);
+    });
+
+    it("captures hidden count on view-only doc threads", () => {
+      const raw = readFileSync(join(EXAMPLES_DIR, "mentions-with-view-only.eml"), "utf-8");
+      const result = parseGmailNotification(raw) as CommentNotification;
+      const threadWithHidden = result.comments.find(c => c.hiddenCount);
+      expect(threadWithHidden).toBeDefined();
+      expect(threadWithHidden!.hiddenCount).toBe(2);
+    });
+
+    it("is not set on threads without hidden comments", () => {
+      const raw = readFileSync(join(EXAMPLES_DIR, "comment_notification.eml"), "utf-8");
+      const result = parseGmailNotification(raw) as CommentNotification;
+      expect(result.comments[0].hiddenCount).toBeUndefined();
+    });
+  });
+
   describe("comment resolved notification", () => {
     const raw = readFileSync(join(EXAMPLES_DIR, "comment_resolved.eml"), "utf-8");
     const result = parseGmailNotification(raw) as CommentNotification;

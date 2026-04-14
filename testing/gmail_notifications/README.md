@@ -30,6 +30,8 @@ Current examples:
 - `suggestion_accept_reject` — format suggestion with reply thread
 - `suggestion_add_link` — "add link" suggestion (Other action type) with @mention reply
 - `suggestion_format_change` — comment, suggestion with accept/reject replies, resolved suggestions
+- `mentions-with-no-access` — @mentions and assigned comment on a doc the recipient can't access
+- `mentions-with-view-only` — @mentions and assigned comment on a doc the recipient has view-only access to
 
 ## Adding a new example
 

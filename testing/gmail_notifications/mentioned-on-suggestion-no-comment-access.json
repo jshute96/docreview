@@ -1,0 +1,39 @@
+{
+  "type": "comment",
+  "subject": "Shared with view permission only",
+  "from": "\"Jeff Shute (Google Docs)\" <comments-noreply@docs.google.com>",
+  "to": "docreview.dave@gmail.com",
+  "date_str": "Tue, 14 Apr 2026 06:38:33 -0700",
+  "date": "2026-04-14T13:38:33.000Z",
+  "documentId": "10e5M_MLaisYyJA1p3V38Exwp5jyhC5cezoMdbmwsb1k",
+  "documentTitle": "Shared with view permission only",
+  "documentUrl": "https://docs.google.com/document/d/10e5M_MLaisYyJA1p3V38Exwp5jyhC5cezoMdbmwsb1k/edit?disco=AAAB3QcAOtI&usp=comment_email_document&ts=69de4359&tab=t.0",
+  "xDocumentId": "xDgAAAHQ6YBGdNsaqhYd502aXrcSsURXt-vs5qA",
+  "feedbackId": "MailTypeComment:EditorsNotification",
+  "recipientUserId": "116797062718942056712",
+  "noCommentsPermission": true,
+  "comments": [],
+  "suggestions": [
+    {
+      "author": "Unknown author",
+      "time_str": "Tue, 14 Apr 2026 06:38:33 -0700",
+      "time": "2026-04-14T13:38:33.000Z",
+      "action": "Other",
+      "text": "[Suggestion not visible]",
+      "isNew": false,
+      "hiddenCount": 4,
+      "discussionId": "AAAB3QcAOtI",
+      "openUrl": "https://docs.google.com/document/d/10e5M_MLaisYyJA1p3V38Exwp5jyhC5cezoMdbmwsb1k/edit?disco=AAAB3QcAOtI&usp=suggestion_email_discussion&ts=69de4359&usp_dm=false",
+      "replies": [
+        {
+          "author": "Jeff Shute",
+          "time_str": "1:33 PM, Apr 14 (UTC)",
+          "time": "2026-04-14T13:33:00.000Z",
+          "text": "mention @docreview.dave@gmail.com",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        }
+      ]
+    }
+  ]
+}

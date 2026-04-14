@@ -1,0 +1,325 @@
+Delivered-To: docreview.dave@gmail.com
+Received: by 2002:a05:6e04:1c89:b0:3bc:cc4:594c with SMTP id ch9csp3111205imd;
+        Mon, 13 Apr 2026 23:52:42 -0700 (PDT)
+X-Received: by 2002:ac8:57c1:0:b0:50b:328b:cd41 with SMTP id d75a77b69052e-50dc1accee8mr260014991cf.20.1776149562183;
+        Mon, 13 Apr 2026 23:52:42 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1776149562; cv=none;
+        d=google.com; s=arc-20240605;
+        b=l0vjI+QO2FvOCFJ3kcXR3tdmylO/2acXVI4dhnGhbUvXh+/mpk3V8VTutyreKX7imL
+         zbqZcDprhYYAOhPsDG+jlcxOHucWdQEQhIihV96oTBpXKqbFtvyJ82G+Dirc3Ye6iiWy
+         ZqwBg7vPsaN83aPHjFoJ+bx3Sj2uZR3BSDcp0ukh35ycY39RDcMtryefUEk88cPm4M1V
+         JASf+7A76De0rZhCykiOgHVAy7re0upOWAEwwLOnudaltqX8kjLwuEqHInxB4FwXPwVA
+         CXI3IsJ2Qtn8kLtiuANshkPQRm/1Sp70SE+aI7MTBbcpe3nXlbGrhd42E+Kg/9c90lv4
+         kL5Q==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
+        h=to:from:subject:message-id:gmsai:reply-to:feedback-id:references
+         :date:mime-version:dkim-signature;
+        bh=27QRSzdK+GfCeaem40PpbjmiOCj3j5A3VoRcDSj6Xv4=;
+        fh=vqyCNxHClNs+C9H286QZve7sy8P02Zp/Xxm4PT++dMg=;
+        b=L8zB4QFT9oSGVlYhhy/nmjuTKjamtShS+02tq3NiCHZfIWze2EQmQXN4IXCGT5ObcN
+         SyhzsFHXsS59cJurvjZEnM4Z8JOIOq6vrtTcMWk+zqcb56MaxEugE9poqQcEApxH0uuh
+         XG1AC3KUJKvDSYWWgKn8/w6XmSxp7KCFC+Wy7mXkJtAGxrDV+r39qYTuLHfLnhwFkvEI
+         gHhKXTzko8Sym/MnjOfxYhMvvZdyWJbM0evsVkUibIYpJy6w5eUALK2heq7+w4TyZRjj
+         fM3CMb62mC50q/ffWl8uyYM0EWPwbPfAXBVh6WTRyb/FWpVx5Kzkp/cosWOYvdDs+1Bs
+         EAcg==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@docs.google.com header.s=20251104 header.b=bCcG59OO;
+       spf=pass (google.com: domain of 3oetdarapam4w866y7dc-78by95ix8wc.08805y.w86@docos.bounces.google.com designates 209.85.220.69 as permitted sender) smtp.mailfrom=3OeTdaRAPAM4w866y7DC-78By95Ix8wC.08805y.w86@docos.bounces.google.com;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=docs.google.com;
+       dara=pass header.i=@gmail.com
+Return-Path: <3OeTdaRAPAM4w866y7DC-78By95Ix8wC.08805y.w86@docos.bounces.google.com>
+Received: from mail-sor-f69.google.com (mail-sor-f69.google.com. [209.85.220.69])
+        by mx.google.com with SMTPS id d75a77b69052e-50e0e77557bsor4057071cf.2.2026.04.13.23.52.42
+        for <docreview.dave@gmail.com>
+        (Google Transport Security);
+        Mon, 13 Apr 2026 23:52:42 -0700 (PDT)
+Received-SPF: pass (google.com: domain of 3oetdarapam4w866y7dc-78by95ix8wc.08805y.w86@docos.bounces.google.com designates 209.85.220.69 as permitted sender) client-ip=209.85.220.69;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@docs.google.com header.s=20251104 header.b=bCcG59OO;
+       spf=pass (google.com: domain of 3oetdarapam4w866y7dc-78by95ix8wc.08805y.w86@docos.bounces.google.com designates 209.85.220.69 as permitted sender) smtp.mailfrom=3OeTdaRAPAM4w866y7DC-78By95Ix8wC.08805y.w86@docos.bounces.google.com;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=docs.google.com;
+       dara=pass header.i=@gmail.com
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=docs.google.com; s=20251104; t=1776149562; x=1776754362; dara=google.com;
+        h=to:from:subject:message-id:gmsai:reply-to:feedback-id:references
+         :date:mime-version:from:to:cc:subject:date:message-id:reply-to;
+        bh=27QRSzdK+GfCeaem40PpbjmiOCj3j5A3VoRcDSj6Xv4=;
+        b=bCcG59OOqyZofx+IDRMfwySOfCdLbR5jjVxh5h/OqAZID1YBAYvLA/K0LgB94Tuw/7
+         z4BAV+c/XwvQNh0m2cM4Ye2GncA3SouyDs6xqo991TeTntI/qz+YKKwDv2iGfj8U+WHg
+         l9GY7B8uagxqUyzJKQe8sL13ScZLeyRpgS8CbfCez4jh0iWI72vmGptYblivJPwELEnx
+         o/LUpADcfdlzLKNYzeykq4r1zbLw2kBqZRKAxYt2Ku6atn4o6mmp7+TNZuSVrQrxzY9G
+         tMAnGsHEWSEov+b1vMkT+a6EUYAKQxlCr9+7Oza1xt6+kk5Ms4c3pS4JHiEZ5V2tDArH
+         aigg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20251104; t=1776149562; x=1776754362;
+        h=to:from:subject:message-id:gmsai:reply-to:feedback-id:references
+         :date:mime-version:x-gm-message-state:from:to:cc:subject:date
+         :message-id:reply-to;
+        bh=27QRSzdK+GfCeaem40PpbjmiOCj3j5A3VoRcDSj6Xv4=;
+        b=hHZ60wr3v/vaVY5n64KYos/XjulOsZu/NLR1alDeMNmAiqcLuDke6yTFtikciPG/3H
+         DVz4HUGltKOZx1/+O7Z9ehRkJXNgXTnjBwfhnVrbioNFwu3nJ0/x9P6gt6UE4u61O4Ef
+         fQA1Sa9cyl5eUOWYWV7w6R/wc+OkQ46PzgdMk+BYJHbt1RzTGSetyTq5hVCKF2DKQkwP
+         jUyMuuUvvSOqciOKnsWP5t5CbpBc/QOu4bZQOBSrdlm6fyGW6Dbbn+lRs9p/7+0pv0WS
+         aKtPxxjasMl5qP7Kci2EK9L3KT7GT4Qnsf/8fO3kmFwz7NSHTACNVCeLV9JUdJvidxim
+         R5hg==
+X-Gm-Message-State: AOJu0YwHTKDjASRwOWnNcw+ZvDbXmFR+GnIQwy4sB/cSf1qWKL6VcfK+
+	CD4EFtcG+3QgyYwVT+IbOFby+IsAmeXE7ftHip5zalvU
+MIME-Version: 1.0
+X-Received: by 2002:a05:622a:1aa2:b0:50d:8e37:169c with SMTP id
+ d75a77b69052e-50dd6bbcc76mr219129791cf.25.1776149561875; Mon, 13 Apr 2026
+ 23:52:41 -0700 (PDT)
+Date: Mon, 13 Apr 2026 23:52:41 -0700
+X-Document-ID: xDgAAANNxyRB5SzDn3Zc9TfI9JAgtz8dHnnrnow
+References: <d+eERnQUFBTk54eVJCNVN6RG4zWmM5VGZJOUpBZ3R6OGRIbm5ybm93Og@docs.google.com>
+X-No-Auto-Attachment: 1
+Feedback-ID: MailTypeComment:EditorsNotification
+X-EditorsNotification-MentionAuthor: jshute@gmail.com
+Reply-to: No Reply <d+noreply@docs.google.com>
+gmsai: true
+X-Google-Notification-Metadata: CgISAA
+X-Notifications: 0000020ef3e269b8
+X-Notifications-Bounce-Info: AZ3VuTireEQ5VrXjYmdzBq5FEAJJlPjx-uuGKZyYqCOJ85VWlmy8BMpJ-Cy4ZGDbRwcr0mBlbWatPyc5lJTATroGEm6P9uJuVzlsCb7n2vv5Nosntbk4dRDlk9a_xUEX8f0aC8CFavouvOrZKy0dgMx6-1Wv8v0BAT5vZmSpgSGwp5ry6sXhVfV-3KF7qsAK4vhKc0KsbwBo1mN-b5mfY5KReZ_jcY1l7EUwFnunCuJfg4yFMAlM77hbN23WV-DYfrehE-BifYOO0V2BZMoi60cYTYEFrQhv76dC-ANjAwNjA0MDQxNTM1NTk2OTMzMg
+Message-ID: <123RaYOu1mTaqk3rXOXuHA@notifications.google.com>
+Subject: Test doc 1111
+From: "Jeff Shute (Google Docs)" <comments-noreply@docs.google.com>
+To: docreview.dave@gmail.com
+Content-Type: multipart/alternative; boundary="000000000000b41db1064f660be4"
+
+--000000000000b41db1064f660be4
+Content-Type: text/plain; charset="UTF-8"; format=flowed; delsp=yes
+
+New activity in the following document
+Test doc 1111  
+(https://docs.google.com/document/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/edit?usp=comment_email_document&ts=69dde439&usp_dm=false&tab=t.0)
+You do not have commenting rights to Test doc 1111.
+
+For you
+
+Comments
+.
+Jeff Shute
+comment for @docreview.dave@gmail.com on a doc he can't see
+
+Open  
+(https://docs.google.com/document/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/edit?disco=AAAB33Ml-HM&usp=comment_email_discussion&ts=69dde439&usp_dm=false)
+
+.
+Jeff Shute
+assigned to @docreview.dave@gmail.com on a doc he can't see
+_Assigned to you_
+
+Open  
+(https://docs.google.com/document/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/edit?disco=AAAB33Ml-HU&usp=todo_email_discussion&ts=69dde439&usp_dm=false)
+
+.
+[2 comments hidden]
+
+Jeff Shute
+second reply in a thread, to @docreview.dave@gmail.com who can't see the  
+doc.
+
+Open  
+(https://docs.google.com/document/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/edit?disco=AAAB33Ml-HY&usp=comment_email_discussion&ts=69dde439&usp_dm=false)
+
+Google LLC, 1600 Amphitheatre Parkway, Mountain View, CA 94043, USA
+
+You have received this email because you are a participant in the updated  
+items or subscribed to notifications on Test doc 1111  
+(https://docs.google.com/document/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/edit?usp=comment_email_document&ts=69dde439&usp_dm=false&tab=t.0).  
+Change what Google sends you  
+(https://docs.google.com/document/u/116797062718942056712/docos/notify?ouid=116797062718942056712&id=1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU&title=Test+doc+1111&resourcekey).  
+You cannot reply to this email.
+
+--000000000000b41db1064f660be4
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!doctype html><html><head><title></title><style>.tombstone-text {color: #3=
+c4043; font: italic 14px Roboto, Arial, Helvetica, sans-serif; margin: 18px=
+ 0 18px 0; width: 100%; text-align: center;}.tombstone-post, .tombstone-pos=
+t + .non-tombstone-post, .tombstone-post + .posts-section-end {border-top: =
+1px dashed #BDC1C6;}.non-tombstone-post + .tombstone-post, .non-tombstone-p=
+ost + .non-tombstone-post {margin-top: 12px;}.tombstone-post + .non-tombsto=
+ne-post {padding-top: 12px;}</style></head><body><div itemscope itemtype=3D=
+"http://schema.org/EmailMessage" style=3D"font: 14px Roboto, Arial, Helveti=
+ca, sans-serif;"><div itemprop=3D"about" itemscope itemtype=3D"http://schem=
+a.org/CreativeWork"><meta itemprop=3D"name" content=3D"Test doc 1111"><meta=
+ itemprop=3D"url" content=3D"https://docs.google.com/document/d/1ysZJZE1B4Q=
+IJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/edit?usp=3Dcomment_email_document&amp;ts=
+=3D69dde439&amp;tab=3Dt.0"><table style=3D"border-collapse: collapse; width=
+: 100%; background-color: white; text-align: center;" role=3D"presentation"=
+><tr><td style=3D"padding: 24px 0 16px 0;"><table style=3D"border-collapse:=
+ collapse;font-family: Roboto, Arial, Helvetica, sans-serif;hyphens: auto; =
+overflow-wrap: break-word; word-wrap: break-word; word-break: break-word;wi=
+dth: 90%; margin: auto;max-width: 700px;min-width: 280px; text-align: left;=
+" role=3D"presentation"><tr><td style=3D"padding: 0;"><div><div><table styl=
+e=3D"width:100%; table-layout:fixed;" role=3D"presentation"><tr><td style=
+=3D"padding: 0;" dir=3D"ltr"><div id=3D"overview-card-contents"><div><div><=
+h1 style=3D"color: #3c4043; font: 400 18px Google Sans, Roboto, Arial, Helv=
+etica, sans-serif; margin: 0;">New activity in the following document</h1><=
+/div><div style=3D"margin-top: 12px;"><div><div><div id=3D"document-chip-se=
+ction"><div id=3D"document-chip"><a href=3D"https://docs.google.com/documen=
+t/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/edit?usp=3Dcomment_email_d=
+ocument&amp;ts=3D69dde439&amp;usp_dm=3Dfalse&amp;tab=3Dt.0" target=3D"_blan=
+k" style=3D"color: #3c4043; display: inline-block; max-width: 100%; text-de=
+coration: none; vertical-align: top;border: 1px solid #DADCE0; border-radiu=
+s: 16px; white-space: nowrap;min-width: 0;"><div style=3D"line-height: 18px=
+; overflow: hidden; text-overflow: ellipsis;padding: 6px 12px;"><span style=
+=3D"display: inline-block; vertical-align: middle; min-width: 26px; width: =
+26px;"><img src=3D"https://ssl.gstatic.com/docs/doclist/images/mediatype/ic=
+on_1_document_x64.png" width=3D"18" height=3D"18" style=3D"vertical-align: =
+top;" role=3D"presentation"></span><span style=3D"font: 500 14px/18px Googl=
+e Sans, Roboto, Arial, Helvetica, sans-serif; display: inline; letter-spaci=
+ng: 0.2px; vertical-align: middle;">Test doc 1111</span></div></a></div></d=
+iv></div></div></div></div><p style=3D"margin-bottom: 0; font-size: 14px;">=
+You do not have commenting rights to <span class=3D"notranslate"><a href=3D=
+"https://docs.google.com/document/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZ=
+twaTU/edit?usp=3Dcomment_email_document&amp;ts=3D69dde439&amp;usp_dm=3Dfals=
+e&amp;tab=3Dt.0" target=3D"_blank" style=3D"color: #0B57D0; text-decoration=
+: none;">Test doc 1111</a></span>.</p></div></td></tr></table></div><div st=
+yle=3D"margin-top: 16px;"><table style=3D"width:100%; border: 1px solid #da=
+dce0; border-radius: 8px; border-spacing: 0; table-layout:fixed; border-col=
+lapse: separate;" role=3D"presentation"><tr><td style=3D"padding: 4.5%;" di=
+r=3D"ltr"><div><div><div><table role=3D"presentation" cellpadding=3D"0" cel=
+lspacing=3D"0" style=3D"width: 100%"><tr><td style=3D"vertical-align: top; =
+width: 32px;"><div style=3D"background: #E8F0FE; border-radius: 50%; displa=
+y: inline-block; height: 18px; padding: 7px; width: 18px;"><img src=3D"http=
+s://fonts.gstatic.com/s/i/googlematerialicons/priority_high/v18/gm_blue-48d=
+p/1x/gm_priority_high_gm_blue_48dp.png" height=3D"18px" width=3D"18px" aria=
+-hidden=3D"true" style=3D"flex-shrink: 0;"></div></td><td style=3D"vertical=
+-align: top;"><h2 style=3D"color: #3c4043; display: inline-block; font: 400=
+ 16px/32px Google Sans, Roboto, Arial, Helvetica, sans-serif; letter-spacin=
+g: .1px; margin: 0 0 0 10px;">For you</h2></td></tr></table><div style=3D"m=
+argin: 18px 0;height: 1px; background-color: #eee;"></div><h2 style=3D"colo=
+r: #3c4043; font: 400 14px/20px Google Sans, Roboto, Arial, Helvetica, sans=
+-serif; margin: 0;">Comments</h2><div itemprop=3D"action" itemscope itemtyp=
+e=3D"http://schema.org/ViewAction"><meta itemprop=3D"url" content=3D"https:=
+//docs.google.com/document/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/e=
+dit?disco=3DAAAB33Ml-HM&amp;usp=3Dcomment_email_discussion&amp;ts=3D69dde43=
+9"><meta itemprop=3D"name" content=3D"Open Discussion"></div><div><div styl=
+e=3D"margin-top: 20px;overflow: visible; line-height: 20px;"><div style=3D"=
+margin-top: 0px; word-break: break-word; word-wrap: break-word;" class=3D"n=
+on-tombstone-post"><table role=3D"presentation" cellpadding=3D"0" cellspaci=
+ng=3D"0" style=3D"color: #3c4043; width: 100%;"><tr><td style=3D"vertical-a=
+lign: top; width: 44px;"><img src=3D"https://lh3.googleusercontent.com/a-/A=
+LV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=3Ds50-c-k-no" alt=
+=3D"" height=3D"32" width=3D"32" style=3D"border-radius: 50%;box-sizing: bo=
+rder-box; display: block;"></td><td><h3 style=3D"display: inline-block; fon=
+t: 500 14px Google Sans, Roboto, Arial, Helvetica, sans-serif; letter-spaci=
+ng: .25px; line-height: 20px; margin: 6px 0 2px 0;">Jeff Shute</h3> <span s=
+tyle=3D"color: #5F6368; font: 400 12px/16px Roboto, Arial, Helvetica, sans-=
+serif; letter-spacing: 0.2px; white-space: nowrap;">=E2=80=A2 6:46=E2=80=AF=
+AM, Apr 14 (UTC)</span><h4 style=3D"background: #0B57D0; border-radius: 8px=
+; color: #fff; display: inline-block; font: 700 12px/16px Roboto, Arial, He=
+lvetica, sans-serif; margin-bottom: 0; margin-top: 0; margin-left: 10px; pa=
+dding: 0 6px;">New</h4><div style=3D"font: 400 14px Roboto, Arial, Helvetic=
+a, sans-serif; line-height: 20px; letter-spacing: .2px;"><div style=3D"marg=
+in-top: 6px;" class=3D"notranslate">comment for @<a href=3D"mailto:docrevie=
+w.dave@gmail.com" target=3D"_blank">docreview.dave@gmail.com</a> on a doc h=
+e can&#39;t see</div></div></td></tr></table></div><div class=3D"posts-sect=
+ion-end"></div><div style=3D"margin: 10px 0 0 42px; overflow: auto; padding=
+: 2px;"><a href=3D"https://docs.google.com/document/d/1ysZJZE1B4QIJ7vdEhYvU=
+9Ul_0hnn0T51DCwReZtwaTU/edit?disco=3DAAAB33Ml-HM&amp;usp=3Dcomment_email_di=
+scussion&amp;ts=3D69dde439&amp;usp_dm=3Dfalse" class=3D"material-button mat=
+erial-button-transparent" target=3D"_blank" tabindex=3D"0" role=3D"link" st=
+yle=3D"padding: 0 8px;font: 500 14px/36px Google Sans, Roboto, Arial, Helve=
+tica, sans-serif; border: none; border-radius: 18px; box-sizing: border-box=
+; display: inline-block; letter-spacing: .25px; min-height: 36px; text-alig=
+n: center; text-decoration: none;background-color: transparent; color: #0B5=
+7D0; cursor: pointer;float: right;">Open</a></div></div></div><div itemprop=
+=3D"action" itemscope itemtype=3D"http://schema.org/ViewAction"><meta itemp=
+rop=3D"url" content=3D"https://docs.google.com/document/d/1ysZJZE1B4QIJ7vdE=
+hYvU9Ul_0hnn0T51DCwReZtwaTU/edit?disco=3DAAAB33Ml-HU&amp;usp=3Dtodo_email_d=
+iscussion&amp;ts=3D69dde439"><meta itemprop=3D"name" content=3D"Open Discus=
+sion"></div><div style=3D"height: 20px;"></div><div><div style=3D"margin-to=
+p: 20px;overflow: visible; line-height: 20px;"><div style=3D"margin-top: 0p=
+x; word-break: break-word; word-wrap: break-word;" class=3D"non-tombstone-p=
+ost"><table role=3D"presentation" cellpadding=3D"0" cellspacing=3D"0" style=
+=3D"color: #3c4043; width: 100%;"><tr><td style=3D"vertical-align: top; wid=
+th: 44px;"><img src=3D"https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqq=
+TCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=3Ds50-c-k-no" alt=3D"" height=
+=3D"32" width=3D"32" style=3D"border-radius: 50%;box-sizing: border-box; di=
+splay: block;"></td><td><h3 style=3D"display: inline-block; font: 500 14px =
+Google Sans, Roboto, Arial, Helvetica, sans-serif; letter-spacing: .25px; l=
+ine-height: 20px; margin: 6px 0 2px 0;">Jeff Shute</h3> <span style=3D"colo=
+r: #5F6368; font: 400 12px/16px Roboto, Arial, Helvetica, sans-serif; lette=
+r-spacing: 0.2px; white-space: nowrap;">=E2=80=A2 6:46=E2=80=AFAM, Apr 14 (=
+UTC)</span><h4 style=3D"background: #0B57D0; border-radius: 8px; color: #ff=
+f; display: inline-block; font: 700 12px/16px Roboto, Arial, Helvetica, san=
+s-serif; margin-bottom: 0; margin-top: 0; margin-left: 10px; padding: 0 6px=
+;">New</h4><div style=3D"font: 400 14px Roboto, Arial, Helvetica, sans-seri=
+f; line-height: 20px; letter-spacing: .2px;"><div style=3D"margin-top: 6px;=
+" class=3D"notranslate">assigned to @<a href=3D"mailto:docreview.dave@gmail=
+.com" target=3D"_blank">docreview.dave@gmail.com</a> on a doc he can&#39;t =
+see</div><div style=3D"margin-top: 6px;"><i>Assigned to you</i></div></div>=
+</td></tr></table></div><div class=3D"posts-section-end"></div><div style=
+=3D"margin: 10px 0 0 42px; overflow: auto; padding: 2px;"><a href=3D"https:=
+//docs.google.com/document/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/e=
+dit?disco=3DAAAB33Ml-HU&amp;usp=3Dtodo_email_discussion&amp;ts=3D69dde439&a=
+mp;usp_dm=3Dfalse" class=3D"material-button material-button-transparent" ta=
+rget=3D"_blank" tabindex=3D"0" role=3D"link" style=3D"padding: 0 8px;font: =
+500 14px/36px Google Sans, Roboto, Arial, Helvetica, sans-serif; border: no=
+ne; border-radius: 18px; box-sizing: border-box; display: inline-block; let=
+ter-spacing: .25px; min-height: 36px; text-align: center; text-decoration: =
+none;background-color: transparent; color: #0B57D0; cursor: pointer;float: =
+right;">Open</a></div></div></div><div itemprop=3D"action" itemscope itemty=
+pe=3D"http://schema.org/ViewAction"><meta itemprop=3D"url" content=3D"https=
+://docs.google.com/document/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/=
+edit?disco=3DAAAB33Ml-HY&amp;usp=3Dcomment_email_discussion&amp;ts=3D69dde4=
+39"><meta itemprop=3D"name" content=3D"Open Discussion"></div><div style=3D=
+"height: 20px;"></div><div><div style=3D"margin-top: 20px;overflow: visible=
+; line-height: 20px;"><div style=3D"color: #777; font: 14px Roboto, Arial, =
+Helvetica, sans-serif; margin: 10px 0 24px 0; padding: 0 15px;">[2 comments=
+ hidden]</div><div style=3D"word-break: break-word; word-wrap: break-word;"=
+ class=3D"non-tombstone-post"><table role=3D"presentation" cellpadding=3D"0=
+" cellspacing=3D"0" style=3D"color: #3c4043; width: 100%;"><tr><td style=3D=
+"vertical-align: top; width: 44px;"><img src=3D"https://lh3.googleuserconte=
+nt.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=3Ds50-=
+c-k-no" alt=3D"" height=3D"32" width=3D"32" style=3D"border-radius: 50%;box=
+-sizing: border-box; display: block;"></td><td><h3 style=3D"display: inline=
+-block; font: 500 14px Google Sans, Roboto, Arial, Helvetica, sans-serif; l=
+etter-spacing: .25px; line-height: 20px; margin: 6px 0 2px 0;">Jeff Shute</=
+h3> <span style=3D"color: #5F6368; font: 400 12px/16px Roboto, Arial, Helve=
+tica, sans-serif; letter-spacing: 0.2px; white-space: nowrap;">=E2=80=A2 6:=
+47=E2=80=AFAM, Apr 14 (UTC)</span><h4 style=3D"background: #0B57D0; border-=
+radius: 8px; color: #fff; display: inline-block; font: 700 12px/16px Roboto=
+, Arial, Helvetica, sans-serif; margin-bottom: 0; margin-top: 0; margin-lef=
+t: 10px; padding: 0 6px;">New</h4><div style=3D"font: 400 14px Roboto, Aria=
+l, Helvetica, sans-serif; line-height: 20px; letter-spacing: .2px;"><div st=
+yle=3D"margin-top: 6px;" class=3D"notranslate">second reply in a thread, to=
+ @<a href=3D"mailto:docreview.dave@gmail.com" target=3D"_blank">docreview.d=
+ave@gmail.com</a> who can&#39;t see the doc.</div></div></td></tr></table><=
+/div><div class=3D"posts-section-end"></div><div style=3D"margin: 10px 0 0 =
+42px; overflow: auto; padding: 2px;"><a href=3D"https://docs.google.com/doc=
+ument/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/edit?disco=3DAAAB33Ml-=
+HY&amp;usp=3Dcomment_email_discussion&amp;ts=3D69dde439&amp;usp_dm=3Dfalse"=
+ class=3D"material-button material-button-transparent" target=3D"_blank" ta=
+bindex=3D"0" role=3D"link" style=3D"padding: 0 8px;font: 500 14px/36px Goog=
+le Sans, Roboto, Arial, Helvetica, sans-serif; border: none; border-radius:=
+ 18px; box-sizing: border-box; display: inline-block; letter-spacing: .25px=
+; min-height: 36px; text-align: center; text-decoration: none;background-co=
+lor: transparent; color: #0B57D0; cursor: pointer;float: right;">Open</a></=
+div></div></div></div></div></div></td></tr></table></div></div><table styl=
+e=3D"border-collapse: collapse; width: 100%;" role=3D"presentation"><tr><td=
+ style=3D"padding: 24px 4.5%"><table style=3D"border-collapse: collapse; wi=
+dth: 100%;" dir=3D"ltr"><tr><td style=3D"padding: 0;font-family: Roboto, Ar=
+ial, Helvetica, sans-serif; color: #5F6368; width: 100%; font-size: 12px; l=
+ine-height: 16px; min-height: 40px; letter-spacing: .3px;"><p style=3D"marg=
+in: 0; padding: 0;">Google LLC, 1600 Amphitheatre Parkway, Mountain View, C=
+A 94043, USA<br><br>You have received this email because you are a particip=
+ant in the updated items or subscribed to notifications on <span class=3D"n=
+otranslate"><a href=3D"https://docs.google.com/document/d/1ysZJZE1B4QIJ7vdE=
+hYvU9Ul_0hnn0T51DCwReZtwaTU/edit?usp=3Dcomment_email_document&amp;ts=3D69dd=
+e439&amp;usp_dm=3Dfalse&amp;tab=3Dt.0" target=3D"_blank" style=3D"color: #0=
+B57D0; text-decoration: none;">Test doc 1111</a></span>. <a target=3D"_blan=
+k" style=3D"color: #0B57D0; text-decoration: none;" href=3D"https://docs.go=
+ogle.com/document/u/116797062718942056712/docos/notify?ouid=3D1167970627189=
+42056712&amp;id=3D1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU&amp;title=3D=
+Test+doc+1111&amp;resourcekey">Change what Google sends you</a>. You cannot=
+ reply to this email.</p></td><td style=3D"padding: 0;padding-left: 20px; m=
+in-width: 96px"><img src=3D"https://www.gstatic.com/images/branding/googlel=
+ogo/2x/googlelogo_tm_black54_color_96x40dp.png" width=3D"96px" height=3D"40=
+px"></td></tr></table></td></tr></table></td></tr></table></td></tr></table=
+></div></div></body></html>
+--000000000000b41db1064f660be4--

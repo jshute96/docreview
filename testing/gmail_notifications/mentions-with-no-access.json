@@ -1,0 +1,62 @@
+{
+  "type": "comment",
+  "subject": "Test doc 1111",
+  "from": "\"Jeff Shute (Google Docs)\" <comments-noreply@docs.google.com>",
+  "to": "docreview.dave@gmail.com",
+  "date_str": "Mon, 13 Apr 2026 23:52:41 -0700",
+  "date": "2026-04-14T06:52:41.000Z",
+  "documentId": "1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU",
+  "documentTitle": "Test doc 1111",
+  "documentUrl": "https://docs.google.com/document/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/edit?usp=comment_email_document&ts=69dde439&tab=t.0",
+  "xDocumentId": "xDgAAANNxyRB5SzDn3Zc9TfI9JAgtz8dHnnrnow",
+  "feedbackId": "MailTypeComment:EditorsNotification",
+  "recipientUserId": "116797062718942056712",
+  "noCommentsPermission": true,
+  "comments": [
+    {
+      "discussionId": "AAAB33Ml-HM",
+      "openUrl": "https://docs.google.com/document/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/edit?disco=AAAB33Ml-HM&usp=comment_email_discussion&ts=69dde439&usp_dm=false",
+      "replies": [
+        {
+          "author": "Jeff Shute",
+          "time_str": "6:46 AM, Apr 14 (UTC)",
+          "time": "2026-04-14T06:46:00.000Z",
+          "text": "comment for @docreview.dave@gmail.com on a doc he can't see",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        }
+      ]
+    },
+    {
+      "assignedTo": "you",
+      "discussionId": "AAAB33Ml-HU",
+      "openUrl": "https://docs.google.com/document/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/edit?disco=AAAB33Ml-HU&usp=todo_email_discussion&ts=69dde439&usp_dm=false",
+      "replies": [
+        {
+          "author": "Jeff Shute",
+          "time_str": "6:46 AM, Apr 14 (UTC)",
+          "time": "2026-04-14T06:46:00.000Z",
+          "text": "assigned to @docreview.dave@gmail.com on a doc he can't see",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        }
+      ]
+    },
+    {
+      "hiddenCount": 2,
+      "discussionId": "AAAB33Ml-HY",
+      "openUrl": "https://docs.google.com/document/d/1ysZJZE1B4QIJ7vdEhYvU9Ul_0hnn0T51DCwReZtwaTU/edit?disco=AAAB33Ml-HY&usp=comment_email_discussion&ts=69dde439&usp_dm=false",
+      "replies": [
+        {
+          "author": "Jeff Shute",
+          "time_str": "6:47 AM, Apr 14 (UTC)",
+          "time": "2026-04-14T06:47:00.000Z",
+          "text": "second reply in a thread, to @docreview.dave@gmail.com who can't see the doc.",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a-/ALV-UjVTmtBCnqqTCpn_a2HpB7TQ5s-Cr1MM5TG7oTXo6qFeXM6UuzrWGQ=s50-c-k-no"
+        }
+      ]
+    }
+  ],
+  "suggestions": []
+}
