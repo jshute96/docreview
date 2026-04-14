@@ -915,7 +915,7 @@ chrome.runtime.onInstalled.addListener(function() {
   // and old orphaned listeners' chrome.runtime.sendMessage calls fail silently,
   // so double-injection is safe.
   registerBridgeScript().then(reinjectContentScripts).catch(function(e) {
-    console.warn('[background] onInstalled setup failed:', e.message);
+    console.warn('[background] onInstalled setup failed:', e);
   });
   // Clear all context menus before recreating — onInstalled fires on both
   // fresh install and update, and chrome.contextMenus.create with a duplicate

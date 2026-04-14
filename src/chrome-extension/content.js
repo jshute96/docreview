@@ -15,6 +15,13 @@
 //     doc links in the body.
 
 (async function() {
+  // Guard against duplicate execution — re-injection on extension reload
+  // must not add duplicate MutationObservers or event listeners. The old
+  // orphaned script's listeners fail silently (chrome.runtime is dead),
+  // so the new script takes over cleanly.
+  if (window.__drContentInjected) return;
+  window.__drContentInjected = true;
+
   var settings = await chrome.storage.sync.get({
     baseUrl: DEFAULTS.baseUrl,
     enableDocs: DEFAULTS.enableDocs,
