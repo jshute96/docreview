@@ -917,19 +917,24 @@ chrome.runtime.onInstalled.addListener(function() {
   registerBridgeScript().then(reinjectContentScripts).catch(function(e) {
     console.warn('[background] onInstalled setup failed:', e.message);
   });
-  // Right-click on the toolbar icon
-  chrome.contextMenus.create({
-    id: 'open-docreview',
-    title: 'Open Docreview',
-    contexts: ['action']
+  // Clear all context menus before recreating — onInstalled fires on both
+  // fresh install and update, and chrome.contextMenus.create with a duplicate
+  // ID sets runtime.lastError ("Cannot create item with duplicate id").
+  chrome.contextMenus.removeAll(function() {
+    // Right-click on the toolbar icon
+    chrome.contextMenus.create({
+      id: 'open-docreview',
+      title: 'Open Docreview',
+      contexts: ['action']
+    });
+    chrome.contextMenus.create({
+      id: 'add-page',
+      title: 'Open Add Document',
+      contexts: ['action']
+    });
+    // Right-click on links (any page) that look like Google Docs or shortener URLs
+    rebuildLinkContextMenu();
   });
-  chrome.contextMenus.create({
-    id: 'add-page',
-    title: 'Open Add Document',
-    contexts: ['action']
-  });
-  // Right-click on links (any page) that look like Google Docs or shortener URLs
-  rebuildLinkContextMenu();
 });
 
 // Re-inject content scripts into existing tabs so they reconnect after an
