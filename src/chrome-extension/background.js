@@ -261,7 +261,13 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
             type: 'docReady',
             docId: msg.docId
           }, function() {
-            if (chrome.runtime.lastError) { /* ignore */ }
+            // Expected to fail on tabs without the bridge content script
+            // (e.g. options page matching baseUrl pattern). Only warn for
+            // fully loaded tabs where the bridge should be present.
+            if (chrome.runtime.lastError && tab.status === 'complete') {
+              console.warn('[background] sendMessage(docReady) failed for docId', msg.docId,
+                'to tab', tab.id, ':', chrome.runtime.lastError.message);
+            }
           });
         });
       });
@@ -361,8 +367,12 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
             discoId: msg.discoId,
             selected: msg.selected
           }, function() {
-            // Expected to fail on tabs without the bridge content script
-            if (chrome.runtime.lastError) { /* ignore */ }
+            // Expected to fail on tabs without the bridge content script.
+            // Only warn for fully loaded tabs where the bridge should be present.
+            if (chrome.runtime.lastError && tab.status === 'complete') {
+              console.warn('[background] sendMessage(commentSelection) failed for docId', msg.docId,
+                'to tab', tab.id, ':', chrome.runtime.lastError.message);
+            }
           });
         });
       });
@@ -894,7 +904,19 @@ async function rebuildLinkContextMenu() {
 }
 
 chrome.runtime.onInstalled.addListener(function() {
-  registerBridgeScript();
+  // Register the bridge first, then re-inject all content scripts (including
+  // the bridge) into existing tabs. registerBridgeScript must complete before
+  // reinjectContentScripts runs because reinjectContentScripts reads the
+  // dynamically registered scripts via getRegisteredContentScripts().
+  // Re-injection reconnects orphaned content scripts in already-open tabs —
+  // their chrome.runtime connection dies on extension install/update, breaking
+  // comment activity detection, docReady notifications, and the bridge.
+  // The injection functions guard against duplicate DOM elements (dr-link, etc.),
+  // and old orphaned listeners' chrome.runtime.sendMessage calls fail silently,
+  // so double-injection is safe.
+  registerBridgeScript().then(reinjectContentScripts).catch(function(e) {
+    console.warn('[background] onInstalled setup failed:', e.message);
+  });
   // Right-click on the toolbar icon
   chrome.contextMenus.create({
     id: 'open-docreview',
@@ -909,6 +931,53 @@ chrome.runtime.onInstalled.addListener(function() {
   // Right-click on links (any page) that look like Google Docs or shortener URLs
   rebuildLinkContextMenu();
 });
+
+// Re-inject content scripts into existing tabs so they reconnect after an
+// extension install/update. Reads the script lists from the same sources
+// that define them — manifest.json (static) and registerContentScripts
+// (dynamic) — so this stays in sync automatically if scripts are added
+// or renamed.
+async function reinjectContentScripts() {
+  // Gather all content script definitions from both sources:
+  // 1. Static scripts from manifest.json (Docs/Drive/Gmail)
+  // 2. Dynamically registered scripts (bridge-to-docreview for baseUrl)
+  var entries = [];
+  var manifest = chrome.runtime.getManifest();
+  if (manifest.content_scripts) {
+    manifest.content_scripts.forEach(function(cs) {
+      entries.push({ matches: cs.matches, js: cs.js, source: 'manifest' });
+    });
+  }
+  try {
+    var registered = await chrome.scripting.getRegisteredContentScripts();
+    registered.forEach(function(cs) {
+      entries.push({ matches: cs.matches, js: cs.js, source: 'registered (' + cs.id + ')' });
+    });
+  } catch (e) {
+    console.warn('[background] getRegisteredContentScripts failed:', e.message);
+  }
+
+  for (var entry of entries) {
+    try {
+      var tabs = await chrome.tabs.query({ url: entry.matches });
+      for (var tab of tabs) {
+        if (tab.status === 'loading' || tab.discarded) continue; // skip mid-load and discarded tabs
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: entry.js
+          });
+          console.log('[background] re-injected', entry.source, 'scripts into tab', tab.id);
+        } catch (e) {
+          // Tab may be a special page, discarded, etc. — not actionable
+          console.warn('[background] failed to re-inject', entry.source, 'into tab', tab.id, ':', e.message);
+        }
+      }
+    } catch (e) {
+      console.warn('[background] reinjectContentScripts query failed for', entry.source, ':', e.message);
+    }
+  }
+}
 
 chrome.contextMenus.onClicked.addListener(async function(info) {
   var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });

@@ -61,7 +61,7 @@ Context menus:
 
 **`background-tabs.js`** — Doc tab tracking. Maps docId → tabId in `chrome.storage.session` to survive MV3 service worker restarts. Provides `findDocTab()`, `setDocTab()`, `setDocTabName()`, and cleanup listeners for tab removal/navigation.
 
-**`background-comments.js`** — Comment sync state. Manages pre-extracted comment IDs (`pendingCommentIds`) and debounced comment sync (`fireCommentSync`, `commentSyncTimers`).
+**`background-comments.js`** — Comment sync state. Manages pre-extracted comment IDs (`pendingCommentIds`) and debounced comment sync (`fireCommentSync`, `commentSyncTimers`). `notifyDocreviewTabs` sends the `commentSynced` message to the first available docreview tab, trying each tab in order until one accepts — if the first tab's bridge content script is orphaned (extension was reloaded), it falls back to the next tab. Logs elapsed time for each sync fetch.
 
 **`bridge-to-docreview.js`** — Content script dynamically registered for Docreview app pages.
 
@@ -245,9 +245,7 @@ Console logging:
 
 This works for both anchored comments (sidebar) and comments in the "Show all comments" pane (including resolved comments). Works on Docs, Sheets, and Slides. On Google Docs, there are two `#docos-stream-view` containers (anchored sidebar and comments pane) — the tracker discovers and observes both.
 
-### Log tags
-
-Content script logs (Google Docs page console) use the `[docreview]` prefix. Background service worker logs use `[background]`. Injected page scripts use `[docreview-extract]` or `[docreview-nav]`.
+See `docs/chrome-console-debugging.md` for the three consoles (service worker, Google Docs page, Docreview page), what log prefixes appear in each, and runnable debugging commands.
 
 ## Testing
 
@@ -272,5 +270,29 @@ The solution is `window.postMessage`, which crosses the isolation boundary. The 
 The bridge content script is registered dynamically (via `chrome.scripting.registerContentScripts`) for the configured `baseUrl`, rather than being hardcoded in the manifest. This requires:
 
 1. The target URL must be covered by `host_permissions` in `manifest.json`. Without this, registration appears to succeed but the script never injects. Currently `http://localhost/*` is hardcoded; non-localhost deployments need their URL added.
-2. Dynamically registered scripts only inject into pages loaded **after** registration. After reloading the extension, refresh the Docreview page.
+2. Dynamically registered scripts only inject into pages loaded **after** registration. To handle existing tabs, `onInstalled` re-injects content scripts (see below).
 3. The content script runs at `document_idle`, so it may not be ready when React components mount. The web app handles this by sending a ping on mount and awaiting the response (with a 2s timeout) before checking extension status.
+
+### Content script re-injection on install/update
+
+When the extension is installed or updated, Chrome orphans all content scripts in existing tabs — their `chrome.runtime` connection dies, so comment activity detection, `docReady` notifications, and the docreview bridge all stop working. Previously this required manually reloading every affected tab.
+
+The `onInstalled` handler calls `registerBridgeScript().then(reinjectContentScripts)`. `reinjectContentScripts()` reads the script lists from the same sources that define them — there are no hardcoded file lists to keep in sync:
+
+1. **Static scripts** from `chrome.runtime.getManifest().content_scripts` — the manifest's `matches` and `js` arrays (Docs/Drive/Gmail).
+2. **Dynamic scripts** from `chrome.scripting.getRegisteredContentScripts()` — the bridge registered for the configured `baseUrl`.
+
+For each entry, it queries matching tabs and re-injects the script files. Loading and discarded tabs are skipped (the manifest handles injection when they become active).
+
+**Why this is safe:**
+- Icon injection functions guard against duplicates (check for existing `.dr-link` / `.dr-gmail-bar` elements).
+- Old orphaned listeners still fire but their `chrome.runtime.sendMessage` calls fail silently (already wrapped in try/catch).
+- The orphaned bridge suppresses "Extension context invalidated" errors instead of posting error responses to the web app, so the new bridge's responses arrive cleanly.
+
+**What this fixes:** After reloading the extension, comment activity auto-sync and `docReady` notifications resume immediately on existing Google Docs tabs. The docreview bridge also reconnects, so `commentSynced` notifications and all request/response message flows work without reloading the docreview page. Currently all content script setup is idempotent, so no manual tab reloads are required.
+
+### Tab fallback for message delivery
+
+When the background sends `commentSynced` to a docreview tab (after a comment sync completes), it tries each matching tab in order via `sendToFirstAvailableTab()`. If the first tab's bridge is orphaned or unresponsive, it logs a warning and tries the next tab. The bridge on the accepting tab relays via `BroadcastChannel` to all other docreview tabs.
+
+The `docReady` and `commentSelection` message types are broadcast to all matching tabs (each tab may show a different doc page), so they don't use the fallback pattern — they send to every tab and log individual failures.

@@ -473,6 +473,17 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] `loadAllComments()` returns immediately on view-only doc (no comment infrastructure)
 - [ ] Refresh comment thread on comments/ page gets `originalContentDeleted` from extension
 
+### Content Script Re-injection on Extension Reload
+- [ ] After extension reload, content scripts are re-injected into existing Google Docs tabs (comment activity detection resumes without manual tab reload)
+- [ ] After extension reload, bridge is re-injected into existing docreview tabs (ping/response and commentSynced notifications work without manual tab reload)
+- [ ] Re-injection is idempotent: no duplicate icons or UI elements after re-inject
+- [ ] Tabs in `loading` state are skipped (manifest handles them)
+- [ ] Orphaned bridge suppresses "Extension context invalidated" errors (doesn't race with new bridge's responses)
+
+### Tab Fallback for commentSynced Delivery
+- [ ] When first docreview tab's bridge is stale, commentSynced is delivered to next available tab
+- [ ] When all docreview tabs have stale bridges, warning is logged (no silent failure)
+
 ### Comment Activity Auto-Sync
 - [ ] Detects: new comment, reply, resolve, accept suggestion, reject suggestion
 - [ ] Detects: edit comment (via "..." > Edit > Save), edit reply

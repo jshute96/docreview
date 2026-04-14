@@ -66,6 +66,11 @@
         window.postMessage({ source: 'docreview-extension', id: id, response: response }, '*');
       }
     } catch (err) {
+      // If the extension context is invalidated (extension was reloaded while
+      // this tab was open), suppress the error response — a re-injected bridge
+      // instance will handle the message. Posting an error here would race with
+      // the new bridge's success response and the web app would see the error first.
+      if (err.message && err.message.indexOf('Extension context invalidated') !== -1) return;
       if (!fireAndForget) {
         window.postMessage({ source: 'docreview-extension', id: id, error: err.message }, '*');
       }

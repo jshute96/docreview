@@ -30,22 +30,49 @@ function syncLabel(commentType, googleCommentId) {
   return parts.length > 0 ? ' (' + parts.join(' ') + ')' : '';
 }
 
-// Notify open docreview tabs that a comment sync completed. Sends to the first
-// matching tab; the bridge relays via BroadcastChannel to all tabs.
+// Send a message to a docreview tab, trying each tab in order until one
+// succeeds. The web app tab that receives the message broadcasts it via
+// BroadcastChannel to all other open Docreview tabs, so we only need one
+// bridge to accept it. Returns a Promise that resolves to true if any tab
+// accepted the message, false if all failed.
+function sendToFirstAvailableTab(tabs, msg, docId) {
+  return new Promise(function(resolve) {
+    function tryTab(index) {
+      if (index >= tabs.length) {
+        console.warn('[background] sendMessage(' + msg.type + ') failed for docId', docId,
+          '— all', tabs.length, 'docreview tab(s) rejected the message (content scripts may be orphaned)');
+        resolve(false);
+        return;
+      }
+      var tab = tabs[index];
+      chrome.tabs.sendMessage(tab.id, msg, function() {
+        if (chrome.runtime.lastError) {
+          // Only warn for fully loaded tabs — loading/discarded tabs are expected
+          // to reject messages (their content scripts aren't ready yet).
+          if (tab.status === 'complete') {
+            console.warn('[background] sendMessage(' + msg.type + ') failed for docId', docId,
+              'to tab', tab.id, ', trying next tab...');
+          }
+          tryTab(index + 1);
+        } else {
+          resolve(true);
+        }
+      });
+    }
+    tryTab(0);
+  });
+}
+
 function notifyDocreviewTabs(baseUrl, docId, commentType, googleCommentId, threads) {
   chrome.tabs.query({ url: baseUrl + '/*' }, function(tabs) {
-    if (tabs && tabs[0]) {
+    if (tabs && tabs.length > 0) {
       var syncedMsg = { type: 'commentSynced', docId: docId };
       if (googleCommentId) syncedMsg.googleCommentId = googleCommentId;
       if (commentType) syncedMsg.commentType = commentType.toUpperCase();
       if (threads) syncedMsg.threads = threads;
-      chrome.tabs.sendMessage(tabs[0].id, syncedMsg, function() {
-        if (chrome.runtime.lastError) {
-          console.warn('[background] sendMessage failed for docId', docId, 'to tab', tabs[0].id, '(' + tabs[0].url + '):', chrome.runtime.lastError.message);
-        }
-      });
+      sendToFirstAvailableTab(tabs, syncedMsg, docId);
     } else {
-      console.log('[background] no docreview tabs open, skipping notification');
+      console.log('[background] no docreview tabs open, skipping commentSynced notification');
     }
   });
 }
@@ -62,9 +89,11 @@ function fireCommentSync(docId, commentType, googleCommentId) {
       fetchOpts.body = JSON.stringify(body);
     }
     var label = syncLabel(commentType, googleCommentId);
+    var t0 = Date.now();
     fetch(url, fetchOpts).then(function(res) {
+      var elapsed = Date.now() - t0;
       if (res.ok) {
-        console.log('[background] comment sync succeeded for', docId + label);
+        console.log('[background] comment sync succeeded for', docId + label, '(' + elapsed + 'ms)');
         // Parse response for inline thread data (single-comment sync).
         // On parse failure, still notify tabs without thread data.
         return res.json().then(function(data) {
@@ -73,10 +102,11 @@ function fireCommentSync(docId, commentType, googleCommentId) {
           notifyDocreviewTabs(config.baseUrl, docId, commentType, googleCommentId);
         });
       } else {
-        console.warn('[background] comment sync failed for', docId + label, 'status:', res.status);
+        console.warn('[background] comment sync failed for', docId + label, 'status:', res.status, '(' + elapsed + 'ms)');
       }
     }).catch(function(err) {
-      console.warn('[background] comment sync error for', docId + label, err);
+      var elapsed = Date.now() - t0;
+      console.warn('[background] comment sync error for', docId + label, '(' + elapsed + 'ms)', err);
     });
   });
 }
