@@ -848,9 +848,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
     return <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
   }
 
-  function ThButton({ col, title, children }: { col: SortCol; title?: string; children: React.ReactNode }) {
+  function ThButton({ col, title, children, className }: { col: SortCol; title?: string; children: React.ReactNode; className?: string }) {
     return (
-      <th className="py-2.5 pr-4 text-left">
+      <th className={`py-2.5 pr-4 text-left ${className ?? ""}`}>
         <button
           onClick={() => handleSort(col)}
           title={title}
@@ -1138,11 +1138,11 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
             : "No comments match the current filters."}
         </p>
       ) : (
-        <div className="rounded-lg border border-zinc-200">
-          <table className="w-full min-w-fit">
+        <div className="rounded-lg border border-zinc-200 overflow-hidden">
+          <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50">
-                <th className="pl-4 py-2.5 pr-4 text-left">
+                <th className="pl-4 py-2.5 pr-4 text-left w-[110px]">
                   <button
                     onClick={() => handleSort("driveCreatedAt")}
                     title="Thread creation time"
@@ -1151,12 +1151,12 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                     Created<SortIcon col="driveCreatedAt" />
                   </button>
                 </th>
-                <ThButton col="driveModifiedAt" title="Thread last-modified time">Modified</ThButton>
-                <ThButton col="replyCount" title="Number of replies">Responses</ThButton>
+                <ThButton col="driveModifiedAt" title="Thread last-modified time" className="w-[110px]">Modified</ThButton>
+                <ThButton col="replyCount" title="Number of replies" className="w-[100px]">Responses</ThButton>
                 <th className="py-2.5 pr-4 text-left">
                   <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide" title="Comment status">Status</span>
                 </th>
-                <th className="pr-4 py-2.5 text-right">
+                <th className="pr-4 py-2.5 text-right w-[360px]">
                   <div className="flex items-center justify-end gap-2">
                     <Button
                       variant="outline"

@@ -634,10 +634,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
           )}
         </div>
       )}
-      {cell(`${cellPy} flex`,
+      {cell(`${cellPy} flex justify-end`,
         // stopPropagation + self-stretch: non-clickable buffer around buttons
         // so near-miss clicks don't accidentally expand/collapse the row
-        <div className="flex items-center gap-1 self-stretch pl-1 pr-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-end gap-1 self-stretch pl-1 pr-1" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="outline"
             size="sm"

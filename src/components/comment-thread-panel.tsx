@@ -142,7 +142,8 @@ export function CommentThreadPanel({
     const containerWidth = container.clientWidth;
     const minWidth = containerWidth * 0.25;
     const padding = 26; // horizontal padding + border
-    const targetWidth = Math.max(minWidth, Math.min(textWidth + padding, containerWidth));
+    // Use a small buffer (4px) to avoid pushing the container width and triggering a feedback loop
+    const targetWidth = Math.max(minWidth, Math.min(textWidth + padding, containerWidth - 4));
     textarea.style.width = targetWidth + "px";
 
     // Auto-grow height: save/restore scroll position to prevent scroll jumps
