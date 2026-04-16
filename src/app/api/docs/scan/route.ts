@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { listRecentDocs } from "@/lib/google-drive";
+import { listRecentDocs, driveUrlFor } from "@/lib/google-drive";
 import { scanGmailNotifications } from "@/lib/gmail";
 import { parseLoadOptions } from "@/lib/load-options";
 import { logInfo, logError } from "@/lib/log";
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
                 googleDocId: d.googleDocId,
                 title: d.title,
                 mimeType: "",
-                driveUrl: `https://docs.google.com/document/d/${d.googleDocId}/edit`,
+                driveUrl: driveUrlFor(d.googleDocId),
                 role: "REVIEWER",
                 isNew: true,
                 accessState: d.accessState,

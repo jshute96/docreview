@@ -68,6 +68,11 @@ export function parseGoogleDocId(url: string): string | null {
   return null;
 }
 
+/** Build a Drive URL for a file, preferring webViewLink when available. */
+export function driveUrlFor(fileId: string, webViewLink?: string | null): string {
+  return webViewLink ?? `https://docs.google.com/document/d/${fileId}/edit`;
+}
+
 export async function getDriveClient(userId: string) {
   if (OFFLINE_MODE) throw new OfflineModeError("getDriveClient");
 
@@ -1006,7 +1011,7 @@ export async function listChanges(
     docs.push({
       googleDocId: file.id,
       title: file.name,
-      driveUrl: file.webViewLink ?? `https://docs.google.com/document/d/${file.id}/edit`,
+      driveUrl: driveUrlFor(file.id, file.webViewLink),
       mimeType: file.mimeType,
       role: isOwner ? "AUTHOR" : "REVIEWER",
       lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,
@@ -1047,7 +1052,7 @@ export async function fetchDocsByIds(
         return {
           googleDocId: id,
           title: file.name ?? id,
-          driveUrl: file.webViewLink ?? `https://docs.google.com/document/d/${id}/edit`,
+          driveUrl: driveUrlFor(id, file.webViewLink),
           mimeType: file.mimeType ?? "",
           role: (isOwner ? "AUTHOR" : "REVIEWER") as "AUTHOR" | "REVIEWER",
           lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,
@@ -1135,7 +1140,7 @@ export async function listRecentDocs(
       docs.push({
         googleDocId: file.id,
         title: file.name,
-        driveUrl: file.webViewLink ?? `https://docs.google.com/document/d/${file.id}/edit`,
+        driveUrl: driveUrlFor(file.id, file.webViewLink),
         mimeType: file.mimeType ?? "",
         role: isOwner ? "AUTHOR" : "REVIEWER",
         lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,

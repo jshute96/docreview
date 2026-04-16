@@ -7,6 +7,7 @@ import {
   parseGoogleDocId,
   SUPPORTED_MIME_TYPES,
   invalidGrantResponse,
+  driveUrlFor,
 } from "@/lib/google-drive";
 import { runWithRequestId } from "@/lib/request-context";
 import { tryResolveRedirect } from "@/lib/url-utils";
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
       googleDocId: fileId,
       title: existing?.title ?? "Unknown title",
       mimeType: existing?.mimeType ?? "application/vnd.google-apps.document",
-      driveUrl: `https://docs.google.com/document/d/${fileId}/edit`,
+      driveUrl: driveUrlFor(fileId),
       permissionDenied: true,
       ...(existing ? {
         existing: true,
@@ -86,6 +87,7 @@ export async function GET(req: NextRequest) {
       error: "trashed",
       title: f.name ?? "",
       mimeType: f.mimeType,
+      driveUrl: driveUrlFor(fileId, f.webViewLink),
     }, { status: 400 });
   }
 
@@ -94,6 +96,7 @@ export async function GET(req: NextRequest) {
       error: "invalid_mime_type",
       title: f.name ?? "",
       mimeType: f.mimeType,
+      driveUrl: driveUrlFor(fileId, f.webViewLink),
     }, { status: 400 });
   }
 
@@ -103,7 +106,7 @@ export async function GET(req: NextRequest) {
     googleDocId: fileId,
     title: f.name ?? "",
     mimeType: f.mimeType,
-    driveUrl: f.webViewLink ?? `https://docs.google.com/document/d/${fileId}/edit`,
+    driveUrl: driveUrlFor(fileId, f.webViewLink),
     role: isOwner ? "AUTHOR" : "REVIEWER",
     lastModifiedInDrive: f.modifiedTime ?? null,
     createdTimeInDrive: f.createdTime ?? null,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { parseGoogleDocId } from "@/lib/google-drive";
+import { parseGoogleDocId, driveUrlFor } from "@/lib/google-drive";
 import { addDoc, validateDocInputs } from "@/lib/add-doc";
 import { docWithCountsInclude, withCommentCounts, stripServerOnly } from "@/lib/doc-queries";
 import { runWithRequestId } from "@/lib/request-context";
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
     status,
     fallback: {
       title: customTitle || "Unknown title",
-      driveUrl: `https://docs.google.com/document/d/${fileId}/edit`,
+      driveUrl: driveUrlFor(fileId),
       mimeType: "application/vnd.google-apps.document",
       role: "REVIEWER",
       lastModifiedInDrive: now,

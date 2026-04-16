@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, createDriveService, invalidGrantResponse, fetchCommentData, fetchDocData, fetchFileTextViaExport } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, invalidGrantResponse, fetchCommentData, fetchDocData, fetchFileTextViaExport, driveUrlFor } from "@/lib/google-drive";
 import type { ThreadMap, SuggestionContent, DriveSuggestion } from "@/lib/google-drive";
 import { upsertDocsAndSyncComments } from "@/lib/refresh";
 import { docWithCommentsInclude, stripServerOnly } from "@/lib/doc-queries";
@@ -55,7 +55,7 @@ export async function POST(
     driveDoc = {
       googleDocId: f.id!,
       title: f.name!,
-      driveUrl: f.webViewLink ?? `https://docs.google.com/document/d/${f.id}/edit`,
+      driveUrl: driveUrlFor(f.id!, f.webViewLink),
       mimeType: f.mimeType!,
       role: isOwner ? "AUTHOR" : "REVIEWER",
       lastModifiedInDrive: f.modifiedTime ? new Date(f.modifiedTime) : null,

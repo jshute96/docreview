@@ -6,6 +6,7 @@ import {
   getChangesStartPageToken,
   fetchDocsByIds,
   findDeletedOrDeniedDocIds,
+  driveUrlFor,
   type DriveDoc,
 } from "@/lib/google-drive";
 import { scanGmailForDocIds, buildInaccessibleDocs, type GmailInaccessibleDoc } from "@/lib/gmail";
@@ -336,7 +337,7 @@ export async function insertInaccessibleDocs(
             userId,
             googleDocId: doc.googleDocId,
             title: doc.title,
-            driveUrl: `https://docs.google.com/document/d/${doc.googleDocId}/edit`,
+            driveUrl: driveUrlFor(doc.googleDocId),
             accessState: doc.accessState,
             status: options?.status ?? "INBOX",
             role: "REVIEWER",

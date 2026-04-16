@@ -11,6 +11,7 @@ import {
   createDriveService,
   SUPPORTED_MIME_TYPES,
   invalidGrantResponse,
+  driveUrlFor,
 } from "@/lib/google-drive";
 import { syncComments } from "@/lib/sync-comments";
 import { docWithCountsInclude, withCommentCounts, stripServerOnly } from "@/lib/doc-queries";
@@ -126,7 +127,7 @@ export async function addDoc(params: AddDocParams): Promise<NextResponse> {
       }
     : {
         title: f!.name ?? "",
-        driveUrl: f!.webViewLink ?? `https://docs.google.com/document/d/${googleDocId}/edit`,
+        driveUrl: driveUrlFor(googleDocId, f!.webViewLink),
         mimeType: f!.mimeType!,
         role: (isOwner ? "AUTHOR" : "REVIEWER") as "AUTHOR" | "REVIEWER",
         lastModifiedInDrive: f!.modifiedTime ? new Date(f!.modifiedTime) : null,

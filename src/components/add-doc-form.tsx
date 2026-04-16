@@ -189,6 +189,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
       } else {
         if (data.title) setValidTitle(data.title as string);
         if (data.mimeType) setValidMimeType(data.mimeType as string);
+        if (data.driveUrl) setValidDriveUrl(data.driveUrl as string);
         setValidationState("invalid");
         setValidationError(errorMessageForCode(data.error as string));
       }

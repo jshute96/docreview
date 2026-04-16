@@ -43,6 +43,7 @@ vi.mock("@/lib/google-drive", () => ({
   parseGoogleDocId: vi.fn((url) => url.split("/").pop()),
   SUPPORTED_MIME_TYPES: new Set(["application/vnd.google-apps.document"]),
   invalidGrantResponse: vi.fn(() => null),
+  driveUrlFor: vi.fn((fileId: string, webViewLink?: string | null) => webViewLink ?? `https://docs.google.com/document/d/${fileId}/edit`),
 }));
 
 vi.mock("@/lib/sync-comments", () => ({

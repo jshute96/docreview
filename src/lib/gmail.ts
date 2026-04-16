@@ -1,6 +1,6 @@
 import { gmail as createGmail } from "@googleapis/gmail";
 import { drive as createDrive } from "@googleapis/drive";
-import { getDriveClient } from "@/lib/google-drive";
+import { getDriveClient, driveUrlFor } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { formatDate } from "@/lib/utils";
 import { extractBodyText, extractHtmlBody, extractDocId, parseShareNote } from "@/lib/gmail-parse";
@@ -285,7 +285,7 @@ export async function scanGmailNotifications(
           googleDocId: docId,
           title: file.name ?? docId,
           mimeType: file.mimeType ?? "",
-          driveUrl: file.webViewLink ?? "",
+          driveUrl: driveUrlFor(docId, file.webViewLink),
           role: isOwner ? "AUTHOR" : "REVIEWER",
         });
 
