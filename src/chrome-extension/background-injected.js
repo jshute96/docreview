@@ -540,7 +540,11 @@ function injectDiscoIdHelpers() {
     if (isCommentsPaneOpen()) return Promise.resolve();
     console.log('[docreview] opening comments pane');
     var btn = document.querySelector('[aria-label*="Show all comments"]');
-    if (!btn) return Promise.resolve();
+    if (!btn) {
+      console.log('[docreview] openCommentsPane: "Show all comments" button not found (activity sidebar present:',
+        !!document.querySelector('.docs-docos-activity-sidebar') + ')');
+      return Promise.resolve();
+    }
     fullClick(btn);
     return new Promise(function(resolve) {
       var attempts = 0;
@@ -653,6 +657,8 @@ function injectDiscoIdHelpers() {
     }
 
     return (async function() {
+      console.log('[docreview] loadAllComments: starting');
+
       // Phase 1: Wait for Google Docs to create the stream view container
       // (may not exist yet if page is still loading).
       // View-only docs have no comment infrastructure at all (no stream view,
@@ -660,6 +666,7 @@ function injectDiscoIdHelpers() {
       if (!streamViewExists()) {
         if (!document.querySelector('.docs-docos-activity-sidebar') &&
             !document.querySelector('[aria-label*="Show all comments"]')) {
+          console.log('[docreview] loadAllComments: no comment infrastructure (view-only doc?)');
           return;
         }
         console.log('[docreview] loadAllComments: waiting for stream view');
@@ -671,7 +678,11 @@ function injectDiscoIdHelpers() {
 
       // Phase 2: Already loaded (pane was previously opened)?
       // Stream items appear for docs with comments; zero-state appears for empty docs.
-      if (paneLoadingComplete()) return;
+      if (paneLoadingComplete()) {
+        console.log('[docreview] loadAllComments: already loaded (hasStreamItems:',
+          hasStreamItems() + ', hasZeroState:', hasZeroState() + ')');
+        return;
+      }
 
       // Phase 3: Load the second list by opening the comments pane
       var wasOpen = isCommentsPaneOpen();
@@ -726,12 +737,9 @@ function injectDiscoIdHelpers() {
   window.getSuggestion = getSuggestion;
   window.getActiveCommentId = getActiveCommentId;
 
-  // Async helper — fire-and-forget wrapper that logs start/finish.
+  // Async helper — fire-and-forget wrapper. loadAllComments logs its own start/phases.
   window.loadAllComments = function() {
-    console.log('[docreview] loadAllComments: starting');
-    loadAllComments().then(function() {
-      console.log('[docreview] loadAllComments: finished');
-    }).catch(function(err) {
+    loadAllComments().catch(function(err) {
       console.warn('[docreview] loadAllComments error:', err);
     });
   };

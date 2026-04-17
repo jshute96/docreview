@@ -456,8 +456,11 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
         var results = await chrome.scripting.executeScript({
           target: { tabId: tabId },
           func: async function() {
+            console.log('[docreview] getSuggestions: handler invoked');
             await window.__docreviewDisco.loadAllComments();
-            return window.__docreviewDisco.getSuggestions();
+            var suggestions = window.__docreviewDisco.getSuggestions();
+            console.log('[docreview] getSuggestions: returning', suggestions.length, 'suggestion(s)');
+            return suggestions;
           },
           world: 'MAIN'
         });
@@ -494,11 +497,17 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
         var results = await chrome.scripting.executeScript({
           target: { tabId: tabId },
           func: async function(targetId) {
+            console.log('[docreview] getSuggestion: handler invoked, id:', targetId);
             var disco = window.__docreviewDisco;
             var match = disco.getSuggestions(targetId);
-            if (match.length > 0) return match;
+            if (match.length > 0) {
+              console.log('[docreview] getSuggestion: returning', match.length, 'match(es) without loadAllComments');
+              return match;
+            }
             await disco.loadAllComments();
-            return disco.getSuggestions(targetId);
+            var result = disco.getSuggestions(targetId);
+            console.log('[docreview] getSuggestion: returning', result.length, 'match(es) after loadAllComments');
+            return result;
           },
           args: [msg.discoId],
           world: 'MAIN'
@@ -538,8 +547,11 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
         var results = await chrome.scripting.executeScript({
           target: { tabId: tabId },
           func: async function() {
+            console.log('[docreview] getComments: handler invoked');
             await window.__docreviewDisco.loadAllComments();
-            return window.__docreviewDisco.getComments();
+            var comments = window.__docreviewDisco.getComments();
+            console.log('[docreview] getComments: returning', comments.length, 'comment(s)');
+            return comments;
           },
           world: 'MAIN'
         });
@@ -576,11 +588,17 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
         var results = await chrome.scripting.executeScript({
           target: { tabId: tabId },
           func: async function(targetId) {
+            console.log('[docreview] getComment: handler invoked, id:', targetId);
             var disco = window.__docreviewDisco;
             var match = disco.getComments(targetId);
-            if (match.length > 0) return match;
+            if (match.length > 0) {
+              console.log('[docreview] getComment: returning', match.length, 'match(es) without loadAllComments');
+              return match;
+            }
             await disco.loadAllComments();
-            return disco.getComments(targetId);
+            var result = disco.getComments(targetId);
+            console.log('[docreview] getComment: returning', result.length, 'match(es) after loadAllComments');
+            return result;
           },
           args: [msg.discoId],
           world: 'MAIN'
@@ -619,8 +637,12 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
         var results = await chrome.scripting.executeScript({
           target: { tabId: tabId },
           func: async function() {
+            console.log('[docreview] getCommentsAndSuggestions: handler invoked');
             await window.__docreviewDisco.loadAllComments();
-            return window.__docreviewDisco.getCommentsAndSuggestions();
+            var data = window.__docreviewDisco.getCommentsAndSuggestions();
+            console.log('[docreview] getCommentsAndSuggestions: returning',
+              data.comments.length, 'comment(s) and', data.suggestions.length, 'suggestion(s)');
+            return data;
           },
           world: 'MAIN'
         });
