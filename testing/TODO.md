@@ -373,6 +373,14 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Gmail-discovered docs go to Inbox
 - [ ] Resharing an archived doc via Gmail unarchives it to Inbox
 
+### No-Gmail Account (Google account with no Gmail mailbox)
+- [ ] Gmail-only Refresh: shows "No Gmail account" warning toast and does NOT show "Gmail refresh complete"
+- [ ] Combined Drive+Gmail Refresh: "No Gmail account" warning persists alongside the Drive "Refresh complete" success toast
+- [ ] Load dialog with Gmail source: scan completes, shows "No Gmail account" warning instead of "Found N documents in Gmail"
+- [ ] Refresh and Load both succeed without throwing or surfacing a generic error toast
+- [ ] Server logs the underlying Gmail error (reason=failedPrecondition, full message) once per scan
+- [ ] `Status.lastGmailUpdateTimestamp` is NOT advanced after a no-Gmail-account scan (so a later Gmail-enabled scan still covers the same window)
+
 ---
 
 ## Synced Attributes

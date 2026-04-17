@@ -388,6 +388,12 @@ In this state:
 - The Drive `driveChangesPageToken` is **not** updated.
 - The Gmail `lastGmailUpdateTimestamp` is **not** updated.
 
+The Gmail timestamp is also skipped when the account has no Gmail mailbox
+(`failedPrecondition` from `messages.list`) — see
+[`gmail.md` § Accounts Without a Gmail Mailbox](./gmail.md#accounts-without-a-gmail-mailbox)
+— because no scan actually ran and we don't want to lose the existing window if
+Gmail is later enabled on the account.
+
 This prevents the system from "skipping ahead" in the changes feed or Gmail window if a broad
 issue (like a network outage or expired OAuth scope) is preventing access to all documents.
 Permission-denied docs (typically from the Docs suggestions API returning 403) count as

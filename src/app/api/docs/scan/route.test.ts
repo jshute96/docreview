@@ -7,6 +7,7 @@ interface ScanResult {
   existingCount: number;
   errorCount?: number;
   docs: Array<{ googleDocId: string; title: string; role: string; isNew: boolean }>;
+  noGmailAccount?: boolean;
 }
 
 vi.mock("@/auth", () => ({
@@ -219,6 +220,25 @@ describe("POST /api/docs/scan", () => {
     expect(data.total).toBe(0);
     expect(data.docs).toEqual([]);
     expect(data.errorCount).toBe(0);
+  });
+
+  it("forwards noGmailAccount flag in scan result when account has no Gmail mailbox", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockScanGmailNotifications.mockResolvedValue({
+      docs: [],
+      shareNotes: new Map(),
+      inaccessibleDocs: [],
+      errorCount: 0,
+      skipCount: 0,
+      noGmailAccount: true,
+    });
+    mockDoc.findMany.mockResolvedValue([]);
+
+    const res = await POST(scanRequest({ source: "gmail", daysBack: 7 }));
+    const data = await readSSEResult<ScanResult>(res);
+    expect(data.noGmailAccount).toBe(true);
+    expect(data.total).toBe(0);
+    expect(data.docs).toEqual([]);
   });
 
   it("returns error event when Gmail API fails", async () => {

@@ -93,6 +93,7 @@ Easy:
 * gmail notificaitons include a reply-to for adding replies to a suggestion by email. we could use that to allow adding replies (but not accept/reject).
 * tabbed docs - capture and show which tab comments are on, allow filter by tab, etc.
 * fix prisma-obscure so it's aware of tables, not just column names, and doesn't get confused
+* for non-Gmail users - fetch email notifications from other email, maybe by IMAP
 
 ## low priority
 * rename a label

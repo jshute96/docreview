@@ -80,6 +80,39 @@ ARCHIVED docs are also unarchived to INBOX.
 The `gmail.readonly` scope is requested alongside Drive scopes in `src/auth.ts`.
 Users must sign out and sign back in to grant the new scope.
 
+### Accounts Without a Gmail Mailbox
+
+Some Google accounts (consumer accounts that were never provisioned with Gmail, or
+Workspace users with the Gmail service disabled) cannot use the Gmail API at all —
+the first call to `gmailClient.users.messages.list` returns HTTP 400 with the
+canonical reason `failedPrecondition` (the googleapis library stringifies the
+underlying message — typically `"Mail service not enabled"` — as
+`"Precondition check failed."`).
+
+`scanGmailForDocIds()` detects this via the structured
+`errors[0].reason === "failedPrecondition"` field (with a message-text fallback)
+and returns an empty result with `noGmailAccount: true` instead of throwing.
+`executeRefresh()` also skips the `lastGmailUpdateTimestamp` write in this case —
+no scan actually happened, so advancing the cursor would lose the existing window
+if Gmail later becomes available on the account. The flag is propagated through:
+
+- The SSE `phase: "gmail", status: "done"` progress event (`noGmailAccount` field).
+- `RefreshResult.noGmailAccount` from `executeRefresh()`.
+- The `/api/docs/scan` Gmail-source response (`noGmailAccount: true`).
+
+Client toasts react to the flag:
+
+- `handleRefreshProgress()` shows a `"No Gmail account"` warning instead of
+  `"No new changes from Gmail"`.
+- `RefreshButton` (combined refresh) keeps the warning visible alongside the
+  `Refresh complete` Drive summary by passing `keep: [PROGRESS_GMAIL]` to
+  `dismissProgressToasts()`.
+- `runRefresh()` in `doc-table.tsx` does the same and additionally suppresses the
+  `Gmail refresh complete` success toast when the user requested a Gmail-only
+  refresh (so the warning isn't replaced by a misleading "complete" message).
+- `LoadDialog` shows `"No Gmail account"` instead of `Found X documents in Gmail`
+  when scanning Gmail returns the flag.
+
 ---
 
 ## Load Dialog — Gmail Source

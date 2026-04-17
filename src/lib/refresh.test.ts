@@ -1,13 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { upsertDocsAndSyncComments } from "./refresh";
+import { upsertDocsAndSyncComments, executeRefresh } from "./refresh";
 import { prisma } from "./prisma";
 import { getDriveClient } from "./google-drive";
 import { syncComments } from "./sync-comments";
+import { scanGmailForDocIds } from "./gmail";
+import { getStatus, updateGmailTimestamp, updateDriveChangesToken } from "./status";
 
 vi.mock("./prisma");
 vi.mock("./google-drive");
 vi.mock("./sync-comments");
 vi.mock("./log");
+vi.mock("./gmail", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./gmail")>();
+  return {
+    ...actual,
+    scanGmailForDocIds: vi.fn(),
+    buildInaccessibleDocs: vi.fn(() => []),
+  };
+});
+vi.mock("./status", () => ({
+  getStatus: vi.fn(),
+  updateGmailTimestamp: vi.fn(),
+  updateDriveChangesToken: vi.fn(),
+}));
 
 describe("upsertDocsAndSyncComments", () => {
   const userId = "u1";
@@ -182,6 +197,41 @@ describe("upsertDocsAndSyncComments", () => {
         data: { status: "INBOX" },
       })
     );
+  });
+
+  it("does NOT advance lastGmailUpdateTimestamp when account has no Gmail mailbox", async () => {
+    vi.mocked(getStatus).mockResolvedValue(undefined as any);
+    vi.mocked(scanGmailForDocIds).mockResolvedValue({
+      docIds: [],
+      shareNotes: new Map(),
+      emailMeta: new Map(),
+      errorCount: 0,
+      noGmailAccount: true,
+    });
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([] as any);
+    vi.mocked(prisma.doc.findMany).mockResolvedValue([] as any);
+
+    const result = await executeRefresh(userId, userEmail, { gmail: true });
+
+    expect(result.noGmailAccount).toBe(true);
+    expect(updateGmailTimestamp).not.toHaveBeenCalled();
+  });
+
+  it("advances lastGmailUpdateTimestamp on a normal Gmail scan with no docs", async () => {
+    vi.mocked(getStatus).mockResolvedValue(undefined as any);
+    vi.mocked(scanGmailForDocIds).mockResolvedValue({
+      docIds: [],
+      shareNotes: new Map(),
+      emailMeta: new Map(),
+      errorCount: 0,
+    });
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([] as any);
+    vi.mocked(prisma.doc.findMany).mockResolvedValue([] as any);
+
+    const result = await executeRefresh(userId, userEmail, { gmail: true });
+
+    expect(result.noGmailAccount).toBeUndefined();
+    expect(updateGmailTimestamp).toHaveBeenCalledTimes(1);
   });
 
   it("still unarchives when lastCommentActivity is newer than unarchiveCutoff", async () => {

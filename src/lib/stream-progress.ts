@@ -16,11 +16,12 @@ export const PROGRESS_DRIVE = "progress-drive";
 export const PROGRESS_GMAIL = "progress-gmail";
 export const PROGRESS_SYNC = "progress-sync";
 
-/** Dismiss all progress toasts. */
-export function dismissProgressToasts() {
-  toast.dismiss(PROGRESS_DRIVE);
-  toast.dismiss(PROGRESS_GMAIL);
-  toast.dismiss(PROGRESS_SYNC);
+/** Dismiss all progress toasts, optionally keeping some by id. */
+export function dismissProgressToasts(opts?: { keep?: ReadonlyArray<string> }) {
+  const keep = new Set(opts?.keep ?? []);
+  if (!keep.has(PROGRESS_DRIVE)) toast.dismiss(PROGRESS_DRIVE);
+  if (!keep.has(PROGRESS_GMAIL)) toast.dismiss(PROGRESS_GMAIL);
+  if (!keep.has(PROGRESS_SYNC)) toast.dismiss(PROGRESS_SYNC);
 }
 
 /**
@@ -124,6 +125,8 @@ export function handleRefreshProgress(event: ProgressEvent) {
           msg = `Reading notifications from Gmail (${event.count} found)...`;
         }
         toast.loading(msg, { id: PROGRESS_GMAIL });
+      } else if (event.noGmailAccount) {
+        toast.warning("No Gmail account", { id: PROGRESS_GMAIL, duration: 4000 });
       } else {
         const msg = event.count > 0
           ? `Read ${event.count} changes from Gmail`

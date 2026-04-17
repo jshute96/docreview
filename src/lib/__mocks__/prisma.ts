@@ -27,5 +27,6 @@ export const prisma = {
   account,
   comment,
   $executeRaw: vi.fn(),
+  $queryRaw: vi.fn(),
   $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn({ doc, label, docLabel, account, comment, $executeRaw: vi.fn() })),
 };

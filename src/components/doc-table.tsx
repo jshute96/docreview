@@ -39,6 +39,7 @@ import {
   handleRefreshProgress,
   formatResultParts,
   dismissProgressToasts,
+  PROGRESS_GMAIL,
 } from "@/lib/stream-progress";
 import { UNREAD_COMMENTS_TOOLTIP, INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 
@@ -235,12 +236,21 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
     fetchOpts: Record<string, unknown>,
     successLabel: string,
     errorLabel: string,
+    opts?: { gmailOnly?: boolean },
   ) {
     setRefreshing(spinnerKey);
     const contextId = generateContextId();
     try {
       let fetchSeq = 0; // Guards against out-of-order doc fetches
-      const data = await fetchWithProgress<Record<string, number>>(url, {
+      const data = await fetchWithProgress<{
+        added?: number;
+        updated?: number;
+        deleted?: number;
+        unarchived?: number;
+        errorCount?: number;
+        totalDocuments?: number;
+        noGmailAccount?: boolean;
+      }>(url, {
         method: "POST",
         contextId,
         ...fetchOpts,
@@ -264,7 +274,10 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
       setDocs(newDocs);
       broadcastChange({ type: "docs" }, contextId);
 
-      dismissProgressToasts();
+      // Keep the "No Gmail account" warning visible; for a Gmail-only refresh,
+      // skip the otherwise-misleading "complete" success toast.
+      dismissProgressToasts(data.noGmailAccount ? { keep: [PROGRESS_GMAIL] } : undefined);
+      if (data.noGmailAccount && opts?.gmailOnly) return;
       const { summary, errorSuffix } = formatResultParts(data);
       toast.success(`${successLabel} — ${summary}${errorSuffix}`, { duration: 8000 });
     } catch (err) {
@@ -300,6 +313,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
       "/api/docs/refresh",
       { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sources }) },
       `${label} complete`, "Failed to refresh",
+      { gmailOnly: sources.length === 1 && sources[0] === "gmail" },
     );
   }
 

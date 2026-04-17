@@ -64,6 +64,7 @@ interface ScanResult {
   existingCount: number;
   errorCount?: number;
   docs: ScanDoc[];
+  noGmailAccount?: boolean;
 }
 
 const DEFAULT_OPTIONS: LoadOptions = {
@@ -176,7 +177,11 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       setDocListRows(Math.min(15, Math.max(5, result.docs.filter((d) => viewMode === "all" || d.isNew).length)));
       const newCount = result.docs.filter(d => d.isNew).length;
       dismissProgressToasts();
-      toast.success(`Found ${result.total} documents in ${sourceLabel} (${newCount} new)`, { duration: 4000 });
+      if (result.noGmailAccount) {
+        toast.warning("No Gmail account", { duration: 4000 });
+      } else {
+        toast.success(`Found ${result.total} documents in ${sourceLabel} (${newCount} new)`, { duration: 4000 });
+      }
     } catch (err) {
       dismissProgressToasts();
       if (err instanceof Error && err.name === "AbortError") return;

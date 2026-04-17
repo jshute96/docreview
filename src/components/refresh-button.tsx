@@ -13,6 +13,7 @@ import {
   handleRefreshProgress,
   formatResultParts,
   dismissProgressToasts,
+  PROGRESS_GMAIL,
 } from "@/lib/stream-progress";
 
 interface RefreshButtonProps {
@@ -30,7 +31,15 @@ export function RefreshButton({ onRefresh, disabled, onLoadingChange }: RefreshB
     const contextId = generateContextId();
     try {
       let fetchSeq = 0;
-      const data = await fetchWithProgress<Record<string, number>>("/api/docs/refresh", {
+      const data = await fetchWithProgress<{
+        added?: number;
+        updated?: number;
+        deleted?: number;
+        unarchived?: number;
+        errorCount?: number;
+        totalDocuments?: number;
+        noGmailAccount?: boolean;
+      }>("/api/docs/refresh", {
         method: "POST",
         contextId,
         headers: { "Content-Type": "application/json" },
@@ -54,7 +63,8 @@ export function RefreshButton({ onRefresh, disabled, onLoadingChange }: RefreshB
       onRefresh(docs);
       broadcastChange({ type: "docs" }, contextId);
 
-      dismissProgressToasts();
+      // Keep the "No Gmail account" warning visible alongside the Drive result.
+      dismissProgressToasts(data.noGmailAccount ? { keep: [PROGRESS_GMAIL] } : undefined);
       const { summary, errorSuffix } = formatResultParts(data);
       toast.success(`Refresh complete — ${summary}${errorSuffix}`, { duration: 8000 });
     } catch (err) {

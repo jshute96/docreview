@@ -3,7 +3,7 @@ export type ProgressEvent =
   | { phase: "drive"; status: "reading"; count: number; docsCount?: number; deletedCount?: number }
   | { phase: "drive"; status: "done"; count: number; totalChanges?: number }
   | { phase: "gmail"; status: "reading"; count: number; total?: number }
-  | { phase: "gmail"; status: "done"; count: number; errorCount?: number }
+  | { phase: "gmail"; status: "done"; count: number; errorCount?: number; noGmailAccount?: boolean }
   | { phase: "metadata"; completed: number; total: number }
   | { phase: "docs-updated" }
   | { phase: "sync"; completed: number; total: number };

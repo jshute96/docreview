@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
         try {
           const userEmail = session.user.email ?? undefined;
-          const { docs: gmailDocs, inaccessibleDocs, errorCount } = await scanGmailNotifications(userId, since, userEmail, send);
+          const { docs: gmailDocs, inaccessibleDocs, errorCount, noGmailAccount } = await scanGmailNotifications(userId, since, userEmail, send);
 
           const docs: Array<{
             googleDocId: string; title: string; mimeType: string; driveUrl: string;
@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
             existingCount,
             errorCount,
             docs,
+            ...(noGmailAccount ? { noGmailAccount: true } : {}),
           };
         } catch (err) {
           logError("[Scan] Gmail error:", err);

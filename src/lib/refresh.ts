@@ -34,6 +34,8 @@ export interface RefreshResult {
   skipNotAuthor?: number;
   driveChangesRead?: number;
   totalDocuments?: number;
+  /** True when Gmail scan was skipped because the account has no Gmail mailbox. */
+  noGmailAccount?: boolean;
   // Extra stats for safety checks
   successCount?: number;
   totalAttempted?: number;
@@ -470,6 +472,7 @@ export async function executeRefresh(
   let gmailEmailMeta = new Map<string, ParsedEmail[]>();
   let gmailErrorCount = 0;
   let gmailSucceeded = false;
+  let gmailNoAccount = false;
 
   let staleGoogleDocIds: string[] = [];
 
@@ -567,8 +570,9 @@ export async function executeRefresh(
       gmailEmailMeta = result.emailMeta;
       gmailErrorCount = result.errorCount;
       gmailSucceeded = true;
+      gmailNoAccount = result.noGmailAccount === true;
       logInfo(`[Refresh] Gmail: ${gmailDocIds.length} doc IDs (${gmailErrorCount} errors)`);
-      onProgress?.({ phase: "gmail", status: "done", count: gmailDocIds.length, errorCount: gmailErrorCount });
+      onProgress?.({ phase: "gmail", status: "done", count: gmailDocIds.length, errorCount: gmailErrorCount, noGmailAccount: result.noGmailAccount });
     })());
   }
 
@@ -710,7 +714,10 @@ export async function executeRefresh(
     logWarning(`[Refresh] All document syncs failed, skipping Drive token update for safety`);
   }
 
-  if (gmailSucceeded && syncRes.errorCount === 0 && !allFailed && gmailErrorCount === 0) {
+  // Skip the timestamp update when the account has no Gmail mailbox — we never
+  // actually scanned anything, so advancing the cursor would silently lose any
+  // window if Gmail later becomes available for this account.
+  if (gmailSucceeded && !gmailNoAccount && syncRes.errorCount === 0 && !allFailed && gmailErrorCount === 0) {
     await updateGmailTimestamp(userId, new Date());
   }
 
@@ -732,6 +739,15 @@ export async function executeRefresh(
     : "";
   const driveStr = driveChangesRead > 0 ? `${pluralize(driveChangesRead, "Drive change")} processed, ` : "";
   logInfo(`[Refresh] Complete in ${elapsed}ms: ${driveStr}${counts.join(", ")}, ${commentStr}${suggestionStr}${skipStr} (${pluralize(totalErrorCount, "error")})`);
-  return { ...syncRes, added: syncRes.added + inaccessibleAdded, deleted: totalDeleted, unarchived: syncRes.unarchived + gmailMergeUnarchived, errorCount: totalErrorCount, driveChangesRead, totalDocuments: allDiscoveryDocs.length };
+  return {
+    ...syncRes,
+    added: syncRes.added + inaccessibleAdded,
+    deleted: totalDeleted,
+    unarchived: syncRes.unarchived + gmailMergeUnarchived,
+    errorCount: totalErrorCount,
+    driveChangesRead,
+    totalDocuments: allDiscoveryDocs.length,
+    ...(gmailNoAccount ? { noGmailAccount: true } : {}),
+  };
 }
 

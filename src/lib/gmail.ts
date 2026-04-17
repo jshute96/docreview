@@ -12,6 +12,53 @@ export interface GmailDocIdResult {
   shareNotes: Map<string, string>;
   emailMeta: Map<string, ParsedEmail[]>;
   errorCount: number;
+  /** True when the Google account has no Gmail mailbox (Gmail returned failedPrecondition). */
+  noGmailAccount?: boolean;
+}
+
+/**
+ * Detect the Gmail API error returned when a Google account has no Gmail mailbox
+ * (e.g., a Google account that was never provisioned with Gmail, or a Workspace
+ * user with the Gmail service disabled). Gmail returns HTTP 400 with structured
+ * reason "failedPrecondition" — typical underlying message is "Mail service not
+ * enabled". The googleapis library stringifies this as "Precondition check failed."
+ *
+ * Detection priority: structured `errors[].reason === "failedPrecondition"` first
+ * (per Google API error format), with a message-text fallback for safety.
+ */
+export function isNoGmailMailboxError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = (err as { code?: number | string }).code;
+  if (code !== 400 && code !== "400") return false;
+
+  const errors = (err as { errors?: Array<{ reason?: string }> }).errors;
+  if (Array.isArray(errors) && errors.some((e) => e?.reason === "failedPrecondition")) {
+    return true;
+  }
+  const message = (err as { message?: string }).message ?? "";
+  return /precondition check failed|mail service not enabled/i.test(message);
+}
+
+/**
+ * Pull the most informative message and reason out of a googleapis error so we can
+ * log something more specific than "Precondition check failed." Looks at structured
+ * `errors[]`, then `response.data.error`, then the bare `message` field.
+ */
+export function describeGoogleApiError(err: unknown): string {
+  if (!err || typeof err !== "object") return String(err);
+  const e = err as {
+    message?: string;
+    errors?: Array<{ reason?: string; message?: string; domain?: string }>;
+    response?: { data?: { error?: { message?: string; status?: string; errors?: Array<{ reason?: string; message?: string }> } } };
+  };
+  const parts: string[] = [];
+  const structured = e.errors?.[0] ?? e.response?.data?.error?.errors?.[0];
+  if (structured?.reason) parts.push(`reason=${structured.reason}`);
+  const detailMessage = structured?.message ?? e.response?.data?.error?.message ?? e.message;
+  if (detailMessage) parts.push(`message="${detailMessage}"`);
+  const status = e.response?.data?.error?.status;
+  if (status) parts.push(`status=${status}`);
+  return parts.length > 0 ? parts.join(" ") : String(err);
 }
 
 export interface GmailScanDoc {
@@ -36,6 +83,8 @@ export interface GmailScanResult {
   shareNotes: Map<string, string>;
   errorCount: number;
   skipCount: number;
+  /** True when the Google account has no Gmail mailbox (Gmail returned failedPrecondition). */
+  noGmailAccount?: boolean;
 }
 
 /**
@@ -64,21 +113,36 @@ export async function scanGmailForDocIds(
   const messageIds: string[] = [];
   let pageToken: string | undefined;
 
-  do {
-    const t0 = Date.now();
-    const res = await gmailClient.users.messages.list({
-      userId: "me",
-      q: query,
-      maxResults: 100,
-      ...(pageToken ? { pageToken } : {}),
-    });
-    logInfo(`[Gmail] messages.list → ${res.data.messages?.length ?? 0} messages (${Date.now() - t0}ms)`);
+  try {
+    do {
+      const t0 = Date.now();
+      const res = await gmailClient.users.messages.list({
+        userId: "me",
+        q: query,
+        maxResults: 100,
+        ...(pageToken ? { pageToken } : {}),
+      });
+      logInfo(`[Gmail] messages.list → ${res.data.messages?.length ?? 0} messages (${Date.now() - t0}ms)`);
 
-    for (const msg of res.data.messages ?? []) {
-      if (msg.id) messageIds.push(msg.id);
+      for (const msg of res.data.messages ?? []) {
+        if (msg.id) messageIds.push(msg.id);
+      }
+      pageToken = res.data.nextPageToken ?? undefined;
+    } while (pageToken);
+  } catch (err) {
+    // Google account without a Gmail mailbox — skip Gmail scanning gracefully.
+    if (isNoGmailMailboxError(err)) {
+      logWarning(`[Gmail] Skipping scan — Gmail not available for this account (${describeGoogleApiError(err)})`);
+      return {
+        docIds: [],
+        shareNotes: new Map(),
+        emailMeta: new Map<string, ParsedEmail[]>(),
+        errorCount: 0,
+        noGmailAccount: true,
+      };
     }
-    pageToken = res.data.nextPageToken ?? undefined;
-  } while (pageToken);
+    throw err;
+  }
 
   if (messageIds.length === 0) {
     logInfo("[Gmail] No notification emails found");
@@ -248,14 +312,17 @@ export async function scanGmailNotifications(
   userEmail?: string,
   onProgress?: OnProgress
 ): Promise<GmailScanResult> {
-  const { docIds, shareNotes, emailMeta, errorCount: scanErrors } = await scanGmailForDocIds(userId, since, userEmail, (count, total) => {
+  const { docIds, shareNotes, emailMeta, errorCount: scanErrors, noGmailAccount } = await scanGmailForDocIds(userId, since, userEmail, (count, total) => {
     onProgress?.({ phase: "gmail", status: "reading", count, total });
   });
   if (docIds.length === 0) {
-    onProgress?.({ phase: "gmail", status: "done", count: 0, errorCount: scanErrors });
-    return { docs: [], inaccessibleDocs: [], shareNotes, errorCount: scanErrors, skipCount: 0 };
+    onProgress?.({ phase: "gmail", status: "done", count: 0, errorCount: scanErrors, noGmailAccount });
+    return { docs: [], inaccessibleDocs: [], shareNotes, errorCount: scanErrors, skipCount: 0, noGmailAccount };
   }
-  onProgress?.({ phase: "gmail", status: "done", count: docIds.length, errorCount: scanErrors });
+  // Defense in depth: noGmailAccount implies docIds.length === 0 today (early
+  // return above), so this branch is unreachable when the flag is set. Forward
+  // it anyway so a future change to the early-return guard can't silently drop it.
+  onProgress?.({ phase: "gmail", status: "done", count: docIds.length, errorCount: scanErrors, noGmailAccount });
 
   const auth = await getDriveClient(userId);
   const driveClient = createDrive({ version: "v3", auth });
@@ -319,5 +386,5 @@ export async function scanGmailNotifications(
   }
 
   logInfo(`[Gmail] Scan complete: ${results.length} docs, ${inaccessibleDocs.length} inaccessible, ${errorCount} errors, ${skipCount} skipped`);
-  return { docs: results, inaccessibleDocs, shareNotes, errorCount, skipCount };
+  return { docs: results, inaccessibleDocs, shareNotes, errorCount, skipCount, noGmailAccount };
 }
