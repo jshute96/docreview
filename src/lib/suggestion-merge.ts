@@ -1,9 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { logInfo, logWarning } from "@/lib/log";
-import { computeSuggestionHash, gmailActionToSuggestionType } from "@/lib/suggestion-hash";
-import { bumpLastCommentActivity } from "@/lib/sync-comments";
+import { computeSuggestionHash, gmailActionToSuggestionType, extractHashTextsFromGmail } from "@/lib/suggestion-hash";
+import { bumpLastCommentActivity, findUnlinkedSuggestionsByHash } from "@/lib/sync-comments";
 import { parseGmailNotificationFromParsed, type ParsedEmail } from "@/lib/parse-gmail-notification";
-import type { Suggestion } from "@/lib/parse-gmail-notification";
 import { CommentStatus, CommentType } from "@prisma/client";
 
 // Merges suggestion data from a Gmail notification into existing suggestion records
@@ -39,7 +38,7 @@ export async function mergeSuggestionsFromGmail(
 
   for (const suggestion of parsed.suggestions) {
     const actionType = gmailActionToSuggestionType(suggestion.action);
-    const { deletedText, insertedText } = gmailSuggestionTexts(suggestion);
+    const { deletedText, insertedText } = extractHashTextsFromGmail(suggestion);
     const contentHash = computeSuggestionHash(actionType, deletedText, insertedText);
 
     // Check if this suggestion's comment ID is already in the DB (idempotency)
@@ -50,16 +49,7 @@ export async function mergeSuggestionsFromGmail(
       if (existingById) continue; // Already merged
     }
 
-    // Look up by content hash
-    const candidates = await prisma.comment.findMany({
-      where: {
-        docId,
-        type: CommentType.SUGGESTION,
-        suggestionContentHash: contentHash,
-        // Only match rows that don't already have a googleCommentId
-        googleCommentId: null,
-      },
-    });
+    const candidates = await findUnlinkedSuggestionsByHash(docId, contentHash);
 
     if (candidates.length === 1) {
       // Unique match — merge Gmail data into existing Drive-created row.
@@ -121,20 +111,4 @@ export async function mergeSuggestionsFromGmail(
   }
 
   return { merged, inserted, shouldUnarchive };
-}
-
-// Extracts deleted/inserted text from a Gmail suggestion in the format needed for hashing.
-function gmailSuggestionTexts(s: Suggestion): { deletedText: string; insertedText: string } {
-  switch (s.action) {
-    case "Add":
-      return { deletedText: "", insertedText: s.text };
-    case "Delete":
-      return { deletedText: s.text, insertedText: "" };
-    case "Replace":
-      return { deletedText: s.oldText ?? "", insertedText: s.newText ?? "" };
-    default:
-      // Non-text suggestions (formatting, links, etc.) — use empty strings
-      // to match the hash computed by Drive sync and extension sync.
-      return { deletedText: "", insertedText: "" };
-  }
 }

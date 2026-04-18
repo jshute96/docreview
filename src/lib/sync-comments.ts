@@ -37,6 +37,26 @@ export async function bumpLastCommentActivity(
   `;
 }
 
+/**
+ * Find existing suggestion rows in a doc that match a given content hash and
+ * have not yet been paired with a disco ID (`googleCommentId: null`). Used by
+ * Gmail and extension merge paths to decide whether to enrich an existing
+ * Drive-sourced row or insert a new one.
+ */
+export async function findUnlinkedSuggestionsByHash(
+  docId: string,
+  contentHash: string,
+): Promise<Comment[]> {
+  return prisma.comment.findMany({
+    where: {
+      docId,
+      type: CommentType.SUGGESTION,
+      suggestionContentHash: contentHash,
+      googleCommentId: null,
+    },
+  });
+}
+
 // --- Result type ---
 
 interface SyncResult {

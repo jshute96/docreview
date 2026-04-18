@@ -16,9 +16,9 @@
 
 import { prisma } from "@/lib/prisma";
 import { logInfo, logWarning } from "@/lib/log";
-import { computeSuggestionHash, gmailActionToSuggestionType } from "@/lib/suggestion-hash";
+import { computeSuggestionHash, gmailActionToSuggestionType, extractHashTextsFromExtension } from "@/lib/suggestion-hash";
 import { computeMentionedMeUnreplied } from "@/lib/google-drive";
-import { bumpLastCommentActivity, computeInitialInboxStatus } from "@/lib/sync-comments";
+import { bumpLastCommentActivity, computeInitialInboxStatus, findUnlinkedSuggestionsByHash } from "@/lib/sync-comments";
 import { parseExtensionTimestamp } from "@/lib/extension-suggestions";
 import { CommentStatus, CommentType, DocRole, type Comment, type Doc } from "@prisma/client";
 
@@ -162,8 +162,7 @@ export async function mergeExtensionSuggestions(
 
   for (const s of suggestions) {
     const actionType = gmailActionToSuggestionType(s.suggestionType);
-    const deletedText = s.suggestionType === "Delete" || s.suggestionType === "Replace" ? s.oldText : "";
-    const insertedText = s.suggestionType === "Add" || s.suggestionType === "Replace" ? s.newText : "";
+    const { deletedText, insertedText } = extractHashTextsFromExtension(s.suggestionType, s.oldText, s.newText);
     const contentHash = computeSuggestionHash(actionType, deletedText, insertedText);
     const createdAt = parseExtensionTimestamp(s.timestamp);
     const lastReplyTs = s.replies.length > 0
@@ -212,14 +211,7 @@ export async function mergeExtensionSuggestions(
       updated++;
     } else {
       // 2. Look up by content hash (rows without a googleCommentId — not yet merged from Gmail/extension)
-      const candidates = await prisma.comment.findMany({
-        where: {
-          docId,
-          type: CommentType.SUGGESTION,
-          suggestionContentHash: contentHash,
-          googleCommentId: null,
-        },
-      });
+      const candidates = await findUnlinkedSuggestionsByHash(docId, contentHash);
 
       if (candidates.length === 1) {
         // 3. Unique match — merge extension data into existing Drive-created row.
