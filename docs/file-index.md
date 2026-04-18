@@ -171,6 +171,9 @@ Shadcn/ui components:
 | `query_test_database.sh` | Readonly SQL queries against `docreview_test` DB via `docreview_ro` user |
 | `query_db_common.sh` | Shared implementation for query scripts — arg parsing, psql invocation |
 | `run-test.sh` | Run Playwright e2e tests — finds the right config file automatically |
+| `parse-gmail-notification.ts` | CLI wrapper around `parseGmailNotification()` — parses `.eml` files to structured JSON, optionally saves alongside |
+| `check-gmail-notifications.ts` | Checks saved `.json` fixtures under `testing/gmail_notifications/` against current parser output; `--update` rewrites any that differ |
+| `extract-email-body.ts` | Extracts HTML/plaintext body from Gmail `.eml` files — prints to stdout or saves alongside |
 
 ## Contexts (`src/contexts/`)
 
@@ -201,6 +204,7 @@ Shadcn/ui components:
 | `browser-cache.ts` | Generic localStorage cache — namespaced key-value store with JSON values, batch operations, and staleness-based eviction |
 | `doc-queries.ts` | Shared Prisma include constants (`labelInclude`, `docWithCountsInclude`, `docWithCommentsInclude`) + `withCommentCounts` transform + `stripServerOnly` (strips titles from API responses for privacy) |
 | `highlight.tsx` | `highlightText()` — regex/substring highlighter for plain text; `highlightHtml()` — same for HTML strings (highlights text outside tags, returns null if no match); `matchesFilter()` — centralized dual regex/substring search; `createMatcher()` — compiled reusable matcher |
+| `label-validation.ts` | Shared label validation helpers — `isValidColor()` (hex color regex), `MAX_LABEL_NAME_LENGTH` constant |
 | `prisma.ts` | Singleton PrismaClient with dev-mode write-op logging and base64 field obscuring |
 | `prisma-obscure.ts` | Prisma client extension that base64-encodes/decodes Doc.title, Doc.notes, Label.name transparently |
 | `bulk-edit.ts` | `BulkEditState` type and `cycleBulkEditState` helper for multi-doc editing |
@@ -240,6 +244,7 @@ Shadcn/ui components:
 
 | File | Description |
 |------|-------------|
+| `access-states.md` | Doc `accessState` enum — OK/TRASHED/NOT_FOUND/DENIED semantics, transitions, and UI display rules |
 | `api-routes.md` | API route reference — every endpoint, what it does, Google API vs Prisma-only, comparison tables for similar endpoints |
 | `architecture.md` | High-level system architecture — tech stack, data model, API layer, client/server split, security |
 | `auth.md` | Authentication — NextAuth v5 + Google OAuth, session handling, token refresh |
@@ -250,10 +255,12 @@ Shadcn/ui components:
 | `cross-tab.md` | Cross-tab sync — BroadcastChannel events, deduplication, listener hook |
 | `dialog-sizing.md` | Shared dialog sizing pattern — flexible item list, stable height on removal |
 | `file-index.md` | This file — one-line descriptions of every source file |
+| `gcp-deploy.md` | Deploying to Google Cloud Run + Cloud SQL — Docker image, deploy command, env vars, DB migrations |
 | `gmail.md` | Gmail integration — scanner internals, combined refresh engine, timestamp lifecycle, Load vs Refresh comparison |
 | `inbox-states.md` | Describes Inbox/Archived/Muted states for docs and comments, and state changes between them |
 | `local-storage-cache.md` | Browser localStorage cache — motivation, privacy model, key/value format, staleness detection, eviction, future plans |
 | `load-dialog.md` | Load dialog — two-phase scan→add flow, Drive/Gmail source toggle, search options, dialog layout |
+| `notes-on-comment-navigation.md` | Notes on Google Docs comment navigation — DOM snapshot, selectors the extension depends on, navigation techniques |
 | `notes-on-dom-snapshot-testing.md` | DOM snapshot testing for content script development — saving/loading snapshots, known issues, next steps |
 | `refresh.md` | Full refresh flow — Drive sync modes, deletion detection, comment sync, UI update |
 | `suggestions.md` | Suggestion sync via Docs API, limitations |

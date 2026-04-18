@@ -16,7 +16,7 @@ import { DialogButtons } from "@/components/dialog-buttons";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { broadcastChange } from "@/lib/cross-tab";
-import { apiFetch, generateContextId } from "@/lib/api-fetch";
+import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { useAutoResize } from "@/hooks/use-auto-resize";
 import { useLabelSync } from "@/hooks/use-label-sync";
 import { StarButton } from "@/components/star-button";
@@ -84,8 +84,8 @@ export function EditDocDialog({
       setOpen(false);
       broadcastChange({ type: "docs", docIds: [doc.docId] }, contextId);
       toast.success("Saved");
-    } catch {
-      toast.error("Failed to save changes");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to save changes");
     } finally {
       setSaving(false);
     }

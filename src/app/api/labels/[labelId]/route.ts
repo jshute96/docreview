@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { runWithRequestId } from "@/lib/request-context";
+import { isValidColor } from "@/lib/label-validation";
 
 export async function GET(
   _req: NextRequest,
@@ -50,6 +51,9 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
   const { color } = body as { color?: string };
+  if (color !== undefined && color !== null && !isValidColor(color)) {
+    return NextResponse.json({ error: "Invalid color" }, { status: 400 });
+  }
 
   const updated = await prisma.label.update({
     where: { labelId },

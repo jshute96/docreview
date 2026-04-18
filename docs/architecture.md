@@ -64,7 +64,7 @@ The PostgreSQL database has eight tables managed by Prisma. See
 
 ## API Layer
 
-The server exposes ~19 REST endpoints under `/api/`, all requiring
+The server exposes ~24 REST endpoints under `/api/`, all requiring
 authentication. See [`docs/file-index.md`](./file-index.md) for the full list.
 
 **Document endpoints** (`/api/docs/*`):
@@ -136,7 +136,7 @@ transitions (inbox/archived/muted) follow rules documented in
 
 ## Client Architecture
 
-The client consists of ~35 `"use client"` React components in `src/components/`.
+The client consists of ~34 `"use client"` React components in `src/components/`.
 Pages are server components that fetch initial data and render client components.
 
 **API communication:** All client-to-server calls go through `apiFetch()`

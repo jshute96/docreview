@@ -12,7 +12,7 @@ import { FriendlyDate } from "@/components/friendly-date";
 import { highlightText } from "@/lib/highlight";
 import { StarButton } from "@/components/star-button";
 import { broadcastChange } from "@/lib/cross-tab";
-import { apiFetch, generateContextId } from "@/lib/api-fetch";
+import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { UNREAD_COMMENTS_TOOLTIP, INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 import { commentsTarget, docTarget } from "@/lib/tab-targets";
 import { handleOpenDocClick } from "@/lib/bridge-to-extension";
@@ -48,8 +48,8 @@ export function DocRow({
       onUpdate(updated);
       broadcastChange({ type: "docs", docIds: [doc.docId] }, contextId);
       toast.success(newStatus === "ARCHIVED" ? "Archived" : "Unarchived");
-    } catch {
-      toast.error("Failed to update status");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to update status");
     } finally {
       setArchiving(false);
     }
@@ -68,8 +68,8 @@ export function DocRow({
       const updated: DocWithLabels = await res.json();
       onUpdate(updated);
       broadcastChange({ type: "docs", docIds: [doc.docId] }, contextId);
-    } catch {
-      toast.error("Failed to update star");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to update star");
     }
   }
 

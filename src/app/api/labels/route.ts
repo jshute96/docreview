@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { runWithRequestId } from "@/lib/request-context";
+import { isValidColor, MAX_LABEL_NAME_LENGTH } from "@/lib/label-validation";
 
 export async function GET(req: NextRequest) {
   return runWithRequestId("GET", req, async () => {
@@ -39,10 +40,17 @@ export async function POST(req: NextRequest) {
   if (!name?.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
+  const trimmedName = name.trim();
+  if (trimmedName.length > MAX_LABEL_NAME_LENGTH) {
+    return NextResponse.json({ error: `Name is too long (max ${MAX_LABEL_NAME_LENGTH} chars)` }, { status: 400 });
+  }
+  if (color !== undefined && color !== null && !isValidColor(color)) {
+    return NextResponse.json({ error: "Invalid color" }, { status: 400 });
+  }
 
   try {
     const label = await prisma.label.create({
-      data: { userId, name: name.trim(), color: color ?? null },
+      data: { userId, name: trimmedName, color: color ?? null },
       include: { _count: { select: { docs: true } } },
     });
     return NextResponse.json(label, { status: 201 });

@@ -150,8 +150,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       setViewedByMeTime(data.viewedByMeTime);
       setShowViewedTimeDialog(false);
       toast.success("Viewed time updated");
-    } catch {
-      toast.error("Failed to update viewed time");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to update viewed time");
     } finally {
       setSavingViewedTime(false);
     }
@@ -609,8 +609,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       setDoc((prev) => ({ ...prev, status: updated.status }));
       broadcastChange({ type: "docs", docIds: [doc.docId] }, contextId);
       toast.success(newStatus === "ARCHIVED" ? "Archived" : "Unarchived");
-    } catch {
-      toast.error("Failed to update status");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to update status");
     } finally {
       setArchiving(false);
     }
@@ -629,8 +629,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       const updated: DocWithLabels = await res.json();
       setDoc((prev) => ({ ...prev, isStarred: updated.isStarred }));
       broadcastChange({ type: "docs", docIds: [doc.docId] }, contextId);
-    } catch {
-      toast.error("Failed to update star");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to update star");
     }
   }
 
@@ -678,8 +678,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
 
       broadcastChange({ type: "comments", docId: doc.docId }, contextId);
       toast.success(`${pastVerb} ${count} comments`);
-    } catch {
-      toast.error(`Failed to ${verb} comments`);
+    } catch (err) {
+      if (!isAuthError(err)) toast.error(`Failed to ${verb} comments`);
     } finally {
       setBusy(false);
     }
@@ -727,8 +727,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
 
       broadcastChange({ type: "comments", docId: doc.docId }, contextId);
       toast.success(`Archived ${count} resolved comments`);
-    } catch {
-      toast.error("Failed to archive resolved comments");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to archive resolved comments");
     } finally {
       setBulkArchivingResolved(false);
     }
@@ -777,8 +777,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
 
       broadcastChange({ type: "comments", docId: doc.docId }, contextId);
       toast.success(`Marked ${count} comments ${pastVerb}`);
-    } catch {
-      toast.error(`Failed to mark comments ${pastVerb}`);
+    } catch (err) {
+      if (!isAuthError(err)) toast.error(`Failed to mark comments ${pastVerb}`);
     } finally {
       setBusy(false);
     }

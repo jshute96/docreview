@@ -397,8 +397,8 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       onUpdate(updated);
       broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
       toast.success(`Comment ${status.toLowerCase()}`);
-    } catch {
-      toast.error("Failed to update comment");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to update comment");
     } finally {
       setLoading(false);
     }
@@ -418,8 +418,8 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       const updated: Comment = await res.json();
       onUpdate(updated);
       broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
-    } catch {
-      toast.error("Failed to update comment");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to update comment");
     } finally {
       setLoading(false);
     }
@@ -438,8 +438,8 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       const updated: Comment = await res.json();
       onUpdate(updated);
       broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
-    } catch {
-      toast.error("Failed to update star");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to update star");
     }
   }
 

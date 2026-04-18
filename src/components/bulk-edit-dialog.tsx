@@ -21,7 +21,7 @@ import { contrastText } from "@/lib/utils";
 import { ManageLabelsDialog } from "@/components/manage-labels-dialog";
 import { Button } from "@/components/ui/button";
 import { broadcastChange } from "@/lib/cross-tab";
-import { apiFetch, generateContextId } from "@/lib/api-fetch";
+import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { useLabels } from "@/contexts/label-context";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { commentsTarget } from "@/lib/tab-targets";
@@ -238,8 +238,8 @@ export function BulkEditDialog({
       if (skipped > 0) {
         toast.warning(`${skipped} document${skipped === 1 ? " was" : "s were"} not found`);
       }
-    } catch {
-      toast.error("Failed to save changes");
+    } catch (err) {
+      if (!isAuthError(err)) toast.error("Failed to save changes");
     } finally {
       setSaving(false);
     }
