@@ -2,7 +2,13 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
-import { parseGoogleDocId, deriveCommentFlags } from "./google-drive";
+import {
+  parseGoogleDocId,
+  deriveCommentFlags,
+  isDriveErrorCode,
+  getDriveErrorCode,
+  isInvalidGrantError,
+} from "./google-drive";
 
 describe("parseGoogleDocId", () => {
   it("extracts ID from a Google Docs URL", () => {
@@ -163,5 +169,90 @@ describe("deriveCommentFlags", () => {
   it("handles empty replies array", () => {
     const result = deriveCommentFlags({ me: true }, []);
     expect(result).toEqual({ isThreadAuthor: true, isReplyAuthor: false, iResolvedIt: false, isRead: true });
+  });
+});
+
+describe("isDriveErrorCode", () => {
+  it("matches numeric err.code", () => {
+    expect(isDriveErrorCode({ code: 404 }, 404)).toBe(true);
+    expect(isDriveErrorCode({ code: 403 }, 403)).toBe(true);
+  });
+
+  it("matches stringified err.code", () => {
+    expect(isDriveErrorCode({ code: "404" }, 404)).toBe(true);
+    expect(isDriveErrorCode({ code: "403" }, 403)).toBe(true);
+  });
+
+  it("falls back to err.status when err.code is absent", () => {
+    expect(isDriveErrorCode({ status: 403 }, 403)).toBe(true);
+    expect(isDriveErrorCode({ status: "404" }, 404)).toBe(true);
+  });
+
+  it("returns false for non-matching codes", () => {
+    expect(isDriveErrorCode({ code: 500 }, 404)).toBe(false);
+    expect(isDriveErrorCode({ code: "500" }, 404)).toBe(false);
+  });
+
+  it("returns false for nullish/non-object errors", () => {
+    expect(isDriveErrorCode(null, 404)).toBe(false);
+    expect(isDriveErrorCode(undefined, 404)).toBe(false);
+    expect(isDriveErrorCode("string error", 404)).toBe(false);
+    expect(isDriveErrorCode(42, 404)).toBe(false);
+  });
+
+  it("returns false when neither code nor status are present", () => {
+    expect(isDriveErrorCode({ message: "oops" }, 404)).toBe(false);
+    expect(isDriveErrorCode({}, 404)).toBe(false);
+  });
+
+  it("handles real Error instances with a code property", () => {
+    const err = Object.assign(new Error("boom"), { code: 404 });
+    expect(isDriveErrorCode(err, 404)).toBe(true);
+  });
+});
+
+describe("getDriveErrorCode", () => {
+  it("returns numeric err.code as-is", () => {
+    expect(getDriveErrorCode({ code: 404 })).toBe(404);
+  });
+
+  it("parses stringified err.code", () => {
+    expect(getDriveErrorCode({ code: "500" })).toBe(500);
+  });
+
+  it("falls back to err.status when err.code missing", () => {
+    expect(getDriveErrorCode({ status: 403 })).toBe(403);
+    expect(getDriveErrorCode({ status: "429" })).toBe(429);
+  });
+
+  it("prefers err.code over err.status when both present", () => {
+    expect(getDriveErrorCode({ code: 404, status: 200 })).toBe(404);
+  });
+
+  it("returns undefined for non-numeric / missing codes", () => {
+    expect(getDriveErrorCode({})).toBeUndefined();
+    expect(getDriveErrorCode({ code: "not-a-number" })).toBeUndefined();
+    expect(getDriveErrorCode(null)).toBeUndefined();
+    expect(getDriveErrorCode("oops")).toBeUndefined();
+  });
+});
+
+describe("isInvalidGrantError", () => {
+  it("matches Error instances whose message includes invalid_grant", () => {
+    expect(isInvalidGrantError(new Error("400 invalid_grant"))).toBe(true);
+  });
+
+  it("matches plain errors with code=400 whose stringified form includes invalid_grant", () => {
+    expect(isInvalidGrantError({ code: 400, toString: () => "invalid_grant" })).toBe(true);
+  });
+
+  it("does not match other 400 errors", () => {
+    expect(isInvalidGrantError({ code: 400, message: "bad request" })).toBe(false);
+  });
+
+  it("does not match non-grant errors", () => {
+    expect(isInvalidGrantError(new Error("some other error"))).toBe(false);
+    expect(isInvalidGrantError({ code: 403 })).toBe(false);
+    expect(isInvalidGrantError(null)).toBe(false);
   });
 });

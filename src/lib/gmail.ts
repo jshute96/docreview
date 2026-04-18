@@ -1,6 +1,6 @@
 import { gmail as createGmail } from "@googleapis/gmail";
 import { drive as createDrive } from "@googleapis/drive";
-import { getDriveClient, driveUrlFor } from "@/lib/google-drive";
+import { getDriveClient, driveUrlFor, isDriveErrorCode } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { formatDate } from "@/lib/utils";
 import { extractBodyText, extractHtmlBody, extractDocId, parseShareNote } from "@/lib/gmail-parse";
@@ -361,11 +361,12 @@ export async function scanGmailNotifications(
         });
 
         logInfo(`[Gmail] Drive metadata for ${docId} (${Date.now() - t0}ms)`);
-      } catch (err: any) {
-        const code = err.code;
-        if (code === 404 || code === 403) {
-          const accessState: InaccessibleState = code === 403 ? AccessState.DENIED : AccessState.NOT_FOUND;
-          logWarning(`[Gmail] Drive ${accessState === AccessState.DENIED ? "permission denied" : "file not found"}: ${docId} (${Date.now() - t0}ms)`);
+      } catch (err) {
+        const denied = isDriveErrorCode(err, 403);
+        const notFound = isDriveErrorCode(err, 404);
+        if (denied || notFound) {
+          const accessState: InaccessibleState = denied ? AccessState.DENIED : AccessState.NOT_FOUND;
+          logWarning(`[Gmail] Drive ${denied ? "permission denied" : "file not found"}: ${docId} (${Date.now() - t0}ms)`);
           skipCount++;
           failedDocs.push({ docId, accessState });
         } else {

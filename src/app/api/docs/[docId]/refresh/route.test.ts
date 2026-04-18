@@ -18,7 +18,20 @@ vi.mock("@/lib/prisma", () => ({
     },
   },
 }));
-vi.mock("@/lib/google-drive");
+vi.mock("@/lib/google-drive", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/google-drive")>("@/lib/google-drive");
+  return {
+    getDriveClient: vi.fn(),
+    createDriveService: vi.fn(),
+    fetchCommentData: vi.fn(),
+    fetchDocData: vi.fn(),
+    fetchFileTextViaExport: vi.fn(),
+    invalidGrantResponse: vi.fn(() => null),
+    driveUrlFor: actual.driveUrlFor,
+    isDriveErrorCode: actual.isDriveErrorCode,
+    getDriveErrorCode: actual.getDriveErrorCode,
+  };
+});
 vi.mock("@/lib/refresh");
 vi.mock("@/lib/request-context", () => ({
   runWithRequestId: vi.fn((method, req, fn) => fn()),

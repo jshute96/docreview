@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
-import { getDriveClient, createDriveService } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, getDriveErrorCode } from "@/lib/google-drive";
 import { OFFLINE_MODE } from "@/lib/offline";
 import { prisma } from "@/lib/prisma";
 import { logInfo, logWarning } from "@/lib/log";
@@ -89,8 +89,7 @@ export async function POST(req: NextRequest) {
               };
             }
           } catch (err: unknown) {
-            const code = (err as { code?: number | string })?.code;
-            logWarning(`[Metadata] ${id} → error ${code ?? "unknown"}`);
+            logWarning(`[Metadata] ${id} → error ${getDriveErrorCode(err) ?? "unknown"}`);
             failedIds.push(id);
           }
         })

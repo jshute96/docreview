@@ -7,6 +7,7 @@ import {
   fetchDocsByIds,
   findDeletedOrDeniedDocIds,
   driveUrlFor,
+  isDriveErrorCode,
   type DriveDoc,
 } from "@/lib/google-drive";
 import { scanGmailForDocIds, buildInaccessibleDocs, type GmailInaccessibleDoc } from "@/lib/gmail";
@@ -527,8 +528,7 @@ export async function executeRefresh(
           driveSucceeded = true;
           onProgress?.({ phase: "drive", status: "done", count: driveDocs.length, totalChanges: result.rawChangeCount });
         } catch (err: unknown) {
-          const code = (err as { code?: number | string })?.code;
-          if (code === 404 || code === "404") {
+          if (isDriveErrorCode(err, 404)) {
             logWarning("[Refresh] Drive: changes.list token expired, falling back to 7-day files.list");
             newPageToken = await getChangesStartPageToken(userId);
             driveDocs = await listRecentDocs(userId, undefined, undefined, (stats) => {

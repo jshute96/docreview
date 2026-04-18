@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { fetchCommentData, fetchDocData, fetchThreadDetail, getDriveClient } from "@/lib/google-drive";
+import { fetchCommentData, fetchDocData, fetchThreadDetail, getDriveClient, isDriveErrorCode } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { computeSuggestionHash } from "@/lib/suggestion-hash";
 import { CommentStatus, CommentType, DocRole, DocStatus, type Doc, type Comment, type Prisma } from "@prisma/client";
@@ -152,8 +152,8 @@ export async function syncSingleComment(
         result = await fetchThreadDetail(driveAuth, doc.googleDocId, googleCommentId, options?.userEmail);
       }
     }
-  } catch (err: any) {
-    if (err.code === 404) {
+  } catch (err) {
+    if (isDriveErrorCode(err, 404)) {
       result = null;
       driveDeleted = true;
     } else {
@@ -232,7 +232,7 @@ export async function syncComments(
         shouldUnarchive: result.shouldUnarchive,
         thread: result.thread,
       };
-    } catch (err: any) {
+    } catch (err) {
       // Fall back to full sync on unexpected error (e.g., 403)
       logWarning(`[Comments] single-comment sync failed for ${hints.googleCommentId}, falling back to full sync:`, err);
     }
@@ -327,13 +327,12 @@ async function fetchDriveComments(
   try {
     const result = await fetchCommentData(driveAuth, doc.googleDocId, { sync: true, userEmail });
     return result.comments!;
-  } catch (err: any) {
-    const code = err.code;
-    if (code === 404) {
+  } catch (err) {
+    if (isDriveErrorCode(err, 404)) {
       logWarning(`[Comments] doc ${doc.googleDocId} not found (code 404)`);
       return { ...EMPTY_RESULT, isDeleted: true };
     }
-    if (code === 403) {
+    if (isDriveErrorCode(err, 403)) {
       logWarning(`[Comments] permission denied for ${doc.googleDocId} (code 403)`);
       // Stamp so we don't retry every refresh — permissions rarely change,
       // and if they do, lastModifiedInDrive will update to trigger a re-sync.

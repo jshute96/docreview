@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, createDriveService, fetchThreadDetail, fetchDocData, fetchCommentData, invalidGrantResponse } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, fetchThreadDetail, fetchDocData, fetchCommentData, invalidGrantResponse, isDriveErrorCode } from "@/lib/google-drive";
 import { OfflineModeError } from "@/lib/offline";
 import type { ThreadMap } from "@/lib/google-drive";
 import { bumpLastCommentActivity, syncSingleComment } from "@/lib/sync-comments";
@@ -43,11 +43,11 @@ export async function GET(
           fields: "modifiedTime",
         });
         return NextResponse.json({ modifiedTime: commentRes.data.modifiedTime });
-      } catch (err: any) {
-        if (err.code === 404) {
+      } catch (err) {
+        if (isDriveErrorCode(err, 404)) {
           return NextResponse.json({ modifiedTime: null });
         }
-        if (err.code === 403 || err.status === 403) {
+        if (isDriveErrorCode(err, 403)) {
           return NextResponse.json({ modifiedTime: null, forbidden: true });
         }
         throw err;
@@ -58,12 +58,12 @@ export async function GET(
       let data;
       try {
         data = await fetchThreadDetail(driveAuth, doc.googleDocId, commentId, session.user.email ?? undefined);
-      } catch (err: any) {
-        if (err.code === 404) {
+      } catch (err) {
+        if (isDriveErrorCode(err, 404)) {
           // Comment was deleted — return empty threads so the UI updates cleanly
           return NextResponse.json({ threads: {} });
         }
-        if (err.code === 403 || err.status === 403) {
+        if (isDriveErrorCode(err, 403)) {
           return NextResponse.json({ threads: {}, forbidden: true });
         }
         throw err;
@@ -93,7 +93,7 @@ export async function GET(
       threads,
       viewedByMeTime: fileRes.data.viewedByMeTime ?? null,
     });
-  } catch (err: any) {
+  } catch (err) {
     if (err instanceof OfflineModeError) {
       logWarning(`[API] Offline mode — skipping Drive thread fetch for doc ${docId}`);
       return NextResponse.json({ threads: {} });
@@ -101,7 +101,7 @@ export async function GET(
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
     // 403 Forbidden — user doesn't have comment access to this doc
-    if (err.code === 403 || err.status === 403) {
+    if (isDriveErrorCode(err, 403)) {
       logWarning(`[API] Forbidden — no comment access for doc ${docId}`);
       return NextResponse.json({ threads: {}, forbidden: true });
     }

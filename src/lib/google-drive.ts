@@ -22,6 +22,38 @@ export function isInvalidGrantError(err: unknown): boolean {
   return code === 400 && String(err).includes("invalid_grant");
 }
 
+/**
+ * Return true when `err` looks like a Google API error with the given HTTP code.
+ * Googleapis typically sets `err.code` to a number, but sometimes it's the
+ * stringified number, and some error paths use `err.status` instead — this
+ * helper checks both so callers don't have to repeat the pattern.
+ */
+export function isDriveErrorCode(err: unknown, code: number): boolean {
+  if (!err || typeof err !== "object") return false;
+  const codeField = (err as { code?: number | string }).code;
+  if (codeField === code || codeField === String(code)) return true;
+  const statusField = (err as { status?: number | string }).status;
+  return statusField === code || statusField === String(code);
+}
+
+/**
+ * Extract the numeric HTTP error code from a Google API error, checking
+ * `err.code` first and falling back to `err.status`. Returns undefined when
+ * neither field parses as a number.
+ */
+export function getDriveErrorCode(err: unknown): number | undefined {
+  if (!err || typeof err !== "object") return undefined;
+  for (const key of ["code", "status"] as const) {
+    const v = (err as Record<string, unknown>)[key];
+    if (typeof v === "number") return v;
+    if (typeof v === "string") {
+      const n = Number(v);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return undefined;
+}
+
 const REAUTH_MESSAGE = "Google authorization expired. Please sign out and sign back in.";
 
 /** If err is an invalid_grant error, return a 401 NextResponse; otherwise return null. */
@@ -151,12 +183,11 @@ export async function findDeletedOrDeniedDocIds(
         logInfo(`[Drive] files.get ${id} → ${trashed ? "trashed" : "ok"} (${Date.now() - t0}ms)`);
         return { id, status: trashed ? "trashed" as const : "ok" as const };
       } catch (err: unknown) {
-        const code = (err as { code?: number | string })?.code;
-        if (code === 404 || code === "404") {
+        if (isDriveErrorCode(err, 404)) {
           logWarning(`[Drive] files.get ${id} → not found (${Date.now() - t0}ms)`);
           return { id, status: "deleted" as const };
         }
-        if (code === 403 || code === "403") {
+        if (isDriveErrorCode(err, 403)) {
           logWarning(`[Drive] files.get ${id} → permission denied (${Date.now() - t0}ms)`);
           return { id, status: "denied" as const };
         }
@@ -449,12 +480,12 @@ export async function fetchCommentData(
 
       pageToken = res.data.nextPageToken ?? undefined;
     } while (pageToken);
-  } catch (err: any) {
+  } catch (err) {
     // When only fetching threads (UI display), gracefully return empty on
     // permission denied — the user can still see the doc, just not comments.
     // When sync is requested, let the error propagate so syncComments can
     // handle it (e.g. stamping sync time, flagging permissionDenied).
-    if (err.code === 403 && threads && !sync) {
+    if (isDriveErrorCode(err, 403) && threads && !sync) {
       logWarning(`[Drive] Permission denied for comments on ${googleDocId}.`);
       return { threads: [] };
     }
@@ -591,12 +622,13 @@ export async function fetchDocData(
       }),
       `[Docs] documents.get ${googleDocId}`
     );
-  } catch (err: any) {
+  } catch (err) {
+    const message = (err as { message?: string }).message ?? "";
     // If we have view-only access but no permission for comments/suggestions,
     // Google might fail the entire call. Retry without asking for suggestions.
     if (
-      err.code === 403 &&
-      err.message?.includes("permission to access the document suggestions")
+      isDriveErrorCode(err, 403) &&
+      message.includes("permission to access the document suggestions")
     ) {
       logWarning(
         `[Docs] Permission denied for suggestions on ${googleDocId}, retrying without suggestions.`
@@ -620,10 +652,10 @@ export async function fetchDocData(
         return { documentText: null, suggestionContent: {}, suggestions: [] };
       }
     } else {
-      const isPermission = err.code === 403 || err.code === 404 ||
-        /permission|forbidden|not found/i.test(err.message ?? "");
+      const isPermission = isDriveErrorCode(err, 403) || isDriveErrorCode(err, 404) ||
+        /permission|forbidden|not found/i.test(message);
       if (isPermission) {
-        logError(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms): ${err.message ?? err}`);
+        logError(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms): ${message || err}`);
       } else {
         logError(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
       }
@@ -1059,9 +1091,10 @@ export async function fetchDocsByIds(
           createdTimeInDrive: file.createdTime ? new Date(file.createdTime) : null,
         };
       } catch (err: unknown) {
-        const code = (err as { code?: number | string })?.code;
-        if (code === 404 || code === "404" || code === 403 || code === "403") {
-          logWarning(`[Drive] files.get ${id} → ${code === 403 || code === "403" ? "permission denied" : "not found"} (${Date.now() - t0}ms)`);
+        if (isDriveErrorCode(err, 403)) {
+          logWarning(`[Drive] files.get ${id} → permission denied (${Date.now() - t0}ms)`);
+        } else if (isDriveErrorCode(err, 404)) {
+          logWarning(`[Drive] files.get ${id} → not found (${Date.now() - t0}ms)`);
         } else {
           logError(`[Drive] files.get ${id} failed (${Date.now() - t0}ms):`, err);
         }

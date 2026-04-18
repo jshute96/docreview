@@ -21,7 +21,8 @@ vi.mock("@/lib/sync-comments", () => ({
   bumpLastCommentActivity: vi.fn(),
   syncSingleComment: vi.fn(),
 }));
-vi.mock("@/lib/google-drive", () => {
+vi.mock("@/lib/google-drive", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/google-drive")>("@/lib/google-drive");
   const commentsGet = vi.fn();
   const filesGet = vi.fn().mockResolvedValue({ data: { viewedByMeTime: null } });
   return {
@@ -31,6 +32,9 @@ vi.mock("@/lib/google-drive", () => {
     fetchDocData: vi.fn(),
     fetchCommentData: vi.fn(),
     invalidGrantResponse: vi.fn(() => null),
+    // Pure helpers — use real implementations so error-code checks work
+    isDriveErrorCode: actual.isDriveErrorCode,
+    getDriveErrorCode: actual.getDriveErrorCode,
     _commentsGet: commentsGet,
     _filesGet: filesGet,
   };

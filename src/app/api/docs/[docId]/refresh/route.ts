@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, createDriveService, invalidGrantResponse, fetchCommentData, fetchDocData, fetchFileTextViaExport, driveUrlFor } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, invalidGrantResponse, fetchCommentData, fetchDocData, fetchFileTextViaExport, driveUrlFor, isDriveErrorCode } from "@/lib/google-drive";
 import type { ThreadMap, SuggestionContent, DriveSuggestion } from "@/lib/google-drive";
 import { upsertDocsAndSyncComments } from "@/lib/refresh";
 import { docWithCommentsInclude, stripServerOnly } from "@/lib/doc-queries";
@@ -66,8 +66,7 @@ export async function POST(
   } catch (err: unknown) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
-    const code = (err as { code?: number })?.code;
-    if (code === 404) {
+    if (isDriveErrorCode(err, 404)) {
       // 404 is ambiguous for DENIED docs (Google returns 404 for permission denied too)
       if (doc.accessState !== AccessState.DENIED) {
         logWarning(`[Refresh] doc ${doc.docId} (${doc.googleDocId}) not found (code 404)`);
@@ -75,7 +74,7 @@ export async function POST(
       } else {
         logWarning(`[Refresh] doc ${doc.docId} (${doc.googleDocId}) still inaccessible (code 404, keeping DENIED)`);
       }
-    } else if (code === 403) {
+    } else if (isDriveErrorCode(err, 403)) {
       logWarning(`[Refresh] doc ${doc.docId} (${doc.googleDocId}) permission denied (code 403)`);
       await prisma.doc.update({ where: { docId }, data: { accessState: AccessState.DENIED } });
     } else {

@@ -19,11 +19,17 @@ vi.mock("@/lib/prisma", () => {
     },
   };
 });
-vi.mock("@/lib/google-drive", () => ({
-  getDriveClient: vi.fn(),
-  fetchCommentData: vi.fn(),
-  fetchDocData: vi.fn(),
-}));
+vi.mock("@/lib/google-drive", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/google-drive")>("@/lib/google-drive");
+  return {
+    getDriveClient: vi.fn(),
+    fetchCommentData: vi.fn(),
+    fetchDocData: vi.fn(),
+    // Pure helpers — use real implementations so error-code checks work
+    isDriveErrorCode: actual.isDriveErrorCode,
+    getDriveErrorCode: actual.getDriveErrorCode,
+  };
+});
 
 import { syncComments } from "./sync-comments";
 import { prisma } from "@/lib/prisma";
