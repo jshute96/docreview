@@ -87,6 +87,7 @@ using different APIs and different IDs.  See `docs/comment-tracking.md` and
 
 ### Google Drive API Error Handling
 - **API routes**: Every catch block around Drive API calls must check `invalidGrantResponse(err)` from `google-drive.ts` before returning a generic 502. This returns a 401 with a clear reauth message when the OAuth token has expired.
+- **HTTP status checks**: Use `isDriveErrorCode(err, 404)` / `isDriveErrorCode(err, 403)` from `google-drive.ts` instead of raw `err.code === 404` — handles both numeric and string `err.code` and falls back to `err.status`. Use `getDriveErrorCode(err)` when you need the numeric code for logging. Avoid `catch (err: any)`; use plain `catch (err)` with these helpers.
 - **Client components**: Use `apiFetch()` from `src/lib/api-fetch.ts` instead of raw `fetch()` for any request to a Drive-backed API route. It intercepts 401 responses, shows a single deduplicated reauth toast, and throws `ApiAuthError`.
 - **Catch blocks**: When a catch block shows a `toast.error`, guard it with `if (!isAuthError(err))` so generic error toasts are suppressed when the real cause is an expired token — otherwise the user sees duplicate/confusing toasts.
 

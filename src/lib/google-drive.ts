@@ -18,8 +18,7 @@ export const SUPPORTED_MIME_TYPES = new Set([
 /** Detect expired/revoked OAuth refresh token (Google returns 400 invalid_grant) */
 export function isInvalidGrantError(err: unknown): boolean {
   if (err instanceof Error && err.message?.includes("invalid_grant")) return true;
-  const code = (err as { code?: number | string })?.code;
-  return code === 400 && String(err).includes("invalid_grant");
+  return isDriveErrorCode(err, 400) && String(err).includes("invalid_grant");
 }
 
 /**

@@ -32,6 +32,10 @@ export interface GmailDocIdResult {
  */
 export function isNoGmailMailboxError(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
+  // Intentionally does not use isDriveErrorCode: the Gmail "no mailbox" signal
+  // is specifically the pairing of code 400 with a structural
+  // `errors[].reason === "failedPrecondition"` reason — falling back to
+  // `err.status` would over-match unrelated 400s from other Gmail errors.
   const code = (err as { code?: number | string }).code;
   if (code !== 400 && code !== "400") return false;
 
