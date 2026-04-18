@@ -1,12 +1,106 @@
 import { gmail as createGmail } from "@googleapis/gmail";
 import { drive as createDrive } from "@googleapis/drive";
-import { getDriveClient, driveUrlFor, isDriveErrorCode } from "@/lib/google-drive";
+import { getDriveClient, driveUrlFor, isDriveErrorCode, parseGoogleDocId } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { formatDate } from "@/lib/utils";
-import { extractBodyText, extractHtmlBody, extractDocId, parseShareNote } from "@/lib/gmail-parse";
-import { parseGmailNotificationFromParsed, type ParsedEmail } from "@/lib/parse-gmail-notification";
+import {
+  parseGmailNotificationFromParsed,
+  type ParsedEmail,
+  type SharingNotification,
+} from "@/lib/parse-gmail-notification";
 import type { OnProgress } from "./progress-events";
 import { AccessState, DocRole } from "@prisma/client";
+
+/**
+ * Gmail API `payload` shape (subset): multipart messages nest `parts`, each with
+ * its own mimeType and either `body.data` (base64url-encoded) or nested parts.
+ */
+type GmailPayload = {
+  mimeType?: string | null;
+  body?: { data?: string | null } | null;
+  parts?: unknown[] | null;
+};
+
+/** Extract plaintext body from a Gmail API payload, recursing into multipart. */
+function extractBodyText(payload: GmailPayload | null | undefined): string | null {
+  if (!payload) return null;
+  if (payload.body?.data) {
+    return Buffer.from(payload.body.data, "base64url").toString("utf-8");
+  }
+  if (payload.parts) {
+    for (const part of payload.parts as Array<GmailPayload>) {
+      if (part?.mimeType === "text/plain" && part.body?.data) {
+        return Buffer.from(part.body.data, "base64url").toString("utf-8");
+      }
+      const nested = extractBodyText(part);
+      if (nested) return nested;
+    }
+    for (const part of payload.parts as Array<GmailPayload>) {
+      if (part?.mimeType === "text/html" && part?.body?.data) {
+        return Buffer.from(part.body.data, "base64url").toString("utf-8");
+      }
+    }
+  }
+  return null;
+}
+
+/** Extract HTML body from a Gmail API payload, recursing into multipart. */
+function extractHtmlBody(payload: GmailPayload | null | undefined): string | null {
+  if (!payload) return null;
+  if (payload.mimeType === "text/html" && payload.body?.data) {
+    return Buffer.from(payload.body.data, "base64url").toString("utf-8");
+  }
+  if (payload.parts) {
+    for (const part of payload.parts as Array<GmailPayload>) {
+      if (part?.mimeType === "text/html" && part.body?.data) {
+        return Buffer.from(part.body.data, "base64url").toString("utf-8");
+      }
+      const nested = extractHtmlBody(part);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+/** Extract a Google Doc/Sheet/Slides ID from Gmail notification body text. */
+function extractDocId(body: string): string | null {
+  const urlMatch = body.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+  if (urlMatch) return parseGoogleDocId(`/d/${urlMatch[1]}/`);
+  const idMatch = body.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
+  if (idMatch) return idMatch[1];
+  return null;
+}
+
+/**
+ * Format a parsed SharingNotification into a human-readable note for storage in
+ * the doc's `notes` field. Produces strings like:
+ *   "Shared by Jane Doe (jane@example.com) on 2026-03-03 12:08"
+ *   "Requested to share by Jane Doe on 2026-03-03 12:08\n<optional message>"
+ * Falls back gracefully when sharer details or date are missing.
+ */
+export function formatShareNote(notification: SharingNotification): string {
+  const verb = notification.isRequest ? "Requested to share by" : "Shared by";
+  let note: string;
+  if (notification.sharerName && notification.sharerEmail) {
+    note = `${verb} ${notification.sharerName} (${notification.sharerEmail})`;
+  } else if (notification.sharerEmail) {
+    note = `${verb} ${notification.sharerEmail}`;
+  } else if (notification.sharerName) {
+    note = `${verb} ${notification.sharerName}`;
+  } else {
+    note = notification.isRequest ? "Requested to share" : "Shared";
+  }
+
+  const date = notification.date ? new Date(notification.date) : null;
+  if (date && !isNaN(date.getTime())) {
+    note += ` on ${formatDate(date, true)}`;
+  }
+
+  if (notification.shareMessage) {
+    note += "\n" + notification.shareMessage;
+  }
+  return note;
+}
 
 /** AccessState values that mean "tracked but inaccessible". */
 type InaccessibleState = typeof AccessState.NOT_FOUND | typeof AccessState.DENIED;
@@ -226,10 +320,17 @@ export async function scanGmailForDocIds(
             emailMeta.set(docId, [parsed]);
           }
 
-          // Extract share note from sharing emails (not comment notifications)
-          const shareNote = body ? parseShareNote(headers, body) : null;
-          if (shareNote) {
-            shareNotes.set(docId, shareNote);
+          // For sharing emails, generate a note via the structured parser so
+          // we share a single implementation with the inaccessible-doc path.
+          if (fromHeader.includes("drive-shares-dm-noreply@google.com")) {
+            try {
+              const notif = parseGmailNotificationFromParsed(parsed);
+              if (notif.type === "sharing") {
+                shareNotes.set(docId, formatShareNote(notif));
+              }
+            } catch (parseErr) {
+              logWarning(`[Gmail] Share note parse failed for ${docId}:`, parseErr);
+            }
           }
         } else {
           logError(`[Gmail] ${messageId}: no doc link found in body (${Date.now() - t0}ms)`);
@@ -288,10 +389,8 @@ export function buildInaccessibleDocs(
             if (reply) {
               notes += `\n${reply.author}: ${reply.text}`;
             }
-          } else if (parsed.type === "sharing" && parsed.sharerName) {
-            notes += parsed.isRequest
-              ? `\nRequested to share by ${parsed.sharerName}`
-              : `\nShared by ${parsed.sharerName}`;
+          } else if (parsed.type === "sharing") {
+            notes += "\n" + formatShareNote(parsed);
           }
         } catch {
           // Fall back to subject as title if parser fails

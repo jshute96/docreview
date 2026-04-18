@@ -1,5 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { isNoGmailMailboxError, describeGoogleApiError } from "./gmail";
+import { isNoGmailMailboxError, describeGoogleApiError, formatShareNote } from "./gmail";
+import type { SharingNotification } from "./parse-gmail-notification";
+
+function shareNotif(overrides: Partial<SharingNotification> = {}): SharingNotification {
+  return {
+    type: "sharing",
+    subject: "",
+    from: "",
+    to: "",
+    date_str: "",
+    sharerName: "",
+    sharerEmail: "",
+    permission: "",
+    isRequest: false,
+    documentTitle: "",
+    documentUrl: "",
+    documentId: "",
+    ...overrides,
+  };
+}
 
 describe("isNoGmailMailboxError", () => {
   it("returns true for structured failedPrecondition with code 400 (number)", () => {
@@ -92,5 +111,60 @@ describe("describeGoogleApiError", () => {
 
   it("returns String(err) when object has no extractable diagnostic fields", () => {
     expect(describeGoogleApiError({})).toBe("[object Object]");
+  });
+});
+
+describe("formatShareNote", () => {
+  it("formats name + email + date for an invitation", () => {
+    const note = formatShareNote(shareNotif({
+      sharerName: "Jeff Someone",
+      sharerEmail: "someone@somewhere.com",
+      date: "2026-03-03T20:08:23.000Z",
+    }));
+    expect(note).toBe("Shared by Jeff Someone (someone@somewhere.com) on 2026-03-03 12:08");
+  });
+
+  it("uses 'Requested to share by' for share requests", () => {
+    const note = formatShareNote(shareNotif({
+      isRequest: true,
+      sharerName: "Dave",
+      sharerEmail: "dave@example.com",
+      date: "2026-03-13T13:44:38.000Z",
+    }));
+    expect(note).toMatch(/^Requested to share by Dave \(dave@example\.com\) on /);
+  });
+
+  it("appends a sharer-supplied message after a newline", () => {
+    const note = formatShareNote(shareNotif({
+      sharerName: "Jane",
+      sharerEmail: "jane@example.com",
+      date: "2026-03-03T20:08:23.000Z",
+      shareMessage: "Taste this doc!",
+    }));
+    expect(note).toContain("(jane@example.com)");
+    expect(note).toContain("\nTaste this doc!");
+  });
+
+  it("omits date when none parseable", () => {
+    const note = formatShareNote(shareNotif({
+      sharerName: "Jane",
+      sharerEmail: "jane@example.com",
+    }));
+    expect(note).toBe("Shared by Jane (jane@example.com)");
+  });
+
+  it("falls back to email only when name missing", () => {
+    const note = formatShareNote(shareNotif({ sharerEmail: "x@y.com" }));
+    expect(note).toBe("Shared by x@y.com");
+  });
+
+  it("falls back to name only when email missing", () => {
+    const note = formatShareNote(shareNotif({ sharerName: "Anon" }));
+    expect(note).toBe("Shared by Anon");
+  });
+
+  it("falls back to bare verb when no sharer details at all", () => {
+    expect(formatShareNote(shareNotif())).toBe("Shared");
+    expect(formatShareNote(shareNotif({ isRequest: true }))).toBe("Requested to share");
   });
 });

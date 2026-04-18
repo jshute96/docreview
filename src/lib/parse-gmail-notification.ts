@@ -86,6 +86,8 @@ export interface SharingNotification {
   documentTitle: string;
   documentUrl: string;
   documentId: string;
+  /** Optional sharer-supplied message extracted from the plaintext body. */
+  shareMessage?: string;
 }
 
 export type GmailNotification = CommentNotification | SharingNotification;
@@ -594,12 +596,22 @@ function parseSharingNotification(email: ParsedEmail): SharingNotification {
   // "Jeff Shute (jshute@gmail.com) is requesting access" — share request
   const requestMatch = !inviteMatch ? html.match(/>([\w\s]+)\s*\(<a[^>]*mailto:([^"]+)"[^>]*>[^<]+<\/a>\)\s*is\s*<b>requesting access<\/b>/) : null;
   const sharerMatch = inviteMatch || requestMatch;
-  const sharerName = sharerMatch ? sharerMatch[1].trim() : "";
-  const sharerEmail = sharerMatch ? sharerMatch[2] : (headers.get("reply-to")?.match(/<([^>]+)>/)?.[1] || "");
+
+  // Fall back to Reply-To for sharer details if HTML regex misses (e.g. text-only
+  // email bodies, or a subject-line variant we haven't seen). Reply-To is
+  // authoritative for sharer identity on Drive share notifications.
+  const replyTo = headers.get("reply-to") ?? "";
+  const replyToMatch = replyTo.match(/^(.+?)\s*<([^>]+)>$/);
+  const sharerName = sharerMatch ? sharerMatch[1].trim() : (replyToMatch?.[1]?.trim() ?? "");
+  const sharerEmail = sharerMatch ? sharerMatch[2] : (replyToMatch?.[2] ?? "");
+
+  // Detect share-request emails via Subject when HTML regex missed the pattern.
+  const isRequest = !!requestMatch || (!inviteMatch && /share request/i.test(headers.get("subject") ?? ""));
+
   // For invitations, permission is in the text ("edit", "view", "comment")
   // For share requests, extract from URL role parameter
   let permission = inviteMatch ? inviteMatch[3] : "";
-  if (requestMatch && !permission) {
+  if (isRequest && !permission) {
     const roleMatch = html.match(/role=(\w+)/);
     permission = roleMatch ? roleMatch[1] : "";
   }
@@ -616,6 +628,8 @@ function parseSharingNotification(email: ParsedEmail): SharingNotification {
   const sharingDateStr = headers.get("date") || "";
   const sharingDateISO = headerDateToISO(sharingDateStr);
 
+  const shareMessage = extractShareMessage(email.textBody);
+
   return {
     type: "sharing",
     subject: headers.get("subject") || "",
@@ -626,11 +640,32 @@ function parseSharingNotification(email: ParsedEmail): SharingNotification {
     sharerName,
     sharerEmail,
     permission,
-    isRequest: !!requestMatch,
+    isRequest,
     documentTitle,
     documentUrl,
     documentId,
+    ...(shareMessage ? { shareMessage } : {}),
   };
+}
+
+/**
+ * Extract the optional sharer-supplied message from a sharing email's plaintext body.
+ * Plaintext structure (language-independent) is:
+ *   paragraph 0: intro line
+ *   paragraph 1: title + URL
+ *   paragraph 2: boilerplate (varies by locale)
+ *   paragraph 3+: share message (optional)
+ */
+function extractShareMessage(body: string): string | null {
+  if (!body) return null;
+  const paragraphs = body.split(/\n\s*\n/);
+  const urlParaIndex = paragraphs.findIndex(p =>
+    /https:\/\/(docs|sheets|slides|drive)\.google\.com\//.test(p)
+  );
+  if (urlParaIndex < 0) return null;
+  if (urlParaIndex + 2 >= paragraphs.length) return null;
+  const message = paragraphs.slice(urlParaIndex + 2).join("\n\n").trim();
+  return message || null;
 }
 
 // ---------------------------------------------------------------------------

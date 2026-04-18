@@ -6,8 +6,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { parseGmailNotification, parseCommentTime, headerDateToISO, decodeHtmlEntities, formatAsCommentTime } from "./parse-gmail-notification";
-import type { CommentNotification, SharingNotification } from "./parse-gmail-notification";
+import { parseGmailNotification, parseGmailNotificationFromParsed, parseCommentTime, headerDateToISO, decodeHtmlEntities, formatAsCommentTime } from "./parse-gmail-notification";
+import type { CommentNotification, SharingNotification, ParsedEmail } from "./parse-gmail-notification";
 
 const EXAMPLES_DIR = join(__dirname, "../../testing/gmail_notifications");
 
@@ -176,6 +176,86 @@ describe("parseGmailNotification", () => {
       expect(result.documentTitle).toBe("Shared from home 1");
       expect(result.documentId).toBe("1xMvTIcXaNHyf2HQlKU8lBYhmZ-RJMh7Db-rWgVsgUZk");
       expect(result.documentUrl).toContain("docs.google.com/document/d/1xMvTIcXaNHyf2HQlKU8lBYhmZ-RJMh7Db-rWgVsgUZk");
+    });
+  });
+
+  describe("sharing invitation — textBody fallback & shareMessage", () => {
+    function shareEmail(overrides: Partial<{
+      headers: Record<string, string>;
+      textBody: string;
+      htmlBody: string;
+    }>): ParsedEmail {
+      const headers = new Map<string, string>();
+      for (const [k, v] of Object.entries(overrides.headers ?? {})) {
+        headers.set(k.toLowerCase(), v);
+      }
+      return { headers, textBody: overrides.textBody ?? "", htmlBody: overrides.htmlBody ?? "" };
+    }
+
+    const SHARE_BODY_WITH_MESSAGE = [
+      "I've shared an item with you:",
+      "",
+      "share test 2 - with a message",
+      "https://docs.google.com/document/d/18QlPQjxUCMK3k3n1mNMe0n0kAt2VyE5bSi4xtzq_YxM/edit",
+      "",
+      "It's not an attachment — it's stored online. To open this item, click the link.",
+      "",
+      "Taste this doc!",
+    ].join("\n");
+
+    it("extracts shareMessage from textBody when present", () => {
+      const email = shareEmail({
+        headers: { from: "Jane <drive-shares-dm-noreply@google.com>", subject: "Document shared" },
+        textBody: SHARE_BODY_WITH_MESSAGE,
+      });
+      const result = parseGmailNotificationFromParsed(email) as SharingNotification;
+      expect(result.shareMessage).toBe("Taste this doc!");
+    });
+
+    it("returns no shareMessage when textBody has none", () => {
+      const email = shareEmail({
+        headers: { from: "drive-shares-dm-noreply@google.com", subject: "Document shared" },
+        textBody: "Intro\n\nTitle\nhttps://docs.google.com/document/d/x/edit\n\nBoilerplate only.",
+      });
+      const result = parseGmailNotificationFromParsed(email) as SharingNotification;
+      expect(result.shareMessage).toBeUndefined();
+    });
+
+    it("handles multi-line shareMessage", () => {
+      const body = SHARE_BODY_WITH_MESSAGE.replace("Taste this doc!", "Line 1\n\nLine 2");
+      const email = shareEmail({
+        headers: { from: "drive-shares-dm-noreply@google.com" },
+        textBody: body,
+      });
+      const result = parseGmailNotificationFromParsed(email) as SharingNotification;
+      expect(result.shareMessage).toBe("Line 1\n\nLine 2");
+    });
+
+    it("falls back to Reply-To header for sharerName/Email when HTML regex misses", () => {
+      const email = shareEmail({
+        headers: {
+          from: "drive-shares-dm-noreply@google.com",
+          "reply-to": "Jane Someone <jane@example.com>",
+          subject: "Document shared",
+          date: "Tue, 03 Mar 2026 20:08:23 +0000",
+        },
+        textBody: "intro",
+      });
+      const result = parseGmailNotificationFromParsed(email) as SharingNotification;
+      expect(result.sharerName).toBe("Jane Someone");
+      expect(result.sharerEmail).toBe("jane@example.com");
+    });
+
+    it("detects share-request via Subject when HTML regex misses", () => {
+      const email = shareEmail({
+        headers: {
+          from: "drive-shares-dm-noreply@google.com",
+          "reply-to": "Jane <jane@example.com>",
+          subject: "Share request for Doc",
+        },
+      });
+      const result = parseGmailNotificationFromParsed(email) as SharingNotification;
+      expect(result.isRequest).toBe(true);
     });
   });
 
