@@ -69,6 +69,12 @@ These comment changes trigger moving the document to Inbox:
   5. Exception: comments in **read** state (where I'm the last commenter) never trigger unarchive.
      My own activity shouldn't resurface an archived document, regardless of whether I'm Author or Reviewer.
 
+The same three unarchive rules apply to suggestions when the Chrome extension
+provides reply-authorship data (accept/reject counts as a reply, and the user's
+`isMine` flag on the last reply sets `isRead`). Without the extension, suggestion
+unarchive falls back to "new suggestion on my own doc" since the Docs API and
+Gmail merge paths can't identify the authors.
+
 ---
 
 ## Deferred / Not Yet Implemented

@@ -423,4 +423,189 @@ describe("mergeExtensionSuggestions", () => {
     await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion()], userEmail, makeDoc());
     expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
   });
+
+  // ---------- isRead computation ----------
+
+  describe("isRead", () => {
+    it("marks new suggestion as read when it's my own with no replies", async () => {
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({ isMine: true })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
+      expect(mockComment.create.mock.calls[0][0].data.isRead).toBe(true);
+    });
+
+    it("marks new suggestion as unread when it's someone else's with no replies", async () => {
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({ isMine: false })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
+      expect(mockComment.create.mock.calls[0][0].data.isRead).toBe(false);
+    });
+
+    it("marks new suggestion as read when my reply is the last one", async () => {
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        isMine: false,
+        replies: [
+          { author: "Alice", isMine: false, timestamp: "3:01 PM Mar 20", text: "first" },
+          { author: "Me", isMine: true, timestamp: "4:00 PM Mar 20", text: "reply" },
+        ],
+      })], userEmail, makeDoc());
+      expect(mockComment.create.mock.calls[0][0].data.isRead).toBe(true);
+    });
+
+    it("marks new suggestion as unread when someone else's reply is the last one", async () => {
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        isMine: true,
+        replies: [
+          { author: "Me", isMine: true, timestamp: "3:01 PM Mar 20", text: "first" },
+          { author: "Alice", isMine: false, timestamp: "4:00 PM Mar 20", text: "reply" },
+        ],
+      })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
+      expect(mockComment.create.mock.calls[0][0].data.isRead).toBe(false);
+    });
+
+    it("marks new suggestion as read when I accepted my own suggestion (last action is mine)", async () => {
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        isMine: true,
+        status: "accepted",
+        replies: [{ author: "Me", isMine: true, timestamp: "4:00 PM Mar 20", text: "", action: "accept" }],
+      })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
+      expect(mockComment.create.mock.calls[0][0].data.isRead).toBe(true);
+    });
+
+    it("marks existing suggestion read when a new reply from me arrives", async () => {
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, isRead: false,
+      });
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        replies: [{ author: "Me", isMine: true, timestamp: "4:00 PM Mar 20", text: "reply" }],
+      })], userEmail, makeDoc());
+      expect(mockComment.update.mock.calls[0][0].data.isRead).toBe(true);
+    });
+
+    it("marks existing suggestion unread when a new reply from someone else arrives", async () => {
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, isRead: true,
+      });
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        replies: [{ author: "Alice", isMine: false, timestamp: "4:00 PM Mar 20", text: "reply" }],
+      })], userEmail, makeDoc());
+      expect(mockComment.update.mock.calls[0][0].data.isRead).toBe(false);
+    });
+
+    it("preserves manually-toggled isRead when no new activity", async () => {
+      // User manually marked as read, no new replies or state change → keep isRead=true
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, isRead: true,
+      });
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({ isMine: false })], userEmail, makeDoc());
+      expect(mockComment.update.mock.calls[0][0].data.isRead).toBe(true);
+    });
+
+    it("flips isRead when resolve state changes (my suggestion accepted by someone else)", async () => {
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, isRead: true,
+      });
+      // Reply arrives: my suggestion, they accepted it (the accept reply is theirs)
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        isMine: true, status: "accepted",
+        replies: [{ author: "Alice", isMine: false, timestamp: "4:00 PM Mar 20", text: "", action: "accept" }],
+      })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
+      expect(mockComment.update.mock.calls[0][0].data.isRead).toBe(false);
+    });
+
+    it("sets isRead on hash-match merge into a Drive-first row", async () => {
+      mockComment.findFirst.mockResolvedValue(null);
+      mockComment.findMany.mockResolvedValueOnce([{
+        commentId: "cr1", googleCommentId: null, suggestionContentHash: computeSuggestionHash(SuggestionType.INSERT, "", "new text"),
+        status: CommentStatus.ARCHIVED, replyCount: 0, resolved: false, isRead: false,
+      }]);
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        isMine: true,
+      })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
+      // New row was my own with no replies → isRead=true
+      expect(mockComment.update.mock.calls[0][0].data.isRead).toBe(true);
+    });
+  });
+
+  // ---------- shouldUnarchive gating on isRead ----------
+
+  describe("shouldUnarchive gating", () => {
+    it("does NOT unarchive when I inserted my own suggestion (isRead=true)", async () => {
+      const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({ isMine: true })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
+      expect(res.inserted).toBe(1);
+      expect(res.shouldUnarchive).toBe(false);
+    });
+
+    it("does NOT unarchive on hash-match merge when I just made the suggestion", async () => {
+      mockComment.findFirst.mockResolvedValue(null);
+      mockComment.findMany.mockResolvedValueOnce([{
+        commentId: "cr1", googleCommentId: null, suggestionContentHash: computeSuggestionHash(SuggestionType.INSERT, "", "new text"),
+        status: CommentStatus.ARCHIVED, replyCount: 0, resolved: false, isRead: false,
+      }]);
+      const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({ isMine: true })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
+      expect(res.shouldUnarchive).toBe(false);
+    });
+
+    it("unarchives when existing INBOX suggestion gets new reply from someone else (rule 2)", async () => {
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 1, resolved: false, isRead: true,
+      });
+      const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        isMine: true,
+        replies: [
+          { author: "Me", isMine: true, timestamp: "3:01 PM", text: "first" },
+          { author: "Alice", isMine: false, timestamp: "4:00 PM", text: "reply" },
+        ],
+      })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
+      expect(res.shouldUnarchive).toBe(true);
+    });
+
+    it("does NOT unarchive when existing INBOX suggestion gets new reply but I was the one who accepted (rule 2 exception)", async () => {
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, isRead: false,
+      });
+      const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        isMine: false, status: "accepted",
+        replies: [{ author: "Me", isMine: true, timestamp: "4:00 PM", text: "", action: "accept" }],
+      })], userEmail, makeDoc());
+      // I accepted someone else's suggestion — doc shouldn't resurface
+      expect(res.shouldUnarchive).toBe(false);
+    });
+
+    it("unarchives when my INBOX suggestion is accepted by someone else (rule 3)", async () => {
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, isRead: true,
+      });
+      const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        isMine: true, status: "accepted",
+        // Enough replies that the silent-accept archive rule doesn't fire
+        replies: [
+          { author: "Alice", isMine: false, timestamp: "3:00 PM", text: "looks good" },
+          { author: "Alice", isMine: false, timestamp: "4:00 PM", text: "", action: "accept" },
+        ],
+      })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
+      expect(res.shouldUnarchive).toBe(true);
+    });
+
+    it("does NOT unarchive when my INBOX suggestion is silently accepted by someone else (archive transition)", async () => {
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, isRead: true,
+      });
+      const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        isMine: true, status: "accepted",
+        // Only the accept action, no discussion → silent accept → target=ARCHIVED
+        replies: [{ author: "Alice", isMine: false, timestamp: "4:00 PM", text: "", action: "accept" }],
+      })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
+      expect(res.shouldUnarchive).toBe(false);
+    });
+
+    it("does NOT unarchive when existing INBOX suggestion has no new activity and isRead is preserved", async () => {
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 2, resolved: false, isRead: true,
+      });
+      const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        replies: [
+          { author: "Alice", isMine: false, timestamp: "3:00 PM", text: "first" },
+          { author: "Me", isMine: true, timestamp: "3:30 PM", text: "reply" },
+        ],
+      })], userEmail, makeDoc());
+      expect(res.shouldUnarchive).toBe(false);
+    });
+  });
 });

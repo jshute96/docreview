@@ -331,6 +331,9 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Extension suggestion merge unarchives doc when suggestion moves to Inbox
 - [ ] Gmail suggestion merge unarchives doc when suggestion is promoted/inserted as Inbox
 - [ ] Does NOT unarchive on: muted comments (unless @mentioned), my own activity (isRead)
+- [ ] Does NOT unarchive on suggestions where I was the last actor (e.g., I typed my own suggestion, I accepted/rejected it myself)
+- [ ] Unarchives when existing INBOX suggestion gets a new non-self reply (suggestion rule 2)
+- [ ] Unarchives when my INBOX suggestion is accepted/rejected by someone else (suggestion rule 3)
 - [ ] Recency cutoff prevents stale docs from surfacing
 
 ---
@@ -348,6 +351,11 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] New @mention on muted comment → breaks out to Inbox
 - [ ] Your own activity marks comment as read
 - [ ] isRead sticky: sync only overwrites when thread has genuinely new activity
+
+### Suggestion Updates (Chrome extension sync only — only source with reply-authorship data)
+- [ ] Suggestion isRead set from last-actor-is-me: my reply/accept/reject → read; theirs → unread
+- [ ] isRead for suggestion sticky across extension syncs when no new replies and no resolve-state change
+- [ ] First-time extension enrichment of a Drive-/Gmail-first suggestion computes isRead fresh (doesn't preserve the schema-default false)
 
 ### Reply & Resolve
 - [ ] Reply posts to Google Drive, syncs back

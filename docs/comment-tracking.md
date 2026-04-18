@@ -199,14 +199,26 @@ in inbox when first synced. See [Phase 3.5 — Smart Unarchive](./refresh.md#pha
 - **Extension path**: applies comment-like rules — `@-mention → INBOX`, `resolved → ARCHIVED`,
   `doc author or participant → INBOX`, otherwise `ARCHIVED`.
 - **Extension enrichment**: when the extension first enriches a Docs API-created suggestion
-  (adding the disco ID), the initial status is re-evaluated with the now-available
-  participation data. This corrects cases like "my suggestion on a REVIEWER doc" from
-  ARCHIVED to INBOX.
+  (adding the disco ID), both the initial status and `isRead` are re-evaluated with the
+  now-available participation data. This corrects cases like "my suggestion on a REVIEWER
+  doc" from ARCHIVED to INBOX, and sets `isRead` from the last-actor-is-me rule.
 - **Gmail-first inserts**: always `"INBOX"` (notification = interesting activity).
 - Gmail merge promotes `ARCHIVED` suggestions to `INBOX`; `MUTED` stays `MUTED`.
 - Extension merge applies activity-based status transitions on existing suggestions
   (same rules as comments: new reply @-mention breaks MUTED, new activity + relevance
   promotes ARCHIVED → INBOX).
+
+**Suggestion `isRead`** (extension merge only — Docs API and Gmail have no authorship data):
+- `isRead = replies[last].isMine` when there are replies (including accept/reject actions);
+  otherwise `isRead = isMine` on the suggestion itself. Mirrors the rule `deriveCommentFlags`
+  uses for comments.
+- Preserved across updates when there's no new activity (no new replies, no resolve-state
+  change), so manual "mark unread" toggles stick.
+- Doc-level unarchive rules for suggestions mirror comments and are gated on `!isRead`:
+  (1) transition to INBOX, (2) existing INBOX with new replies (unless I resolved it),
+  (3) INBOX resolved by someone else. Rules 2 and 3 additionally require the target
+  status to be INBOX — when silent-accept sends a suggestion to ARCHIVED, the doc is
+  not resurfaced.
 
 **Suggestion resolution** (extension sync only — Docs API marks resolved but has no
 authorship data):
@@ -317,7 +329,7 @@ table but syncs from different APIs:
 | **DB type** | `COMMENT` | `SUGGESTION` |
 | **ID format** | `googleCommentId` — Drive comment ID (`AAAB...`) | `googleSuggestionId` — Docs API ID (`suggest.xxx`) |
 | **Replies** | Full thread with reply count, author tracking, @mentions | Not tracked by Docs API; available when Chrome extension provides DOM data |
-| **Status fields** | `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, etc. from Drive | Default to `false` from Docs API; populated by extension merge when available |
+| **Status fields** | `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, `isRead`, etc. from Drive | Default to `false` from Docs API; `isThreadAuthor`/`isReplyAuthor`/`mentionedMe`/`isRead` populated by extension merge when available |
 | **Resolution** | Resolved/reopened via Drive API | Accepted/rejected — disappears from doc body |
 | **Navigation** | `?disco=` with `googleCommentId` | `?disco=` with `googleCommentId` when available (see below) |
 

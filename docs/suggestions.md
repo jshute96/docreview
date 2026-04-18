@@ -101,15 +101,19 @@ stripped before storage.
 | `isThreadAuthor` | false | — | false |
 | `isReplyAuthor` | false | — | false |
 | `mentionedMe` | false | — | false |
+| `isRead` | false (default) | false (default) | Extension authoritative (last-actor-is-me) |
 
 **Extension source:** When extension suggestions are merged into the DB, the merge also
 populates `isThreadAuthor` and `isReplyAuthor` from the `isMine` flag, `mentionedMe` and
-`mentionedMeUnreplied` by checking reply HTML for the user's email address, and `resolved`
-from the accepted/rejected status. The extension merge also applies comment-like inbox
-status rules (see docs/inbox-states.md): new suggestions get status based on mention,
-doc role, and participation; existing suggestions are promoted to INBOX on new activity
+`mentionedMeUnreplied` by checking reply HTML for the user's email address, `resolved`
+from the accepted/rejected status, and `isRead` from whether the last action (reply or
+accept/reject) was mine. The extension merge also applies comment-like inbox status
+rules (see docs/inbox-states.md): new suggestions get status based on mention, doc
+role, and participation; existing suggestions are promoted to INBOX on new activity
 when relevant (e.g., new replies mentioning me, or new activity on a suggestion I'm
 involved in). MUTED suggestions are only promoted when a new reply @-mentions me.
+Doc-level unarchive is gated on `!isRead` so my own last action (typing a reply,
+accepting/rejecting) won't resurface an archived doc.
 
 **Future:** `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, and `resolved` could
 potentially be derived from parsed Gmail notifications but are left for later.

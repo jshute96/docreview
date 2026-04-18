@@ -63,6 +63,20 @@ function replyMentionsEmail(reply: ExtensionSuggestionInput["replies"][number], 
 }
 
 /**
+ * Compute isRead from current suggestion state: if there are replies (including
+ * accept/reject actions), the last actor determines read state; otherwise the
+ * suggestion's own author does. Mirrors deriveCommentFlags' isRead logic for
+ * comments — keeps suggestions consistent with comment behavior so "I was the
+ * last to act" reliably marks the row as read.
+ */
+function computeSuggestionIsRead(
+  isMine: boolean,
+  replies: ExtensionSuggestionInput["replies"],
+): boolean {
+  return replies.length > 0 ? replies[replies.length - 1].isMine : isMine;
+}
+
+/**
  * Compute mentionedMe, mentionedMeUnreplied, and per-reply flags from extension
  * reply data. Per-reply flags are needed for new-reply-mention detection on
  * existing suggestions (parallels comment sync's replyMentionedMeFlags).
@@ -77,6 +91,83 @@ function computeMentionFlags(
   // Suggestions have no top-level @mention (the body is a text change, not a comment)
   const mentionedMeUnreplied = computeMentionedMeUnreplied(false, replyMentionFlags, replyAuthorMeFlags);
   return { mentionedMe, mentionedMeUnreplied, replyMentionFlags, replyAuthorMeFlags };
+}
+
+/**
+ * For rows the extension has already enriched (disco ID already set), preserve
+ * a manually-toggled `isRead` when nothing new happened (no new replies, resolve
+ * state unchanged) — parallels comment sync's
+ * `effectiveIsRead = modifiedChanged ? c.isRead : existing.isRead`. We gate on
+ * reply-count/resolve transitions rather than the `driveModifiedAt` timestamp
+ * because extension timestamps are DOM-parsed and imprecise.
+ *
+ * This is NOT used for the Drive-first / Gmail-first enrichment path. Those
+ * rows land here with the schema-default `isRead: false`, which isn't a real
+ * manual toggle worth preserving. The hash-match branch uses the freshly
+ * computed `isRead` directly, so read-state and unarchive signals still land
+ * correctly on the first enrichment — e.g., if Drive sync seeded a suggestion
+ * and someone else then replied, the extension picks it up as unread and
+ * unarchives the doc; if I seeded it and nothing has happened, it's marked
+ * read and the doc stays archived.
+ */
+function effectiveIsReadForUpdate(
+  existing: Pick<Comment, "isRead" | "replyCount" | "resolved">,
+  isRead: boolean,
+  isResolved: boolean,
+  newReplyCount: number,
+): boolean {
+  const hasNewActivity =
+    newReplyCount > existing.replyCount || existing.resolved !== isResolved;
+  return hasNewActivity ? isRead : existing.isRead;
+}
+
+/**
+ * Doc-level unarchive rules for an existing suggestion update. Parallels the
+ * three rules in sync-comments.ts (`updateExistingComment`), all gated on
+ * `!isRead` so my own activity doesn't resurface an archived doc.
+ *
+ * Note: callers on the `existingById` path pass the *preserved* `effectiveIsRead`
+ * (honoring a manual "mark unread" toggle), while the comment-sync parallel gates
+ * on the freshly computed `c.isRead`. Deliberate divergence — a user-triggered
+ * unread on a suggestion should be allowed to resurface the doc on the next sync,
+ * which matches the intent of the manual toggle.
+ */
+function suggestionShouldUnarchive(opts: {
+  previousStatus: CommentStatus;
+  targetStatus: CommentStatus;
+  hasNewReplies: boolean;
+  isResolved: boolean;
+  iResolvedIt: boolean;
+  isRead: boolean;
+}): boolean {
+  if (opts.isRead) return false;
+
+  // 1. Status transitions from non-INBOX to INBOX
+  if (opts.previousStatus !== CommentStatus.INBOX && opts.targetStatus === CommentStatus.INBOX) return true;
+
+  // If this sync is archiving the suggestion (e.g., silent-accept on my own
+  // suggestion routes it INBOX → ARCHIVED), don't resurface the doc — there's
+  // nothing interesting there for the user to look at. Rules 2 and 3 only
+  // apply when the suggestion ends up in INBOX.
+  if (opts.targetStatus !== CommentStatus.INBOX) return false;
+
+  // 2. Existing INBOX with new replies (unless I resolved/accepted/rejected it myself)
+  if (opts.previousStatus === CommentStatus.INBOX && opts.hasNewReplies && !(opts.isResolved && opts.iResolvedIt)) return true;
+
+  // 3. INBOX suggestion is resolved by someone else — mirrors the comment rule
+  // at sync-comments.ts, which fires on stable resolved-by-not-me state too
+  // (not only on the resolve transition). Re-fires on each sync, but
+  // unarchiveDocIfNeeded is idempotent.
+  //
+  // Accept vs reject is NOT differentiated here — both are "resolved by
+  // not-me". The distinction has already been made upstream in
+  // computeSuggestionStatusUpdate: a silent accept of my own suggestion
+  // routes targetStatus to ARCHIVED (and is blocked by the gate above), while
+  // a rejection, or an accept with discussion, leaves targetStatus on INBOX
+  // and reaches this rule as "worth surfacing for follow-up".
+  if (opts.previousStatus === CommentStatus.INBOX && opts.isResolved && !opts.iResolvedIt) return true;
+
+  return false;
 }
 
 /**
@@ -172,6 +263,7 @@ export async function mergeExtensionSuggestions(
 
     // Common fields for all DB writes
     const isResolved = s.status === "accepted" || s.status === "rejected";
+    const isRead = computeSuggestionIsRead(s.isMine, s.replies);
     const commentData = {
       replyCount: s.replies.length,
       resolved: isResolved,
@@ -197,12 +289,21 @@ export async function mergeExtensionSuggestions(
       logInfo(`[Suggestions:Ext] ${googleDocId}: ${s.id} already exists as ${existingById.commentId} — updating metadata`);
       if (commentData.resolved && !existingById.resolved) resolved++;
       const newStatus = computeSuggestionStatusUpdate(doc, existingById, commentData, mention, iResolvedIt, lastResolveReply);
-      if (newStatus === CommentStatus.INBOX && existingById.status !== CommentStatus.INBOX) shouldUnarchive = true;
+      const effectiveIsRead = effectiveIsReadForUpdate(existingById, isRead, isResolved, s.replies.length);
+      if (suggestionShouldUnarchive({
+        previousStatus: existingById.status,
+        targetStatus: newStatus ?? existingById.status,
+        hasNewReplies: s.replies.length > existingById.replyCount,
+        isResolved,
+        iResolvedIt,
+        isRead: effectiveIsRead,
+      })) shouldUnarchive = true;
       await prisma.$transaction(async (tx) => {
         await tx.comment.update({
           where: { commentId: existingById.commentId },
           data: {
             ...commentData,
+            isRead: effectiveIsRead,
             ...(newStatus ? { status: newStatus } : {}),
           },
         });
@@ -235,13 +336,25 @@ export async function mergeExtensionSuggestions(
           });
           if (shouldBe === CommentStatus.INBOX) newStatus = CommentStatus.INBOX;
         }
-        if (newStatus === CommentStatus.INBOX && existing.status !== CommentStatus.INBOX) shouldUnarchive = true;
+        // First enrichment: the Drive/Gmail-first row had no authorship data so
+        // its isRead is the schema default (false), not a manual toggle worth
+        // preserving. Use the freshly computed value — matches how we re-evaluate
+        // status here via computeInitialInboxStatus.
+        if (suggestionShouldUnarchive({
+          previousStatus: existing.status,
+          targetStatus: newStatus ?? existing.status,
+          hasNewReplies: s.replies.length > existing.replyCount,
+          isResolved,
+          iResolvedIt,
+          isRead,
+        })) shouldUnarchive = true;
         await prisma.$transaction(async (tx) => {
           await tx.comment.update({
             where: { commentId: existing.commentId },
             data: {
               googleCommentId: s.id,
               ...commentData,
+              isRead,
               ...(newStatus ? { status: newStatus } : {}),
             },
           });
@@ -264,7 +377,9 @@ export async function mergeExtensionSuggestions(
           isThreadAuthor: commentData.isThreadAuthor,
           isReplyAuthor: commentData.isReplyAuthor,
         });
-        if (status === CommentStatus.INBOX) shouldUnarchive = true;
+        // Don't resurface the doc if I'm the last actor (e.g., I just made my own
+        // suggestion) — parallels buildNewComment's `!c.isRead` gate.
+        if (status === CommentStatus.INBOX && !isRead) shouldUnarchive = true;
         await prisma.$transaction(async (tx) => {
           await tx.comment.create({
             data: {
@@ -274,6 +389,7 @@ export async function mergeExtensionSuggestions(
               suggestionType: actionType,
               suggestionContentHash: contentHash,
               status,
+              isRead,
               ...commentData,
             },
           });
