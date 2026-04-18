@@ -78,7 +78,11 @@
       // On Google Docs pages, track this tab so comment navigation can reuse it
       // instead of opening a new one when the user clicks Open in Docreview
       if (docsEnabled && docId) {
-        chrome.runtime.sendMessage({ type: 'trackDocTab', docId: docId });
+        try {
+          chrome.runtime.sendMessage({ type: 'trackDocTab', docId: docId });
+        } catch(e) {
+          console.warn('[docreview] extension context invalidated, skipping trackDocTab:', e);
+        }
       }
       window.open(openUrl, '_blank');
     }, true);
@@ -365,7 +369,11 @@
     link.addEventListener('click', function(e) {
       e.preventDefault();
       e.stopPropagation();
-      chrome.runtime.sendMessage({ type: 'openDocInDocreview' });
+      try {
+        chrome.runtime.sendMessage({ type: 'openDocInDocreview' });
+      } catch(e) {
+        console.warn('[docreview] extension context invalidated, skipping openDocInDocreview:', e);
+      }
     });
     var img = document.createElement('img');
     img.src = iconUrl;

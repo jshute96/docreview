@@ -286,7 +286,7 @@ For each entry, it queries matching tabs and re-injects the script files. Loadin
 
 **Why this is safe:**
 - Icon injection functions guard against duplicates (check for existing `.dr-link` / `.dr-gmail-bar` elements).
-- Old orphaned listeners still fire but their `chrome.runtime.sendMessage` calls fail silently (already wrapped in try/catch).
+- Old orphaned listeners still fire but their `chrome.runtime.sendMessage` calls are wrapped in try/catch that logs a warning (`[docreview] extension context invalidated, skipping ...`) instead of throwing.
 - The orphaned bridge suppresses "Extension context invalidated" errors instead of posting error responses to the web app, so the new bridge's responses arrive cleanly.
 
 **What this fixes:** After reloading the extension, comment activity auto-sync and `docReady` notifications resume immediately on existing Google Docs tabs. The docreview bridge also reconnects, so `commentSynced` notifications and all request/response message flows work without reloading the docreview page. Currently all content script setup is idempotent, so no manual tab reloads are required.
