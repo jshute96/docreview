@@ -708,7 +708,11 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     )}
     {hasBeenExpanded && (
       <tr className={`${expanded && !isExiting ? "border-b border-zinc-100" : ""}${isExiting ? " pointer-events-none" : ""}`}>
-        <td colSpan={5} className="p-0">
+        {/* max-w-0 + overflow-hidden: prevents the thread panel's intrinsic
+            width (textarea, buttons) from leaking into the table's auto-layout
+            column-width calculation. Without this, expanding a thread or
+            typing in the reply box shifts the header row's columns. */}
+        <td colSpan={5} className="max-w-0 overflow-hidden p-0">
           <div
             className="grid transition-[grid-template-rows] duration-200 ease-out"
             style={{ gridTemplateRows: expanded && !isExiting ? "1fr" : "0fr" }}
