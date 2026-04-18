@@ -610,10 +610,18 @@ function injectDiscoIdHelpers() {
   //
   // Logic:
   //   - Waits for the stream view container if page is still loading
-  //   - If stream items (docos-streamdocoview) already exist, returns immediately
-  //   - If pane is closed: opens it, waits for stream items, closes it
-  //   - If pane is already open: waits for stream items without closing
+  //   - If a previous call settled successfully and the items are still in the
+  //     DOM, returns immediately (short-circuit)
+  //   - Otherwise: opens the pane if closed, waits for the pane's stream view
+  //     to stop mutating for SETTLE_MS, then closes the pane if we opened it
+  //   - The settle wait is critical: Google populates the pane incrementally,
+  //     so checking "any item exists" resolves too early and we'd close the
+  //     pane before the full list is loaded
   var _loadAllPromise = null;
+  // Set to true after a successful settle. Gates the short-circuit so that
+  // leftover partial state from a timed-out previous call cannot masquerade
+  // as a complete load — we only trust DOM state we actually observed settle.
+  var _loadedSuccessfully = false;
   function loadAllComments() {
     if (_loadAllPromise) return _loadAllPromise;
     _loadAllPromise = _loadAllCommentsImpl().finally(function() { _loadAllPromise = null; });
@@ -621,10 +629,12 @@ function injectDiscoIdHelpers() {
   }
   function _loadAllCommentsImpl() {
     var TIMEOUT = 5000;
-    var POLL_MS = 200;
+    // Wait this long with no relevant mutations before declaring an element
+    // to have stopped changing. Matches setupDocReadyDetection's debounce.
+    var SETTLE_MS = 250;
     var deadline = Date.now() + TIMEOUT;
 
-    function timedOut() { return Date.now() >= deadline; }
+    function remaining() { return Math.max(0, deadline - Date.now()); }
 
     function streamViewExists() {
       return !!document.querySelector('#docos-stream-view');
@@ -634,25 +644,94 @@ function injectDiscoIdHelpers() {
       return !!document.querySelector('#docos-stream-view .docos-streamdocoview[role="listitem"]');
     }
 
-    // Google Docs shows a zero-state element when the comments pane is opened
-    // on a doc with no comments. This only exists after the pane has been
-    // opened (not in the initial page DOM), so it's a reliable signal that
-    // loading is complete with zero results.
+    // True when the comments pane is showing its empty-state UI, meaning the
+    // doc has zero comments of any kind. Docs with only resolved comments
+    // do NOT trigger this — their resolved comments render as
+    // .docos-streamdocoview listitems when the pane is opened and show up
+    // via hasStreamItems instead. So this is a reliable "nothing to load"
+    // signal; it does not misfire on the "anchored sidebar is empty, but
+    // resolved comments exist" case. Only exists after the pane has been
+    // opened at least once — not in the initial page DOM. Together,
+    // hasStreamItems || hasZeroState means "the pane has finished loading,
+    // we know its contents".
     function hasZeroState() {
       return !!document.querySelector('.docos-streampane-zero-state');
     }
 
-    function paneLoadingComplete() {
-      return hasStreamItems() || hasZeroState();
+    // The comments pane is inside .docs-docos-activity-sidebar and contains
+    // its own #docos-stream-view (distinct from the anchored sidebar's). We
+    // observe this specific stream view for settle — watching the anchored
+    // one would pick up unrelated mutations.
+    function getPaneStreamView() {
+      var panel = document.querySelector('.docs-docos-activity-sidebar');
+      return panel ? panel.querySelector('#docos-stream-view') : null;
     }
 
-    function poll(condFn) {
+    // Wait for an element matching `selector` to exist, bounded by the
+    // overall deadline. Resolves true on found, false on timeout.
+    function waitForSelector(selector) {
       return new Promise(function(resolve) {
-        if (condFn()) { resolve(true); return; }
-        var check = setInterval(function() {
-          if (condFn()) { clearInterval(check); resolve(true); }
-          else if (timedOut()) { clearInterval(check); resolve(false); }
-        }, POLL_MS);
+        if (document.querySelector(selector)) { resolve(true); return; }
+        var timeLeft = remaining();
+        if (timeLeft <= 0) { resolve(false); return; }
+        var hardTimer = null;
+        var observer = new MutationObserver(function() {
+          if (document.querySelector(selector)) {
+            observer.disconnect();
+            clearTimeout(hardTimer);
+            resolve(true);
+          }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        hardTimer = setTimeout(function() {
+          observer.disconnect();
+          resolve(false);
+        }, timeLeft);
+      });
+    }
+
+    // Wait for the pane's stream view to stop mutating for SETTLE_MS.
+    // Resolves true on settle, false on overall timeout.
+    async function waitForPaneSettle() {
+      // openCommentsPane resolves as soon as the sidebar is visible
+      // (offsetParent !== null), but Google's Closure code may not have
+      // constructed the pane's inner #docos-stream-view yet. Wait for that
+      // element to exist before observing — otherwise a null target would
+      // resolve false immediately and we'd report a spurious timeout on
+      // exactly the first-call cold-start we're trying to fix.
+      if (!(await waitForSelector('.docs-docos-activity-sidebar #docos-stream-view'))) {
+        return false;
+      }
+      var target = getPaneStreamView();
+      if (!target) return false; // belt-and-suspenders: selector matched, lookup should too
+
+      return new Promise(function(resolve) {
+        var settleTimer = null;
+        var hardTimer = null;
+        var observer = new MutationObserver(function() {
+          if (settleTimer) clearTimeout(settleTimer);
+          settleTimer = setTimeout(onSettled, SETTLE_MS);
+        });
+        function cleanup() {
+          observer.disconnect();
+          if (settleTimer) clearTimeout(settleTimer);
+          if (hardTimer) clearTimeout(hardTimer);
+        }
+        function onSettled() { cleanup(); resolve(true); }
+        function onTimeout() { cleanup(); resolve(false); }
+
+        observer.observe(target, { childList: true, subtree: true });
+        // Start the debounce optimistically — if no mutations arrive, the
+        // DOM is already stable and we'll resolve after SETTLE_MS.
+        settleTimer = setTimeout(onSettled, SETTLE_MS);
+        // Hard cap so we never wait past the overall deadline. Note: if
+        // remaining() < SETTLE_MS when we get here, the hard timer fires
+        // before the debounce settle — we report timeout even if the DOM
+        // is quiet. That's acceptable; it only happens when we've nearly
+        // exhausted the 5s budget already.
+        var timeLeft = remaining();
+        if (timeLeft > 0) hardTimer = setTimeout(onTimeout, timeLeft);
+        else onTimeout();
       });
     }
 
@@ -660,51 +739,62 @@ function injectDiscoIdHelpers() {
       console.log('[docreview] loadAllComments: starting');
 
       // Phase 1: Wait for Google Docs to create the stream view container
-      // (may not exist yet if page is still loading).
-      // View-only docs have no comment infrastructure at all (no stream view,
-      // no sidebar, no "Show all comments" button) — return immediately.
+      // (may not exist yet if page is still loading). View-only docs never
+      // get one, so we time out on them — acceptable since they have no
+      // comments to scrape anyway.
       if (!streamViewExists()) {
-        if (!document.querySelector('.docs-docos-activity-sidebar') &&
-            !document.querySelector('[aria-label*="Show all comments"]')) {
-          console.log('[docreview] loadAllComments: no comment infrastructure (view-only doc?)');
-          return;
-        }
         console.log('[docreview] loadAllComments: waiting for stream view');
-        if (!(await poll(streamViewExists))) {
-          console.log('[docreview] loadAllComments: stream view not found (page may still be loading)');
+        if (!(await waitForSelector('#docos-stream-view'))) {
+          console.log('[docreview] loadAllComments: stream view did not appear (view-only or slow-loading doc)');
           return;
         }
       }
 
-      // Phase 2: Already loaded (pane was previously opened)?
-      // Stream items appear for docs with comments; zero-state appears for empty docs.
-      if (paneLoadingComplete()) {
-        console.log('[docreview] loadAllComments: already loaded (hasStreamItems:',
-          hasStreamItems() + ', hasZeroState:', hasZeroState() + ')');
+      // Phase 2: If a previous call settled successfully and the DOM still
+      // reflects that state, skip reopening the pane.
+      // Why _loadedSuccessfully gate: without it, a previous call that timed
+      // out mid-load would leave a partial set of stream items in the DOM,
+      // and this check would incorrectly short-circuit subsequent calls —
+      // causing getComments() to return the partial list indefinitely.
+      if (_loadedSuccessfully && (hasStreamItems() || hasZeroState())) {
+        console.log('[docreview] loadAllComments: already loaded (cached settled state)');
         return;
       }
 
-      // Phase 3: Load the second list by opening the comments pane
+      // Phase 3: Open the pane if closed; then wait for the list to finish
+      // populating before returning. Google populates items incrementally,
+      // so "any item exists" is not a reliable done signal — we wait for
+      // mutations to settle.
       var wasOpen = isCommentsPaneOpen();
       if (!wasOpen) {
+        // The "Show all comments" toolbar button can lag behind the stream
+        // view during slow page loads. Wait for it before clicking so
+        // openCommentsPane isn't a silent no-op.
+        if (!(await waitForSelector('[aria-label*="Show all comments"]'))) {
+          console.log('[docreview] loadAllComments: "Show all comments" button did not appear');
+          return;
+        }
         console.log('[docreview] loadAllComments: opening comments pane');
         await openCommentsPane();
       } else {
-        console.log('[docreview] loadAllComments: pane already open, waiting for comments to load');
+        console.log('[docreview] loadAllComments: pane already open, waiting for items to settle');
       }
 
-      var loaded = await poll(paneLoadingComplete);
+      var settled = await waitForPaneSettle();
+      if (settled) _loadedSuccessfully = true;
 
       if (!wasOpen) {
         closeCommentsPane();
       }
 
-      if (!loaded) {
-        console.log('[docreview] loadAllComments: timeout waiting for comments pane to finish loading');
+      if (!settled) {
+        console.log('[docreview] loadAllComments: timeout waiting for pane to settle');
         return;
       }
 
-      console.log('[docreview] loadAllComments: done' + (hasStreamItems() ? '' : ' (no comments)') + (wasOpen ? ' (pane left open)' : ' (pane closed)'));
+      var itemCount = document.querySelectorAll('#docos-stream-view [role="listitem"]').length;
+      console.log('[docreview] loadAllComments: done (' + itemCount + ' listitem(s))' +
+        (wasOpen ? ' (pane left open)' : ' (pane closed)'));
     })();
   }
 

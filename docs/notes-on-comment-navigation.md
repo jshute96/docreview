@@ -213,6 +213,8 @@ This means **item references become stale** after any of these events. Code must
 
 **Lazy loading:** On initial page load, only open anchored comments are in the DOM. Resolved and unanchored comments are loaded when the comments pane is opened. Once loaded, they persist as hidden DOM elements even after the pane is closed.
 
+**Incremental population:** Items in the pane do not appear atomically — Google adds them one-at-a-time over 100s of ms (longer for large lists). Scrapers must wait for the pane's stream view to *stop mutating* (debounced MutationObserver) before reading, not merely for the first item to appear. Closing the pane too early leaves a partial set of items in the DOM, which then looks "already loaded" on subsequent checks — the root cause of a race condition fixed in `loadAllComments()`.
+
 **What we learned about reliable navigation:**
 - A single `.click()` on a listitem may not reliably select the comment, especially if the click triggers a document tab switch that rebuilds the DOM
 - The solution is click-then-refind-then-click: click once to navigate/switch tabs, wait for the DOM to settle (300ms), re-query to get a fresh item reference, then click again to ensure selection

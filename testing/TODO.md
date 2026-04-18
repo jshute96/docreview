@@ -474,11 +474,14 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] `getSuggestion(discoId)` finds suggestion in anchored view without opening pane
 - [ ] `getSuggestion(discoId)` opens pane and retries when suggestion not in anchored view
 - [ ] `getComments()` / `getSuggestions()` / `getCommentsAndSuggestions()` load all comments before returning
-- [ ] `loadAllComments()` no-ops when both lists already loaded
-- [ ] `loadAllComments()` opens pane, waits for stream items, closes pane when pane was closed
+- [ ] `loadAllComments()` short-circuits on subsequent calls after a successful settle, while items remain in the DOM
+- [ ] `loadAllComments()` opens pane, waits for pane stream view to stop mutating (250ms settle), closes pane when pane was closed
+- [ ] `loadAllComments()` returns full comment list on slow-loading docs (pane populates incrementally — no early close)
+- [ ] `loadAllComments()` recovers on second call if first call timed out mid-load (partial DOM state must not be treated as complete)
 - [ ] `loadAllComments()` waits without closing when pane was already open
+- [ ] `loadAllComments()` waits for the "Show all comments" button to appear before clicking (slow page loads)
 - [ ] `loadAllComments()` detects zero-state on doc with no comments (returns quickly, no 5s timeout)
-- [ ] `loadAllComments()` returns immediately on view-only doc (no comment infrastructure)
+- [ ] `loadAllComments()` returns for view-only doc (bounded by 5s deadline; doesn't hang)
 - [ ] Refresh comment thread on comments/ page gets `originalContentDeleted` from extension
 
 ### Content Script Re-injection on Extension Reload
