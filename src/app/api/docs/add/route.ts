@@ -5,6 +5,7 @@ import { parseGoogleDocId, driveUrlFor } from "@/lib/google-drive";
 import { addDoc, validateDocInputs } from "@/lib/add-doc";
 import { docWithCountsInclude, withCommentCounts, stripServerOnly } from "@/lib/doc-queries";
 import { runWithRequestId } from "@/lib/request-context";
+import { DocRole, DocStatus } from "@prisma/client";
 
 export async function POST(req: NextRequest) {
   return runWithRequestId("POST", req, async () => {
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
     labelIds?: string[];
     isStarred?: boolean;
     notes?: string;
-    status?: "INBOX" | "ARCHIVED";
+    status?: DocStatus;
     title?: string;
   };
 
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
         where: { docId: existing.docId },
         data: {
           notes: notes || null,
-          status: status ?? "INBOX",
+          status: status ?? DocStatus.INBOX,
           ...(isStarred !== undefined ? { isStarred } : {}),
         },
       }),
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
       title: customTitle || "Unknown title",
       driveUrl: driveUrlFor(fileId),
       mimeType: "application/vnd.google-apps.document",
-      role: "REVIEWER",
+      role: DocRole.REVIEWER,
       lastModifiedInDrive: now,
       createdTimeInDrive: now,
     },

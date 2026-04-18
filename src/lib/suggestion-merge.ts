@@ -4,6 +4,7 @@ import { computeSuggestionHash, gmailActionToSuggestionType } from "@/lib/sugges
 import { bumpLastCommentActivity } from "@/lib/sync-comments";
 import { parseGmailNotificationFromParsed, type ParsedEmail } from "@/lib/parse-gmail-notification";
 import type { Suggestion } from "@/lib/parse-gmail-notification";
+import { CommentStatus, CommentType } from "@prisma/client";
 
 // Merges suggestion data from a Gmail notification into existing suggestion records
 // (created by Drive sync) or creates new records if Gmail arrived first.
@@ -53,7 +54,7 @@ export async function mergeSuggestionsFromGmail(
     const candidates = await prisma.comment.findMany({
       where: {
         docId,
-        type: "SUGGESTION",
+        type: CommentType.SUGGESTION,
         suggestionContentHash: contentHash,
         // Only match rows that don't already have a googleCommentId
         googleCommentId: null,
@@ -68,7 +69,7 @@ export async function mergeSuggestionsFromGmail(
       logInfo(`[Suggestions:Gmail] ${googleDocId}: merged ${suggestion.discussionId} into ${candidates[0].commentId} by hash`);
       // Gmail notification = interesting activity → promote ARCHIVED to INBOX
       // but respect MUTED (user explicitly silenced this thread).
-      const promoteStatus = candidates[0].status === "ARCHIVED" ? "INBOX" : undefined;
+      const promoteStatus = candidates[0].status === CommentStatus.ARCHIVED ? CommentStatus.INBOX : undefined;
       // Use the last reply's timestamp as driveModifiedAt if available,
       // keeping the later of the existing value and the new one.
       const lastReply = suggestion.replies[suggestion.replies.length - 1];
@@ -99,11 +100,11 @@ export async function mergeSuggestionsFromGmail(
           data: {
             docId,
             googleCommentId: suggestion.discussionId || null,
-            type: "SUGGESTION",
+            type: CommentType.SUGGESTION,
             suggestionType: actionType,
             suggestionContentHash: contentHash,
             resolved: false,
-            status: "INBOX",
+            status: CommentStatus.INBOX,
             driveCreatedAt: sugCreatedAt,
             driveModifiedAt: sugCreatedAt,
             replyCount: suggestion.replies.length,

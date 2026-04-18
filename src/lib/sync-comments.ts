@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { fetchCommentData, fetchDocData, fetchThreadDetail, getDriveClient } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { computeSuggestionHash } from "@/lib/suggestion-hash";
-import type { Doc, Comment, Prisma, CommentStatus, DocStatus } from "@prisma/client";
+import { CommentStatus, CommentType, DocRole, DocStatus, type Doc, type Comment, type Prisma } from "@prisma/client";
 import type { DriveComment, DriveSuggestion, CommentThread, ThreadDetailResult } from "@/lib/google-drive";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
@@ -163,7 +163,7 @@ export async function syncSingleComment(
 
   // Look up existing DB record
   const existing = await prisma.comment.findFirst({
-    where: { docId: doc.docId, googleCommentId, type: "COMMENT" },
+    where: { docId: doc.docId, googleCommentId, type: CommentType.COMMENT },
   });
 
   // --- Comment deleted from Drive ---
@@ -395,7 +395,7 @@ async function syncDriveComments(
   // Batch-fetch all existing comments for this doc to avoid N+1 queries
   const existingComments = new Map(
     (await prisma.comment.findMany({
-      where: { docId: doc.docId, type: "COMMENT" },
+      where: { docId: doc.docId, type: CommentType.COMMENT },
     })).map((c) => [c.googleCommentId, c])
   );
 
@@ -460,11 +460,11 @@ export function computeInitialInboxStatus(opts: {
   isDocAuthor: boolean;
   isThreadAuthor: boolean;
   isReplyAuthor: boolean;
-}): "INBOX" | "ARCHIVED" {
-  if (opts.mentionedOrAssigned) return "INBOX";
-  if (opts.resolved) return "ARCHIVED";
-  if (opts.isDocAuthor || opts.isThreadAuthor || opts.isReplyAuthor) return "INBOX";
-  return "ARCHIVED";
+}): typeof CommentStatus.INBOX | typeof CommentStatus.ARCHIVED {
+  if (opts.mentionedOrAssigned) return CommentStatus.INBOX;
+  if (opts.resolved) return CommentStatus.ARCHIVED;
+  if (opts.isDocAuthor || opts.isThreadAuthor || opts.isReplyAuthor) return CommentStatus.INBOX;
+  return CommentStatus.ARCHIVED;
 }
 
 /**
@@ -479,7 +479,7 @@ function buildNewComment(
   const status = computeInitialInboxStatus({
     mentionedOrAssigned,
     resolved: c.resolved,
-    isDocAuthor: doc.role === "AUTHOR",
+    isDocAuthor: doc.role === DocRole.AUTHOR,
     isThreadAuthor: c.isThreadAuthor,
     isReplyAuthor: c.isReplyAuthor,
   });
@@ -487,7 +487,7 @@ function buildNewComment(
   const record: Prisma.CommentCreateManyInput = {
     docId: doc.docId,
     googleCommentId: c.id,
-    type: "COMMENT",
+    type: CommentType.COMMENT,
     resolved: c.resolved,
     isThreadAuthor: c.isThreadAuthor,
     isReplyAuthor: c.isReplyAuthor,
@@ -503,7 +503,7 @@ function buildNewComment(
 
   // Doc-level unarchive: new INBOX comment triggers unarchive, but not if
   // already read (my own activity shouldn't resurface an archived doc).
-  const unarchive = status === "INBOX" && !c.isRead;
+  const unarchive = status === CommentStatus.INBOX && !c.isRead;
 
   return { record, unarchive };
 }
@@ -532,7 +532,7 @@ async function updateExistingComment(
     (c.replyAssignedToMeFlags ?? []).slice(existing.replyCount).some(Boolean);
 
   // MUTED fast-path: update metadata but preserve MUTED status unless @-mentioned or assigned
-  if (existing.status === "MUTED" && !newReplyMentionsMe && !newReplyAssignsMe) {
+  if (existing.status === CommentStatus.MUTED && !newReplyMentionsMe && !newReplyAssignsMe) {
     const { changed, data } = buildCommentUpdate(existing, c);
     let comment = existing;
     if (changed) {
@@ -545,7 +545,7 @@ async function updateExistingComment(
     return { comment, updated: changed, unarchive: false };
   }
 
-  const previousStatus = existing.status as "INBOX" | "ARCHIVED" | "MUTED";
+  const previousStatus = existing.status;
 
   // Determine the target status using spec rules (first matching rule wins)
   const status = computeCommentStatus(doc, c, existing, previousStatus, hasNewActivity, hasNewReplies, newReplyMentionsMe, newReplyAssignsMe);
@@ -554,11 +554,11 @@ async function updateExistingComment(
   let unarchive = false;
   if (!c.isRead) {
     // 1. Comment transitions from non-INBOX to INBOX
-    if (previousStatus !== "INBOX" && status === "INBOX") unarchive = true;
+    if (previousStatus !== CommentStatus.INBOX && status === CommentStatus.INBOX) unarchive = true;
     // 2. Existing INBOX comment gets new replies (unless I resolved it myself)
-    if (previousStatus === "INBOX" && hasNewReplies && !(c.resolved && c.iResolvedIt)) unarchive = true;
+    if (previousStatus === CommentStatus.INBOX && hasNewReplies && !(c.resolved && c.iResolvedIt)) unarchive = true;
     // 3. INBOX comment resolved by someone else
-    if (previousStatus === "INBOX" && c.resolved && !c.iResolvedIt) unarchive = true;
+    if (previousStatus === CommentStatus.INBOX && c.resolved && !c.iResolvedIt) unarchive = true;
   }
 
   const { changed, data } = buildCommentUpdate(existing, c, status);
@@ -587,29 +587,29 @@ function computeCommentStatus(
   doc: Doc,
   c: DriveComment,
   existing: Comment,
-  previousStatus: "INBOX" | "ARCHIVED" | "MUTED",
+  previousStatus: CommentStatus,
   hasNewActivity: boolean,
   hasNewReplies: boolean,
   newReplyMentionsMe: boolean,
   newReplyAssignsMe: boolean,
-): "INBOX" | "ARCHIVED" | "MUTED" {
-  if (newReplyMentionsMe || newReplyAssignsMe) return "INBOX";
-  if (c.resolved && c.iResolvedIt) return "ARCHIVED";
+): CommentStatus {
+  if (newReplyMentionsMe || newReplyAssignsMe) return CommentStatus.INBOX;
+  if (c.resolved && c.iResolvedIt) return CommentStatus.ARCHIVED;
 
   if (hasNewActivity) {
     // I was mentioned or assigned anywhere in the thread — new activity brings
     // it back to INBOX (even if I previously archived it). MUTED comments never
     // reach here (handled by the fast-path in updateExistingComment).
     const mentionedInThread = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
-    if (mentionedInThread || c.assignedToMe) return "INBOX";
-    if (doc.role === "AUTHOR") return "INBOX";
+    if (mentionedInThread || c.assignedToMe) return CommentStatus.INBOX;
+    if (doc.role === DocRole.AUTHOR) return CommentStatus.INBOX;
     if (c.isThreadAuthor && hasNewReplies) {
       // Only INBOX if someone else replied (not just my own self-replies)
       const newReplies = c.replyAuthorMeFlags.slice(existing.replyCount);
-      if (newReplies.some((me) => !me)) return "INBOX";
+      if (newReplies.some((me) => !me)) return CommentStatus.INBOX;
     } else if (c.isReplyAuthor && !c.isThreadAuthor) {
       // I participated on someone else's thread — any activity → INBOX
-      return "INBOX";
+      return CommentStatus.INBOX;
     }
   }
 
@@ -681,7 +681,7 @@ async function syncDocsSuggestions(
   // Build lookup maps: by googleSuggestionId (primary) and by content hash
   // (fallback for Gmail-first rows that don't have a googleSuggestionId yet).
   const allExisting = await prisma.comment.findMany({
-    where: { docId: doc.docId, type: "SUGGESTION" },
+    where: { docId: doc.docId, type: CommentType.SUGGESTION },
     select: { commentId: true, googleSuggestionId: true, suggestionType: true, suggestionContentHash: true },
   });
 
@@ -727,15 +727,15 @@ async function syncDocsSuggestions(
       toCreate.push({
         docId: doc.docId,
         googleSuggestionId: s.id,
-        type: "SUGGESTION",
+        type: CommentType.SUGGESTION,
         suggestionType: s.suggestionType,
         suggestionContentHash: contentHash,
         resolved: false,
-        status: doc.role === "AUTHOR" ? "INBOX" : "ARCHIVED",
+        status: doc.role === DocRole.AUTHOR ? CommentStatus.INBOX : CommentStatus.ARCHIVED,
         driveCreatedAt: sugCreatedAt,
         driveModifiedAt: sugCreatedAt,
       });
-      if (doc.role === "AUTHOR") shouldUnarchive = true;
+      if (doc.role === DocRole.AUTHOR) shouldUnarchive = true;
     } else {
       // Update fields that may have changed or been missing (e.g., Gmail-first row
       // that needs googleSuggestionId filled in by Drive sync)
@@ -769,7 +769,7 @@ async function syncDocsSuggestions(
   // from their absence.  Those will be resolved when the extension reports
   // accepted/rejected status.
   const activeSuggestions = await prisma.comment.findMany({
-    where: { docId: doc.docId, type: "SUGGESTION", resolved: false, googleSuggestionId: { not: null } },
+    where: { docId: doc.docId, type: CommentType.SUGGESTION, resolved: false, googleSuggestionId: { not: null } },
   });
   const toResolve = activeSuggestions.filter(s => !liveIds.has(s.googleSuggestionId!));
 
@@ -784,13 +784,13 @@ async function syncDocsSuggestions(
   if (toResolve.length > 0) {
     // Batch-resolve all absent suggestions + bump in one transaction.
     // INBOX suggestions move to ARCHIVED; MUTED stays MUTED.
-    const resolveInbox = toResolve.filter(s => s.status === "INBOX").map(s => s.commentId);
-    const resolveOther = toResolve.filter(s => s.status !== "INBOX").map(s => s.commentId);
+    const resolveInbox = toResolve.filter(s => s.status === CommentStatus.INBOX).map(s => s.commentId);
+    const resolveOther = toResolve.filter(s => s.status !== CommentStatus.INBOX).map(s => s.commentId);
     await prisma.$transaction(async (tx) => {
       if (resolveInbox.length > 0) {
         await tx.comment.updateMany({
           where: { commentId: { in: resolveInbox } },
-          data: { resolved: true, status: "ARCHIVED" },
+          data: { resolved: true, status: CommentStatus.ARCHIVED },
         });
       }
       if (resolveOther.length > 0) {
@@ -822,8 +822,8 @@ export async function unarchiveDocIfNeeded(
   docStatus: DocStatus,
   shouldUnarchive: boolean,
 ): Promise<boolean> {
-  if (docStatus === "ARCHIVED" && shouldUnarchive) {
-    await prisma.doc.update({ where: { docId }, data: { status: "INBOX" } });
+  if (docStatus === DocStatus.ARCHIVED && shouldUnarchive) {
+    await prisma.doc.update({ where: { docId }, data: { status: DocStatus.INBOX } });
     logInfo(`[Sync] Unarchived doc ${docId} — comment/suggestion moved to INBOX`);
     return true;
   }

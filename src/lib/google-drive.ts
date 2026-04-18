@@ -3,7 +3,7 @@ import { docs as createDocs, type docs_v1 } from "@googleapis/docs";
 import { OAuth2Client } from "google-auth-library";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { SuggestionType } from "@prisma/client";
+import { DocRole, SuggestionType } from "@prisma/client";
 import { OFFLINE_MODE, OfflineModeError } from "@/lib/offline";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { withProgressLogging } from "./promise-utils";
@@ -125,7 +125,7 @@ export interface DriveDoc {
   title: string;
   driveUrl: string;
   mimeType: string;
-  role: "AUTHOR" | "REVIEWER";
+  role: DocRole;
   lastModifiedInDrive: Date | null;
   createdTimeInDrive: Date | null;
 }
@@ -729,7 +729,7 @@ export async function fetchDocData(
       suggestionContent[id] = { insertedText: "", deletedText: "", description, anchorText: insertedText };
       suggestions.push({
         id,
-        suggestionType: "OTHER",
+        suggestionType: SuggestionType.OTHER,
         insertedText: "",
         deletedText: "",
         description,
@@ -738,7 +738,7 @@ export async function fetchDocData(
       suggestionContent[id] = { insertedText, deletedText, ...(description ? { description } : {}), ...(anchorText ? { anchorText } : {}) };
       suggestions.push({
         id,
-        suggestionType: hasInsert && hasDelete ? "EDIT" : hasInsert ? "INSERT" : "DELETE",
+        suggestionType: hasInsert && hasDelete ? SuggestionType.EDIT : hasInsert ? SuggestionType.INSERT : SuggestionType.DELETE,
         insertedText,
         deletedText,
         ...(description ? { description } : {}),
@@ -754,7 +754,7 @@ export async function fetchDocData(
     suggestionContent[id] = { insertedText: "", deletedText: "", description, ...(anchorText ? { anchorText } : {}) };
     suggestions.push({
       id,
-      suggestionType: "OTHER",
+      suggestionType: SuggestionType.OTHER,
       insertedText: "",
       deletedText: "",
       description,
@@ -1013,7 +1013,7 @@ export async function listChanges(
       title: file.name,
       driveUrl: driveUrlFor(file.id, file.webViewLink),
       mimeType: file.mimeType,
-      role: isOwner ? "AUTHOR" : "REVIEWER",
+      role: isOwner ? DocRole.AUTHOR : DocRole.REVIEWER,
       lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,
       createdTimeInDrive: file.createdTime ? new Date(file.createdTime) : null,
     });
@@ -1054,7 +1054,7 @@ export async function fetchDocsByIds(
           title: file.name ?? id,
           driveUrl: driveUrlFor(id, file.webViewLink),
           mimeType: file.mimeType ?? "",
-          role: (isOwner ? "AUTHOR" : "REVIEWER") as "AUTHOR" | "REVIEWER",
+          role: isOwner ? DocRole.AUTHOR : DocRole.REVIEWER,
           lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,
           createdTimeInDrive: file.createdTime ? new Date(file.createdTime) : null,
         };
@@ -1142,7 +1142,7 @@ export async function listRecentDocs(
         title: file.name,
         driveUrl: driveUrlFor(file.id, file.webViewLink),
         mimeType: file.mimeType ?? "",
-        role: isOwner ? "AUTHOR" : "REVIEWER",
+        role: isOwner ? DocRole.AUTHOR : DocRole.REVIEWER,
         lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,
         createdTimeInDrive: file.createdTime ? new Date(file.createdTime) : null,
       });

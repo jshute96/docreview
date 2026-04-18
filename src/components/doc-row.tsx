@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { AccessState, DocRole, DocStatus } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import { LabelBadge } from "@/components/label-badge";
 import { ROLE_COLORS } from "@/lib/role-colors";
@@ -36,7 +37,7 @@ export function DocRow({
     setArchiving(true);
     const contextId = generateContextId();
     try {
-      const newStatus = doc.status === "INBOX" ? "ARCHIVED" : "INBOX";
+      const newStatus = doc.status === DocStatus.INBOX ? DocStatus.ARCHIVED : DocStatus.INBOX;
       const res = await apiFetch(`/api/docs/${doc.docId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -47,7 +48,7 @@ export function DocRow({
       const updated: DocWithLabels = await res.json();
       onUpdate(updated);
       broadcastChange({ type: "docs", docIds: [doc.docId] }, contextId);
-      toast.success(newStatus === "ARCHIVED" ? "Archived" : "Unarchived");
+      toast.success(newStatus === DocStatus.ARCHIVED ? "Archived" : "Unarchived");
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to update status");
     } finally {
@@ -78,7 +79,7 @@ export function DocRow({
   }
 
   const hasNotes = !!doc.notes?.trim();
-  const notOk = doc.accessState !== "OK";
+  const notOk = doc.accessState !== AccessState.OK;
   const hasSubline = hasNotes || notOk;
   const notesTooltip = hasNotes
     ? doc.notes!.split("\n").slice(0, 20).join("\n") + (doc.notes!.split("\n").length > 20 ? "\n…" : "")
@@ -112,7 +113,7 @@ export function DocRow({
               {highlightText(cachedTitle || doc.title || "Unknown title", searchFilter)}
             </span>
           </a>
-          {doc.role === "AUTHOR" && (
+          {doc.role === DocRole.AUTHOR && (
             <span title="You are an author of this document" className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>
               Author
             </span>
@@ -123,9 +124,9 @@ export function DocRow({
         </div>
         {(notOk || hasNotes) && (
           <p className="truncate text-sm text-zinc-400 w-0 min-w-full" title={notesTooltip}>
-            {doc.accessState === "DENIED" && <span className="text-red-500">(Permission denied) </span>}
-            {doc.accessState === "TRASHED" && <span className="text-red-500">(In trash) </span>}
-            {doc.accessState === "NOT_FOUND" && <span className="text-red-500">(Not accessible) </span>}
+            {doc.accessState === AccessState.DENIED && <span className="text-red-500">(Permission denied) </span>}
+            {doc.accessState === AccessState.TRASHED && <span className="text-red-500">(In trash) </span>}
+            {doc.accessState === AccessState.NOT_FOUND && <span className="text-red-500">(Not accessible) </span>}
             {hasNotes && (
               <>
                 <span className="text-zinc-500">Notes: </span>
@@ -169,11 +170,11 @@ export function DocRow({
             variant="outline"
             size="sm"
             className="h-6 px-2 text-xs"
-            title={doc.status === "INBOX" ? "Archive this document" : "Move to inbox"}
+            title={doc.status === DocStatus.INBOX ? "Archive this document" : "Move to inbox"}
             onClick={handleArchive}
             disabled={archiving}
           >
-            {doc.status === "INBOX" ? "Archive" : "Unarchive"}
+            {doc.status === DocStatus.INBOX ? "Archive" : "Unarchive"}
           </Button>
         </div>
       </td>

@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import { apiFetch, isAuthError } from "@/lib/api-fetch";
 import { AlertTriangle, CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { DocStatus } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import { LabelPicker } from "@/components/label-picker";
 import { DocTypeIcon } from "@/components/doc-type-icon";
@@ -181,7 +182,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
           setSelectedLabelIds((data.labels as string[]) ?? []);
           setIsStarred((data.isStarred as boolean) ?? false);
           setNotes((data.notes as string) ?? "");
-          setAddAsActive(data.status === "INBOX");
+          setAddAsActive(data.status === DocStatus.INBOX);
         } else {
           setIsExisting(false);
           setExistingDocId(null);
@@ -340,7 +341,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
             labelIds: selectedLabelIds,
             isStarred,
             notes,
-            status: addToInbox ? "INBOX" : "ARCHIVED",
+            status: addToInbox ? DocStatus.INBOX : DocStatus.ARCHIVED,
             ...(permissionDenied && validTitle ? { title: validTitle } : {}),
           }),
         });

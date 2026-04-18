@@ -2,6 +2,7 @@ import type { DocWithLabels } from "@/types";
 import type { TriState } from "./tri-state";
 import { partitionTriState } from "./tri-state";
 import { matchesFilter } from "./highlight";
+import { DocRole, DocStatus } from "@prisma/client";
 
 export type SortCol = "title" | "lastCommentActivity" | "unread" | "inbox" | "open";
 export type SortDir = "asc" | "desc";
@@ -27,8 +28,8 @@ export function filterDocs(
 
   return docs.filter((doc) => {
     // isInbox: include = inbox only, exclude = archived only, off = all
-    if (opts.isInbox === "include" && doc.status === "ARCHIVED") return false;
-    if (opts.isInbox === "exclude" && doc.status !== "ARCHIVED") return false;
+    if (opts.isInbox === "include" && doc.status === DocStatus.ARCHIVED) return false;
+    if (opts.isInbox === "exclude" && doc.status !== DocStatus.ARCHIVED) return false;
 
     // hasComments: include = only with comments, exclude = only without
     if (opts.hasComments === "include" && doc._count.openComments === 0)
@@ -37,8 +38,8 @@ export function filterDocs(
       return false;
 
     // isAuthor: include = AUTHOR only, exclude = non-AUTHOR only
-    if (opts.isAuthor === "include" && doc.role !== "AUTHOR") return false;
-    if (opts.isAuthor === "exclude" && doc.role === "AUTHOR") return false;
+    if (opts.isAuthor === "include" && doc.role !== DocRole.AUTHOR) return false;
+    if (opts.isAuthor === "exclude" && doc.role === DocRole.AUTHOR) return false;
 
     // isStarred: include = starred only, exclude = unstarred only
     if (opts.isStarred === "include" && !doc.isStarred) return false;

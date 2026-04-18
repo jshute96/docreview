@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { logInfo } from "@/lib/log";
 import { bumpLastCommentActivity } from "@/lib/sync-comments";
 import { parseGmailNotificationFromParsed, type ParsedEmail } from "@/lib/parse-gmail-notification";
+import { CommentStatus, CommentType } from "@prisma/client";
 
 /**
  * Merges comment data from a Gmail notification into the database.
@@ -67,9 +68,9 @@ export async function mergeCommentsFromGmail(
         data: {
           docId,
           googleCommentId: thread.discussionId,
-          type: "COMMENT",
+          type: CommentType.COMMENT,
           resolved: false,
-          status: "INBOX",
+          status: CommentStatus.INBOX,
           mentionedMe: true,
           mentionedMeUnreplied: true,
           assignedToMe: thread.assignedTo === "you",

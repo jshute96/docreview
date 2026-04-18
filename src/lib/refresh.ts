@@ -18,7 +18,7 @@ import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "@/lib/
 import { logWarning, logInfo } from "@/lib/log";
 import { appendNotes, formatDate, pluralize } from "@/lib/utils";
 import type { OnProgress } from "@/lib/progress-events";
-import type { Doc } from "@prisma/client";
+import { AccessState, DocRole, DocStatus, type Doc } from "@prisma/client";
 import pLimit from "p-limit";
 
 export interface RefreshResult {
@@ -87,7 +87,7 @@ export async function upsertDocsAndSyncComments(
 
     // Refresh/full-refresh: auto-add new docs I authored; skip others.
     // Shared docs arrive via Gmail notifications instead.
-    if ((mode === "refresh" || mode === "full-refresh") && !isExisting && !fromGmail && doc.role !== "AUTHOR") {
+    if ((mode === "refresh" || mode === "full-refresh") && !isExisting && !fromGmail && doc.role !== DocRole.AUTHOR) {
       skipNotAuthor++;
       continue;
     }
@@ -111,7 +111,7 @@ export async function upsertDocsAndSyncComments(
         // All new docs discovered via Drive activity start as ARCHIVED to avoid noise
         // from old docs resurfacing. We rely on Gmail notifications or the
         // subsequent comment sync (Phase 3) to move them to INBOX if relevant.
-        status: fromGmail ? "INBOX" : "ARCHIVED",
+        status: fromGmail ? DocStatus.INBOX : DocStatus.ARCHIVED,
       },
       update: {
         title: "", // Clear any previously stored title
@@ -119,7 +119,7 @@ export async function upsertDocsAndSyncComments(
         mimeType: doc.mimeType,
         lastModifiedInDrive: doc.lastModifiedInDrive,
         createdTimeInDrive: doc.createdTimeInDrive,
-        accessState: "OK",
+        accessState: AccessState.OK,
       },
     });
 
@@ -130,14 +130,14 @@ export async function upsertDocsAndSyncComments(
     const shareNote = shareNotes?.get(doc.googleDocId);
     if (isExisting && shareNote) {
       const newNotes = appendNotes(result.notes, shareNote);
-      const unarchive = result.status === "ARCHIVED";
+      const unarchive = result.status === DocStatus.ARCHIVED;
       await prisma.doc.update({
         where: { docId: result.docId },
-        data: { notes: newNotes, ...(unarchive ? { status: "INBOX" } : {}) },
+        data: { notes: newNotes, ...(unarchive ? { status: DocStatus.INBOX } : {}) },
       });
       result.notes = newNotes;
       if (unarchive) {
-        result.status = "INBOX";
+        result.status = DocStatus.INBOX;
         unarchived++;
       }
     }
@@ -195,9 +195,9 @@ export async function upsertDocsAndSyncComments(
       }
       // Apply DB updates immediately so partial progress is visible on page reload
       if (result.isDeleted) {
-        await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "NOT_FOUND" } });
+        await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: AccessState.NOT_FOUND } });
         deleted++;
-      } else if (doc.status === "ARCHIVED" && result.shouldUnarchive) {
+      } else if (doc.status === DocStatus.ARCHIVED && result.shouldUnarchive) {
         // Note: result.permissionDenied means comment-level 403 (comments.list or
         // Docs API suggestions), NOT file-level. files.get already succeeded for
         // these docs, so accessState stays OK (see docs/access-states.md).
@@ -212,7 +212,7 @@ export async function upsertDocsAndSyncComments(
           }
         }
         if (recentEnough) {
-          await prisma.doc.update({ where: { docId: doc.docId }, data: { status: "INBOX" } });
+          await prisma.doc.update({ where: { docId: doc.docId }, data: { status: DocStatus.INBOX } });
           unarchived++;
         }
       }
@@ -270,21 +270,21 @@ async function markMissingAsDeletedOrDenied(
     if (trashedIds.has(id)) {
       // Only count as changed if the doc wasn't already TRASHED
       const result = await prisma.doc.updateMany({
-        where: { userId, googleDocId: id, accessState: { not: "TRASHED" } },
-        data: { accessState: "TRASHED" },
+        where: { userId, googleDocId: id, accessState: { not: AccessState.TRASHED } },
+        data: { accessState: AccessState.TRASHED },
       });
       count += result.count;
     } else if (deletedIds.has(id)) {
       // 404 is ambiguous for DENIED docs — keep DENIED state (see docs/access-states.md)
       const result = await prisma.doc.updateMany({
-        where: { userId, googleDocId: id, accessState: { notIn: ["DENIED", "NOT_FOUND"] } },
-        data: { accessState: "NOT_FOUND" },
+        where: { userId, googleDocId: id, accessState: { notIn: [AccessState.DENIED, AccessState.NOT_FOUND] } },
+        data: { accessState: AccessState.NOT_FOUND },
       });
       count += result.count;
     } else if (permissionDeniedIds.has(id)) {
       await prisma.doc.updateMany({
-        where: { userId, googleDocId: id, accessState: { not: "DENIED" } },
-        data: { accessState: "DENIED" },
+        where: { userId, googleDocId: id, accessState: { not: AccessState.DENIED } },
+        data: { accessState: AccessState.DENIED },
       });
     }
   }
@@ -313,7 +313,7 @@ async function handleMissingGmailDocs(
 export async function insertInaccessibleDocs(
   userId: string,
   docs: GmailInaccessibleDoc[],
-  options?: { labelIds?: string[]; extraNotes?: string; status?: "INBOX" | "ARCHIVED"; isStarred?: boolean },
+  options?: { labelIds?: string[]; extraNotes?: string; status?: DocStatus; isStarred?: boolean },
 ): Promise<number> {
   if (docs.length === 0) return 0;
 
@@ -341,8 +341,8 @@ export async function insertInaccessibleDocs(
             title: doc.title,
             driveUrl: driveUrlFor(doc.googleDocId),
             accessState: doc.accessState,
-            status: options?.status ?? "INBOX",
-            role: "REVIEWER",
+            status: options?.status ?? DocStatus.INBOX,
+            role: DocRole.REVIEWER,
             notes,
             isStarred: options?.isStarred ?? false,
             createdTimeInDrive: doc.emailDate,
@@ -639,7 +639,7 @@ export async function executeRefresh(
           const r = await mergeCommentsFromGmail(dbDoc.docId, dbDoc.googleDocId, email);
           if (r.shouldUnarchive) shouldUnarchive = true;
         }
-        if (shouldUnarchive && dbDoc.status === "ARCHIVED") {
+        if (shouldUnarchive && dbDoc.status === DocStatus.ARCHIVED) {
           let recentEnough = true;
           if (unarchiveCutoff) {
             const fresh = await prisma.doc.findUnique({ where: { docId: dbDoc.docId }, select: { lastCommentActivity: true } });
@@ -649,7 +649,7 @@ export async function executeRefresh(
             }
           }
           if (recentEnough) {
-            await prisma.doc.update({ where: { docId: dbDoc.docId }, data: { status: "INBOX" } });
+            await prisma.doc.update({ where: { docId: dbDoc.docId }, data: { status: DocStatus.INBOX } });
             gmailMergeUnarchived++;
           }
         }
@@ -671,14 +671,14 @@ export async function executeRefresh(
     const docsToTrash = await prisma.doc.findMany({
       where: {
         userId,
-        accessState: { not: "TRASHED" }, // Only count docs not already trashed
+        accessState: { not: AccessState.TRASHED }, // Only count docs not already trashed
         googleDocId: { in: [...trashedDocIdsFromDrive] },
       },
       select: { docId: true, googleDocId: true, title: true },
     });
     logInfo(`[Refresh] Drive: ${docsToTrash.length} of ${trashedDocIdsFromDrive.size} trashed were tracked docs`);
     for (const doc of docsToTrash) {
-      await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "TRASHED" } });
+      await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: AccessState.TRASHED } });
       extraDeleted++;
     }
   }
@@ -687,14 +687,14 @@ export async function executeRefresh(
     const docsToRemove = await prisma.doc.findMany({
       where: {
         userId,
-        accessState: { notIn: ["DENIED", "NOT_FOUND"] }, // Don't overwrite DENIED (404 ambiguity) or re-count NOT_FOUND
+        accessState: { notIn: [AccessState.DENIED, AccessState.NOT_FOUND] }, // Don't overwrite DENIED (404 ambiguity) or re-count NOT_FOUND
         googleDocId: { in: [...removedDocIdsFromDrive] },
       },
       select: { docId: true, googleDocId: true, title: true },
     });
     logInfo(`[Refresh] Drive: ${docsToRemove.length} of ${removedDocIdsFromDrive.size} removals were tracked docs`);
     for (const doc of docsToRemove) {
-      await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "NOT_FOUND" } });
+      await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: AccessState.NOT_FOUND } });
       extraDeleted++;
     }
   }

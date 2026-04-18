@@ -6,6 +6,10 @@ import { formatDate } from "@/lib/utils";
 import { extractBodyText, extractHtmlBody, extractDocId, parseShareNote } from "@/lib/gmail-parse";
 import { parseGmailNotificationFromParsed, type ParsedEmail } from "@/lib/parse-gmail-notification";
 import type { OnProgress } from "./progress-events";
+import { AccessState, DocRole } from "@prisma/client";
+
+/** AccessState values that mean "tracked but inaccessible". */
+type InaccessibleState = typeof AccessState.NOT_FOUND | typeof AccessState.DENIED;
 
 export interface GmailDocIdResult {
   docIds: string[];
@@ -66,13 +70,13 @@ export interface GmailScanDoc {
   title: string;
   mimeType: string;
   driveUrl: string;
-  role: "AUTHOR" | "REVIEWER";
+  role: DocRole;
 }
 
 export interface GmailInaccessibleDoc {
   googleDocId: string;
   title: string;
-  accessState: "NOT_FOUND" | "DENIED";
+  accessState: InaccessibleState;
   notes: string;
   emailDate: Date;
 }
@@ -252,7 +256,7 @@ export async function scanGmailForDocIds(
 export function buildInaccessibleDocs(
   failedDocIds: string[],
   emailMeta: Map<string, ParsedEmail[]>,
-  accessState: "NOT_FOUND" | "DENIED" = "NOT_FOUND",
+  accessState: InaccessibleState = AccessState.NOT_FOUND,
 ): GmailInaccessibleDoc[] {
   const results: GmailInaccessibleDoc[] = [];
   for (const docId of failedDocIds) {
@@ -260,7 +264,7 @@ export function buildInaccessibleDocs(
     const email = emails?.[0];
     if (!email) continue;
     try {
-      const stateLabel = accessState === "DENIED" ? "permission denied" : "not found";
+      const stateLabel = accessState === AccessState.DENIED ? "permission denied" : "not found";
       const dateRaw = email.headers.get("date") ?? "";
       const date = dateRaw ? new Date(dateRaw) : null;
       const dateStr = date && !isNaN(date.getTime()) ? formatDate(date, true) : dateRaw;
@@ -330,7 +334,7 @@ export async function scanGmailNotifications(
   let errorCount = scanErrors;
   let skipCount = 0;
   const results: GmailScanDoc[] = [];
-  const failedDocs: Array<{ docId: string; accessState: "NOT_FOUND" | "DENIED" }> = [];
+  const failedDocs: Array<{ docId: string; accessState: InaccessibleState }> = [];
 
   let completedCount = 0;
   onProgress?.({ phase: "metadata", completed: 0, total: docIds.length });
@@ -353,15 +357,15 @@ export async function scanGmailNotifications(
           title: file.name ?? docId,
           mimeType: file.mimeType ?? "",
           driveUrl: driveUrlFor(docId, file.webViewLink),
-          role: isOwner ? "AUTHOR" : "REVIEWER",
+          role: isOwner ? DocRole.AUTHOR : DocRole.REVIEWER,
         });
 
         logInfo(`[Gmail] Drive metadata for ${docId} (${Date.now() - t0}ms)`);
       } catch (err: any) {
         const code = err.code;
         if (code === 404 || code === 403) {
-          const accessState = code === 403 ? "DENIED" as const : "NOT_FOUND" as const;
-          logWarning(`[Gmail] Drive ${accessState === "DENIED" ? "permission denied" : "file not found"}: ${docId} (${Date.now() - t0}ms)`);
+          const accessState: InaccessibleState = code === 403 ? AccessState.DENIED : AccessState.NOT_FOUND;
+          logWarning(`[Gmail] Drive ${accessState === AccessState.DENIED ? "permission denied" : "file not found"}: ${docId} (${Date.now() - t0}ms)`);
           skipCount++;
           failedDocs.push({ docId, accessState });
         } else {
@@ -378,7 +382,7 @@ export async function scanGmailNotifications(
   // Build inaccessible doc entries from email metadata for failed Drive fetches
   // Group by accessState since buildInaccessibleDocs takes a single state
   const inaccessibleDocs: GmailInaccessibleDoc[] = [];
-  for (const state of ["NOT_FOUND", "DENIED"] as const) {
+  for (const state of [AccessState.NOT_FOUND, AccessState.DENIED] as const) {
     const ids = failedDocs.filter(f => f.accessState === state).map(f => f.docId);
     if (ids.length > 0) {
       inaccessibleDocs.push(...buildInaccessibleDocs(ids, emailMeta, state));

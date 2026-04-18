@@ -15,6 +15,7 @@ import { validateLabelOwnership } from "@/lib/add-doc";
 import { createProgressStream } from "@/lib/sse";
 import type { OnProgress } from "@/lib/progress-events";
 import pLimit from "p-limit";
+import { AccessState, DocRole, DocStatus } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
   return runWithRequestId("GET", req, async () => {
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
   const rawDocs = await prisma.doc.findMany({
     where: {
       userId,
-      ...(includeArchived ? {} : { status: "INBOX" }),
+      ...(includeArchived ? {} : { status: DocStatus.INBOX }),
       ...(labelIds.length > 0
         ? { labels: { some: { labelId: { in: labelIds } } } }
         : {}),
@@ -62,11 +63,11 @@ export async function POST(req: NextRequest) {
     : null;
   const loadLabelIds: string[] = Array.isArray(loadBody.labelIds) ? loadBody.labelIds as string[] : [];
   const loadNotes: string = typeof loadBody.notes === "string" ? (loadBody.notes as string).trim() : "";
-  const loadStatus: "INBOX" | "ARCHIVED" | undefined = typeof loadBody.status === "string" && (loadBody.status === "INBOX" || loadBody.status === "ARCHIVED") ? (loadBody.status as "INBOX" | "ARCHIVED") : undefined;
+  const loadStatus: DocStatus | undefined = typeof loadBody.status === "string" && (loadBody.status === DocStatus.INBOX || loadBody.status === DocStatus.ARCHIVED) ? loadBody.status as DocStatus : undefined;
   const loadIsStarred: boolean | undefined = typeof loadBody.isStarred === "boolean" ? loadBody.isStarred : undefined;
   const loadInaccessibleDocs: GmailInaccessibleDoc[] = Array.isArray(loadBody.inaccessibleDocs)
     ? (loadBody.inaccessibleDocs as any[])
-        .filter((d: any) => d.googleDocId && d.title && (d.accessState === "NOT_FOUND" || d.accessState === "DENIED"))
+        .filter((d: any) => d.googleDocId && d.title && (d.accessState === AccessState.NOT_FOUND || d.accessState === AccessState.DENIED))
         .map((d: any) => ({
           ...d,
           emailDate: d.emailDate ? new Date(d.emailDate) : new Date(),
@@ -96,7 +97,7 @@ async function executeLoad(opts: {
   selectedSet: Set<string> | null;
   loadLabelIds: string[];
   loadNotes: string;
-  loadStatus: "INBOX" | "ARCHIVED" | undefined;
+  loadStatus: DocStatus | undefined;
   loadIsStarred: boolean | undefined;
   loadInaccessibleDocs: GmailInaccessibleDoc[];
   send: OnProgress;
@@ -165,7 +166,7 @@ async function executeLoad(opts: {
         role: doc.role,
         lastModifiedInDrive: doc.lastModifiedInDrive,
         createdTimeInDrive: doc.createdTimeInDrive,
-        status: loadStatus ?? (doc.role === "AUTHOR" ? "INBOX" : "ARCHIVED"),
+        status: loadStatus ?? (doc.role === DocRole.AUTHOR ? DocStatus.INBOX : DocStatus.ARCHIVED),
         ...(loadIsStarred !== undefined ? { isStarred: loadIsStarred } : {}),
         ...(loadNotes ? { notes: loadNotes } : {}),
         ...(loadLabelIds.length > 0
@@ -178,8 +179,8 @@ async function executeLoad(opts: {
         mimeType: doc.mimeType,
         lastModifiedInDrive: doc.lastModifiedInDrive,
         createdTimeInDrive: doc.createdTimeInDrive,
-        accessState: "OK",
-        ...(loadStatus === "INBOX" ? { status: "INBOX" as const } : {}),
+        accessState: AccessState.OK,
+        ...(loadStatus === DocStatus.INBOX ? { status: DocStatus.INBOX } : {}),
         ...(loadIsStarred !== undefined ? { isStarred: loadIsStarred } : {}),
       },
       select: { docId: true, notes: true },
@@ -212,7 +213,7 @@ async function executeLoad(opts: {
 
   // Sync comments for docs returned by Drive
   const commentDocs = await prisma.doc.findMany({
-    where: { userId, accessState: "OK", googleDocId: { in: [...driveDocIds] } },
+    where: { userId, accessState: AccessState.OK, googleDocId: { in: [...driveDocIds] } },
   });
   logInfo(`[Sync] Syncing comments for ${commentDocs.length} docs (selected docs)`);
 
@@ -227,10 +228,10 @@ async function executeLoad(opts: {
       const result = await syncComments(doc, driveAuth, userEmail);
       // Apply DB updates immediately so partial progress is visible on page reload
       if (result.isDeleted) {
-        await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: "NOT_FOUND" } });
+        await prisma.doc.update({ where: { docId: doc.docId }, data: { accessState: AccessState.NOT_FOUND } });
         deleted++;
-      } else if (doc.status === "ARCHIVED" && result.shouldUnarchive) {
-        await prisma.doc.update({ where: { docId: doc.docId }, data: { status: "INBOX" } });
+      } else if (doc.status === DocStatus.ARCHIVED && result.shouldUnarchive) {
+        await prisma.doc.update({ where: { docId: doc.docId }, data: { status: DocStatus.INBOX } });
         unarchived++;
       }
       syncCompleted++;

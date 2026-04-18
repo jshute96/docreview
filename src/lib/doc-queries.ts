@@ -1,6 +1,7 @@
 /**
  * Shared Prisma include clauses and transform for docs.
  */
+import { CommentStatus } from "@prisma/client";
 
 /** Labels with their label relation, ordered by position */
 export const labelInclude = {
@@ -14,7 +15,7 @@ export const docWithCountsInclude = {
   comments: {
     where: {
       OR: [
-        { status: "INBOX" as const },
+        { status: CommentStatus.INBOX },
         { resolved: false as const }
       ]
     },
@@ -54,7 +55,7 @@ export function withCommentCounts<
   },
 >(doc: T) {
   const { comments, ...rest } = doc;
-  const isInbox = (c: (typeof comments)[number]) => c.status === "INBOX";
+  const isInbox = (c: (typeof comments)[number]) => c.status === CommentStatus.INBOX;
   return {
     ...rest,
     _count: {

@@ -7,6 +7,7 @@ import type { ThreadMap } from "@/lib/google-drive";
 import { bumpLastCommentActivity, syncSingleComment } from "@/lib/sync-comments";
 import { logError, logWarning } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
+import { CommentStatus, CommentType } from "@prisma/client";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 
@@ -153,7 +154,7 @@ export async function POST(
     const driveAuth = await getDriveClient(userId);
 
     // Suggestions live in the Docs API, not Drive comments
-    if (commentRecord.type === "SUGGESTION") {
+    if (commentRecord.type === CommentType.SUGGESTION) {
       if (doc.mimeType !== DOCS_MIME_TYPE) {
         return NextResponse.json({ comment: commentRecord, threads: {} });
       }
@@ -168,7 +169,7 @@ export async function POST(
             where: { commentId: commentRecord.commentId },
             data: {
               resolved: true,
-              status: commentRecord.status === "MUTED" ? commentRecord.status : "ARCHIVED",
+              status: commentRecord.status === CommentStatus.MUTED ? commentRecord.status : CommentStatus.ARCHIVED,
             },
           });
           await bumpLastCommentActivity(doc.docId, [now], tx);

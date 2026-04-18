@@ -7,6 +7,7 @@ import { upsertDocsAndSyncComments } from "@/lib/refresh";
 import { docWithCommentsInclude, stripServerOnly } from "@/lib/doc-queries";
 import { logError, logWarning } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
+import { AccessState, DocRole } from "@prisma/client";
 
 const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 const SLIDES_MIME_TYPE = "application/vnd.google-apps.presentation";
@@ -57,7 +58,7 @@ export async function POST(
       title: f.name!,
       driveUrl: driveUrlFor(f.id!, f.webViewLink),
       mimeType: f.mimeType!,
-      role: isOwner ? "AUTHOR" : "REVIEWER",
+      role: isOwner ? DocRole.AUTHOR : DocRole.REVIEWER,
       lastModifiedInDrive: f.modifiedTime ? new Date(f.modifiedTime) : null,
       createdTimeInDrive: f.createdTime ? new Date(f.createdTime) : null,
       trashed: f.trashed === true,
@@ -68,15 +69,15 @@ export async function POST(
     const code = (err as { code?: number })?.code;
     if (code === 404) {
       // 404 is ambiguous for DENIED docs (Google returns 404 for permission denied too)
-      if (doc.accessState !== "DENIED") {
+      if (doc.accessState !== AccessState.DENIED) {
         logWarning(`[Refresh] doc ${doc.docId} (${doc.googleDocId}) not found (code 404)`);
-        await prisma.doc.update({ where: { docId }, data: { accessState: "NOT_FOUND" } });
+        await prisma.doc.update({ where: { docId }, data: { accessState: AccessState.NOT_FOUND } });
       } else {
         logWarning(`[Refresh] doc ${doc.docId} (${doc.googleDocId}) still inaccessible (code 404, keeping DENIED)`);
       }
     } else if (code === 403) {
       logWarning(`[Refresh] doc ${doc.docId} (${doc.googleDocId}) permission denied (code 403)`);
-      await prisma.doc.update({ where: { docId }, data: { accessState: "DENIED" } });
+      await prisma.doc.update({ where: { docId }, data: { accessState: AccessState.DENIED } });
     } else {
       logError("[Refresh] Failed to refresh file metadata:", err);
     }
@@ -87,7 +88,7 @@ export async function POST(
 
   if (driveDoc) {
     if (driveDoc.trashed) {
-      await prisma.doc.update({ where: { docId }, data: { accessState: "TRASHED" } });
+      await prisma.doc.update({ where: { docId }, data: { accessState: AccessState.TRASHED } });
     } else {
       // Fetch comments+threads and doc content in parallel — each API is called
       // once, then the results feed both the DB sync and the client response.

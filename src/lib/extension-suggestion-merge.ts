@@ -20,7 +20,7 @@ import { computeSuggestionHash, gmailActionToSuggestionType } from "@/lib/sugges
 import { computeMentionedMeUnreplied } from "@/lib/google-drive";
 import { bumpLastCommentActivity, computeInitialInboxStatus } from "@/lib/sync-comments";
 import { parseExtensionTimestamp } from "@/lib/extension-suggestions";
-import type { Comment, Doc } from "@prisma/client";
+import { CommentStatus, CommentType, DocRole, type Comment, type Doc } from "@prisma/client";
 
 /** Shape of a single extension suggestion as received from the API request body. */
 export interface ExtensionSuggestionInput {
@@ -95,44 +95,44 @@ function computeSuggestionStatusUpdate(
   mention: { replyMentionFlags: boolean[]; replyAuthorMeFlags: boolean[] },
   iResolvedIt: boolean,
   lastResolveReply: ExtensionSuggestionInput["replies"][number] | undefined,
-): "INBOX" | "ARCHIVED" | undefined {
+): typeof CommentStatus.INBOX | typeof CommentStatus.ARCHIVED | undefined {
   const hasNewReplies = commentData.replyCount > existing.replyCount;
   const newReplyMentionsMe = hasNewReplies &&
     mention.replyMentionFlags.slice(existing.replyCount).some(Boolean);
 
   // New reply @-mentions me → INBOX (overrides MUTED)
-  if (newReplyMentionsMe) return "INBOX";
+  if (newReplyMentionsMe) return CommentStatus.INBOX;
 
   // MUTED without new mention → preserve (don't check further).
   // Must be before resolve rules so muted suggestions stay muted even on
   // accept/reject (consistent with comment behavior where the MUTED fast-path
   // fires before computeCommentStatus).
-  if (existing.status === "MUTED") return undefined;
+  if (existing.status === CommentStatus.MUTED) return undefined;
 
   // I accepted/rejected someone else's suggestion → ARCHIVED (parallels iResolvedIt)
-  if (commentData.resolved && iResolvedIt && !commentData.isThreadAuthor) return "ARCHIVED";
+  if (commentData.resolved && iResolvedIt && !commentData.isThreadAuthor) return CommentStatus.ARCHIVED;
 
   // My suggestion was accepted with no discussion replies → ARCHIVED (silent accept,
   // nothing interesting to see). Rejections or threads with replies stay — may need
   // follow-up. Applies regardless of who accepted it.
   if (commentData.resolved && commentData.isThreadAuthor && lastResolveReply?.action === "accept") {
     // Archive if the only reply is the accept action itself (no discussion)
-    if (commentData.replyCount <= 1) return "ARCHIVED";
+    if (commentData.replyCount <= 1) return CommentStatus.ARCHIVED;
   }
 
   // Check for new activity
   if (!hasNewReplies) return undefined;
 
   // With new activity, apply relevance rules
-  if (commentData.mentionedMe) return "INBOX";
-  if (doc.role === "AUTHOR") return "INBOX";
+  if (commentData.mentionedMe) return CommentStatus.INBOX;
+  if (doc.role === DocRole.AUTHOR) return CommentStatus.INBOX;
   if (commentData.isThreadAuthor) {
     // Only INBOX if someone else replied (not just my own self-replies)
     const newReplies = mention.replyAuthorMeFlags.slice(existing.replyCount);
-    if (newReplies.some((me) => !me)) return "INBOX";
+    if (newReplies.some((me) => !me)) return CommentStatus.INBOX;
   } else if (commentData.isReplyAuthor) {
     // I participated on someone else's suggestion — any activity → INBOX
-    return "INBOX";
+    return CommentStatus.INBOX;
   }
 
   return undefined;
@@ -198,7 +198,7 @@ export async function mergeExtensionSuggestions(
       logInfo(`[Suggestions:Ext] ${googleDocId}: ${s.id} already exists as ${existingById.commentId} — updating metadata`);
       if (commentData.resolved && !existingById.resolved) resolved++;
       const newStatus = computeSuggestionStatusUpdate(doc, existingById, commentData, mention, iResolvedIt, lastResolveReply);
-      if (newStatus === "INBOX" && existingById.status !== "INBOX") shouldUnarchive = true;
+      if (newStatus === CommentStatus.INBOX && existingById.status !== CommentStatus.INBOX) shouldUnarchive = true;
       await prisma.$transaction(async (tx) => {
         await tx.comment.update({
           where: { commentId: existingById.commentId },
@@ -215,7 +215,7 @@ export async function mergeExtensionSuggestions(
       const candidates = await prisma.comment.findMany({
         where: {
           docId,
-          type: "SUGGESTION",
+          type: CommentType.SUGGESTION,
           suggestionContentHash: contentHash,
           googleCommentId: null,
         },
@@ -233,17 +233,17 @@ export async function mergeExtensionSuggestions(
         // initial status may be wrong (e.g., ARCHIVED for a suggestion I created
         // on a REVIEWER doc). Re-evaluate with the now-available data.
         let newStatus = computeSuggestionStatusUpdate(doc, existing, commentData, mention, iResolvedIt, lastResolveReply);
-        if (!newStatus && existing.status === "ARCHIVED") {
+        if (!newStatus && existing.status === CommentStatus.ARCHIVED) {
           const shouldBe = computeInitialInboxStatus({
             mentionedOrAssigned: commentData.mentionedMe,
             resolved: commentData.resolved,
-            isDocAuthor: doc.role === "AUTHOR",
+            isDocAuthor: doc.role === DocRole.AUTHOR,
             isThreadAuthor: commentData.isThreadAuthor,
             isReplyAuthor: commentData.isReplyAuthor,
           });
-          if (shouldBe === "INBOX") newStatus = "INBOX";
+          if (shouldBe === CommentStatus.INBOX) newStatus = CommentStatus.INBOX;
         }
-        if (newStatus === "INBOX" && existing.status !== "INBOX") shouldUnarchive = true;
+        if (newStatus === CommentStatus.INBOX && existing.status !== CommentStatus.INBOX) shouldUnarchive = true;
         await prisma.$transaction(async (tx) => {
           await tx.comment.update({
             where: { commentId: existing.commentId },
@@ -268,17 +268,17 @@ export async function mergeExtensionSuggestions(
         const status = computeInitialInboxStatus({
           mentionedOrAssigned: commentData.mentionedMe,
           resolved: commentData.resolved || !!s.originalContentDeleted,
-          isDocAuthor: doc.role === "AUTHOR",
+          isDocAuthor: doc.role === DocRole.AUTHOR,
           isThreadAuthor: commentData.isThreadAuthor,
           isReplyAuthor: commentData.isReplyAuthor,
         });
-        if (status === "INBOX") shouldUnarchive = true;
+        if (status === CommentStatus.INBOX) shouldUnarchive = true;
         await prisma.$transaction(async (tx) => {
           await tx.comment.create({
             data: {
               docId,
               googleCommentId: s.id,
-              type: "SUGGESTION",
+              type: CommentType.SUGGESTION,
               suggestionType: actionType,
               suggestionContentHash: contentHash,
               status,
@@ -294,7 +294,7 @@ export async function mergeExtensionSuggestions(
 
   // Fetch final state of all suggestion records for this doc
   const comments = await prisma.comment.findMany({
-    where: { docId, type: "SUGGESTION" },
+    where: { docId, type: CommentType.SUGGESTION },
     orderBy: [{ googleSuggestionId: "asc" }, { googleCommentId: "asc" }],
   });
 

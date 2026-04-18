@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
-import type { Comment } from "@prisma/client";
+import { CommentStatus, CommentType, SuggestionType, type Comment } from "@prisma/client";
 import type { CommentThread, ThreadMap, SuggestionContent } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
 import { CommentThreadPanel } from "@/components/comment-thread-panel";
@@ -45,7 +45,7 @@ function splitContent(raw: string): { author: string | null; text: string } {
 }
 
 export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal, isSelected, onSelectInDoc, onSuggestionRefresh, userName, emptyMessage }: CommentRowProps) {
-  const isSuggestion = comment.type === "SUGGESTION";
+  const isSuggestion = comment.type === CommentType.SUGGESTION;
   const currentModifiedMs = comment.driveModifiedAt
     ? new Date(comment.driveModifiedAt).getTime()
     : 0;
@@ -379,10 +379,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       "Failed to post reply",
       "Reply posted",
     );
-    await updateStatus("ARCHIVED");
+    await updateStatus(CommentStatus.ARCHIVED);
   }
 
-  async function updateStatus(status: "INBOX" | "ARCHIVED" | "MUTED") {
+  async function updateStatus(status: CommentStatus) {
     setLoading(true);
     const contextId = generateContextId();
     try {
@@ -443,8 +443,8 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     }
   }
 
-  const isArchived = comment.status === "ARCHIVED";
-  const isMuted = comment.status === "MUTED";
+  const isArchived = comment.status === CommentStatus.ARCHIVED;
+  const isMuted = comment.status === CommentStatus.MUTED;
 
   const sameAsCreated =
     comment.driveCreatedAt &&
@@ -454,8 +454,8 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   const hasContentRow = isSuggestion || !!content;
   const cellPy = hasContentRow ? "pt-1.5 pb-0" : "py-1.5";
   const { author, text } = content ? splitContent(content) : { author: null, text: "" };
-  const isAssignedHighlight = comment.status === "INBOX" && comment.assignedToMe && !comment.resolved;
-  const isMentionedHighlight = !isAssignedHighlight && comment.status === "INBOX" && comment.mentionedMeUnreplied && !comment.isRead && !comment.resolved;
+  const isAssignedHighlight = comment.status === CommentStatus.INBOX && comment.assignedToMe && !comment.resolved;
+  const isMentionedHighlight = !isAssignedHighlight && comment.status === CommentStatus.INBOX && comment.mentionedMeUnreplied && !comment.isRead && !comment.resolved;
   const rowBg = isSelected
     ? (hovered ? "bg-blue-200" : "bg-blue-100")
     : isAssignedHighlight
@@ -480,11 +480,11 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   };
 
   const suggestionLabel =
-    comment.suggestionType === "INSERT"
+    comment.suggestionType === SuggestionType.INSERT
       ? "suggested add"
-      : comment.suggestionType === "DELETE"
+      : comment.suggestionType === SuggestionType.DELETE
       ? "suggested delete"
-      : comment.suggestionType === "OTHER"
+      : comment.suggestionType === SuggestionType.OTHER
       ? "suggested format change"
       : "suggested edit";
   const SuggestionLabel = suggestionLabel.charAt(0).toUpperCase() + suggestionLabel.slice(1);
@@ -502,9 +502,9 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         ? `Resolved ${suggestionLabel}`
         : !hasTextContent
           ? SuggestionLabel
-          : comment.suggestionType === "EDIT"
+          : comment.suggestionType === SuggestionType.EDIT
             ? `${SuggestionLabel}: ${suggestionContent!.deletedText} → ${suggestionContent!.insertedText}`
-            : comment.suggestionType === "DELETE"
+            : comment.suggestionType === SuggestionType.DELETE
               ? `${SuggestionLabel}: ${suggestionContent!.deletedText}`
               : `${SuggestionLabel}: ${suggestionContent!.insertedText}`;
 
@@ -513,13 +513,13 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     hasTextContent && suggestionContent ? (
       <span>
         <span className="text-zinc-500">{SuggestionLabel}: </span>
-        {(comment.suggestionType === "EDIT" || comment.suggestionType === "DELETE") && (
+        {(comment.suggestionType === SuggestionType.EDIT || comment.suggestionType === SuggestionType.DELETE) && (
           <span className="line-through text-red-400">{highlightText(suggestionContent.deletedText, searchFilter ?? "")}</span>
         )}
-        {comment.suggestionType === "EDIT" && (
+        {comment.suggestionType === SuggestionType.EDIT && (
           <span className="text-zinc-400"> → </span>
         )}
-        {(comment.suggestionType === "EDIT" || comment.suggestionType === "INSERT") && (
+        {(comment.suggestionType === SuggestionType.EDIT || comment.suggestionType === SuggestionType.INSERT) && (
           <span className="text-zinc-600">{highlightText(suggestionContent.insertedText, searchFilter ?? "")}</span>
         )}
       </span>
@@ -654,7 +654,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             size="sm"
             className="h-6 px-2 text-xs"
             title={isArchived ? "Unhide this comment" : "Hide this comment"}
-            onClick={() => updateStatus(isArchived ? "INBOX" : "ARCHIVED")}
+            onClick={() => updateStatus(isArchived ? CommentStatus.INBOX : CommentStatus.ARCHIVED)}
             disabled={loading}
           >
             {isArchived ? "Unarchive" : "Archive"}
@@ -674,7 +674,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             size="sm"
             className="h-6 px-2 text-xs"
             title={isMuted ? "Permanently hidden — click to unhide" : "Permanently hide this comment"}
-            onClick={() => updateStatus(isMuted ? "INBOX" : "MUTED")}
+            onClick={() => updateStatus(isMuted ? CommentStatus.INBOX : CommentStatus.MUTED)}
             disabled={loading}
           >
             {isMuted ? "Unmute" : "Mute"}
@@ -736,11 +736,11 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   onResolve={isSuggestion ? undefined : handleResolve}
                   onReopen={isSuggestion ? undefined : handleReopen}
                   onReplyAndArchive={isSuggestion ? undefined : handleReplyAndArchive}
-                  onArchive={() => updateStatus(isArchived ? "INBOX" : "ARCHIVED")}
+                  onArchive={() => updateStatus(isArchived ? CommentStatus.INBOX : CommentStatus.ARCHIVED)}
                   isArchived={isArchived}
                   onToggleRead={toggleRead}
                   isRead={comment.isRead}
-                  onMute={() => updateStatus(isMuted ? "INBOX" : "MUTED")}
+                  onMute={() => updateStatus(isMuted ? CommentStatus.INBOX : CommentStatus.MUTED)}
                   isMuted={isMuted}
                   onDirtyChange={isSuggestion ? undefined : setHasDirtyReply}
                   searchFilter={searchFilter}

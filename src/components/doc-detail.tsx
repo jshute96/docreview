@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 import { RefreshCw, Menu, Trash2, Pencil, CircleHelp } from "lucide-react";
-import type { Comment, Label } from "@prisma/client";
+import { AccessState, CommentStatus, CommentType, DocRole, DocStatus, type Comment, type Label } from "@prisma/client";
 import type { DocWithComments, DocWithLabels } from "@/types";
 import type { CommentThread, ThreadMap, SuggestionContent } from "@/lib/google-drive";
 import { DocTypeIcon } from "@/components/doc-type-icon";
@@ -57,7 +57,7 @@ import { docTarget } from "@/lib/tab-targets";
 // comments use googleCommentId. Extension-sourced suggestions only have googleCommentId
 // (disco ID) so we fall back to that.
 function commentKey(c: Comment): string {
-  if (c.type === "SUGGESTION") return c.googleSuggestionId ?? c.googleCommentId ?? "";
+  if (c.type === CommentType.SUGGESTION) return c.googleSuggestionId ?? c.googleCommentId ?? "";
   return c.googleCommentId ?? "";
 }
 
@@ -212,7 +212,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
     setSuggestionContent((prev) => ({ ...prev, [discoId]: content }));
     const contextId = generateContextId();
     mergeExtensionSuggestions([raw], contextId).then(() => {
-      broadcastChange({ type: "comments", docId: doc.docId, commentType: "SUGGESTION", googleCommentId: discoId }, contextId);
+      broadcastChange({ type: "comments", docId: doc.docId, commentType: CommentType.SUGGESTION, googleCommentId: discoId }, contextId);
     }).catch((err) => {
       console.log("[doc-detail] suggestion refresh: server merge error", err);
     });
@@ -398,7 +398,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
         ]);
         if (labelsRes.ok) setLabelsRaw(await labelsRes.json());
       } else if (event.type === "comments" && (event.docId === initialDoc.docId || event.docId === initialDoc.googleDocId)) {
-        const isSuggestionEvent = event.commentType === "SUGGESTION";
+        const isSuggestionEvent = event.commentType === CommentType.SUGGESTION;
         // googleCommentId serves different roles depending on event type:
         // for comments it targets a single Drive thread fetch; for suggestions
         // it targets a single extension scrape.
@@ -523,7 +523,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
   const [collapseSignal, setCollapseSignal] = useState(0);
 
   function wouldBeFilteredOut(c: Comment): boolean {
-    if (showMode === "inbox" && (c.status === "ARCHIVED" || c.status === "MUTED")) return true;
+    if (showMode === "inbox" && (c.status === CommentStatus.ARCHIVED || c.status === CommentStatus.MUTED)) return true;
     if (showMode === "open" && c.resolved) return true;
     if (showMode === "resolved" && !c.resolved) return true;
     if (mineFilter === "include" && !c.isThreadAuthor) return true;
@@ -536,8 +536,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
     if (mentionedFilter === "exclude" && c.mentionedMe) return true;
     if (resolvedFilter === "include" && !c.resolved) return true;
     if (resolvedFilter === "exclude" && c.resolved) return true;
-    if (suggestionsFilter === "include" && c.type !== "SUGGESTION") return true;
-    if (suggestionsFilter === "exclude" && c.type === "SUGGESTION") return true;
+    if (suggestionsFilter === "include" && c.type !== CommentType.SUGGESTION) return true;
+    if (suggestionsFilter === "exclude" && c.type === CommentType.SUGGESTION) return true;
     if (unreadFilter === "include" && c.isRead) return true;
     if (unreadFilter === "exclude" && !c.isRead) return true;
     if (isStarredFilter === "include" && !c.isStarred) return true;
@@ -597,7 +597,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
     setArchiving(true);
     const contextId = generateContextId();
     try {
-      const newStatus = doc.status === "INBOX" ? "ARCHIVED" : "INBOX";
+      const newStatus = doc.status === DocStatus.INBOX ? DocStatus.ARCHIVED : DocStatus.INBOX;
       const res = await apiFetch(`/api/docs/${doc.docId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -608,7 +608,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       const updated: DocWithLabels = await res.json();
       setDoc((prev) => ({ ...prev, status: updated.status }));
       broadcastChange({ type: "docs", docIds: [doc.docId] }, contextId);
-      toast.success(newStatus === "ARCHIVED" ? "Archived" : "Unarchived");
+      toast.success(newStatus === DocStatus.ARCHIVED ? "Archived" : "Unarchived");
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to update status");
     } finally {
@@ -634,13 +634,13 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
     }
   }
 
-  async function handleBulkStatusChange(fromStatus: "INBOX" | "ARCHIVED", toStatus: "INBOX" | "ARCHIVED") {
+  async function handleBulkStatusChange(fromStatus: CommentStatus, toStatus: CommentStatus) {
     const targets = filteredComments.filter((c) => c.status === fromStatus);
     if (targets.length === 0) return;
 
-    const setBusy = toStatus === "ARCHIVED" ? setBulkArchiving : setBulkUnarchiving;
-    const verb = toStatus === "ARCHIVED" ? "archive" : "unarchive";
-    const pastVerb = toStatus === "ARCHIVED" ? "Archived" : "Unarchived";
+    const setBusy = toStatus === CommentStatus.ARCHIVED ? setBulkArchiving : setBulkUnarchiving;
+    const verb = toStatus === CommentStatus.ARCHIVED ? "archive" : "unarchive";
+    const pastVerb = toStatus === CommentStatus.ARCHIVED ? "Archived" : "Unarchived";
 
     setBusy(true);
     const contextId = generateContextId();
@@ -685,11 +685,11 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
     }
   }
 
-  function handleArchiveAll() { void handleBulkStatusChange("INBOX", "ARCHIVED"); }
-  function handleUnarchiveAll() { void handleBulkStatusChange("ARCHIVED", "INBOX"); }
+  function handleArchiveAll() { void handleBulkStatusChange(CommentStatus.INBOX, CommentStatus.ARCHIVED); }
+  function handleUnarchiveAll() { void handleBulkStatusChange(CommentStatus.ARCHIVED, CommentStatus.INBOX); }
 
   async function handleArchiveAllResolved() {
-    const targets = filteredComments.filter((c) => c.status === "INBOX" && c.resolved);
+    const targets = filteredComments.filter((c) => c.status === CommentStatus.INBOX && c.resolved);
     if (targets.length === 0) return;
 
     setBulkArchivingResolved(true);
@@ -698,7 +698,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       const commentIds = targets.map((c) => c.commentId);
       const res = await apiFetch(`/api/docs/${doc.docId}/comments`, {
         method: "PATCH",
-        body: JSON.stringify({ commentIds, status: "ARCHIVED" }),
+        body: JSON.stringify({ commentIds, status: CommentStatus.ARCHIVED }),
         contextId,
       });
       if (!res.ok) throw new Error("Failed");
@@ -706,12 +706,12 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       const { count } = await res.json();
       setComments((prev) =>
         prev.map((c) =>
-          commentIds.includes(c.commentId) ? { ...c, status: "ARCHIVED" as const } : c
+          commentIds.includes(c.commentId) ? { ...c, status: CommentStatus.ARCHIVED } : c
         )
       );
 
       targets.forEach(c => {
-        const updated = { ...c, status: "ARCHIVED" as const };
+        const updated = { ...c, status: CommentStatus.ARCHIVED };
         if (wouldBeFilteredOut(updated)) {
           setExitingIds((prev) => new Set(prev).add(updated.commentId));
         }
@@ -915,17 +915,17 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
   return (
     <LabelProvider allLabels={labels} onLabelsChange={setLabels} onLabelDelete={handleLabelDelete}>
     <div className="flex flex-col gap-6">
-      {doc.accessState === "TRASHED" && (
+      {doc.accessState === AccessState.TRASHED && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-center gap-2">
           <span className="font-bold">Note:</span> This document is in the trash.
         </div>
       )}
-      {doc.accessState === "NOT_FOUND" && (
+      {doc.accessState === AccessState.NOT_FOUND && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-center gap-2">
           <span className="font-bold">Note:</span> This document is not accessible in Google Drive.
         </div>
       )}
-      {doc.accessState === "DENIED" && (
+      {doc.accessState === AccessState.DENIED && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 flex items-center gap-2">
           <span className="font-bold">Permission denied</span>
         </div>
@@ -944,7 +944,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
             title="Open document"
             onClick={handleOpenDoc}
             className={`hover:underline hover:text-blue-600 ${
-              doc.accessState !== "OK" ? "line-through text-zinc-400" : "text-zinc-900"
+              doc.accessState !== AccessState.OK ? "line-through text-zinc-400" : "text-zinc-900"
             }`}
           ><span suppressHydrationWarning>{displayTitle}</span></a>
         </div>
@@ -953,11 +953,11 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
             variant="outline"
             size="sm"
             className="text-zinc-900"
-            title={doc.status === "INBOX" ? "Archive this document" : "Move this document to inbox"}
+            title={doc.status === DocStatus.INBOX ? "Archive this document" : "Move this document to inbox"}
             onClick={handleArchive}
             disabled={archiving}
           >
-            {doc.status === "INBOX" ? "Archive" : "Unarchive"}
+            {doc.status === DocStatus.INBOX ? "Archive" : "Unarchive"}
           </Button>
           <Button variant="outline" size="sm" title="Open the document" className="text-zinc-900" asChild>
             <a href={doc.driveUrl} target={docTarget(doc.googleDocId)} onClick={handleOpenDoc}>Open</a>
@@ -1068,7 +1068,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
         <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-zinc-600">
           <span className="font-medium text-zinc-400">Labels:</span>
           <StarButton starred={doc.isStarred} onToggle={handleToggleStar} />
-          {doc.role === "AUTHOR" && (
+          {doc.role === DocRole.AUTHOR && (
             <span title="You are an author of this document" className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>
               Author
             </span>
@@ -1076,7 +1076,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
           {doc.labels.map((dl) => (
             <LabelBadge key={dl.labelId} label={dl.label} />
           ))}
-          {doc.role !== "AUTHOR" && doc.labels.length === 0 && (
+          {doc.role !== DocRole.AUTHOR && doc.labels.length === 0 && (
             <span className="text-zinc-400">—</span>
           )}
           <EditDocDialog
@@ -1192,7 +1192,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                       className="h-5 px-1.5 text-[10px] text-zinc-900"
                       title="Archive all visible inbox comments"
                       onClick={handleArchiveAll}
-                      disabled={bulkArchiving || !filteredComments.some((c) => c.status === "INBOX")}
+                      disabled={bulkArchiving || !filteredComments.some((c) => c.status === CommentStatus.INBOX)}
                     >
                       {bulkArchiving ? "Archiving..." : "Archive all"}
                     </Button>
@@ -1217,14 +1217,14 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={handleArchiveAllResolved}
-                          disabled={bulkArchivingResolved || !filteredComments.some((c) => c.status === "INBOX" && c.resolved)}
+                          disabled={bulkArchivingResolved || !filteredComments.some((c) => c.status === CommentStatus.INBOX && c.resolved)}
                           title="Archive all visible comments that are Resolved"
                         >
                           {bulkArchivingResolved ? "Archiving..." : "Archive all resolved"}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={handleUnarchiveAll}
-                          disabled={bulkUnarchiving || !filteredComments.some((c) => c.status === "ARCHIVED")}
+                          disabled={bulkUnarchiving || !filteredComments.some((c) => c.status === CommentStatus.ARCHIVED)}
                           title="Move all visible archived comments back to inbox"
                         >
                           {bulkUnarchiving ? "Unarchiving..." : "Unarchive all"}
@@ -1248,8 +1248,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                   comment={comment}
                   docId={doc.docId}
                   driveUrl={doc.driveUrl}
-                  content={comment.type === "COMMENT" ? commentContent[commentKey(comment)] : undefined}
-                  suggestionContent={comment.type === "SUGGESTION"
+                  content={comment.type === CommentType.COMMENT ? commentContent[commentKey(comment)] : undefined}
+                  suggestionContent={comment.type === CommentType.SUGGESTION
                     ? (suggestionContent[commentKey(comment)] ?? (comment.googleCommentId ? suggestionContent[comment.googleCommentId] : undefined))
                     : undefined}
                   initialThread={threadMap[commentKey(comment)] ?? (comment.googleCommentId ? threadMap[comment.googleCommentId] : undefined)}
@@ -1265,7 +1265,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                   onSelectInDoc={supportsCommentNavigation() && comment.googleCommentId
                     ? () => selectCommentInDoc(googleDocId, comment.googleCommentId!)
                     : undefined}
-                  onSuggestionRefresh={comment.type === "SUGGESTION" ? handleSuggestionRefresh : undefined}
+                  onSuggestionRefresh={comment.type === CommentType.SUGGESTION ? handleSuggestionRefresh : undefined}
                   userName={userName}
                   emptyMessage={threadsForbidden ? "Comments not visible on this document." : undefined}
                 />

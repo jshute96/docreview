@@ -10,6 +10,7 @@ import {
   dismissProgressToasts,
 } from "@/lib/stream-progress";
 import { X, Loader2 } from "lucide-react";
+import { AccessState, DocRole, DocStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -52,9 +53,9 @@ interface ScanDoc {
   title: string;
   mimeType: string;
   driveUrl: string;
-  role: "AUTHOR" | "REVIEWER";
+  role: DocRole;
   isNew: boolean;
-  accessState?: "NOT_FOUND" | "DENIED";
+  accessState?: typeof AccessState.NOT_FOUND | typeof AccessState.DENIED;
   notes?: string;
   emailDate?: string;
 }
@@ -212,7 +213,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
           labelIds: selectedLabelIds,
           notes,
           ...(isStarred ? { isStarred } : {}),
-          status: addToInbox ? "INBOX" : "ARCHIVED",
+          status: addToInbox ? DocStatus.INBOX : DocStatus.ARCHIVED,
         }),
         signal: controller.signal,
       }, handleRefreshProgress);

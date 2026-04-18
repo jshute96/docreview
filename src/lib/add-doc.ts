@@ -16,13 +16,14 @@ import {
 import { syncComments } from "@/lib/sync-comments";
 import { docWithCountsInclude, withCommentCounts, stripServerOnly } from "@/lib/doc-queries";
 import { logWarning } from "@/lib/log";
+import { AccessState, DocRole, DocStatus } from "@prisma/client";
 
 /** Fallback metadata used when Drive access is denied. */
 export interface PermissionDeniedFallback {
   title: string;
   driveUrl: string;
   mimeType: string;
-  role: "AUTHOR" | "REVIEWER";
+  role: DocRole;
   lastModifiedInDrive: Date | null;
   createdTimeInDrive: Date | null;
 }
@@ -34,7 +35,7 @@ export interface AddDocParams {
   labelIds: string[];
   isStarred?: boolean;
   notes?: string | null;
-  status?: "INBOX" | "ARCHIVED";
+  status?: DocStatus;
   /** If set, delete this doc before creating (re-add, or replacing a denied row). */
   deleteDocId?: string;
   /** Metadata to use when Drive access fails. */
@@ -65,7 +66,7 @@ export async function validateDocInputs(
     isStarred?: boolean;
   }
 ): Promise<NextResponse | null> {
-  if (status !== undefined && status !== "INBOX" && status !== "ARCHIVED") {
+  if (status !== undefined && status !== DocStatus.INBOX && status !== DocStatus.ARCHIVED) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
   if (isStarred !== undefined && typeof isStarred !== "boolean") {
@@ -123,16 +124,16 @@ export async function addDoc(params: AddDocParams): Promise<NextResponse> {
         role: fallback.role,
         lastModifiedInDrive: fallback.lastModifiedInDrive,
         createdTimeInDrive: fallback.createdTimeInDrive,
-        accessState: "DENIED" as const,
+        accessState: AccessState.DENIED,
       }
     : {
         title: f!.name ?? "",
         driveUrl: driveUrlFor(googleDocId, f!.webViewLink),
         mimeType: f!.mimeType!,
-        role: (isOwner ? "AUTHOR" : "REVIEWER") as "AUTHOR" | "REVIEWER",
+        role: isOwner ? DocRole.AUTHOR : DocRole.REVIEWER,
         lastModifiedInDrive: f!.modifiedTime ? new Date(f!.modifiedTime) : null,
         createdTimeInDrive: f!.createdTime ? new Date(f!.createdTime) : null,
-        accessState: "OK" as const,
+        accessState: AccessState.OK,
       };
 
   // Transactional: optionally delete old doc, then create new one
@@ -146,7 +147,7 @@ export async function addDoc(params: AddDocParams): Promise<NextResponse> {
         googleDocId,
         ...docData,
         lastCommentActivity: docData.createdTimeInDrive, // Initialize from creation time; comment sync will bump it up
-        status: status ?? "INBOX",
+        status: status ?? DocStatus.INBOX,
         notes: notes || null,
         isStarred: isStarred ?? false,
         labels: {

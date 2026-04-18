@@ -11,6 +11,7 @@ import {
 } from "@/lib/google-drive";
 import { runWithRequestId } from "@/lib/request-context";
 import { tryResolveRedirect } from "@/lib/url-utils";
+import { DocRole } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
   return runWithRequestId("GET", req, async () => {
@@ -107,7 +108,7 @@ export async function GET(req: NextRequest) {
     title: f.name ?? "",
     mimeType: f.mimeType,
     driveUrl: driveUrlFor(fileId, f.webViewLink),
-    role: isOwner ? "AUTHOR" : "REVIEWER",
+    role: isOwner ? DocRole.AUTHOR : DocRole.REVIEWER,
     lastModifiedInDrive: f.modifiedTime ?? null,
     createdTimeInDrive: f.createdTime ?? null,
     ...(existing ? {

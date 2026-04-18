@@ -3,6 +3,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { addDoc } from "@/lib/add-doc";
 import { runWithRequestId } from "@/lib/request-context";
+import { DocStatus } from "@prisma/client";
 
 export async function POST(
   req: NextRequest,
@@ -27,7 +28,7 @@ export async function POST(
       labelIds?: string[];
       isStarred?: boolean;
       notes?: string;
-      status?: "INBOX" | "ARCHIVED";
+      status?: DocStatus;
     };
 
     // Find old doc
@@ -52,7 +53,7 @@ export async function POST(
         title: oldDoc.title || "Unknown title",
         driveUrl: oldDoc.driveUrl,
         mimeType: oldDoc.mimeType ?? "application/vnd.google-apps.document",
-        role: oldDoc.role as "AUTHOR" | "REVIEWER",
+        role: oldDoc.role,
         lastModifiedInDrive: oldDoc.lastModifiedInDrive,
         createdTimeInDrive: oldDoc.createdTimeInDrive,
       },

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
+import { AccessState, DocRole, DocStatus } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import {
   Dialog,
@@ -117,7 +118,7 @@ export function EditDocDialog({
               draggable="false"
               title="Open document"
               className={`flex items-center gap-1.5 text-base hover:text-blue-600 hover:underline line-clamp-1 ${
-                doc.accessState !== "OK" ? "line-through text-zinc-400" : "text-zinc-600"
+                doc.accessState !== AccessState.OK ? "line-through text-zinc-400" : "text-zinc-600"
               }`}
             >
               <DocTypeIcon mimeType={doc.mimeType} className="h-4 w-4 flex-shrink-0" />
@@ -131,10 +132,10 @@ export function EditDocDialog({
                 </label>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setRole(role === "AUTHOR" ? "REVIEWER" : "AUTHOR")}
+                    onClick={() => setRole(role === DocRole.AUTHOR ? DocRole.REVIEWER : DocRole.AUTHOR)}
                     title={"Toggle Author vs Reviewer state.\nIn Author state, all new comments go to your Inbox."}
                     className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                      role === "AUTHOR"
+                      role === DocRole.AUTHOR
                         ? ROLE_COLORS.AUTHOR.activeFilter
                         : ROLE_COLORS.AUTHOR.inactiveFilter
                     }`}
@@ -150,10 +151,10 @@ export function EditDocDialog({
                 </label>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setStatus(status === "INBOX" ? "ARCHIVED" : "INBOX")}
+                    onClick={() => setStatus(status === DocStatus.INBOX ? DocStatus.ARCHIVED : DocStatus.INBOX)}
                     title="Toggle Inbox vs Archived state"
                     className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                      status === "INBOX"
+                      status === DocStatus.INBOX
                         ? STATUS_COLORS.INBOX.activeFilter
                         : STATUS_COLORS.INBOX.inactiveFilter
                     }`}

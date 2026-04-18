@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { CommentStatus } from "@prisma/client";
+import { CommentStatus, DocStatus } from "@prisma/client";
 import { runWithRequestId } from "@/lib/request-context";
 
 export async function PATCH(
@@ -64,10 +64,10 @@ export async function PATCH(
     });
 
     // Moving a comment to INBOX should also move the doc to INBOX if it's ARCHIVED
-    if (status === "INBOX" && comment.doc.status === "ARCHIVED") {
+    if (status === CommentStatus.INBOX && comment.doc.status === DocStatus.ARCHIVED) {
       await tx.doc.update({
         where: { docId: comment.docId },
-        data: { status: "INBOX" },
+        data: { status: DocStatus.INBOX },
       });
     }
 

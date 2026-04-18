@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import type { SuggestionType } from "@prisma/client";
+import { SuggestionType } from "@prisma/client";
 
 // Computes a content hash for a suggestion to enable matching across data sources
 // (Docs API and Gmail notifications). The hash is based on the action type and text
@@ -22,9 +22,9 @@ export function gmailActionToSuggestionType(
   action: string,
 ): SuggestionType {
   switch (action) {
-    case "Add": return "INSERT";
-    case "Delete": return "DELETE";
-    case "Replace": return "EDIT";
-    default: return "OTHER";
+    case "Add": return SuggestionType.INSERT;
+    case "Delete": return SuggestionType.DELETE;
+    case "Replace": return SuggestionType.EDIT;
+    default: return SuggestionType.OTHER;
   }
 }

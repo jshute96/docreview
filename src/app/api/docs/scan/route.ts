@@ -8,6 +8,7 @@ import { logInfo, logError } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 import { formatDate } from "@/lib/utils";
 import { createProgressStream } from "@/lib/sse";
+import { DocRole } from "@prisma/client";
 
 export async function POST(req: NextRequest) {
   return runWithRequestId("POST", req, async () => {
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
                 title: d.title,
                 mimeType: "",
                 driveUrl: driveUrlFor(d.googleDocId),
-                role: "REVIEWER",
+                role: DocRole.REVIEWER,
                 isNew: true,
                 accessState: d.accessState,
                 notes: d.notes,

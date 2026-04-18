@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { Plus, HelpCircle, X } from "lucide-react";
+import { AccessState, DocRole, DocStatus } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import {
   Dialog,
@@ -106,12 +107,12 @@ export function BulkEditDialog({
    * (no-op) for the remaining documents. Prevents unnecessary DB updates.
    */
   function revertRedundantStates(remainingDocs: DocWithLabels[]) {
-    const role = checkConsistency(remainingDocs, d => d.role === "AUTHOR");
+    const role = checkConsistency(remainingDocs, d => d.role === DocRole.AUTHOR);
     if ((roleState === "set" && role.all) || (roleState === "clear" && role.none)) {
       setRoleState("as-is");
     }
 
-    const status = checkConsistency(remainingDocs, d => d.status === "INBOX");
+    const status = checkConsistency(remainingDocs, d => d.status === DocStatus.INBOX);
     if ((statusState === "set" && status.all) || (statusState === "clear" && status.none)) {
       setStatusState("as-is");
     }
@@ -150,7 +151,7 @@ export function BulkEditDialog({
   function cycleRole(e: React.MouseEvent) {
     // Prevent interaction with the underlying dialog/overlay when clicking toggles
     e.preventDefault(); e.stopPropagation();
-    const { all, none } = checkConsistency(effectiveDocs, d => d.role === "AUTHOR");
+    const { all, none } = checkConsistency(effectiveDocs, d => d.role === DocRole.AUTHOR);
     setRoleState(prev => {
       // Skip redundant states:
       // If all are authors, skip 'set' (+). If none are authors, skip 'clear' (-).
@@ -162,7 +163,7 @@ export function BulkEditDialog({
 
   function cycleStatus(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
-    const { all, none } = checkConsistency(effectiveDocs, d => d.status === "INBOX");
+    const { all, none } = checkConsistency(effectiveDocs, d => d.status === DocStatus.INBOX);
     setStatusState(prev => {
       if (all) return prev === "as-is" ? "clear" : "as-is";
       if (none) return prev === "as-is" ? "set" : "as-is";
@@ -245,8 +246,8 @@ export function BulkEditDialog({
     }
   }
 
-  const role = checkConsistency(effectiveDocs, d => d.role === "AUTHOR");
-  const status = checkConsistency(effectiveDocs, d => d.status === "INBOX");
+  const role = checkConsistency(effectiveDocs, d => d.role === DocRole.AUTHOR);
+  const status = checkConsistency(effectiveDocs, d => d.status === DocStatus.INBOX);
   const star = checkConsistency(effectiveDocs, d => d.isStarred);
 
   return (
@@ -425,10 +426,10 @@ export function BulkEditDialog({
                       }}
                       title="Click to select, middle- or double-click to open"
                       className={`flex items-center gap-2 ${
-                        doc.accessState !== "OK" ? "text-zinc-400 line-through" : ""
+                        doc.accessState !== AccessState.OK ? "text-zinc-400 line-through" : ""
                       }`}
                     >
-                      <DocTypeIcon mimeType={doc.mimeType} className={`h-3 w-3 flex-shrink-0 ${doc.accessState !== "OK" ? "text-zinc-300" : ""}`} />
+                      <DocTypeIcon mimeType={doc.mimeType} className={`h-3 w-3 flex-shrink-0 ${doc.accessState !== AccessState.OK ? "text-zinc-300" : ""}`} />
                       <span className="whitespace-nowrap pr-4 text-xs font-medium">
                         {cachedTitles?.[doc.googleDocId] || doc.title || "Unknown title"}
                       </span>
