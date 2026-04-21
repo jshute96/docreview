@@ -288,10 +288,23 @@ export async function mergeExtensionSuggestions(
     if (existingById && !existingById.googleSuggestionId) {
       // Found by disco ID, but missing suggestion ID. Check if there's a
       // suggestion-only record with the same hash that we should merge with.
-      const hashCandidates = await findUnlinkedSuggestionsByHash(docId, contentHash);
+      // The partner must actually have a `googleSuggestionId` to contribute;
+      // filter defensively so a hash-only row (both IDs null) can't cause us
+      // to delete a partner that adds nothing.
+      const hashCandidates = (await findUnlinkedSuggestionsByHash(docId, contentHash))
+        .filter((c) => c.googleSuggestionId);
       if (hashCandidates.length === 1) {
         const partner = hashCandidates[0];
         logInfo(`[Suggestions:Ext] ${googleDocId}: merging disco-only row ${existingById.commentId} with suggestion-only partner ${partner.commentId} by hash`);
+        // We keep the disco-ID record and drop the partner's other columns.
+        // The disco-ID record was created by a live source (extension or Gmail)
+        // that carries full participation/reply/read state; the partner was
+        // written by Docs API sync, which only knows the suggestion's text and
+        // type — no author, mention, reply, or read info. So the disco-ID row
+        // is strictly richer, and the only field we need to salvage from the
+        // partner is `googleSuggestionId`. The metadata update immediately
+        // below then refreshes the disco-ID row from the current extension
+        // payload, so nothing the partner had is lost.
         await prisma.$transaction(async (tx) => {
           await tx.comment.delete({ where: { commentId: partner.commentId } });
           await tx.comment.update({

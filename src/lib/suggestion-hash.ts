@@ -1,14 +1,26 @@
 import { createHash } from "crypto";
 import { SuggestionType } from "@prisma/client";
 import type { Suggestion } from "@/lib/parse-gmail-notification";
-import { logInfo } from "@/lib/log";
 
 // Computes a content hash for a suggestion to enable matching across data sources
-// (Docs API and Gmail notifications). The hash is based on the action type and text
-// content, which are available from both sources.
+// (Docs API, Gmail notifications, and the Chrome extension scraping the Docs UI).
+// The hash is based on the action type and text content, which all three sources
+// expose.
 //
 // Gmail uses "Add"/"Delete"/"Replace"; Docs API uses "INSERT"/"DELETE"/"EDIT".
 // Callers must normalize to the canonical form before calling.
+//
+// Observed source behaviors (which dictate the normalizer rules below):
+//   - Docs API (`documents.get` suggestion fragments) and Drive's `comments.get`
+//     return the full comment/suggestion text verbatim, preserving every
+//     whitespace character (including newlines between paragraphs).
+//   - Gmail notifications display text that has already been whitespace-trimmed
+//     and run-collapsed to single spaces, then truncated to ~100 characters
+//     with a single-character "…" glyph appended to indicate truncation.
+//   - The Docs UI (what the extension scrapes) presents the same trimmed +
+//     collapsed + 100-char + "…" treatment as Gmail.
+// To make a Docs-API hash match an already-truncated Gmail/extension hash, we
+// apply the strictest of the three (truncate-to-100-with-trim) to every input.
 export function computeSuggestionHash(
   actionType: SuggestionType,
   deletedText: string,
@@ -17,22 +29,20 @@ export function computeSuggestionHash(
   const normalize = (s: string) => {
     // 1. Remove trailing ellipsis (both ... and …)
     const withoutEllipsis = s.replace(/\.\.\.$/, "").replace(/…$/, "");
-    // 2. Trim and 3. Collapse whitespace
+    // 2. Trim and
+    // 3. Collapse whitespace
     return withoutEllipsis.trim().replace(/\s+/g, " ");
   };
 
   const normD = normalize(deletedText);
   const normI = normalize(insertedText);
-  // 4. Truncate to 100 characters and 5. Trim again to remove boundary spaces
+  // 4. Truncate to 100 characters and 
+  // 5. Trim again to remove boundary spaces
   const truncD = normD.substring(0, 100).trim();
   const truncI = normI.substring(0, 100).trim();
 
   const input = `${actionType}|${truncD}|${truncI}`;
-  const hash = createHash("sha256").update(input).digest("hex");
-
-  logInfo(`[Hash] ${actionType} | D: "${truncD}" | I: "${truncI}" | hash: ${hash.substring(0, 12)}… | fullD: "${normD}" | fullI: "${normI}"`);
-
-  return hash;
+  return createHash("sha256").update(input).digest("hex");
 }
 
 // Maps Gmail notification action strings to canonical suggestion types.

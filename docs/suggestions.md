@@ -74,6 +74,20 @@ in either field don't conflict.
 Suggestion data comes from two sources with different strengths. A content hash
 (`suggestionContentHash`) enables matching across them.
 
+**Observed source behavior.** Each source exposes suggestion/comment text
+differently, and the normalizer rules below are driven by these observations:
+
+| Source | Whitespace | Length | Truncation marker |
+|--------|------------|--------|-------------------|
+| Docs API (`documents.get`) | Verbatim, including paragraph-crossing newlines | Full | — |
+| Drive API (`comments.get`) | Verbatim | Full | — |
+| Gmail notification body | Trimmed and whitespace runs collapsed to one space | ~100 chars | Single-character `…` glyph |
+| Docs UI (extension scrape) | Trimmed and collapsed | ~100 chars | Single-character `…` glyph |
+
+Because Gmail and the extension both ship pre-truncated + collapsed text while
+the Docs/Drive APIs ship full text, the hash can only match if we apply the
+strictest treatment of the three sources to every input.
+
 **Text Normalization:** To ensure the Docs API and Gmail hashes match, both strings are
 normalized before hashing:
 1. Trailing ellipses (both `...` and `…`) are removed — this allows truncated Gmail
@@ -82,8 +96,6 @@ normalized before hashing:
    by a single space.
 3. The normalized string is truncated to 100 characters.
 4. Truncated strings are trimmed again to ensure no trailing spaces.
-
-The hash is **case-sensitive** to improve matching accuracy.
 
 **Assembly Logic:** When collecting suggestion fragments from the Docs API, Docreview
 preserves structural newlines between fragments (e.g., when a suggestion spans multiple
@@ -98,7 +110,7 @@ stripped before storage.
 |--------|----------------------|-------------------|------------|
 | `googleSuggestionId` | `suggest.xxx` | — | Drive only |
 | `googleCommentId` | — | `discussionId` (AAA*) | Gmail only |
-| `suggestionContentHash` | computed from text | computed from text | Updated by either (formula recovery) |
+| `suggestionContentHash` | computed from text | computed from text | Drive & Extension refresh on each sync; Gmail only fills when missing |
 | `type` | SUGGESTION | SUGGESTION | Either |
 | `suggestionType` | INSERT/DELETE/EDIT/OTHER | mappable from Add/Delete/Replace/Other | Either |
 | `resolved` | lifecycle (false→true) | — | Drive authoritative |
@@ -119,7 +131,13 @@ rules (see docs/inbox-states.md): new suggestions get status based on mention, d
 role, and participation; existing suggestions are promoted to INBOX on new activity
 when relevant (e.g., new replies mentioning me, or new activity on a suggestion I'm
 involved in). MUTED suggestions are only promoted when a new reply @-mentions me.
-The `suggestionContentHash` is updated in case the formula changed.
+The `suggestionContentHash` is refreshed in case the formula or suggestion content
+changed — the extension reads live content, so two snapshots taken at different
+times may yield different hashes, and refreshing lets a later match succeed once
+all sources are caught up. The Docs API path refreshes the hash on the same
+grounds. Gmail merge, by contrast, only fills the hash when it is missing: Gmail
+notification text is a point-in-time snapshot (often truncated with an ellipsis),
+so it should not override a fresh hash written by Drive or Extension.
 Doc-level unarchive is gated on `!isRead` so my own last action (typing a reply,
 accepting/rejecting) won't resurface an archived doc.
 

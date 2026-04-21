@@ -752,9 +752,8 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   headerContent={isSuggestion ? (
                     <p className="mb-1 text-xs text-zinc-300 font-mono">
                       {comment.googleSuggestionId && <span>suggest: {comment.googleSuggestionId} </span>}
-                      {comment.googleCommentId && <span>disco: {comment.googleCommentId} </span>}
-                      {comment.suggestionContentHash && <span title={comment.suggestionContentHash}>hash: {comment.suggestionContentHash.substring(0, 12)}…</span>}
-                      {!comment.googleSuggestionId && !comment.googleCommentId && !comment.suggestionContentHash && <span>(no IDs)</span>}
+                      {comment.googleCommentId && <span>disco: {comment.googleCommentId}</span>}
+                      {!comment.googleSuggestionId && !comment.googleCommentId && <span>(no IDs)</span>}
                     </p>
                   ) : undefined}
                   footerContent={isSynthesizedThread ? (

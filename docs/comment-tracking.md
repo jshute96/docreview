@@ -30,7 +30,7 @@ filter and sort controls.
 | `assignedToMe` | Drive | The comment was assigned to me (derived from comment + reply `assigneeEmailAddress`; see limitation below) |
 | `mentionedMe` | Drive | I was @mentioned anywhere in the thread (comment or any reply). Cleared when `assignedToMe` is true (assignment takes precedence) |
 | `mentionedMeUnreplied` | Drive | `mentionedMe` is true and there's no reply/resolve by me after the last mention. Cleared when `assignedToMe` is true |
-| `suggestionContentHash` | Drive / Gmail / Ext | Content hash of suggestion text/action, used for cross-source matching. Truncated hash is displayed in the UI for suggestions. |
+| `suggestionContentHash` | Drive / Gmail / Ext | Content hash of suggestion text/action, used to pair up records created by different sync paths. |
 | `status` | User | `INBOX`, `ARCHIVED`, or `MUTED` — see below |
 
 ---
@@ -191,11 +191,11 @@ in inbox when first synced. See [Phase 3.5 — Smart Unarchive](./refresh.md#pha
    should see.
 5. **New suggestion with INBOX status** — a new suggestion (from Docs API, Gmail, or
    extension) that gets INBOX status triggers unarchive.
-6. **Existing suggestion promoted to INBOX** — a suggestion moving from ARCHIVED to INBOX
-   (e.g., Gmail merge or extension merge detects new activity) triggers unarchive.
-7. **Existing suggestion with new activity** — new replies or resolution changes on an
-   existing INBOX/ARCHIVED suggestion (mirroring comment rules 2, 3, and 4) trigger
-   unarchive, provided they aren't marked `isRead`.
+6. **Existing suggestion with new activity** — the suggestion mirror of comment rules
+   2–4: a suggestion moving ARCHIVED → INBOX, a new non-self reply on an already-INBOX
+   suggestion, or someone else accepting/rejecting it triggers unarchive. Gated on
+   `!isRead` so my own last action (typing a reply, accepting/rejecting myself) won't
+   resurface the doc.
 
 **New suggestion** (not previously in DB):
 - **Docs API path**: `status: "INBOX"` when `doc.role === "AUTHOR"`; otherwise `"ARCHIVED"`.

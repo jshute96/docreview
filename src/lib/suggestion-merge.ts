@@ -3,7 +3,7 @@ import { logInfo, logWarning } from "@/lib/log";
 import { computeSuggestionHash, gmailActionToSuggestionType, extractHashTextsFromGmail } from "@/lib/suggestion-hash";
 import { bumpLastCommentActivity, findUnlinkedSuggestionsByHash } from "@/lib/sync-comments";
 import { parseGmailNotificationFromParsed, type ParsedEmail } from "@/lib/parse-gmail-notification";
-import { CommentStatus, CommentType } from "@prisma/client";
+import { CommentStatus, CommentType, type Comment } from "@prisma/client";
 
 // Merges suggestion data from a Gmail notification into existing suggestion records
 // (created by Drive sync) or creates new records if Gmail arrived first.
@@ -42,35 +42,41 @@ export async function mergeSuggestionsFromGmail(
     const contentHash = computeSuggestionHash(actionType, deletedText, insertedText);
 
     // Check if this suggestion's comment ID is already in the DB (idempotency)
-    let existingById: any = null;
+    let existingById: Comment | null = null;
     if (suggestion.discussionId) {
       existingById = await prisma.comment.findFirst({
         where: { docId, googleCommentId: suggestion.discussionId },
       });
       if (existingById) {
+        const existing = existingById;
         // Found by disco ID, but missing suggestion ID. Check if there's a
         // suggestion-only record with the same hash that we should merge with.
-        if (!existingById.googleSuggestionId) {
-          const hashCandidates = await findUnlinkedSuggestionsByHash(docId, contentHash);
+        // The partner must actually have a `googleSuggestionId` to contribute;
+        // a hash-only row (both IDs null) shouldn't exist in today's code, but
+        // defensively filter so we never delete a partner that adds nothing.
+        if (!existing.googleSuggestionId) {
+          const hashCandidates = (await findUnlinkedSuggestionsByHash(docId, contentHash))
+            .filter((c) => c.googleSuggestionId);
           if (hashCandidates.length === 1) {
             const partner = hashCandidates[0];
-            logInfo(`[Suggestions:Gmail] ${googleDocId}: merging disco-only row ${existingById.commentId} with suggestion-only partner ${partner.commentId} by hash`);
+            logInfo(`[Suggestions:Gmail] ${googleDocId}: merging disco-only row ${existing.commentId} with suggestion-only partner ${partner.commentId} by hash`);
             await prisma.$transaction(async (tx) => {
               await tx.comment.delete({ where: { commentId: partner.commentId } });
               await tx.comment.update({
-                where: { commentId: existingById!.commentId },
+                where: { commentId: existing.commentId },
                 data: { googleSuggestionId: partner.googleSuggestionId },
               });
             });
-            existingById.googleSuggestionId = partner.googleSuggestionId;
+            existing.googleSuggestionId = partner.googleSuggestionId;
           }
         }
 
-        // Update the hash in case the formula changed, but don't
-        // do a full metadata merge (Drive sync or Extension sync are better sources).
-        if (existingById.suggestionContentHash !== contentHash) {
+        // Fill the hash if missing, but don't overwrite an existing one: Gmail
+        // notification text is a point-in-time snapshot (and often truncated),
+        // while Drive/Extension sync read fresh content and are authoritative.
+        if (!existing.suggestionContentHash) {
           await prisma.comment.update({
-            where: { commentId: existingById.commentId },
+            where: { commentId: existing.commentId },
             data: { suggestionContentHash: contentHash },
           });
         }
