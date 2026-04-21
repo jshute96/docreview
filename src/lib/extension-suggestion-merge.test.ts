@@ -142,6 +142,34 @@ describe("mergeExtensionSuggestions", () => {
     expect(mockComment.create.mock.calls[0][0].data.status).toBe(CommentStatus.ARCHIVED);
   });
 
+  it("skips the DB write when disco ID exists and nothing has changed", async () => {
+    const hash = computeSuggestionHash(SuggestionType.INSERT, "", "new text");
+    // Existing row mirrors exactly what mergeExtensionSuggestions would compute
+    // for the default makeSuggestion() input: Add, open, no replies, not mine.
+    mockComment.findFirst.mockResolvedValue({
+      commentId: "cr1",
+      googleCommentId: "AAAB1disco",
+      googleSuggestionId: "suggest.xyz",
+      status: CommentStatus.ARCHIVED,
+      suggestionContentHash: hash,
+      replyCount: 0,
+      resolved: false,
+      isThreadAuthor: false,
+      isReplyAuthor: false,
+      mentionedMe: false,
+      mentionedMeUnreplied: false,
+      isRead: false,
+      driveCreatedAt: new Date("2026-03-20T15:00:00.000Z"),
+      driveModifiedAt: new Date("2026-03-20T15:00:00.000Z"),
+    });
+
+    const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion()], userEmail, makeDoc());
+
+    expect(mockComment.update).not.toHaveBeenCalled();
+    expect(mockExecuteRaw).not.toHaveBeenCalled();
+    expect(res.updated).toBe(0);
+  });
+
   it("updates metadata in place when disco ID already exists", async () => {
     mockComment.findFirst.mockResolvedValue({
       commentId: "cr1",

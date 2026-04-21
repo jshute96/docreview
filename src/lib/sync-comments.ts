@@ -82,7 +82,7 @@ const EMPTY_RESULT: SyncResult = {
 
 // --- Helpers ---
 
-function datesEqual(a: Date | null | undefined, b: Date | null | undefined): boolean {
+export function datesEqual(a: Date | null | undefined, b: Date | null | undefined): boolean {
   const timeA = a instanceof Date ? a.getTime() : null;
   const timeB = b instanceof Date ? b.getTime() : null;
   return timeA === timeB;

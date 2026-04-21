@@ -18,9 +18,9 @@ import { prisma } from "@/lib/prisma";
 import { logInfo, logWarning } from "@/lib/log";
 import { computeSuggestionHash, gmailActionToSuggestionType, extractHashTextsFromExtension } from "@/lib/suggestion-hash";
 import { computeMentionedMeUnreplied } from "@/lib/google-drive";
-import { bumpLastCommentActivity, computeInitialInboxStatus, findUnlinkedSuggestionsByHash } from "@/lib/sync-comments";
+import { bumpLastCommentActivity, computeInitialInboxStatus, datesEqual, findUnlinkedSuggestionsByHash } from "@/lib/sync-comments";
 import { parseExtensionTimestamp } from "@/lib/extension-suggestions";
-import { CommentStatus, CommentType, DocRole, type Comment, type Doc } from "@prisma/client";
+import { CommentStatus, CommentType, DocRole, Prisma, type Comment, type Doc } from "@prisma/client";
 
 /** Shape of a single extension suggestion as received from the API request body. */
 export interface ExtensionSuggestionInput {
@@ -230,6 +230,66 @@ function computeSuggestionStatusUpdate(
 }
 
 /**
+ * Shape of the per-suggestion field bundle computed from one extension payload.
+ * Kept as a local interface so `buildExtensionSuggestionUpdate` can type the
+ * existing-vs-new comparison explicitly and catch any drift at compile time.
+ */
+interface SuggestionCommentData {
+  replyCount: number;
+  resolved: boolean;
+  isThreadAuthor: boolean;
+  isReplyAuthor: boolean;
+  mentionedMe: boolean;
+  mentionedMeUnreplied: boolean;
+  driveCreatedAt: Date | null;
+  driveModifiedAt: Date | null;
+}
+
+/**
+ * Build the update payload for an existing suggestion row along with a
+ * `changed` flag. Mirrors `buildCommentUpdate` in `sync-comments.ts` — pairing
+ * the diff check with the data it builds keeps them from drifting when new
+ * columns are added.
+ *
+ * `googleSuggestionId` is intentionally excluded from both the diff and the
+ * data: when the partner-merge branch above salvages an ID onto this row, it
+ * does so in its own transaction before we get here, so the DB already has
+ * the correct value. Don't add `googleSuggestionId` to `data` without also
+ * adding it to `changed`, or a no-op-looking sync after a partner merge could
+ * skip persisting it.
+ */
+function buildExtensionSuggestionUpdate(
+  existing: Comment,
+  commentData: SuggestionCommentData,
+  contentHash: string,
+  effectiveIsRead: boolean,
+  newStatus: CommentStatus | undefined,
+): { changed: boolean; data: Prisma.CommentUncheckedUpdateInput } {
+  const status = newStatus ?? existing.status;
+  const changed =
+    existing.replyCount !== commentData.replyCount ||
+    existing.resolved !== commentData.resolved ||
+    existing.isThreadAuthor !== commentData.isThreadAuthor ||
+    existing.isReplyAuthor !== commentData.isReplyAuthor ||
+    existing.mentionedMe !== commentData.mentionedMe ||
+    existing.mentionedMeUnreplied !== commentData.mentionedMeUnreplied ||
+    existing.isRead !== effectiveIsRead ||
+    existing.status !== status ||
+    existing.suggestionContentHash !== contentHash ||
+    !datesEqual(existing.driveCreatedAt, commentData.driveCreatedAt) ||
+    !datesEqual(existing.driveModifiedAt, commentData.driveModifiedAt);
+
+  const data: Prisma.CommentUncheckedUpdateInput = {
+    ...commentData,
+    suggestionContentHash: contentHash,
+    isRead: effectiveIsRead,
+    ...(newStatus ? { status: newStatus } : {}),
+  };
+
+  return { changed, data };
+}
+
+/**
  * Merge extension-scraped suggestions into the database for a document.
  * Returns the final state of all suggestion Comment records for the doc.
  */
@@ -264,7 +324,7 @@ export async function mergeExtensionSuggestions(
     // Common fields for all DB writes
     const isResolved = s.status === "accepted" || s.status === "rejected";
     const isRead = computeSuggestionIsRead(s.isMine, s.replies);
-    const commentData = {
+    const commentData: SuggestionCommentData = {
       replyCount: s.replies.length,
       resolved: isResolved,
       isThreadAuthor: s.isMine,
@@ -317,7 +377,6 @@ export async function mergeExtensionSuggestions(
     }
 
     if (existingById) {
-      logInfo(`[Suggestions:Ext] ${googleDocId}: ${s.id} already exists as ${existingById.commentId} — updating metadata`);
       if (commentData.resolved && !existingById.resolved) resolved++;
       const newStatus = computeSuggestionStatusUpdate(doc, existingById, commentData, mention, iResolvedIt, lastResolveReply);
       const effectiveIsRead = effectiveIsReadForUpdate(existingById, isRead, isResolved, s.replies.length);
@@ -329,15 +388,17 @@ export async function mergeExtensionSuggestions(
         iResolvedIt,
         isRead: effectiveIsRead,
       })) shouldUnarchive = true;
+      // Skip the DB write when nothing would change — extension re-syncs run on
+      // every pane snapshot and most suggestions are unchanged between syncs.
+      const { changed, data } = buildExtensionSuggestionUpdate(
+        existingById, commentData, contentHash, effectiveIsRead, newStatus,
+      );
+      if (!changed) continue;
+      logInfo(`[Suggestions:Ext] ${googleDocId}: ${s.id} already exists as ${existingById.commentId} — updating metadata`);
       await prisma.$transaction(async (tx) => {
         await tx.comment.update({
           where: { commentId: existingById.commentId },
-          data: {
-            ...commentData,
-            suggestionContentHash: contentHash,
-            isRead: effectiveIsRead,
-            ...(newStatus ? { status: newStatus } : {}),
-          },
+          data,
         });
         await bumpLastCommentActivity(docId, [commentData.driveCreatedAt, commentData.driveModifiedAt], tx);
       });
