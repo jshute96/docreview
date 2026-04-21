@@ -75,8 +75,15 @@ Suggestion data comes from two sources with different strengths. A content hash
 (`suggestionContentHash`) enables matching across them.
 
 **Text Normalization:** To ensure the Docs API and Gmail hashes match, both strings are
-normalized before hashing: trimmed, converted to lowercase, and all whitespace sequences
-(including newlines) replaced by a single space.
+normalized before hashing:
+1. Trailing ellipses (both `...` and `…`) are removed — this allows truncated Gmail
+   text to match full Docs API text.
+2. Strings are trimmed and all whitespace sequences (including newlines) are replaced
+   by a single space.
+3. The normalized string is truncated to 100 characters.
+4. Truncated strings are trimmed again to ensure no trailing spaces.
+
+The hash is **case-sensitive** to improve matching accuracy.
 
 **Assembly Logic:** When collecting suggestion fragments from the Docs API, Docreview
 preserves structural newlines between fragments (e.g., when a suggestion spans multiple
@@ -91,7 +98,7 @@ stripped before storage.
 |--------|----------------------|-------------------|------------|
 | `googleSuggestionId` | `suggest.xxx` | — | Drive only |
 | `googleCommentId` | — | `discussionId` (AAA*) | Gmail only |
-| `suggestionContentHash` | computed from text | computed from text | Either (should match) |
+| `suggestionContentHash` | computed from text | computed from text | Updated by either (formula recovery) |
 | `type` | SUGGESTION | SUGGESTION | Either |
 | `suggestionType` | INSERT/DELETE/EDIT/OTHER | mappable from Add/Delete/Replace/Other | Either |
 | `resolved` | lifecycle (false→true) | — | Drive authoritative |
@@ -112,6 +119,7 @@ rules (see docs/inbox-states.md): new suggestions get status based on mention, d
 role, and participation; existing suggestions are promoted to INBOX on new activity
 when relevant (e.g., new replies mentioning me, or new activity on a suggestion I'm
 involved in). MUTED suggestions are only promoted when a new reply @-mentions me.
+The `suggestionContentHash` is updated in case the formula changed.
 Doc-level unarchive is gated on `!isRead` so my own last action (typing a reply,
 accepting/rejecting) won't resurface an archived doc.
 
@@ -132,6 +140,13 @@ from ARCHIVED to INBOX via `unarchiveDocIfNeeded()`.
 **Gmail arrives first:** Inserts row with `googleCommentId`, content hash, `suggestionType`,
 `driveCreatedAt` from Gmail time, `replyCount`, and `status: "INBOX"`. Drive sync later finds by content hash
 and fills in `googleSuggestionId`. The Gmail timestamp is preserved as `driveCreatedAt`.
+
+**Disco-only / Suggestion-only merge:** If a sync path (Extension, Gmail, or Docs API) finds
+an existing record by one ID (e.g., disco ID) but that record is missing the other ID (e.g.,
+suggestion ID), it looks for a "partner" record with the same content hash that has the
+missing ID but no disco ID. If exactly one such partner is found, the two records are merged
+into one, and the partner record is deleted. This handles cases where different sources
+initially created separate records for the same suggestion.
 
 **No unique hash match:** If content hash matches zero or multiple rows, Drive sync inserts
 a new record. This may create duplicates for the same suggestion — see below.

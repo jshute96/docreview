@@ -701,7 +701,13 @@ async function syncDocsSuggestions(
   // (fallback for Gmail-first rows that don't have a googleSuggestionId yet).
   const allExisting = await prisma.comment.findMany({
     where: { docId: doc.docId, type: CommentType.SUGGESTION },
-    select: { commentId: true, googleSuggestionId: true, suggestionType: true, suggestionContentHash: true },
+    select: {
+      commentId: true,
+      googleSuggestionId: true,
+      googleCommentId: true,
+      suggestionType: true,
+      suggestionContentHash: true,
+    },
   });
 
   const byGoogleSuggestionId = new Map(
@@ -738,6 +744,25 @@ async function syncDocsSuggestions(
         existing = hashCandidates[0];
       } else if (hashCandidates && hashCandidates.length > 1) {
         logWarning(`[Suggestions:Docs] ${doc.googleDocId}: multiple hash matches for ${s.id} — inserting new row`);
+      }
+    } else if (!existing.googleCommentId) {
+      // Found by suggestion ID, but missing disco ID. Check if there's a
+      // disco-only record with the same hash that we should merge with.
+      const hashCandidates = byContentHash.get(contentHash);
+      if (hashCandidates?.length === 1) {
+        const partner = hashCandidates[0];
+        const currentExisting = existing;
+        logInfo(`[Suggestions:Docs] ${doc.googleDocId}: merging suggestion-only row ${currentExisting.commentId} into disco-only partner ${partner.commentId} by hash`);
+        await prisma.$transaction(async (tx) => {
+          await tx.comment.delete({ where: { commentId: currentExisting.commentId } });
+          await tx.comment.update({
+            where: { commentId: partner.commentId },
+            data: { googleSuggestionId: s.id },
+          });
+        });
+        // Switch to the partner record for any subsequent updates in this sync
+        existing = { ...partner, googleSuggestionId: s.id };
+        updated++;
       }
     }
 

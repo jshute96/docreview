@@ -135,7 +135,8 @@ describe("mergeSuggestionsFromGmail", () => {
       suggestions: [makeSuggestion()],
     });
     // Already merged — row with this googleCommentId exists
-    mockComment.findFirst.mockResolvedValue({ commentId: "cr1" });
+    const hash = computeSuggestionHash("INSERT", "", "new text");
+    mockComment.findFirst.mockResolvedValue({ commentId: "cr1", suggestionContentHash: hash });
 
     const result = await mergeSuggestionsFromGmail("d1", "gdoc1", email);
     expect(result).toEqual({ merged: 0, inserted: 0, shouldUnarchive: false });

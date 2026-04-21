@@ -36,10 +36,31 @@ describe("computeSuggestionHash", () => {
     expect(a).toBe(b);
   });
 
-  it("is case-insensitive", () => {
+  it("is case-sensitive", () => {
     const a = computeSuggestionHash("EDIT", "Old Text", "New Text");
     const b = computeSuggestionHash("EDIT", "old text", "new text");
-    expect(a).toBe(b);
+    expect(a).not.toBe(b);
+  });
+
+  it("matches truncated text with ellipsis to full text", () => {
+    const full = "This is a very long suggestion that goes on and on and on and eventually it will be truncated by some sources";
+    const truncated = full.substring(0, 100) + "...";
+    const truncatedUnicode = full.substring(0, 100) + "…";
+    
+    const hashFull = computeSuggestionHash("INSERT", "", full);
+    const hashTrunc = computeSuggestionHash("INSERT", "", truncated);
+    const hashTruncUnicode = computeSuggestionHash("INSERT", "", truncatedUnicode);
+    
+    expect(hashFull).toBe(hashTrunc);
+    expect(hashFull).toBe(hashTruncUnicode);
+  });
+
+  it("truncates at 100 characters even without ellipsis", () => {
+    const a = "a".repeat(100) + "b";
+    const b = "a".repeat(100);
+    const hashA = computeSuggestionHash("INSERT", "", a);
+    const hashB = computeSuggestionHash("INSERT", "", b);
+    expect(hashA).toBe(hashB);
   });
 
   it("produces matching hashes for Gmail and Docs API equivalent inputs", () => {

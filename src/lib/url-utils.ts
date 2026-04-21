@@ -1,5 +1,6 @@
 import { parseGoogleDocId } from "@/lib/google-drive";
 import { logInfo } from "@/lib/log";
+import { isInternalGoLink, resolveInternalGoLink } from "@/lib/go-links";
 
 /** Public URL shorteners safe to follow server-side. */
 const PUBLIC_SHORTENER_HOSTS = new Set([
@@ -22,6 +23,10 @@ export function isPublicShortenerUrl(input: string): boolean {
  * Only follows known public shorteners (SSRF mitigation).
  */
 export async function tryResolveRedirect(url: string): Promise<string | null> {
+  if (isInternalGoLink(url)) {
+    return resolveInternalGoLink(url);
+  }
+
   if (!isPublicShortenerUrl(url)) return null;
 
   let fullUrl = url.trim();

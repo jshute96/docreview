@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { SuggestionType } from "@prisma/client";
 import type { Suggestion } from "@/lib/parse-gmail-notification";
+import { logInfo } from "@/lib/log";
 
 // Computes a content hash for a suggestion to enable matching across data sources
 // (Docs API and Gmail notifications). The hash is based on the action type and text
@@ -13,9 +14,25 @@ export function computeSuggestionHash(
   deletedText: string,
   insertedText: string,
 ): string {
-  const normalize = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
-  const input = `${actionType}|${normalize(deletedText)}|${normalize(insertedText)}`;
-  return createHash("sha256").update(input).digest("hex");
+  const normalize = (s: string) => {
+    // 1. Remove trailing ellipsis (both ... and …)
+    const withoutEllipsis = s.replace(/\.\.\.$/, "").replace(/…$/, "");
+    // 2. Trim and 3. Collapse whitespace
+    return withoutEllipsis.trim().replace(/\s+/g, " ");
+  };
+
+  const normD = normalize(deletedText);
+  const normI = normalize(insertedText);
+  // 4. Truncate to 100 characters and 5. Trim again to remove boundary spaces
+  const truncD = normD.substring(0, 100).trim();
+  const truncI = normI.substring(0, 100).trim();
+
+  const input = `${actionType}|${truncD}|${truncI}`;
+  const hash = createHash("sha256").update(input).digest("hex");
+
+  logInfo(`[Hash] ${actionType} | D: "${truncD}" | I: "${truncI}" | hash: ${hash.substring(0, 12)}… | fullD: "${normD}" | fullI: "${normI}"`);
+
+  return hash;
 }
 
 // Maps Gmail notification action strings to canonical suggestion types.
