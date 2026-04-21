@@ -428,6 +428,9 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Drive-created suggestion matched by hash when Gmail notification arrives (no googleSuggestionId yet)
 - [ ] Extension-created suggestion matched by hash when Drive sync runs
 - [ ] Multiple formatting suggestions on same doc: hash collision doesn't cause incorrect merges (primary match uses IDs)
+- [ ] Disco-only row (Gmail/extension-first, has googleCommentId) merges with suggestion-only partner (Docs-API-first, has googleSuggestionId) when both reference the same suggestion — one row remains, no duplicates
+- [ ] Partner merge happens on all three sync paths (Drive, Gmail, Extension) when that path runs first after the two rows exist
+- [ ] Gmail merge only fills `suggestionContentHash` when missing (does not overwrite a hash written by Drive or Extension, since Gmail text is a stale snapshot)
 
 ---
 

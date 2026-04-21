@@ -6,6 +6,7 @@ vi.mock("@/lib/prisma", () => {
     findMany: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    delete: vi.fn(),
   };
   return {
     prisma: {
@@ -33,6 +34,7 @@ const mockComment = prisma.comment as unknown as {
   findMany: ReturnType<typeof vi.fn>;
   create: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
+  delete: ReturnType<typeof vi.fn>;
 };
 const mockParse = vi.mocked(parseGmailNotificationFromParsed);
 
@@ -60,6 +62,7 @@ beforeEach(() => {
   mockComment.findMany.mockResolvedValue([]);
   mockComment.create.mockResolvedValue({});
   mockComment.update.mockResolvedValue({});
+  mockComment.delete.mockResolvedValue({});
 });
 
 describe("mergeSuggestionsFromGmail", () => {
@@ -135,7 +138,8 @@ describe("mergeSuggestionsFromGmail", () => {
       suggestions: [makeSuggestion()],
     });
     // Already merged — row with this googleCommentId exists
-    mockComment.findFirst.mockResolvedValue({ commentId: "cr1" });
+    const hash = computeSuggestionHash("INSERT", "", "new text");
+    mockComment.findFirst.mockResolvedValue({ commentId: "cr1", suggestionContentHash: hash });
 
     const result = await mergeSuggestionsFromGmail("d1", "gdoc1", email);
     expect(result).toEqual({ merged: 0, inserted: 0, shouldUnarchive: false });
@@ -245,6 +249,130 @@ describe("mergeSuggestionsFromGmail", () => {
     expect(result).toEqual({ merged: 1, inserted: 0, shouldUnarchive: false });
     const updateCall = mockComment.update.mock.calls[0][0];
     expect(updateCall.data.status).toBeUndefined();
+  });
+
+  // --- Partner merge + hash-fill rules ---
+
+  it("merges a disco-only existing row with a unique suggestion-only partner by hash", async () => {
+    mockParse.mockReturnValue({
+      type: "comment",
+      subject: "", from: "", to: "", date_str: "",
+      documentId: "gdoc1", documentTitle: "Test", documentUrl: "https://docs.google.com/document/d/gdoc1/edit",
+      comments: [],
+      suggestions: [makeSuggestion()],
+    });
+    const hash = computeSuggestionHash("INSERT", "", "new text");
+    // Found by disco ID but missing googleSuggestionId
+    mockComment.findFirst.mockResolvedValue({
+      commentId: "discoRow", googleCommentId: "AAAB0abc", googleSuggestionId: null,
+      suggestionContentHash: hash,
+    });
+    // One suggestion-only partner with same hash
+    mockComment.findMany.mockResolvedValue([
+      { commentId: "sugRow", googleCommentId: null, googleSuggestionId: "suggest.xyz",
+        suggestionContentHash: hash, replyCount: 0 },
+    ]);
+
+    await mergeSuggestionsFromGmail("d1", "gdoc1", email);
+
+    // Partner deleted, existing updated with salvaged googleSuggestionId
+    expect(mockComment.update).toHaveBeenCalledWith({
+      where: { commentId: "discoRow" },
+      data: { googleSuggestionId: "suggest.xyz" },
+    });
+  });
+
+  it("does not merge when the only hash candidate is itself missing googleSuggestionId", async () => {
+    mockParse.mockReturnValue({
+      type: "comment",
+      subject: "", from: "", to: "", date_str: "",
+      documentId: "gdoc1", documentTitle: "Test", documentUrl: "https://docs.google.com/document/d/gdoc1/edit",
+      comments: [],
+      suggestions: [makeSuggestion()],
+    });
+    const hash = computeSuggestionHash("INSERT", "", "new text");
+    mockComment.findFirst.mockResolvedValue({
+      commentId: "discoRow", googleCommentId: "AAAB0abc", googleSuggestionId: null,
+      suggestionContentHash: hash,
+    });
+    // Candidate has no googleSuggestionId to salvage — should be filtered out
+    mockComment.findMany.mockResolvedValue([
+      { commentId: "other", googleCommentId: null, googleSuggestionId: null,
+        suggestionContentHash: hash, replyCount: 0 },
+    ]);
+
+    await mergeSuggestionsFromGmail("d1", "gdoc1", email);
+
+    // No update call for the partner-merge step
+    expect(mockComment.update).not.toHaveBeenCalled();
+  });
+
+  it("does not merge when multiple qualifying partners match the hash", async () => {
+    mockParse.mockReturnValue({
+      type: "comment",
+      subject: "", from: "", to: "", date_str: "",
+      documentId: "gdoc1", documentTitle: "Test", documentUrl: "https://docs.google.com/document/d/gdoc1/edit",
+      comments: [],
+      suggestions: [makeSuggestion()],
+    });
+    const hash = computeSuggestionHash("INSERT", "", "new text");
+    mockComment.findFirst.mockResolvedValue({
+      commentId: "discoRow", googleCommentId: "AAAB0abc", googleSuggestionId: null,
+      suggestionContentHash: hash,
+    });
+    mockComment.findMany.mockResolvedValue([
+      { commentId: "a", googleCommentId: null, googleSuggestionId: "suggest.a",
+        suggestionContentHash: hash, replyCount: 0 },
+      { commentId: "b", googleCommentId: null, googleSuggestionId: "suggest.b",
+        suggestionContentHash: hash, replyCount: 0 },
+    ]);
+
+    await mergeSuggestionsFromGmail("d1", "gdoc1", email);
+    expect(mockComment.update).not.toHaveBeenCalled();
+  });
+
+  it("fills suggestionContentHash when missing on the existing disco-ID row", async () => {
+    mockParse.mockReturnValue({
+      type: "comment",
+      subject: "", from: "", to: "", date_str: "",
+      documentId: "gdoc1", documentTitle: "Test", documentUrl: "https://docs.google.com/document/d/gdoc1/edit",
+      comments: [],
+      suggestions: [makeSuggestion()],
+    });
+    // Existing row found by disco ID, already has googleSuggestionId (so partner
+    // branch is skipped), but no hash yet.
+    mockComment.findFirst.mockResolvedValue({
+      commentId: "cr1", googleCommentId: "AAAB0abc", googleSuggestionId: "suggest.xyz",
+      suggestionContentHash: null,
+    });
+
+    await mergeSuggestionsFromGmail("d1", "gdoc1", email);
+
+    const expectedHash = computeSuggestionHash("INSERT", "", "new text");
+    expect(mockComment.update).toHaveBeenCalledWith({
+      where: { commentId: "cr1" },
+      data: { suggestionContentHash: expectedHash },
+    });
+  });
+
+  it("does NOT overwrite an existing suggestionContentHash (Gmail is fill-only)", async () => {
+    mockParse.mockReturnValue({
+      type: "comment",
+      subject: "", from: "", to: "", date_str: "",
+      documentId: "gdoc1", documentTitle: "Test", documentUrl: "https://docs.google.com/document/d/gdoc1/edit",
+      comments: [],
+      suggestions: [makeSuggestion()],
+    });
+    // Existing row already has a stale/different hash from Drive or extension.
+    // Gmail should not touch it.
+    mockComment.findFirst.mockResolvedValue({
+      commentId: "cr1", googleCommentId: "AAAB0abc", googleSuggestionId: "suggest.xyz",
+      suggestionContentHash: "deadbeef-hash-from-fresh-source",
+    });
+
+    await mergeSuggestionsFromGmail("d1", "gdoc1", email);
+
+    expect(mockComment.update).not.toHaveBeenCalled();
   });
 
   it("handles Delete action correctly", async () => {

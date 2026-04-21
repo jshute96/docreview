@@ -701,7 +701,13 @@ async function syncDocsSuggestions(
   // (fallback for Gmail-first rows that don't have a googleSuggestionId yet).
   const allExisting = await prisma.comment.findMany({
     where: { docId: doc.docId, type: CommentType.SUGGESTION },
-    select: { commentId: true, googleSuggestionId: true, suggestionType: true, suggestionContentHash: true },
+    select: {
+      commentId: true,
+      googleSuggestionId: true,
+      googleCommentId: true,
+      suggestionType: true,
+      suggestionContentHash: true,
+    },
   });
 
   const byGoogleSuggestionId = new Map(
@@ -738,6 +744,42 @@ async function syncDocsSuggestions(
         existing = hashCandidates[0];
       } else if (hashCandidates && hashCandidates.length > 1) {
         logWarning(`[Suggestions:Docs] ${doc.googleDocId}: multiple hash matches for ${s.id} — inserting new row`);
+      }
+    } else if (!existing.googleCommentId) {
+      // Found by suggestion ID, but missing disco ID. Check if there's a
+      // disco-only record with the same hash that we should merge with. The
+      // partner must actually have a `googleCommentId` to contribute; a
+      // hash-only row (both IDs null) shouldn't exist in today's code, but
+      // defensively filter so we never delete a partner that adds nothing.
+      const hashCandidates = (byContentHash.get(contentHash) ?? []).filter((c) => c.googleCommentId);
+      if (hashCandidates.length === 1) {
+        const partner = hashCandidates[0];
+        const currentExisting = existing;
+        logInfo(`[Suggestions:Docs] ${doc.googleDocId}: merging suggestion-only row ${currentExisting.commentId} into disco-only partner ${partner.commentId} by hash`);
+        await prisma.$transaction(async (tx) => {
+          await tx.comment.delete({ where: { commentId: currentExisting.commentId } });
+          await tx.comment.update({
+            where: { commentId: partner.commentId },
+            data: { googleSuggestionId: s.id },
+          });
+        });
+        // Keep the in-memory maps in sync with the DB, otherwise a later
+        // suggestion with the same hash would re-match `partner` through
+        // `byContentHash` (still listed as unlinked) and clobber the
+        // googleSuggestionId we just assigned. Likewise `byGoogleSuggestionId`
+        // must now point at the surviving partner row, not the deleted one.
+        const merged = { ...partner, googleSuggestionId: s.id };
+        byGoogleSuggestionId.set(s.id, merged);
+        const fullList = byContentHash.get(contentHash) ?? [];
+        const remaining = fullList.filter((r) => r.commentId !== partner.commentId);
+        if (remaining.length > 0) byContentHash.set(contentHash, remaining);
+        else byContentHash.delete(contentHash);
+        updated++;
+        // Skip the fall-through metadata update: by construction the merged
+        // partner's hash and suggestionType already match `s`, and we just set
+        // googleSuggestionId. Letting the fall-through run would double-count
+        // `updated` if any invariant ever slipped.
+        continue;
       }
     }
 

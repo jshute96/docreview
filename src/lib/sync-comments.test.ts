@@ -8,6 +8,7 @@ vi.mock("@/lib/prisma", () => {
     update: vi.fn(),
     updateMany: vi.fn(),
     deleteMany: vi.fn(),
+    delete: vi.fn(),
   };
   const doc = { update: vi.fn() };
   return {
@@ -34,7 +35,8 @@ vi.mock("@/lib/google-drive", async () => {
 import { syncComments } from "./sync-comments";
 import { prisma } from "@/lib/prisma";
 import { fetchCommentData, fetchDocData } from "@/lib/google-drive";
-import type { Doc } from "@prisma/client";
+import { computeSuggestionHash } from "./suggestion-hash";
+import { SuggestionType, type Doc } from "@prisma/client";
 
 const mockComment = prisma.comment as unknown as {
   findMany: ReturnType<typeof vi.fn>;
@@ -42,6 +44,7 @@ const mockComment = prisma.comment as unknown as {
   update: ReturnType<typeof vi.fn>;
   updateMany: ReturnType<typeof vi.fn>;
   deleteMany: ReturnType<typeof vi.fn>;
+  delete: ReturnType<typeof vi.fn>;
 };
 const mockDoc = prisma.doc as unknown as {
   update: ReturnType<typeof vi.fn>;
@@ -78,6 +81,7 @@ beforeEach(() => {
   mockComment.createMany.mockResolvedValue({ count: 0 });
   mockComment.update.mockResolvedValue({});
   mockComment.deleteMany.mockResolvedValue({ count: 0 });
+  mockComment.delete.mockResolvedValue({});
   mockDoc.update.mockResolvedValue({});
   mockFetchDocData.mockResolvedValue({ suggestions: [], suggestionContent: {}, documentText: null });
 });
@@ -918,6 +922,123 @@ describe("syncComments suggestion resolution", () => {
     const findManyCall = mockComment.findMany.mock.calls[2][0];
     expect(findManyCall.where.googleSuggestionId).toEqual({ not: null });
     expect(mockComment.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+// --------------- Deleted comment cleanup ---------------
+
+// --------------- syncDocsSuggestions partner merge ---------------
+//
+// When the Docs API path finds an existing row by googleSuggestionId but that
+// row has no googleCommentId, and there's a unique disco-only row with the
+// same content hash, the two are merged into one.
+
+describe("syncDocsSuggestions partner merge", () => {
+  const driveSuggestion = {
+    id: "suggest.abc",
+    suggestionType: SuggestionType.INSERT,
+    deletedText: "",
+    insertedText: "new text",
+  };
+  const expectedHash = () => computeSuggestionHash("INSERT", "", "new text");
+
+  it("merges a suggestion-only existing row into a unique disco-only partner", async () => {
+    const doc = makeDoc();
+    const hash = expectedHash();
+    mockFetchCommentData.mockResolvedValue({ comments: [] });
+    mockFetchDocData.mockResolvedValue({
+      suggestions: [driveSuggestion],
+      suggestionContent: {},
+      documentText: null,
+    });
+    mockComment.findMany
+      .mockResolvedValueOnce([])  // batch fetch comments
+      .mockResolvedValueOnce([    // allExisting
+        { commentId: "sug", googleSuggestionId: "suggest.abc", googleCommentId: null,
+          suggestionContentHash: hash, suggestionType: "INSERT" },
+        { commentId: "disco", googleSuggestionId: null, googleCommentId: "AAAB0disco",
+          suggestionContentHash: hash, suggestionType: "INSERT" },
+      ])
+      .mockResolvedValueOnce([    // activeSuggestions — disco row now has the merged googleSuggestionId
+        { commentId: "disco", googleSuggestionId: "suggest.abc", resolved: false, status: "INBOX" },
+      ]);
+
+    await syncComments(doc, driveAuth);
+
+    // The suggestion-only row was deleted; googleSuggestionId was salvaged onto the disco row
+    expect(mockComment.delete).toHaveBeenCalledWith({ where: { commentId: "sug" } });
+    expect(mockComment.update).toHaveBeenCalledWith({
+      where: { commentId: "disco" },
+      data: { googleSuggestionId: "suggest.abc" },
+    });
+  });
+
+  it("does NOT partner-merge when the only hash candidate also lacks googleCommentId", async () => {
+    const doc = makeDoc();
+    const hash = expectedHash();
+    mockFetchCommentData.mockResolvedValue({ comments: [] });
+    mockFetchDocData.mockResolvedValue({
+      suggestions: [driveSuggestion],
+      suggestionContent: {},
+      documentText: null,
+    });
+    mockComment.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { commentId: "sug", googleSuggestionId: "suggest.abc", googleCommentId: null,
+          suggestionContentHash: hash, suggestionType: "INSERT" },
+        // Candidate has no IDs at all — defensive filter rejects
+        { commentId: "ghost", googleSuggestionId: null, googleCommentId: null,
+          suggestionContentHash: hash, suggestionType: "INSERT" },
+      ])
+      .mockResolvedValueOnce([
+        { commentId: "sug", googleSuggestionId: "suggest.abc", resolved: false, status: "INBOX" },
+      ]);
+
+    await syncComments(doc, driveAuth);
+
+    expect(mockComment.delete).not.toHaveBeenCalled();
+  });
+
+  it("keeps maps consistent: a second same-hash suggestion does not clobber the merged partner", async () => {
+    // Two Docs-API suggestions with the same content hash: the first triggers a
+    // partner merge (into `disco`), the second must NOT re-match `disco` via
+    // byContentHash and overwrite its googleSuggestionId. Instead it should
+    // insert a new row (no matching partner left in the map).
+    const doc = makeDoc();
+    const hash = expectedHash();
+    const secondSuggestion = { ...driveSuggestion, id: "suggest.def" };
+    mockFetchCommentData.mockResolvedValue({ comments: [] });
+    mockFetchDocData.mockResolvedValue({
+      suggestions: [driveSuggestion, secondSuggestion],
+      suggestionContent: {},
+      documentText: null,
+    });
+    mockComment.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { commentId: "sug", googleSuggestionId: "suggest.abc", googleCommentId: null,
+          suggestionContentHash: hash, suggestionType: "INSERT" },
+        { commentId: "disco", googleSuggestionId: null, googleCommentId: "AAAB0disco",
+          suggestionContentHash: hash, suggestionType: "INSERT" },
+      ])
+      .mockResolvedValueOnce([
+        { commentId: "disco", googleSuggestionId: "suggest.abc", resolved: false, status: "INBOX" },
+      ]);
+
+    await syncComments(doc, driveAuth);
+
+    // Only the first merge assigns googleSuggestionId onto disco; the second
+    // suggestion must not update disco again (that would clobber the ID).
+    const updateCalls = mockComment.update.mock.calls.map((c) => c[0]);
+    const updatesOnDisco = updateCalls.filter((a) => a.where?.commentId === "disco");
+    expect(updatesOnDisco).toHaveLength(1);
+    expect(updatesOnDisco[0].data).toEqual({ googleSuggestionId: "suggest.abc" });
+
+    // The second suggestion should have gone into the create batch (new row).
+    expect(mockComment.createMany).toHaveBeenCalled();
+    const created = mockComment.createMany.mock.calls[0][0].data;
+    expect(created.some((c: { googleSuggestionId?: string }) => c.googleSuggestionId === "suggest.def")).toBe(true);
   });
 });
 
