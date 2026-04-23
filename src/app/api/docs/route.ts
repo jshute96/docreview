@@ -166,6 +166,7 @@ async function executeLoad(opts: {
         role: doc.role,
         lastModifiedInDrive: doc.lastModifiedInDrive,
         createdTimeInDrive: doc.createdTimeInDrive,
+        lastCommentActivity: doc.createdTimeInDrive, // Initialize from creation time; comment sync will bump it up
         status: loadStatus ?? (doc.role === DocRole.AUTHOR ? DocStatus.INBOX : DocStatus.ARCHIVED),
         ...(loadIsStarred !== undefined ? { isStarred: loadIsStarred } : {}),
         ...(loadNotes ? { notes: loadNotes } : {}),

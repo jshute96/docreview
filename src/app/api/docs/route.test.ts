@@ -648,6 +648,43 @@ describe("POST /api/docs", () => {
     expect(upsertCall.create.status).toBe("ARCHIVED");
   });
 
+  it("load mode initializes lastCommentActivity from createdTimeInDrive on new docs", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
+    mockGetDriveClient.mockResolvedValue(driveAuth);
+    const createdTime = new Date("2024-05-01T00:00:00.000Z");
+    mockFetchDocsByIds.mockResolvedValue([
+      {
+        googleDocId: "g1",
+        title: "New Doc",
+        driveUrl: "https://docs.google.com/document/d/g1/edit",
+        mimeType: "application/vnd.google-apps.document",
+        role: "AUTHOR" as const,
+        lastModifiedInDrive: new Date("2024-06-01"),
+        createdTimeInDrive: createdTime,
+      },
+    ]);
+
+    mockDoc.findMany
+      .mockResolvedValueOnce([]) // existingDocIds
+      .mockResolvedValueOnce([]); // commentDocs
+    mockDoc.upsert.mockResolvedValue({ docId: "d-any" } as any);
+    mockSyncComments.mockResolvedValue({
+      commentsCreated: 0, commentsUpdated: 0,
+      suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
+      shouldUnarchive: false,
+    });
+
+    const res = await POST(postRequestWithBody({
+      source: "drive",
+      selectedGoogleDocIds: ["g1"],
+    }));
+    await readSSEResult(res);
+
+    const upsertCall = mockDoc.upsert.mock.calls[0][0];
+    expect(upsertCall.create.lastCommentActivity).toEqual(createdTime);
+  });
+
   it("load mode with empty selection fetches no docs", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
