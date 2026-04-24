@@ -528,6 +528,10 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] First click opens new tab; subsequent clicks reuse same tab
 - [ ] Falls back to page reload if navigation script fails
 - [ ] Doesn't trample diff/version-history views in Google Docs (from recent changes button or view activity menu) — opens another tab instead
+- [ ] When the tracked tab is in diff view but another tab already has the doc open in non-diff view (e.g., user duplicated the diff tab via Chrome's Duplicate Tab), reuses that sibling tab instead of opening a third one
+- [ ] When tracked tab navigates away to a different doc (or non-Docs page), tracking is dropped so the next Open creates a fresh tab instead of hijacking the navigated-away tab
+- [ ] When tracked tab is closed, mapping is cleaned up so the next Open opens a new tab rather than targeting the stale tabId
+- [ ] After the diff-view fallback creates an adjacent non-diff tab and the original diff tab is later closed, the next Open reuses the surviving non-diff tab (via URL scan) instead of opening another one
 - [ ] Navigation works on doc with no comments (no error from loadAllComments)
 - [ ] Navigation works on view-only doc (no hang from loadAllComments)
 

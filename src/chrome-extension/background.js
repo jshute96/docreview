@@ -707,24 +707,43 @@ async function navigateToComment(docId, discoId, docUrl, resolved, senderTab) {
     return { success: true, opened: true };
   }
 
-  // Check if the tracked tab is in diff/version history view. If so, open a new
-  // adjacent tab for comment navigation instead of disrupting the diff view.
+  // Check if the tracked tab is in diff/version history view. If so, try to
+  // reuse another open tab for the same doc that isn't in diff view (e.g., one
+  // the user got via Chrome's Duplicate Tab on the diff tab). Only if no such
+  // sibling exists do we open a new adjacent tab.
   var inDiffView = await isTabInDiffView(tabId);
   if (inDiffView) {
-    console.log('[background] tracked tab is in diff/version history view, opening new adjacent tab:', { docId, tabId });
-    try {
-      var diffTab = await chrome.tabs.get(tabId);
-      var newTab = await chrome.tabs.create({ url: fallbackUrl, index: diffTab.index + 1, windowId: diffTab.windowId });
-      await setDocTab(docId, newTab.id);
-      setDocTabName(newTab.id, docId);
-      return { success: true, opened: true };
-    } catch (e) {
-      console.warn('[background] diff view tab disappeared, falling back to new tab:', e);
-      var newTabIndex = senderTab ? senderTab.index + 1 : undefined;
-      var newTab = await chrome.tabs.create({ url: fallbackUrl, index: newTabIndex });
-      await setDocTab(docId, newTab.id);
-      setDocTabName(newTab.id, docId);
-      return { success: true, opened: true };
+    var siblingTabId = null;
+    var siblings = await findAllDocTabs(docId);
+    for (var i = 0; i < siblings.length; i++) {
+      if (siblings[i] === tabId) continue;
+      if (await isTabInDiffView(siblings[i])) continue;
+      siblingTabId = siblings[i];
+      break;
+    }
+
+    if (siblingTabId) {
+      console.log('[background] tracked tab is in diff view; reusing non-diff sibling tab:', { docId, diffTabId: tabId, siblingTabId });
+      await setDocTab(docId, siblingTabId);
+      setDocTabName(siblingTabId, docId);
+      tabId = siblingTabId;
+      // Fall through to the normal focus + inject path below.
+    } else {
+      console.log('[background] tracked tab is in diff/version history view, opening new adjacent tab:', { docId, tabId });
+      try {
+        var diffTab = await chrome.tabs.get(tabId);
+        var newTab = await chrome.tabs.create({ url: fallbackUrl, index: diffTab.index + 1, windowId: diffTab.windowId });
+        await setDocTab(docId, newTab.id);
+        setDocTabName(newTab.id, docId);
+        return { success: true, opened: true };
+      } catch (e) {
+        console.warn('[background] diff view tab disappeared, falling back to new tab:', e);
+        var newTabIndex = senderTab ? senderTab.index + 1 : undefined;
+        var newTab = await chrome.tabs.create({ url: fallbackUrl, index: newTabIndex });
+        await setDocTab(docId, newTab.id);
+        setDocTabName(newTab.id, docId);
+        return { success: true, opened: true };
+      }
     }
   }
 

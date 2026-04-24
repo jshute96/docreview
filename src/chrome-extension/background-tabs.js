@@ -49,22 +49,33 @@ async function findDocTab(docId) {
 
   // Search by URL if not tracked
   if (!tabId) {
-    try {
-      var candidates = await chrome.tabs.query({ url: 'https://docs.google.com/*' });
-      for (var i = 0; i < candidates.length; i++) {
-        if (candidates[i].url && candidates[i].url.includes('/d/' + docId + '/')) {
-          tabId = candidates[i].id;
-          await setDocTab(docId, tabId);
-          console.log('[background] found existing doc tab by URL:', { docId, tabId });
-          break;
-        }
-      }
-    } catch (e) {
-      // Query failed, fall through
+    var matches = await findAllDocTabs(docId);
+    if (matches.length > 0) {
+      tabId = matches[0];
+      await setDocTab(docId, tabId);
+      console.log('[background] found existing doc tab by URL:', { docId, tabId });
     }
   }
 
   return tabId;
+}
+
+// Find all open Google Docs tabs whose URL contains the given doc ID.
+// Used when we need to pick among multiple tabs for the same doc (e.g., the
+// tracked tab is in diff view but a duplicated sibling tab isn't).
+async function findAllDocTabs(docId) {
+  var matches = [];
+  try {
+    var candidates = await chrome.tabs.query({ url: 'https://docs.google.com/*' });
+    for (var i = 0; i < candidates.length; i++) {
+      if (candidates[i].url && candidates[i].url.includes('/d/' + docId + '/')) {
+        matches.push(candidates[i].id);
+      }
+    }
+  } catch (e) {
+    // Query failed, return empty list
+  }
+  return matches;
 }
 
 // Set window.name on a Google Docs tab so the web app's <a target="doc-{id}">

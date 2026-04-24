@@ -115,7 +115,7 @@ The extension bridges this gap via `focusDocTab`: the web app asks the extension
 - Doc list opens first, then comments page "Open" -> extension's `findDocTab` finds the tab by URL
 - Comments page opens first (via extension), then doc list "Open" -> extension's `focusDocTab` finds it in `docTabMap`
 
-**Comment navigation** (clicking "Open" on a specific comment): The extension's `navigateToComment` finds the tab via `findDocTab`, focuses it, and injects a script to scroll to the comment without reloading. If no tab exists, it creates one with a `?disco=` URL for initial scroll. If the tracked tab is in a diff/version history view (detected by the visibility of `.docs-revisions-chromecover-content`), a new adjacent tab is opened instead of disrupting the diff view. If that tab is later closed, the next navigation rediscovers the diff-view tab via URL search and opens a fresh tab again.
+**Comment navigation** (clicking "Open" on a specific comment): The extension's `navigateToComment` finds the tab via `findDocTab`, focuses it, and injects a script to scroll to the comment without reloading. If no tab exists, it creates one with a `?disco=` URL for initial scroll. If the tracked tab is in a diff/version history view (detected by the visibility of `.docs-revisions-chromecover-content`), it first looks for another open tab for the same doc that isn't in diff view (via `findAllDocTabs`) — e.g., one the user got by duplicating the diff tab — and reuses it if found. Only if no non-diff sibling exists does it open a new adjacent tab instead of disrupting the diff view. If that sibling/new tab is later closed, the next navigation rediscovers the diff-view tab via URL search and repeats the search/create flow.
 
 ### window.name synchronization
 
@@ -128,7 +128,7 @@ The extension sets `window.name = 'doc-{id}'` on Google Docs tabs it tracks (via
 | `src/lib/tab-targets.ts` | Named target helpers: `commentsTarget()`, `docTarget()`, `openCommentsPage()`, `openDocPage()` |
 | `src/lib/bridge-to-extension.ts` | `focusDocTab()`, `handleOpenDocClick()`, `navigateToComment()`, `selectCommentInDoc()`, `setCommentSelectionHandler()` |
 | `src/chrome-extension/background.js` | Message handler, `navigateToComment()`, `focusDocTab` handler, `selectComment` handler |
-| `src/chrome-extension/background-tabs.js` | `findDocTab()`, `setDocTab()`, `setDocTabName()` |
+| `src/chrome-extension/background-tabs.js` | `findDocTab()`, `findAllDocTabs()`, `setDocTab()`, `setDocTabName()` |
 | `src/chrome-extension/background-injected.js` | `navigateToCommentInPage()`, `selectCommentInPage()`, `injectDiscoIdHelpers()` |
 
 ## Comment navigation implementation
