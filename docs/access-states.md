@@ -120,11 +120,14 @@ skipping them. This captures docs where someone @mentioned the user in a comment
 shared a doc, but the user doesn't have access.
 
 **Metadata extraction from email:**
-- **Title**: extracted from the email subject (comment notifications use the doc title
-  as the subject; sharing notifications use `Document shared with you: "Title"`)
-- **Notes**: `"Gmail notification received DATE (permission denied|not found)"` with
-  optional second line for comment text (`"Author: comment"`) or sharing info
-  (`"Shared by Name"` or `"Requested to share by Name"` for access requests)
+- **Title**: prefers the parsed `documentTitle` from the email HTML body (the real
+  doc name); falls back to the email Subject header, then `"(no subject)"`
+- **Notes**: multi-line, aggregated across all Gmail notifications for the doc:
+  - Header: `"Gmail notifications received (doc not found):"` or
+    `"Gmail notifications received (permission denied):"`
+  - One entry per email below the header — sharing entries formatted via
+    `formatShareNote()` (`"Shared by Name (email) on DATE"` / `"Requested to share by..."`),
+    comment entries as `"Author: text"` for the first reply of the first thread
 - **Timestamps**: `createdTimeInDrive` and `lastModifiedInDrive` are set to the email
   date (since we can't access Drive metadata)
 

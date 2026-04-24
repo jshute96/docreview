@@ -129,7 +129,7 @@ describe("formatShareNote", () => {
       sharerEmail: "someone@somewhere.com",
       date: "2026-03-03T20:08:23.000Z",
     }));
-    expect(note).toBe("Shared by Jeff Someone (someone@somewhere.com) on 2026-03-03 12:08");
+    expect(note).toBe("Shared by Jeff Someone (someone@somewhere.com) on 2026-03-03");
   });
 
   it("uses 'Requested to share by' for share requests", () => {
@@ -231,8 +231,8 @@ describe("buildInaccessibleDocs", () => {
     const [result] = buildInaccessibleDocs(["doc1"], meta);
     // Notes should contain both the formatted share note and a comment snippet line.
     expect(result.notes).toContain("Shared by");
-    // Comment snippet lines have the "[date] author: text" shape.
-    expect(result.notes).toMatch(/\[.+\] .+: /);
+    // Comment snippet lines have the "author: text" shape.
+    expect(result.notes).toMatch(/^Jeff Shute: /m);
     // Multi-line: header + at least two aggregated entries.
     expect(result.notes.split("\n").length).toBeGreaterThanOrEqual(3);
   });
@@ -245,12 +245,12 @@ describe("buildInaccessibleDocs", () => {
     expect(result.notes).toContain("permission denied");
   });
 
-  it("uses 'not found' label by default", () => {
+  it("uses 'doc not found' label by default", () => {
     const email = readFixture("invitation_to_edit.eml");
     const meta = new Map<string, ParsedEmail[]>([["doc1", [email]]]);
     const [result] = buildInaccessibleDocs(["doc1"], meta);
     expect(result.accessState).toBe(AccessState.NOT_FOUND);
-    expect(result.notes).toContain("not found");
+    expect(result.notes).toContain("doc not found");
   });
 
   it("skips docs with no email metadata", () => {

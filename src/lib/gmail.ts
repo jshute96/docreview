@@ -74,8 +74,8 @@ function extractDocId(body: string): string | null {
 /**
  * Format a parsed SharingNotification into a human-readable note for storage in
  * the doc's `notes` field. Produces strings like:
- *   "Shared by Jane Doe (jane@example.com) on 2026-03-03 12:08"
- *   "Requested to share by Jane Doe on 2026-03-03 12:08\n<optional message>"
+ *   "Shared by Jane Doe (jane@example.com) on 2026-03-03"
+ *   "Requested to share by Jane Doe on 2026-03-03\n<optional message>"
  * Falls back gracefully when sharer details or date are missing.
  */
 export function formatShareNote(notification: SharingNotification): string {
@@ -93,7 +93,7 @@ export function formatShareNote(notification: SharingNotification): string {
 
   const date = notification.date ? new Date(notification.date) : null;
   if (date && !isNaN(date.getTime())) {
-    note += ` on ${formatDate(date, true)}`;
+    note += ` on ${formatDate(date, false, true)}`;
   }
 
   if (notification.shareMessage) {
@@ -377,7 +377,7 @@ export function buildInaccessibleDocs(
   for (const docId of failedDocIds) {
     const emails = emailMeta.get(docId);
     if (!emails || emails.length === 0) continue;
-    const stateLabel = accessState === AccessState.DENIED ? "permission denied" : "not found";
+    const stateLabel = accessState === AccessState.DENIED ? "permission denied" : "doc not found";
 
     // Parser's documentTitle (from the HTML body) is almost always the real doc
     // name; fall back to the email Subject header only if no parsed title is
@@ -391,7 +391,6 @@ export function buildInaccessibleDocs(
       const dateRaw = email.headers.get("date") ?? "";
       const date = dateRaw ? new Date(dateRaw) : null;
       const dateValid = date && !isNaN(date.getTime());
-      const dateStr = dateValid ? formatDate(date!, true) : dateRaw;
 
       if (!emailDate && dateValid) emailDate = date!;
       if (!subjectTitle) {
@@ -408,7 +407,7 @@ export function buildInaccessibleDocs(
           if (parsed.type === "comment" && parsed.comments.length > 0) {
             const reply = parsed.comments[0].replies[0];
             if (reply) {
-              newNote = `[${dateStr}] ${reply.author}: ${reply.text}`;
+              newNote = `${reply.author}: ${reply.text}`;
             }
           } else if (parsed.type === "sharing") {
             newNote = formatShareNote(parsed);
