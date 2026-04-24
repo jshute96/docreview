@@ -145,12 +145,12 @@ export async function syncSingleComment(
   doc: Doc,
   googleCommentId: string,
   driveAuth: Awaited<ReturnType<typeof getDriveClient>>,
-  options?: { expectFresh?: boolean; userEmail?: string },
+  options?: { expectRecentComment?: boolean; userEmail?: string },
 ): Promise<SingleCommentResult> {
   // Fetch the comment from Drive (returns null if content is empty/deleted).
-  // When expectFresh is set (extension-triggered sync), the user just acted on
-  // this comment so its modifiedTime should be recent. If Drive API returns
-  // stale data (backend replication lag), retry with exponential backoff.
+  // When expectRecentComment is set, the caller just observed (or performed)
+  // an action on this comment, so its modifiedTime should be recent. If Drive
+  // API returns stale data (backend replication lag), retry with exponential backoff.
   const FRESH_CUTOFF = 5000;       // modifiedTime must be within 5s of request start
   const INITIAL_RETRY_DELAY = 100; // first retry after 100ms, then 1.5x each time
   const MAX_RETRY_TIME = 2000;     // give up after ~2s total retry time
@@ -160,7 +160,7 @@ export async function syncSingleComment(
   try {
     const freshAfter = Date.now() - FRESH_CUTOFF;
     result = await fetchThreadDetail(driveAuth, doc.googleDocId, googleCommentId, options?.userEmail);
-    if (options?.expectFresh) {
+    if (options?.expectRecentComment) {
       let delay = INITIAL_RETRY_DELAY;
       let elapsed = 0;
       while (result && elapsed < MAX_RETRY_TIME) {
@@ -243,7 +243,7 @@ export async function syncComments(
   // Uses a targeted DB lookup + single Drive API call instead of batch-fetching.
   if (!skipComments && hints?.googleCommentId) {
     try {
-      const result = await syncSingleComment(doc, hints.googleCommentId, driveAuth, { expectFresh: true, userEmail });
+      const result = await syncSingleComment(doc, hints.googleCommentId, driveAuth, { expectRecentComment: true, userEmail });
       logInfo(`[Comments] ${doc.googleDocId}: single-comment sync ${hints.googleCommentId} (${result.created ? "created" : result.updated ? "updated" : result.deleted ? "deleted" : "unchanged"})`);
       return {
         ...EMPTY_RESULT,

@@ -97,7 +97,7 @@ export async function POST(
 
     // Refresh thread data from Drive using shared single-comment sync
     const userEmail = session.user.email ?? undefined;
-    const syncResult = await syncSingleComment(doc, commentId, driveAuth, { userEmail });
+    const syncResult = await syncSingleComment(doc, commentId, driveAuth, { userEmail, expectRecentComment: true });
     if (!syncResult.comment) {
       return NextResponse.json({ error: "Comment not found in Drive" }, { status: 404 });
     }
