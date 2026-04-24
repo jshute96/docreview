@@ -13,6 +13,10 @@ Google APIs check `invalidGrantResponse()` to return 401 on expired tokens.
 | GET | List all tracked docs with comments | No (Prisma) |
 | POST | Selective load — adds scanned docs with labels/notes | Drive (SSE streaming) |
 
+POST Body: `{ source, selectedGoogleDocIds, labelIds, notes, docNotes?, status?, isStarred?, inaccessibleDocs? }`
+
+- `docNotes`: Optional `Record<googleDocId, string>` for document-specific notes (e.g. share messages from Gmail). Appended to any generic `notes` provided.
+
 ### `/api/docs/[docId]` — Single doc CRUD
 
 | Method | Purpose | Google API? |

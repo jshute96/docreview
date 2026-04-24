@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
         try {
           const userEmail = session.user.email ?? undefined;
-          const { docs: gmailDocs, inaccessibleDocs, errorCount, noGmailAccount } = await scanGmailNotifications(userId, since, userEmail, send);
+          const { docs: gmailDocs, inaccessibleDocs, shareNotes, errorCount, noGmailAccount } = await scanGmailNotifications(userId, since, userEmail, send);
 
           const docs: Array<{
             googleDocId: string; title: string; mimeType: string; driveUrl: string;
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
             driveUrl: d.driveUrl,
             role: d.role,
             isNew: !existingDocIds.has(d.googleDocId),
+            notes: shareNotes.get(d.googleDocId),
           }));
 
           // Include inaccessible docs (permission denied / not found) so they can be loaded

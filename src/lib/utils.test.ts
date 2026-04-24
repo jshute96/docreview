@@ -78,6 +78,12 @@ describe("formatDate", () => {
     expect(formatDate(d, true)).toBe("2024-03-01 08:05");
   });
 
+  it("omits time when omitTime is true", () => {
+    // 2024-03-01 08:05:09 PST = 2024-03-01T16:05:09Z
+    const d = new Date("2024-03-01T16:05:09Z");
+    expect(formatDate(d, false, true)).toBe("2024-03-01");
+  });
+
   it("formats midnight correctly (hour 00, not 24)", () => {
     // 2024-01-01 00:00:00 PST = 2024-01-01T08:00:00Z
     const d = new Date("2024-01-01T08:00:00Z");

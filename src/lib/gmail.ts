@@ -2,7 +2,7 @@ import { gmail as createGmail } from "@googleapis/gmail";
 import { drive as createDrive } from "@googleapis/drive";
 import { getDriveClient, driveUrlFor, isDriveErrorCode, parseGoogleDocId } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
-import { formatDate } from "@/lib/utils";
+import { formatDate, appendNotes } from "@/lib/utils";
 import {
   parseGmailNotificationFromParsed,
   type ParsedEmail,
@@ -297,43 +297,49 @@ export async function scanGmailForDocIds(
 
         // Extract doc URL from message body
         const body = extractBodyText(res.data.payload);
-        const docId = body ? extractDocId(body) : null;
+        const htmlBody = extractHtmlBody(res.data.payload);
+        const headerMap = new Map<string, string>();
+        for (const h of headers) {
+          if (h.name && h.value) headerMap.set(h.name.toLowerCase(), h.value);
+        }
+        const parsed: ParsedEmail = {
+          headers: headerMap,
+          textBody: body ?? "",
+          htmlBody: htmlBody ?? "",
+        };
 
-        if (docId) {
-          logInfo(`[Gmail] ${messageId} → doc ${docId} (${Date.now() - t0}ms)`);
-          docIdSet.add(docId);
+        try {
+          const notif = parseGmailNotificationFromParsed(parsed);
+          const docId = notif.documentId;
 
-          // Capture parsed email for inaccessible doc fallback and suggestion merging
-          const headerMap = new Map<string, string>();
-          for (const h of headers) {
-            if (h.name && h.value) headerMap.set(h.name.toLowerCase(), h.value);
-          }
-          const parsed: ParsedEmail = {
-            headers: headerMap,
-            textBody: body ?? "",
-            htmlBody: extractHtmlBody(res.data.payload) ?? "",
-          };
-          const existing = emailMeta.get(docId);
-          if (existing) {
-            existing.push(parsed);
-          } else {
-            emailMeta.set(docId, [parsed]);
-          }
+          if (docId) {
+            logInfo(`[Gmail] ${messageId} → doc ${docId} (${Date.now() - t0}ms)`);
+            docIdSet.add(docId);
 
-          // For sharing emails, generate a note via the structured parser so
-          // we share a single implementation with the inaccessible-doc path.
-          if (fromHeader.includes("drive-shares-dm-noreply@google.com")) {
-            try {
-              const notif = parseGmailNotificationFromParsed(parsed);
-              if (notif.type === "sharing") {
-                shareNotes.set(docId, formatShareNote(notif));
-              }
-            } catch (parseErr) {
-              logWarning(`[Gmail] Share note parse failed for ${docId}:`, parseErr);
+            // Capture parsed email for inaccessible doc fallback and suggestion merging
+            const existing = emailMeta.get(docId);
+            if (existing) {
+              existing.push(parsed);
+            } else {
+              emailMeta.set(docId, [parsed]);
             }
+
+            // Handle specific notification types for notes
+            let note = "";
+            if (notif.type === "sharing") {
+              note = formatShareNote(notif);
+            }
+            
+            if (note) {
+              const existingNote = shareNotes.get(docId);
+              shareNotes.set(docId, existingNote ? appendNotes(existingNote, note) : note);
+            }
+          } else {
+            logError(`[Gmail] ${messageId}: no doc link found in parsed notification. (${Date.now() - t0}ms)`);
+            errorCount++;
           }
-        } else {
-          logError(`[Gmail] ${messageId}: no doc link found in body (${Date.now() - t0}ms)`);
+        } catch (parseErr) {
+          logError(`[Gmail] ${messageId}: failed to parse notification (${Date.now() - t0}ms):`, parseErr);
           errorCount++;
         }
       } catch (err) {
@@ -366,39 +372,55 @@ export function buildInaccessibleDocs(
   const results: GmailInaccessibleDoc[] = [];
   for (const docId of failedDocIds) {
     const emails = emailMeta.get(docId);
-    const email = emails?.[0];
-    if (!email) continue;
+    if (!emails || emails.length === 0) continue;
     try {
       const stateLabel = accessState === AccessState.DENIED ? "permission denied" : "not found";
-      const dateRaw = email.headers.get("date") ?? "";
-      const date = dateRaw ? new Date(dateRaw) : null;
-      const dateStr = date && !isNaN(date.getTime()) ? formatDate(date, true) : dateRaw;
+      
+      let title = "(no subject)";
+      let notes = `Gmail notifications received (${stateLabel}):`;
+      let emailDate = new Date();
+      let dateSet = false;
 
-      let title = email.headers.get("subject") ?? "(no subject)";
-      let notes = `Gmail notification received ${dateStr} (${stateLabel})`;
+      for (const email of emails) {
+        const dateRaw = email.headers.get("date") ?? "";
+        const date = dateRaw ? new Date(dateRaw) : null;
+        const dateStr = date && !isNaN(date.getTime()) ? formatDate(date, true) : dateRaw;
 
-      // Use the full notification parser for structured data extraction
-      if (email.htmlBody) {
-        try {
-          const parsed = parseGmailNotificationFromParsed(email);
-          if (parsed.documentTitle) {
-            title = parsed.documentTitle;
-          }
-          if (parsed.type === "comment" && parsed.comments.length > 0) {
-            const reply = parsed.comments[0].replies[0];
-            if (reply) {
-              notes += `\n${reply.author}: ${reply.text}`;
+        if (!dateSet && date && !isNaN(date.getTime())) {
+          emailDate = date;
+          dateSet = true;
+        }
+
+        if (title === "(no subject)") {
+          title = email.headers.get("subject") ?? "(no subject)";
+        }
+
+        if (email.htmlBody) {
+          try {
+            const parsed = parseGmailNotificationFromParsed(email);
+            if (parsed.documentTitle && title === "(no subject)") {
+              title = parsed.documentTitle;
             }
-          } else if (parsed.type === "sharing") {
-            notes += "\n" + formatShareNote(parsed);
+
+            let newNote = "";
+            if (parsed.type === "comment" && parsed.comments.length > 0) {
+              const reply = parsed.comments[0].replies[0];
+              if (reply) {
+                newNote = `[${dateStr}] ${reply.author}: ${reply.text}`;
+              }
+            } else if (parsed.type === "sharing") {
+              newNote = formatShareNote(parsed);
+            }
+
+            if (newNote) {
+              notes = appendNotes(notes, newNote);
+            }
+          } catch {
+            logWarning(`[Gmail] Notification parser failed for ${docId}, using subject as title`);
           }
-        } catch {
-          // Fall back to subject as title if parser fails
-          logWarning(`[Gmail] Notification parser failed for ${docId}, using subject as title`);
         }
       }
 
-      const emailDate = date && !isNaN(date.getTime()) ? date : new Date();
       results.push({ googleDocId: docId, title, accessState, notes, emailDate });
       logInfo(`[Gmail] Created inaccessible doc entry for ${docId} (${accessState})`);
     } catch (parseErr) {

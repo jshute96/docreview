@@ -199,6 +199,14 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
     setAdding(true);
     const contextId = generateContextId();
     try {
+      const docNotes: Record<string, string> = {};
+      effectiveDocs.forEach(d => {
+        // Only collect notes for accessible docs; inaccessible ones pass notes via inaccessibleDocs below.
+        if (d.notes && !d.accessState) {
+          docNotes[d.googleDocId] = d.notes;
+        }
+      });
+
       const data = await fetchWithProgress<Record<string, number>>("/api/docs?mode=load", {
         method: "POST",
         contextId,
@@ -212,6 +220,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
             .map((d) => ({ googleDocId: d.googleDocId, title: d.title, accessState: d.accessState, notes: d.notes, emailDate: d.emailDate })),
           labelIds: selectedLabelIds,
           notes,
+          docNotes,
           ...(isStarred ? { isStarred } : {}),
           status: addToInbox ? DocStatus.INBOX : DocStatus.ARCHIVED,
         }),

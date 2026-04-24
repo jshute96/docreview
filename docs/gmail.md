@@ -41,38 +41,29 @@ title and notes extracted from the email.
    same day would reprocess messages without this check
 4. Skips sharing notifications that are confirmations of our own shares — detected
    by matching the `Reply-To` email against the logged-in user's email
-5. Parses the plaintext body with regex to find a `/d/DOC_ID/` pattern
-6. For sharing emails (from `drive-shares-dm-noreply@google.com`), extracts a share
-   note via `parseShareNote()` in `gmail-parse.ts` — includes sharer name/email from
-   Reply-To, date, and any custom message from the plaintext body. Distinguishes
-   share invitations ("Shared by") from access requests ("Requested to share by")
-   based on the Subject header.
+5. Parses the body using the structured `parseGmailNotificationFromParsed` utility (in `parse-gmail-notification.ts`) to find the document ID and extract notification details.
+6. For sharing and comment notifications, extracts notes (e.g. sharer messages or comment snippets) via the structured parser.
 7. For messages with a doc ID, calls Drive `files.get` to fetch real title,
    mimeType, webViewLink, and role
 8. Messages with no doc link are logged as errors and counted
 9. Docs that fail Drive fetch (404/403) are collected as `inaccessibleDocs` with
-   best-effort metadata from the email
-10. Deduplicates by googleDocId (multiple emails may reference the same doc)
+   best-effort metadata (titles and notes) extracted from all associated emails.
+10. Deduplicates by googleDocId (multiple emails may reference the same doc),
+    combining notes from all relevant emails via `appendNotes()`.
 11. Returns `{ docs, inaccessibleDocs, shareNotes, errorCount }` — `docs` contains
-    successfully resolved docs; `inaccessibleDocs` contains docs that failed Drive fetch
+    successfully resolved docs; `inaccessibleDocs` contains docs that failed Drive fetch.
 
-### Share Note Extraction — `gmail-parse.ts`
+### Note Extraction
 
-When a sharing email is detected (From: `drive-shares-dm-noreply@google.com`),
-`parseShareNote()` builds a note string from email headers and body:
+The scanner uses the structured parser to extract rich context from notifications:
 
-- **Sharer**: extracted from `Reply-To` header (e.g., `"Jeff Shute <jshute@google.com>"`)
-- **Date**: from `Date` header, formatted via `formatDate(date, true)` (PST, no seconds)
-- **Message**: extracted structurally from the plaintext body — the URL paragraph is
-  found (language-independent), the next paragraph (locale-dependent boilerplate) is
-  skipped, and everything remaining is the custom share message
+- **Sharing Notifications**: extracts the sharer name, date, and any custom share message.
+- **Comment Notifications**: extracts the author and text of the latest reply.
+- **Doc-specific Notes**: During scanning, these notes are collected in `shareNotes` (a map of doc ID to note string). For `inaccessibleDocs`, these are bundled directly into the doc entry.
 
-Output format: `"Shared by Name (email) on YYYY-MM-DD HH:MM\ncustom message"` for
-invitations, or `"Requested to share by Name (email) on YYYY-MM-DD HH:MM"` for
-access requests (detected via "share request" in the Subject header).
-
-For **new docs**, the share note is set as the initial `notes` value in the upsert
-create block. For **existing docs**, it is appended via `appendNotes()`. Existing
+For **new docs**, these notes are set as the initial `notes` value in the upsert
+create block (combining doc-specific notes with any generic notes from the load
+dialog). For **existing docs**, they are appended via `appendNotes()`. Existing
 ARCHIVED docs are also unarchived to INBOX.
 
 ### OAuth Scope

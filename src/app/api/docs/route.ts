@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
     : null;
   const loadLabelIds: string[] = Array.isArray(loadBody.labelIds) ? loadBody.labelIds as string[] : [];
   const loadNotes: string = typeof loadBody.notes === "string" ? (loadBody.notes as string).trim() : "";
+  const loadDocNotes: Record<string, string> = typeof loadBody.docNotes === "object" ? loadBody.docNotes as Record<string, string> : {};
   const loadStatus: DocStatus | undefined = typeof loadBody.status === "string" && (loadBody.status === DocStatus.INBOX || loadBody.status === DocStatus.ARCHIVED) ? loadBody.status as DocStatus : undefined;
   const loadIsStarred: boolean | undefined = typeof loadBody.isStarred === "boolean" ? loadBody.isStarred : undefined;
   const loadInaccessibleDocs: GmailInaccessibleDoc[] = Array.isArray(loadBody.inaccessibleDocs)
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
   return createProgressStream(async (send: OnProgress) => {
     return await executeLoad({
       userId, userEmail, source,
-      selectedSet, loadLabelIds, loadNotes, loadStatus, loadIsStarred, loadInaccessibleDocs, send,
+      selectedSet, loadLabelIds, loadNotes, loadDocNotes, loadStatus, loadIsStarred, loadInaccessibleDocs, send,
     });
   });
   });
@@ -97,6 +98,7 @@ async function executeLoad(opts: {
   selectedSet: Set<string> | null;
   loadLabelIds: string[];
   loadNotes: string;
+  loadDocNotes: Record<string, string>;
   loadStatus: DocStatus | undefined;
   loadIsStarred: boolean | undefined;
   loadInaccessibleDocs: GmailInaccessibleDoc[];
@@ -104,7 +106,7 @@ async function executeLoad(opts: {
 }) {
   const {
     userId, userEmail, source, selectedSet,
-    loadLabelIds, loadNotes, loadStatus, loadIsStarred, loadInaccessibleDocs, send,
+    loadLabelIds, loadNotes, loadDocNotes, loadStatus, loadIsStarred, loadInaccessibleDocs, send,
   } = opts;
   const t0 = Date.now();
 
@@ -169,7 +171,7 @@ async function executeLoad(opts: {
         lastCommentActivity: doc.createdTimeInDrive, // Initialize from creation time; comment sync will bump it up
         status: loadStatus ?? (doc.role === DocRole.AUTHOR ? DocStatus.INBOX : DocStatus.ARCHIVED),
         ...(loadIsStarred !== undefined ? { isStarred: loadIsStarred } : {}),
-        ...(loadNotes ? { notes: loadNotes } : {}),
+        notes: loadDocNotes[doc.googleDocId] || loadNotes || null,
         ...(loadLabelIds.length > 0
           ? { labels: { create: loadLabelIds.map((id) => ({ labelId: id })) } }
           : {}),
@@ -195,10 +197,12 @@ async function executeLoad(opts: {
           skipDuplicates: true,
         });
       }
-      if (loadNotes) {
+      const specificNotes = loadDocNotes[doc.googleDocId];
+      const notesToAppend = specificNotes || loadNotes;
+      if (notesToAppend) {
         await prisma.doc.update({
           where: { docId: result.docId },
-          data: { notes: appendNotes(result.notes, loadNotes) },
+          data: { notes: appendNotes(result.notes, notesToAppend) },
         });
       }
     }
