@@ -374,6 +374,9 @@ Update this list when adding or changing user-facing behaviors.
 ### Share Notes
 - [ ] Sharing emails create notes: "Shared by Name (email) on date\n[message]"
 - [ ] Access request emails create notes: "Requested to share by Name..."
+- [ ] Comment notification emails contribute note snippets (author + reply text)
+- [ ] Multiple Gmail notifications for the same doc aggregate their notes
+- [ ] Load dialog passes per-doc notes (docNotes map) to `/api/docs` POST so scanned notes are preserved on import
 - [ ] New docs: sets as initial notes
 - [ ] Existing docs: appends with newline
 

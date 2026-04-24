@@ -45,6 +45,20 @@ export async function GET(req: NextRequest) {
   });
 }
 
+/**
+ * Validate the optional docNotes map on /api/docs POST bodies. Guards against
+ * `typeof null === "object"`, arrays, and non-string values so the downstream
+ * `loadDocNotes[...]` lookups always yield a string or undefined.
+ */
+export function parseDocNotes(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value === "string") result[key] = value;
+  }
+  return result;
+}
+
 export async function POST(req: NextRequest) {
   return runWithRequestId("POST", req, async () => {
   const session = await getValidSession();
@@ -63,7 +77,7 @@ export async function POST(req: NextRequest) {
     : null;
   const loadLabelIds: string[] = Array.isArray(loadBody.labelIds) ? loadBody.labelIds as string[] : [];
   const loadNotes: string = typeof loadBody.notes === "string" ? (loadBody.notes as string).trim() : "";
-  const loadDocNotes: Record<string, string> = typeof loadBody.docNotes === "object" ? loadBody.docNotes as Record<string, string> : {};
+  const loadDocNotes: Record<string, string> = parseDocNotes(loadBody.docNotes);
   const loadStatus: DocStatus | undefined = typeof loadBody.status === "string" && (loadBody.status === DocStatus.INBOX || loadBody.status === DocStatus.ARCHIVED) ? loadBody.status as DocStatus : undefined;
   const loadIsStarred: boolean | undefined = typeof loadBody.isStarred === "boolean" ? loadBody.isStarred : undefined;
   const loadInaccessibleDocs: GmailInaccessibleDoc[] = Array.isArray(loadBody.inaccessibleDocs)
@@ -171,7 +185,7 @@ async function executeLoad(opts: {
         lastCommentActivity: doc.createdTimeInDrive, // Initialize from creation time; comment sync will bump it up
         status: loadStatus ?? (doc.role === DocRole.AUTHOR ? DocStatus.INBOX : DocStatus.ARCHIVED),
         ...(loadIsStarred !== undefined ? { isStarred: loadIsStarred } : {}),
-        notes: loadDocNotes[doc.googleDocId] || loadNotes || null,
+        notes: loadDocNotes[doc.googleDocId] ?? (loadNotes || null),
         ...(loadLabelIds.length > 0
           ? { labels: { create: loadLabelIds.map((id) => ({ labelId: id })) } }
           : {}),
@@ -198,7 +212,7 @@ async function executeLoad(opts: {
         });
       }
       const specificNotes = loadDocNotes[doc.googleDocId];
-      const notesToAppend = specificNotes || loadNotes;
+      const notesToAppend = specificNotes ?? loadNotes;
       if (notesToAppend) {
         await prisma.doc.update({
           where: { docId: result.docId },

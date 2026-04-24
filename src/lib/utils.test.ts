@@ -84,6 +84,18 @@ describe("formatDate", () => {
     expect(formatDate(d, false, true)).toBe("2024-03-01");
   });
 
+  it("omitTime overrides omitSeconds when both are true", () => {
+    const d = new Date("2024-03-01T16:05:09Z");
+    expect(formatDate(d, true, true)).toBe("2024-03-01");
+  });
+
+  it("omitTime formats correctly near PST/PDT midnight boundary", () => {
+    // 2024-03-10 23:30 PST (before DST) vs 2024-03-11 00:30 PDT (after)
+    // 2024-03-11 07:30 UTC = 2024-03-11 00:30 PDT (date rolls to 11th)
+    const d = new Date("2024-03-11T07:30:00Z");
+    expect(formatDate(d, false, true)).toBe("2024-03-11");
+  });
+
   it("formats midnight correctly (hour 00, not 24)", () => {
     // 2024-01-01 00:00:00 PST = 2024-01-01T08:00:00Z
     const d = new Date("2024-01-01T08:00:00Z");

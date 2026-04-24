@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { isNoGmailMailboxError, describeGoogleApiError, formatShareNote } from "./gmail";
-import type { SharingNotification } from "./parse-gmail-notification";
+import { readFileSync } from "fs";
+import { join } from "path";
+import { AccessState } from "@prisma/client";
+import { isNoGmailMailboxError, describeGoogleApiError, formatShareNote, buildInaccessibleDocs } from "./gmail";
+import { parseEmail } from "./parse-gmail-notification";
+import type { ParsedEmail, SharingNotification } from "./parse-gmail-notification";
+
+const EXAMPLES_DIR = join(__dirname, "../../testing/gmail_notifications");
+const readFixture = (name: string): ParsedEmail =>
+  parseEmail(readFileSync(join(EXAMPLES_DIR, name), "utf-8"));
 
 function shareNotif(overrides: Partial<SharingNotification> = {}): SharingNotification {
   return {
@@ -166,5 +174,95 @@ describe("formatShareNote", () => {
   it("falls back to bare verb when no sharer details at all", () => {
     expect(formatShareNote(shareNotif())).toBe("Shared");
     expect(formatShareNote(shareNotif({ isRequest: true }))).toBe("Requested to share");
+  });
+});
+
+describe("buildInaccessibleDocs", () => {
+  it("prefers parsed documentTitle over email Subject header", () => {
+    // invitation_to_edit has Subject='Document shared with you: "Shared from home 1"'
+    // and parsed documentTitle='Shared from home 1' — the latter is the useful name.
+    const email = readFixture("invitation_to_edit.eml");
+    const meta = new Map<string, ParsedEmail[]>([["doc1", [email]]]);
+    const [result] = buildInaccessibleDocs(["doc1"], meta);
+    expect(result.title).toBe("Shared from home 1");
+  });
+
+  it("falls back to Subject header when parser throws (unknown sender)", () => {
+    const email: ParsedEmail = {
+      headers: new Map([
+        ["from", "unknown-sender@example.com"],
+        ["subject", "Subject fallback"],
+        ["date", "Sat, 07 Mar 2026 06:38:35 +0000"],
+      ]),
+      textBody: "",
+      htmlBody: "<html></html>",
+    };
+    const meta = new Map<string, ParsedEmail[]>([["doc1", [email]]]);
+    const [result] = buildInaccessibleDocs(["doc1"], meta);
+    expect(result.title).toBe("Subject fallback");
+  });
+
+  it("falls back to Subject when no htmlBody (parser isn't invoked)", () => {
+    const email: ParsedEmail = {
+      headers: new Map([["subject", "Plain subject"], ["date", "Sat, 07 Mar 2026 06:38:35 +0000"]]),
+      textBody: "",
+      htmlBody: "",
+    };
+    const meta = new Map<string, ParsedEmail[]>([["doc1", [email]]]);
+    const [result] = buildInaccessibleDocs(["doc1"], meta);
+    expect(result.title).toBe("Plain subject");
+  });
+
+  it('uses "(no subject)" when nothing is available', () => {
+    const email: ParsedEmail = {
+      headers: new Map([["from", "unknown@example.com"]]),
+      textBody: "",
+      htmlBody: "",
+    };
+    const meta = new Map<string, ParsedEmail[]>([["doc1", [email]]]);
+    const [result] = buildInaccessibleDocs(["doc1"], meta);
+    expect(result.title).toBe("(no subject)");
+  });
+
+  it("aggregates notes across multiple emails for the same doc", () => {
+    const share = readFixture("invitation_to_edit.eml");
+    const comment = readFixture("mentioned_me_in_unshared_doc.eml");
+    const meta = new Map<string, ParsedEmail[]>([["doc1", [share, comment]]]);
+    const [result] = buildInaccessibleDocs(["doc1"], meta);
+    // Notes should contain both the formatted share note and a comment snippet line.
+    expect(result.notes).toContain("Shared by");
+    // Comment snippet lines have the "[date] author: text" shape.
+    expect(result.notes).toMatch(/\[.+\] .+: /);
+    // Multi-line: header + at least two aggregated entries.
+    expect(result.notes.split("\n").length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("uses 'permission denied' label for DENIED state", () => {
+    const email = readFixture("invitation_to_edit.eml");
+    const meta = new Map<string, ParsedEmail[]>([["doc1", [email]]]);
+    const [result] = buildInaccessibleDocs(["doc1"], meta, AccessState.DENIED);
+    expect(result.accessState).toBe(AccessState.DENIED);
+    expect(result.notes).toContain("permission denied");
+  });
+
+  it("uses 'not found' label by default", () => {
+    const email = readFixture("invitation_to_edit.eml");
+    const meta = new Map<string, ParsedEmail[]>([["doc1", [email]]]);
+    const [result] = buildInaccessibleDocs(["doc1"], meta);
+    expect(result.accessState).toBe(AccessState.NOT_FOUND);
+    expect(result.notes).toContain("not found");
+  });
+
+  it("skips docs with no email metadata", () => {
+    const results = buildInaccessibleDocs(["doc1"], new Map());
+    expect(results).toHaveLength(0);
+  });
+
+  it("uses the first parseable Date header as emailDate", () => {
+    const email = readFixture("invitation_to_edit.eml");
+    const meta = new Map<string, ParsedEmail[]>([["doc1", [email]]]);
+    const [result] = buildInaccessibleDocs(["doc1"], meta);
+    // invitation_to_edit.eml Date header is Sat, 07 Mar 2026 06:38:35 +0000
+    expect(result.emailDate.toISOString()).toBe("2026-03-07T06:38:35.000Z");
   });
 });

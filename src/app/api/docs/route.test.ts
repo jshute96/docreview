@@ -38,7 +38,7 @@ vi.mock("@/lib/status", () => ({
   updateDriveChangesToken: vi.fn(),
 }));
 
-import { GET, POST } from "./route";
+import { GET, POST, parseDocNotes } from "./route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { fetchDocsByIds, getDriveClient, getChangesStartPageToken } from "@/lib/google-drive";
@@ -712,5 +712,42 @@ describe("POST /api/docs", () => {
     expect(data.updated).toBe(0);
     expect(mockFetchDocsByIds).toHaveBeenCalledWith("u1", [], expect.any(Function));
     expect(mockDoc.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("parseDocNotes", () => {
+  it("returns empty object for null", () => {
+    expect(parseDocNotes(null)).toEqual({});
+  });
+
+  it("returns empty object for undefined", () => {
+    expect(parseDocNotes(undefined)).toEqual({});
+  });
+
+  it("returns empty object for arrays", () => {
+    expect(parseDocNotes(["abc", "def"])).toEqual({});
+  });
+
+  it("returns empty object for primitives", () => {
+    expect(parseDocNotes("string")).toEqual({});
+    expect(parseDocNotes(42)).toEqual({});
+    expect(parseDocNotes(true)).toEqual({});
+  });
+
+  it("returns a valid string map unchanged", () => {
+    expect(parseDocNotes({ doc1: "note 1", doc2: "note 2" })).toEqual({
+      doc1: "note 1",
+      doc2: "note 2",
+    });
+  });
+
+  it("drops non-string values", () => {
+    expect(parseDocNotes({ doc1: "note", doc2: 123, doc3: null, doc4: { nested: true } })).toEqual({
+      doc1: "note",
+    });
+  });
+
+  it("preserves empty-string values (caller decides how to treat them)", () => {
+    expect(parseDocNotes({ doc1: "" })).toEqual({ doc1: "" });
   });
 });

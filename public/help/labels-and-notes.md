@@ -36,7 +36,7 @@ Notes are free-text annotations you attach to documents. They appear below the d
 - **Bulk edit** -- The notes field in bulk edit *appends* to existing notes rather than replacing them, so you can add a note to many documents without overwriting what's already there.
 - **Load dialog** -- Notes entered during import are set on new documents and appended to existing ones.
 
-Notes from Gmail imports include information about who shared the document and when.
+Notes from Gmail imports include information about who shared the document and when, and can also include snippets from comment notification emails. Notes from multiple emails for the same document are combined.
 
 ## Edit dialog
 

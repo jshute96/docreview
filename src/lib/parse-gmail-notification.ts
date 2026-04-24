@@ -122,7 +122,7 @@ function decodeRfc2047(value: string): string {
   });
 }
 
-function parseEmail(raw: string): ParsedEmail {
+export function parseEmail(raw: string): ParsedEmail {
   // Split headers from body at first blank line (handle both \r\n and \n)
   const blankLineMatch = raw.match(/\r?\n\r?\n/);
   if (!blankLineMatch) {
