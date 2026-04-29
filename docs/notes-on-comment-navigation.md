@@ -127,7 +127,7 @@ const allComments = listitem[lmKey].listeners.click[0].Yd.t3b.qq;
 
 **Property names are minified** (`Yd`, `Ai`, `t3b`, `qq`) and could change between Google Docs releases. The structural pattern (closure_lm → click listener → model object with ID) should be more stable than the specific property names.
 
-**Dynamic discovery:** Rather than hardcoding these minified names, the extension discovers the correct path at runtime. The key insight is that each listitem's click handler has two kinds of paths to AAAB strings: (1) a short, direct path to the per-item disco ID (e.g., `Yd.Ai`), and (2) paths through numeric array indices to a shared array of all comment IDs (e.g., `Yd.t3b.qq[N].Ai`). With 2+ items, diffing two items reveals which non-array paths have different values — those are the per-item ID paths. With 1 item, the shortest non-array path is used. Discovery takes ~3ms and is cached for the page session.
+**Dynamic discovery:** Rather than hardcoding these minified names, the extension discovers the correct path at runtime. The key insight is that each listitem's click handler has two kinds of paths to disco-ID-shaped strings (matching `^AAA[A-Z]…` — the 4th char is a counter that increments as Google ages, so older docs use `AAAA`, newer ones `AAAB`+): (1) a short, direct path to the per-item disco ID (e.g., `Yd.Ai`), and (2) paths through numeric array indices to a shared array of all comment IDs (e.g., `Yd.t3b.qq[N].Ai`). With 2+ items, diffing two items reveals which non-array paths have different values — those are the per-item ID paths. With 1 item, the shortest non-array path is used. Discovery takes ~3ms and is cached for the page session.
 
 #### Other useful properties in the comment model
 

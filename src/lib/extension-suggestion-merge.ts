@@ -1,7 +1,7 @@
 // Merges suggestion data from the Chrome extension (DOM scraping) into the database.
 //
 // Similar to mergeSuggestionsFromGmail but with extension-specific data:
-// - Disco IDs (AAAB format, same as Gmail's discussionId)
+// - Disco IDs (AAA[A-Z]... format, same as Gmail's discussionId)
 // - Suggestion type, old/new text (for content hash)
 // - Accept/reject status (maps to resolved: true)
 // - Author name and isMine flag

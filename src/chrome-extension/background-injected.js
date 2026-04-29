@@ -66,13 +66,14 @@ function injectDiscoIdHelpers() {
   // The disco ID for each comment listitem is stored in Google's Closure Library
   // component tree under minified property names (e.g., .Yd.Ai) that change when
   // Google releases new code. Instead of hardcoding these names, we discover the
-  // path dynamically by walking the tree and looking for AAAB-pattern strings.
+  // path dynamically by walking the tree and looking for AAA[A-Z]-pattern strings
+  // (the 4th char is a counter — older docs start with AAAA, newer with AAAB+).
   //
   // Discovery strategy:
   //   - With 2+ items: diff two items' trees. Paths that exist in both but have
   //     different values are per-item IDs. Paths through array indices contain the
   //     shared model array (all IDs) — filter those out.
-  //   - With 1 item: find the shortest path to an AAAB string that doesn't traverse
+  //   - With 1 item: find the shortest path to an AAA[A-Z] string that doesn't traverse
   //     an array index. The shared array goes through numeric indices; the per-item
   //     ID is at a short, direct property path.
   //
@@ -80,7 +81,7 @@ function injectDiscoIdHelpers() {
 
   var discoveredIdPath = null;
 
-  // Walk an object tree collecting paths to AAAB-pattern strings.
+  // Walk an object tree collecting paths to AAA[A-Z]-pattern strings.
   // Each result: { path: string[], value, throughArray: boolean }
   // throughArray is true if any step in the path was a numeric array index.
   function collectIdPaths(obj, maxDepth) {
@@ -98,7 +99,7 @@ function injectDiscoIdHelpers() {
         var isNum = /^\d+$/.test(key);
         try {
           var v = cur[key];
-          if (typeof v === 'string' && /^AAAB[A-Za-z0-9_-]{5,}$/.test(v) && v.length < 20) {
+          if (typeof v === 'string' && /^AAA[A-Z][A-Za-z0-9_-]{5,}$/.test(v) && v.length < 20) {
             results.push({
               path: isNum ? path.concat('*') : path.concat(key),
               value: v,
@@ -155,7 +156,7 @@ function injectDiscoIdHelpers() {
       var cur = getClickRoot(item);
       if (!cur) return null;
       for (var i = 0; i < pathParts.length; i++) cur = cur[pathParts[i]];
-      return (typeof cur === 'string' && /^AAAB/.test(cur)) ? cur : null;
+      return (typeof cur === 'string' && /^AAA[A-Z]/.test(cur)) ? cur : null;
     } catch(e) { return null; }
   }
 

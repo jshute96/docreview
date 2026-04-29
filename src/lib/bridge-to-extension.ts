@@ -183,7 +183,7 @@ export function selectCommentInDoc(docId: string, discoId: string): void {
 
 /** Shape of a suggestion returned by the extension's getSuggestions() DOM scraper. */
 export interface ExtensionSuggestion {
-  id: string;              // disco ID (AAAB format)
+  id: string;              // disco ID (AAA[A-Z]... format)
   suggestionType: string;  // "Replace", "Add", "Delete", or non-text types like "Format", "Add link"
   status: string;          // "open", "accepted", "rejected"
   oldText: string;
@@ -245,7 +245,7 @@ export async function getCommentFromDoc(docId: string, discoId: string): Promise
 
 /** Minimal comment info returned by the extension — fields not available from Drive API. */
 export interface ExtensionCommentInfo {
-  id: string;                     // disco ID (AAAB format)
+  id: string;                     // disco ID (AAA[A-Z]... format)
   originalContentDeleted: boolean;
   tabName?: string;               // tab name from stream view header (e.g., "Tab 1")
 }

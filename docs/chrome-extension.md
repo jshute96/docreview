@@ -137,7 +137,7 @@ Comment navigation works across Google Docs, Sheets, and Slides — they all run
 
 The injected navigation script (`navigateToCommentInPage`) handles several complications:
 
-- **Disco ID discovery**: Comment disco IDs are stored deep in Google's Closure Library component tree under minified property names that change between releases. Instead of hardcoding these names, the script discovers the correct path dynamically by walking the tree and looking for AAAB-pattern ID strings. With 2+ comments, it diffs two items to find paths that differ (per-item ID) vs paths through array indices (shared model). With 1 comment, it finds the shortest non-array path. The discovered path is used for all items within a single navigation call.
+- **Disco ID discovery**: Comment disco IDs are stored deep in Google's Closure Library component tree under minified property names that change between releases. Instead of hardcoding these names, the script discovers the correct path dynamically by walking the tree and looking for AAA[A-Z]-pattern ID strings (the 4th char is a counter — older docs start with AAAA). With 2+ comments, it diffs two items to find paths that differ (per-item ID) vs paths through array indices (shared model). With 1 comment, it finds the shortest non-array path. The discovered path is used for all items within a single navigation call.
 - **Anchored comments** (open, with margin highlights): Navigates and closes the comments pane for a clean view.
 - **Non-anchored comments** (resolved, unanchored): Opens the comments pane so the comment is visible, then navigates.
 - **Suggestions without a disco ID**: Focuses the existing tab without scrolling.
