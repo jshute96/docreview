@@ -108,11 +108,11 @@ export async function upsertDocsAndSyncComments(
         createdTimeInDrive: doc.createdTimeInDrive,
         notes: shareNotes?.get(doc.googleDocId) ?? null,
         lastCommentActivity: doc.createdTimeInDrive, // Initialize from creation time; comment sync will bump it up
-        // Mode-based status defaults:
-        // All new docs discovered via Drive activity start as ARCHIVED to avoid noise
-        // from old docs resurfacing. We rely on Gmail notifications or the
-        // subsequent comment sync (Phase 3) to move them to INBOX if relevant.
-        status: fromGmail ? DocStatus.INBOX : DocStatus.ARCHIVED,
+        // All new docs start ARCHIVED to avoid noise from old docs resurfacing —
+        // including those discovered via Gmail. Sharing notifications, INBOX-worthy
+        // comment activity, or Gmail-merged comments/suggestions promote to INBOX
+        // via the share-note branch below or the post-sync `shouldUnarchive` block.
+        status: DocStatus.ARCHIVED,
       },
       update: {
         title: "", // Clear any previously stored title
@@ -124,22 +124,30 @@ export async function upsertDocsAndSyncComments(
       },
     });
 
-    // Append share note and unarchive existing docs discovered via Gmail.
-    // parseShareNote() returns a note for ALL share emails (even without a custom
-    // message), so this fires for every share — not just ones with a message attached.
-    // A (re)share is a strong signal the doc needs attention, so we always unarchive.
+    // Sharing email is a strong signal the doc needs attention. For existing
+    // docs, append the note and unarchive if archived. For new docs, the note
+    // was already set in the create block; we still need to promote ARCHIVED
+    // (the new default) to INBOX. parseShareNote() returns a note for ALL share
+    // emails (even without a custom message), so this fires for every share.
     const shareNote = shareNotes?.get(doc.googleDocId);
-    if (isExisting && shareNote) {
-      const newNotes = appendNotes(result.notes, shareNote);
-      const unarchive = result.status === DocStatus.ARCHIVED;
-      await prisma.doc.update({
-        where: { docId: result.docId },
-        data: { notes: newNotes, ...(unarchive ? { status: DocStatus.INBOX } : {}) },
-      });
-      result.notes = newNotes;
-      if (unarchive) {
+    if (shareNote) {
+      const updates: { notes?: string; status?: DocStatus } = {};
+      if (isExisting) {
+        const newNotes = appendNotes(result.notes, shareNote);
+        if (newNotes !== result.notes) {
+          updates.notes = newNotes;
+          result.notes = newNotes;
+        }
+      }
+      if (result.status === DocStatus.ARCHIVED) {
+        updates.status = DocStatus.INBOX;
         result.status = DocStatus.INBOX;
-        unarchived++;
+        // Only count as "unarchived" for existing docs; new docs are already
+        // counted via `added`.
+        if (isExisting) unarchived++;
+      }
+      if (Object.keys(updates).length > 0) {
+        await prisma.doc.update({ where: { docId: result.docId }, data: updates });
       }
     }
 

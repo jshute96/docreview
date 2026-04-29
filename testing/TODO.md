@@ -310,8 +310,10 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Scans Drive changes feed + Gmail notifications in parallel
 - [ ] Progress toast shows phases: discovery → metadata → comment sync
 - [ ] Summary toast: "N documents (M new, P updated, Q deleted)"
-- [ ] Newly discovered docs from Gmail go to Inbox
-- [ ] Newly discovered docs from Drive go to Archived (unless comment activity triggers unarchive)
+- [ ] Newly discovered docs (Drive or Gmail) go to Archived by default
+- [ ] Newly discovered Gmail doc with sharing email goes to Inbox (share-note promotion)
+- [ ] Newly discovered Gmail doc with only resolves on already-resolved comments stays Archived
+- [ ] Newly discovered Gmail doc with new INBOX-relevant comment activity goes to Inbox via Smart Unarchive
 - [ ] First Refresh does 7 day lookback, later ones do incremental reads
 
 ### Full Refresh
@@ -381,7 +383,7 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Existing docs: appends with newline
 
 ### Gmail-First vs Drive-First
-- [ ] Gmail-discovered docs go to Inbox
+- [ ] Gmail-discovered new docs land in Archived by default; promotion to Inbox requires share-note, comment-sync `shouldUnarchive`, or a Gmail-merged comment/suggestion insert
 - [ ] Resharing an archived doc via Gmail unarchives it to Inbox
 
 ### No-Gmail Account (Google account with no Gmail mailbox)

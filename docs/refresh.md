@@ -188,14 +188,18 @@ For each file Drive returns:
 
 - **New AUTHOR doc (not in DB, user owns it):** created with `role: "AUTHOR"`,
   `createdTimeInDrive` / `owner`, and `lastCommentActivity` initialized from
-  `createdTimeInDrive`. Default status is **ARCHIVED** to avoid "noise"
-  from the Drive changes feed resurfacing old documents. A doc only moves to
-  **INBOX** if it was also discovered via a Gmail notification (`fromGmail`)
-  or if the subsequent comment sync (Phase 3) detects relevant activity
-  that triggers a "Smart Unarchive".
-- **New REVIEWER doc (not in DB, someone else owns it):** only added during **load** mode.
-  Refresh and full-refresh skip these — reviewer docs must already be tracked in the DB or
-  added manually via `/api/docs/add`. Default status is **ARCHIVED**.
+  `createdTimeInDrive`. Default status is **ARCHIVED** to avoid "noise" from
+  old documents resurfacing. A new doc only moves to **INBOX** if a sharing
+  email arrived for it (share-note branch promotes ARCHIVED → INBOX), or if
+  the subsequent comment sync (Phase 3) detects relevant activity that
+  triggers a "Smart Unarchive". This applies whether the doc was discovered
+  via Drive only or also seen in a Gmail notification — Gmail discovery does
+  not by itself force INBOX.
+- **New REVIEWER doc (not in DB, someone else owns it):** only added during
+  **load** mode or via a Gmail notification (where `fromGmail` bypasses the
+  not-author skip; plain Refresh and full-refresh skip these). Reviewer docs
+  not seen via Gmail must already be tracked in the DB or added manually via
+  `/api/docs/add`. Default status is **ARCHIVED**.
 - **Existing doc:** `driveUrl`, `mimeType`, `lastModifiedInDrive`, `owner`,
   `createdTimeInDrive`, and `accessState` are updated. `title` is cleared (titles
   are not stored in the DB — they're fetched on demand from Drive and cached in the

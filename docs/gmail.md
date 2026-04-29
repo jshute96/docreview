@@ -63,8 +63,9 @@ The scanner uses the structured parser to extract rich context from notification
 
 For **new docs**, these notes are set as the initial `notes` value in the upsert
 create block (combining doc-specific notes with any generic notes from the load
-dialog). For **existing docs**, they are appended via `appendNotes()`. Existing
-ARCHIVED docs are also unarchived to INBOX.
+dialog). For **existing docs**, they are appended via `appendNotes()`. ARCHIVED
+docs (new or existing) with a sharing-email note are promoted to INBOX —
+sharing is treated as a strong attention signal regardless of comment activity.
 
 ### OAuth Scope
 
@@ -142,11 +143,13 @@ with different options — see [`refresh.md`](./refresh.md) for the full archite
    - Gmail (if active): `scanGmailForDocIds(userId, since)` → doc IDs only
 3. **Merge**: build `driveDocMap`, compute `gmailOnlyIds` (Gmail IDs not in Drive results)
 4. **Single metadata fetch**: `fetchDocsByIds` for Gmail-only IDs (no double-fetch)
-5. **Upsert loop**: Gmail-sourced new docs always INBOX; Drive-only new non-AUTHOR docs skipped
+5. **Upsert loop**: all new docs created ARCHIVED; new non-AUTHOR docs are skipped
+   unless `fromGmail` (so shared docs with notifications are still added).
+   Promotion to INBOX happens later (step 6 share-notes or step 8 `shouldUnarchive`).
 6. **Share notes**: for sharing emails, a note is set (new docs) or appended (existing docs)
    with format `"Shared by Name (email) on DATE\nmessage"` (or `"Requested to share by..."`
-   for access requests). Existing ARCHIVED docs are unarchived to INBOX — a (re)share is
-   a strong signal the doc needs attention.
+   for access requests). ARCHIVED docs (new or existing) with a share note are promoted
+   to INBOX — a (re)share is a strong signal the doc needs attention.
 7. **Deletions**: Drive `changes.list` deletions + `findDeletedDocIds` for missing Gmail docs
 8. **Comment sync** + **unarchive** for all upserted/updated docs
 9. **Gmail comment merge**: for docs where Drive can't list comments (`noCommentsPermission`

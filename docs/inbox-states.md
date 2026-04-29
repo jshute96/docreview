@@ -22,10 +22,12 @@ I am not longer interested in acting like the author.
 ## Rules for state changes
 
 * For newly added documents (including those that were **Deleted & re-added**):
-  1. If discovered via Gmail (which implies a "shared with me" or comment notification), it goes in Inbox.
-  2. Otherwise, it starts as **Archived** (even if I am the Author).
-     * This avoids noise from the Drive changes feed resurfacing old documents with no new activity.
-     * The subsequent comment sync in the same refresh may move it to Inbox if it has relevant unresolved activity (see "Smart Unarchive" below).
+  1. The doc starts as **Archived** (even if I am the Author, and even if discovered via a Gmail notification).
+     * This avoids noise from old documents resurfacing with no current attention-worthy activity (e.g., a Gmail notification that turns out to be only resolves on old comments).
+  2. The doc is promoted to **Inbox** if any of the following happen during the same refresh:
+     * A sharing email arrived for the doc (share-note branch — sharing is treated as a strong attention signal).
+     * The subsequent comment sync produces `shouldUnarchive` for relevant new activity (see "Smart Unarchive" below).
+     * A Gmail-merged comment or suggestion is inserted (e.g., notifications for docs the user lacks comment access to).
 
 * For new suggestions:
   1. If I am Author on the doc, new suggestions go to Inbox.
@@ -63,10 +65,7 @@ These comment changes trigger moving the document to Inbox:
   3. When a comment in Inbox gets resolved, but not by me
      * This overrides other rules.  If the comment is resolved and I resolved it, the comment becomes Archived, and this comment doesn't
        trigger moving the document to Inbox.
-  4. Exception: if the document is Archived and the only new comment activity is resolutions (no new
-     comments, no new non-resolve replies), the document stays Archived.  This prevents resolved
-     threads from resurfacing a document you've already dismissed.
-  5. Exception: comments in **read** state (where I'm the last commenter) never trigger unarchive.
+  4. Exception: comments in **read** state (where I'm the last commenter) never trigger unarchive.
      My own activity shouldn't resurface an archived document, regardless of whether I'm Author or Reviewer.
 
 The same three unarchive rules apply to suggestions when the Chrome extension
@@ -85,8 +84,10 @@ The following rules from this spec are not yet implemented:
   should interact with comment state changes. Currently only comment-level MUTED is
   implemented.
 
-- **Shared-with-me detection** (rule 2): The Drive API's `sharedWithMe` is only available
+- **Shared-with-me detection**: The Drive API's `sharedWithMe` is only available
   as a query filter on `files.list`, not as a response field on any endpoint. Shared-with-me
-  docs are currently detected via Gmail notifications (gmail-refresh), which sets them to
-  INBOX. Drive-based refresh/load cannot determine sharing status, so non-AUTHOR docs
-  discovered that way start as ARCHIVED.
+  docs are detected via Gmail notifications (gmail-refresh), which adds them to the DB
+  (bypassing the not-author skip) but starts them as ARCHIVED. They move to INBOX only if a
+  sharing email is parsed for them or comment sync surfaces relevant activity. Drive-based
+  refresh/load cannot determine sharing status, so non-AUTHOR docs discovered that way are
+  skipped entirely.

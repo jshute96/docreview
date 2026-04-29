@@ -76,7 +76,7 @@ describe("upsertDocsAndSyncComments", () => {
     );
   });
 
-  it("sets status to INBOX if discovered via Gmail", async () => {
+  it("creates Gmail-discovered docs as ARCHIVED; promotion to INBOX comes from share-note or shouldUnarchive paths", async () => {
     const driveDocs = [
       {
         googleDocId: "g1",
@@ -93,7 +93,7 @@ describe("upsertDocsAndSyncComments", () => {
     vi.mocked(prisma.doc.upsert).mockResolvedValue({
       docId: "d1",
       googleDocId: "g1",
-      status: "INBOX",
+      status: "ARCHIVED",
     } as any);
 
     await upsertDocsAndSyncComments(userId, userEmail, driveDocs as any, {
@@ -106,9 +106,91 @@ describe("upsertDocsAndSyncComments", () => {
       expect.objectContaining({
         create: expect.objectContaining({
           googleDocId: "g1",
-          status: "INBOX", // Gmail discovery takes precedence
+          status: "ARCHIVED",
         }),
       })
+    );
+    // No share note and no shouldUnarchive → stays ARCHIVED.
+    expect(prisma.doc.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "INBOX" }) }),
+    );
+  });
+
+  it("promotes a new Gmail-discovered doc to INBOX when a share note is present", async () => {
+    const driveDocs = [
+      {
+        googleDocId: "g1",
+        title: "Shared Doc",
+        driveUrl: "http://g1",
+        mimeType: "doc",
+        role: "REVIEWER",
+        lastModifiedInDrive: new Date(),
+        createdTimeInDrive: new Date(),
+      },
+    ];
+
+    vi.mocked(prisma.doc.upsert).mockResolvedValue({
+      docId: "d1",
+      googleDocId: "g1",
+      status: "ARCHIVED",
+      notes: "Shared by Alice",
+    } as any);
+
+    await upsertDocsAndSyncComments(userId, userEmail, driveDocs as any, {
+      existingDocIds: new Set(),
+      fromGmailDocIdSet: new Set(["g1"]),
+      shareNotes: new Map([["g1", "Shared by Alice"]]),
+      mode: "refresh",
+    });
+
+    // Share-note branch should promote ARCHIVED → INBOX for the new doc too.
+    expect(prisma.doc.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { docId: "d1" },
+        data: expect.objectContaining({ status: "INBOX" }),
+      }),
+    );
+  });
+
+  it("promotes a new Gmail-discovered doc to INBOX when shouldUnarchive is set by comment sync", async () => {
+    const driveDocs = [
+      {
+        googleDocId: "g1",
+        title: "Mentioned Doc",
+        driveUrl: "http://g1",
+        mimeType: "doc",
+        role: "AUTHOR",
+        lastModifiedInDrive: new Date(),
+        createdTimeInDrive: new Date(),
+      },
+    ];
+
+    vi.mocked(prisma.doc.upsert).mockResolvedValue({
+      docId: "d1",
+      googleDocId: "g1",
+      status: "ARCHIVED",
+    } as any);
+
+    vi.mocked(syncComments).mockResolvedValue({
+      commentsCreated: 1,
+      commentsUpdated: 0,
+      suggestionsCreated: 0,
+      suggestionsUpdated: 0,
+      suggestionsResolved: 0,
+      shouldUnarchive: true,
+    });
+
+    await upsertDocsAndSyncComments(userId, userEmail, driveDocs as any, {
+      existingDocIds: new Set(),
+      fromGmailDocIdSet: new Set(["g1"]),
+      mode: "refresh",
+    });
+
+    expect(prisma.doc.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { docId: "d1" },
+        data: { status: "INBOX" },
+      }),
     );
   });
 
