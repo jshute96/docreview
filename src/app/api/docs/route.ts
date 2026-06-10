@@ -59,6 +59,40 @@ export function parseDocNotes(raw: unknown): Record<string, string> {
   return result;
 }
 
+/**
+ * Validate and normalize the untrusted `inaccessibleDocs` array from the request
+ * body into typed `GmailInaccessibleDoc` records, dropping any entry that is
+ * missing required fields or carries an unexpected `accessState`. Fields are
+ * copied explicitly (no spread) so unknown client-supplied keys never leak through.
+ */
+export function parseInaccessibleDocs(raw: unknown): GmailInaccessibleDoc[] {
+  if (!Array.isArray(raw)) return [];
+  const result: GmailInaccessibleDoc[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const d = item as Record<string, unknown>;
+    if (typeof d.googleDocId !== "string" || !d.googleDocId) continue;
+    if (typeof d.title !== "string" || !d.title) continue;
+    const accessState =
+      d.accessState === AccessState.NOT_FOUND ? AccessState.NOT_FOUND
+      : d.accessState === AccessState.DENIED ? AccessState.DENIED
+      : null;
+    if (!accessState) continue;
+    const parsedDate =
+      typeof d.emailDate === "string" || typeof d.emailDate === "number"
+        ? new Date(d.emailDate)
+        : null;
+    result.push({
+      googleDocId: d.googleDocId,
+      title: d.title,
+      accessState,
+      notes: typeof d.notes === "string" ? d.notes : "",
+      emailDate: parsedDate && !isNaN(parsedDate.getTime()) ? parsedDate : new Date(),
+    });
+  }
+  return result;
+}
+
 export async function POST(req: NextRequest) {
   return runWithRequestId("POST", req, async () => {
   const session = await getValidSession();
@@ -80,14 +114,7 @@ export async function POST(req: NextRequest) {
   const loadDocNotes: Record<string, string> = parseDocNotes(loadBody.docNotes);
   const loadStatus: DocStatus | undefined = typeof loadBody.status === "string" && (loadBody.status === DocStatus.INBOX || loadBody.status === DocStatus.ARCHIVED) ? loadBody.status as DocStatus : undefined;
   const loadIsStarred: boolean | undefined = typeof loadBody.isStarred === "boolean" ? loadBody.isStarred : undefined;
-  const loadInaccessibleDocs: GmailInaccessibleDoc[] = Array.isArray(loadBody.inaccessibleDocs)
-    ? (loadBody.inaccessibleDocs as any[])
-        .filter((d: any) => d.googleDocId && d.title && (d.accessState === AccessState.NOT_FOUND || d.accessState === AccessState.DENIED))
-        .map((d: any) => ({
-          ...d,
-          emailDate: d.emailDate ? new Date(d.emailDate) : new Date(),
-        }))
-    : [];
+  const loadInaccessibleDocs: GmailInaccessibleDoc[] = parseInaccessibleDocs(loadBody.inaccessibleDocs);
 
   // Validate label ownership before proceeding
   const labelError = await validateLabelOwnership(userId, loadLabelIds);

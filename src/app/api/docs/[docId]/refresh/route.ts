@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getDriveClient, createDriveService, invalidGrantResponse, fetchCommentData, fetchDocData, fetchFileTextViaExport, driveUrlFor, isDriveErrorCode } from "@/lib/google-drive";
-import type { ThreadMap, SuggestionContent, DriveSuggestion } from "@/lib/google-drive";
+import type { ThreadMap, SuggestionContent, DriveSuggestion, DriveDoc } from "@/lib/google-drive";
 import { upsertDocsAndSyncComments } from "@/lib/refresh";
 import { docWithCommentsInclude, stripServerOnly } from "@/lib/doc-queries";
 import { logError, logWarning } from "@/lib/log";
@@ -41,7 +41,9 @@ export async function POST(
   }
 
   // Update file metadata first so lastModifiedInDrive is current before comment sync.
-  let driveDoc;
+  // `trashed` is carried alongside the DriveDoc fields for the local trashed-state check;
+  // upsertDocsAndSyncComments only reads the DriveDoc fields.
+  let driveDoc: (DriveDoc & { trashed: boolean }) | undefined;
   let viewedByMeTime: string | null = null;
   try {
     const drive = createDriveService(driveAuth);
@@ -62,7 +64,7 @@ export async function POST(
       lastModifiedInDrive: f.modifiedTime ? new Date(f.modifiedTime) : null,
       createdTimeInDrive: f.createdTime ? new Date(f.createdTime) : null,
       trashed: f.trashed === true,
-    } as any;
+    };
   } catch (err: unknown) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
