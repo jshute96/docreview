@@ -25,7 +25,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { ColorPicker, PRIMARY_COLORS } from "@/components/color-picker";
 import { DialogButtons } from "@/components/dialog-buttons";
 import { broadcastChange } from "@/lib/cross-tab";
-import { apiFetch, generateContextId } from "@/lib/api-fetch";
+import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { useLabels } from "@/contexts/label-context";
 import type { LabelWithCount } from "@/types";
 
@@ -272,7 +272,7 @@ export function ManageLabelsDialog({
       setOpen(false);
       broadcastChange({ type: "labels" }, contextId);
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to save labels");
+      if (!isAuthError(err)) toast.error(err instanceof Error ? err.message : "Failed to save labels");
     } finally {
       setSaving(false);
     }

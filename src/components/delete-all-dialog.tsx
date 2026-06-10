@@ -15,7 +15,7 @@ import {
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import { clearAll as clearBrowserCache } from "@/lib/browser-cache";
-import { apiFetch } from "@/lib/api-fetch";
+import { apiFetch, isAuthError } from "@/lib/api-fetch";
 import { broadcastChange } from "@/lib/cross-tab";
 
 type Step = "confirm" | "choose";
@@ -60,7 +60,7 @@ export function DeleteAllDialog({ open, onOpenChange }: DeleteAllDialogProps) {
         window.location.reload();
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete failed");
+      if (!isAuthError(err)) toast.error(err instanceof Error ? err.message : "Delete failed");
       setDeleting(false);
     }
   }
