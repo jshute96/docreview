@@ -206,6 +206,7 @@ Shadcn/ui components:
 | `label-validation.ts` | Shared label validation helpers — `isValidColor()` (hex color regex), `MAX_LABEL_NAME_LENGTH` constant |
 | `prisma.ts` | Singleton PrismaClient with dev-mode write-op logging and base64 field obscuring |
 | `prisma-obscure.ts` | Prisma client extension that base64-encodes/decodes Doc.title, Doc.notes, Label.name transparently |
+| `sanitize-html.ts` | `sanitizeHtml()` — DOMPurify wrapper that scrubs Drive comment `htmlContent`/`quotedFileContent` before `dangerouslySetInnerHTML`; strips tags on the server (no DOM) |
 | `bulk-edit.ts` | `BulkEditState` type and `cycleBulkEditState` helper for multi-doc editing |
 | `env-config.ts` | Client-accessible environment config — `CHROME_EXTENSION_URL` with env var override |
 | `tab-targets.ts` | Named window targets for tab reuse — `commentsTarget()`, `docTarget()`, `openCommentsPage()`, `openDocPage()` |

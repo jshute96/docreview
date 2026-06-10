@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 import type { CommentThread } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
 import { highlightText, highlightHtml } from "@/lib/highlight";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { FriendlyDate } from "@/components/friendly-date";
 
@@ -18,13 +19,13 @@ function CommentContent({ htmlContent, content, searchFilter, className }: {
   if (htmlContent) {
     const highlighted = highlightHtml(htmlContent, searchFilter);
     if (highlighted != null)
-      return <p className={`${className} [&_a]:text-blue-600 [&_a]:underline`} dangerouslySetInnerHTML={{ __html: highlighted }} />;
+      return <p className={`${className} [&_a]:text-blue-600 [&_a]:underline`} dangerouslySetInnerHTML={{ __html: sanitizeHtml(highlighted) }} />;
     // Search matched plain text but not HTML text segments — fall back
     const plainHighlighted = highlightText(content, searchFilter);
     if (plainHighlighted !== content)
       return <p className={className}>{plainHighlighted}</p>;
     // No match anywhere — show formatted HTML
-    return <p className={`${className} [&_a]:text-blue-600 [&_a]:underline`} dangerouslySetInnerHTML={{ __html: htmlContent }} />;
+    return <p className={`${className} [&_a]:text-blue-600 [&_a]:underline`} dangerouslySetInnerHTML={{ __html: sanitizeHtml(htmlContent) }} />;
   }
   return content ? <p className={className}>{highlightText(content, searchFilter)}</p> : null;
 }
@@ -419,7 +420,7 @@ export function CommentThreadPanel({
                     <div className="mb-2">
                       <div className="rounded border-l-2 border-zinc-300 bg-zinc-100 px-3 py-1.5">
                         {thread.quotedFileContent.mimeType === "text/html" ? (
-                          <p className="text-xs text-zinc-500 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: thread.quotedFileContent.value }} />
+                          <p className="text-xs text-zinc-500 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: sanitizeHtml(thread.quotedFileContent.value) }} />
                         ) : (
                           <p className="text-xs text-zinc-500 whitespace-pre-wrap">{thread.quotedFileContent.value}</p>
                         )}
