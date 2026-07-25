@@ -20,6 +20,7 @@ import { computeSuggestionHash, gmailActionToSuggestionType, extractHashTextsFro
 import { computeMentionedMeUnreplied } from "@/lib/google-drive";
 import { bumpLastCommentActivity, computeInitialInboxStatus, datesEqual, findUnlinkedSuggestionsByHash } from "@/lib/sync-comments";
 import { parseExtensionTimestamp } from "@/lib/extension-suggestions";
+import { isDiscoId } from "@/lib/disco-id";
 import { CommentStatus, CommentType, DocRole, Prisma, type Comment, type Doc } from "@prisma/client";
 
 /** Shape of a single extension suggestion as received from the API request body. */
@@ -49,6 +50,8 @@ export interface ExtensionMergeResult {
   inserted: number;
   updated: number;
   resolved: number;
+  /** Suggestions dropped because their disco ID was missing or malformed. */
+  skipped: number;
   shouldUnarchive: boolean;
   comments: Comment[];
 }
@@ -309,9 +312,31 @@ export async function mergeExtensionSuggestions(
 
   const emailLower = userEmail.toLowerCase();
 
-  logInfo(`[Suggestions:Ext] ${googleDocId}: merging ${suggestions.length} suggestions from extension`);
+  // Drop anything without a usable disco ID before it can reach the database.
+  // `googleCommentId` is the join key for every later lookup — the disco-ID
+  // match below, `findUnlinkedSuggestionsByHash`, the extension's DOM
+  // navigation — so a malformed value is worse than a missing one. It can never
+  // match anything, yet it makes the row ineligible for the hash merge that
+  // would otherwise repair it (that query requires `googleCommentId: null`), so
+  // the real suggestion later inserts a duplicate that never reconciles. Worse,
+  // an ID-less row looks exactly like a legitimate disco-only row to the
+  // partner-merge branch below, which would *delete* the real Docs API row and
+  // move its `googleSuggestionId` onto the bogus one.
+  //
+  // The extension already filters and retries these (see `iterateItems` in
+  // `background-injected.js`); this is the backstop that keeps a stale
+  // extension build from corrupting stored rows. Skipping is safe because the
+  // condition is transient — the next scrape re-sends the suggestion with a
+  // real ID and it merges normally.
+  const validSuggestions = suggestions.filter((s) => isDiscoId(s.id));
+  const skipped = suggestions.length - validSuggestions.length;
+  if (skipped > 0) {
+    logWarning(`[Suggestions:Ext] ${googleDocId}: skipped ${skipped} suggestion(s) with a missing or malformed disco ID`);
+  }
 
-  for (const s of suggestions) {
+  logInfo(`[Suggestions:Ext] ${googleDocId}: merging ${validSuggestions.length} suggestions from extension`);
+
+  for (const s of validSuggestions) {
     const actionType = gmailActionToSuggestionType(s.suggestionType);
     const { deletedText, insertedText } = extractHashTextsFromExtension(s.suggestionType, s.oldText, s.newText);
     const contentHash = computeSuggestionHash(actionType, deletedText, insertedText);
@@ -499,7 +524,7 @@ export async function mergeExtensionSuggestions(
     orderBy: [{ googleSuggestionId: "asc" }, { googleCommentId: "asc" }],
   });
 
-  logInfo(`[Suggestions:Ext] ${googleDocId}: done — ${merged} merged, ${inserted} inserted, ${updated} updated, ${resolved} resolved (${Date.now() - t0}ms)`);
+  logInfo(`[Suggestions:Ext] ${googleDocId}: done — ${merged} merged, ${inserted} inserted, ${updated} updated, ${resolved} resolved${skipped ? `, ${skipped} skipped` : ""} (${Date.now() - t0}ms)`);
 
-  return { merged, inserted, updated, resolved, shouldUnarchive, comments };
+  return { merged, inserted, updated, resolved, skipped, shouldUnarchive, comments };
 }

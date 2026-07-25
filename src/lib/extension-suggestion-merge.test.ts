@@ -101,8 +101,78 @@ describe("mergeExtensionSuggestions", () => {
   it("returns empty counts with no suggestions", async () => {
     const res = await mergeExtensionSuggestions("d1", "gdoc1", [], userEmail, makeDoc());
     expect(res).toEqual({
-      merged: 0, inserted: 0, updated: 0, resolved: 0,
+      merged: 0, inserted: 0, updated: 0, resolved: 0, skipped: 0,
       shouldUnarchive: false, comments: [],
+    });
+  });
+
+  // Regression: the extension used to substitute the literal string "(no ID)"
+  // when disco ID extraction failed, and it was written straight into
+  // Comment.googleCommentId. That value can never match anything, and because
+  // findUnlinkedSuggestionsByHash only considers rows with googleCommentId:
+  // null, the poisoned row could never be repaired either. Skipping is correct:
+  // the failure is transient and the next scrape carries a real ID.
+  describe("disco ID validation", () => {
+    it("skips suggestions with a placeholder disco ID instead of writing it", async () => {
+      const res = await mergeExtensionSuggestions(
+        "d1", "gdoc1", [makeSuggestion({ id: "(no ID)" })], userEmail, makeDoc(),
+      );
+
+      expect(mockComment.create).not.toHaveBeenCalled();
+      expect(mockComment.update).not.toHaveBeenCalled();
+      expect(mockComment.delete).not.toHaveBeenCalled();
+      expect(res.skipped).toBe(1);
+      expect(res.inserted).toBe(0);
+    });
+
+    it("skips empty and malformed disco IDs", async () => {
+      const res = await mergeExtensionSuggestions(
+        "d1", "gdoc1",
+        [makeSuggestion({ id: "" }), makeSuggestion({ id: "not-a-disco-id" })],
+        userEmail, makeDoc(),
+      );
+
+      expect(mockComment.create).not.toHaveBeenCalled();
+      expect(res.skipped).toBe(2);
+    });
+
+    it("still processes the valid suggestions in a partially-bad batch", async () => {
+      const res = await mergeExtensionSuggestions(
+        "d1", "gdoc1",
+        [makeSuggestion({ id: "(no ID)" }), makeSuggestion({ id: "AAAB1good" })],
+        userEmail, makeDoc(),
+      );
+
+      expect(mockComment.create).toHaveBeenCalledTimes(1);
+      expect(mockComment.create.mock.calls[0][0].data.googleCommentId).toBe("AAAB1good");
+      expect(res.skipped).toBe(1);
+      expect(res.inserted).toBe(1);
+    });
+
+    it("does not let an ID-less suggestion trigger the destructive partner merge", async () => {
+      // A row keyed by a placeholder ID would look like a legitimate disco-only
+      // row to the partner-merge branch, which deletes the real Docs API row and
+      // salvages its googleSuggestionId. Nothing may be deleted for a bad ID.
+      //
+      // Today the isDiscoId filter runs before the loop, so these mocks are
+      // never consulted and the assertion passes trivially. Keep them anyway:
+      // they're what fails if someone moves the filter inside the loop, or
+      // reorders it after the disco-ID lookup, and quietly reopens this hole.
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "discoRow", docId: "d1", googleCommentId: "(no ID)",
+        googleSuggestionId: null, status: CommentStatus.INBOX, replyCount: 0,
+        resolved: false, isRead: false,
+      });
+      mockComment.findMany.mockResolvedValue([
+        { commentId: "realRow", googleCommentId: null, googleSuggestionId: "suggest.xyz" },
+      ]);
+
+      const res = await mergeExtensionSuggestions(
+        "d1", "gdoc1", [makeSuggestion({ id: "(no ID)" })], userEmail, makeDoc(),
+      );
+
+      expect(mockComment.delete).not.toHaveBeenCalled();
+      expect(res.skipped).toBe(1);
     });
   });
 

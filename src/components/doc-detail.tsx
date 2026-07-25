@@ -53,6 +53,12 @@ import { LabelProvider } from "@/contexts/label-context";
 import { useCachedMetadata } from "@/hooks/use-cached-metadata";
 import { docTarget } from "@/lib/tab-targets";
 
+// Bounds the automatic re-fetch after a partial extension scrape (see
+// schedulePartialScrapeRetry). The budget is per episode, not per page load —
+// it resets once a scrape comes back complete.
+const PARTIAL_SCRAPE_MAX_RETRIES = 3;
+const PARTIAL_SCRAPE_RETRY_MS = 2000;
+
 // Key for looking up thread/content/suggestion data — suggestions use googleSuggestionId,
 // comments use googleCommentId. Extension-sourced suggestions only have googleCommentId
 // (disco ID) so we fall back to that.
@@ -186,7 +192,16 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
 
   // Push extension suggestions to the server for DB merge, then replace the
   // matching entries in the local comments list with the updated DB records.
-  async function mergeExtensionSuggestions(suggestions: ExtensionSuggestion[], contextId?: string) {
+  // Returns the server's `skipped` count — suggestions it refused to store
+  // because their disco ID didn't validate. The extension and the server apply
+  // slightly different checks, so a suggestion can pass the scrape (counted as
+  // present, not missing) and still be rejected here; treating that as a
+  // partial result keeps it eligible for a re-fetch.
+  //
+  // Returns null when the merge didn't happen at all (non-OK response). Callers
+  // must not read that as "0 skipped" — nothing was persisted, so the fetch is
+  // incomplete and needs retrying just as much as a partial scrape does.
+  async function mergeExtensionSuggestions(suggestions: ExtensionSuggestion[], contextId?: string): Promise<number | null> {
     const cid = contextId ?? generateContextId();
     const res = await apiFetch(`/api/docs/${doc.docId}/extension-suggestions`, {
       method: "POST",
@@ -195,7 +210,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
     });
     if (!res.ok) {
       console.log("[doc-detail] extension suggestions: server merge failed", res.status); // eslint-disable-line no-console
-      return;
+      return null;
     }
     const data = await res.json();
     if (data.comments && Array.isArray(data.comments)) {
@@ -205,16 +220,30 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
         return [...withoutReturned, ...(data.comments as Comment[])];
       });
     }
+    return typeof data.result?.skipped === "number" ? data.result.skipped : 0;
   }
 
   const handleSuggestionRefresh = useCallback((discoId: string, thread: CommentThread, content: SuggestionContent, raw: ExtensionSuggestion) => {
     setThreadMap((prev) => ({ ...prev, [discoId]: thread }));
     setSuggestionContent((prev) => ({ ...prev, [discoId]: content }));
     const contextId = generateContextId();
-    mergeExtensionSuggestions([raw], contextId).then(() => {
+    mergeExtensionSuggestions([raw], contextId).then((skipped) => {
+      // null = the request failed outright; > 0 = the server rejected the disco
+      // ID. Either way nothing was persisted, so don't broadcast a change that
+      // didn't happen, and don't let the local panel update imply it synced.
+      if (skipped === null || skipped > 0) {
+        console.log("[doc-detail] suggestion refresh: not saved —", skipped === null ? "merge request failed" : "server rejected the disco ID"); // eslint-disable-line no-console
+        // Distinct causes deserve distinct advice: a rejected disco ID clears
+        // up once the doc's comment pane is fully wired, a failed request doesn't.
+        toast.error(skipped === null
+          ? "Couldn't save the refreshed suggestion"
+          : "Couldn't save the refreshed suggestion — try again once the doc finishes loading");
+        return;
+      }
       broadcastChange({ type: "comments", docId: doc.docId, commentType: CommentType.SUGGESTION, googleCommentId: discoId }, contextId);
     }).catch((err) => {
       console.log("[doc-detail] suggestion refresh: server merge error", err);
+      if (!isAuthError(err)) toast.error("Couldn't save the refreshed suggestion");
     });
   }, [doc.docId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -258,18 +287,68 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Deferred re-fetch after a partial scrape. `docReady` can't be relied on for
+  // this: the extension fires it once per doc page load, so when the Google Doc
+  // tab was already open before this page mounted, it has already fired and the
+  // handler below never runs. Without this timer the only recovery would be the
+  // user manually clicking Refresh.
+  const partialScrapeRetries = useRef(0);
+  const partialScrapeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (partialScrapeTimer.current) clearTimeout(partialScrapeTimer.current);
+  }, []);
+
+  function schedulePartialScrapeRetry() {
+    if (partialScrapeTimer.current) return; // one in flight already
+    if (partialScrapeRetries.current >= PARTIAL_SCRAPE_MAX_RETRIES) {
+      console.log("[doc-detail] extension: giving up on partial scrape after", partialScrapeRetries.current, "retries"); // eslint-disable-line no-console
+      return;
+    }
+    partialScrapeRetries.current++;
+    partialScrapeTimer.current = setTimeout(() => {
+      partialScrapeTimer.current = null;
+      void fetchExtensionCommentsAndSuggestions();
+    }, PARTIAL_SCRAPE_RETRY_MS);
+  }
+
   // Fetch suggestions and comment info from the Google Docs DOM via the extension:
   //   1. Push suggestions to the server for DB merge (hash matching, insert/update)
   //   2. Merge the returned DB records into the comments list
   //   3. Keep extension thread/content data for reply display (not in DB)
   //   4. Merge comment originalContentDeleted flags into the thread map
+  //
+  // A partial result is safe to merge because the merge is purely additive:
+  // `mergeExtensionSuggestions` never treats "absent from this payload" as
+  // resolved or deleted, so a short batch can't retract anything. Don't add
+  // deletion reconciliation there without revisiting this.
   async function fetchExtensionCommentsAndSuggestions() {
     const data = await getCommentsAndSuggestionsFromDoc(googleDocId);
+    // null covers both "no extension / no doc tab open" (not transient — arming
+    // a retry would just burn the budget every 2s for a doc the user never
+    // opened) and "bridge timeout / torn-down frame" (transient). We can't tell
+    // them apart here, so we deliberately don't retry: returning early preserves
+    // any timer and budget an earlier partial already armed, rather than
+    // cancelling them the way the complete-scrape branch below would.
     if (!data) return;
-    const { suggestions, comments: commentInfos } = data;
+    const { suggestions, comments: commentInfos, missingIdCount } = data;
+
+    // A partial scrape (items the extension couldn't assign a disco ID, even
+    // after retrying in-page) is transient. Take what we got, but leave the
+    // "loaded" flag clear and schedule a re-fetch — marking it loaded here
+    // would freeze the page on incomplete data.
+    // Two independent questions, deliberately tracked separately:
+    //   partial   — should we try again? (incomplete data, or a transient error)
+    //   persisted — did anything actually reach the DB?
+    // An expired token answers "no" to both: retrying is pointless until the
+    // user re-auths, but the load is emphatically not complete, so the
+    // `extensionSuggestionsLoaded` gate must stay open for the next fetch.
+    let partial = missingIdCount > 0;
+    let persisted = true;
+    if (partial) {
+      console.log("[doc-detail] extension: partial scrape —", missingIdCount, "item(s) had no disco ID; will retry"); // eslint-disable-line no-console
+    }
 
     if (suggestions.length > 0) {
-      extensionSuggestionsLoaded.current = true;
       console.log("[doc-detail] extension: got", suggestions.length, "suggestions from doc tab"); // eslint-disable-line no-console
 
       // Keep extension thread data and suggestion content for display —
@@ -285,10 +364,47 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
 
       // Push to server for DB merge and update the comments list
       try {
-        await mergeExtensionSuggestions(suggestions);
+        // The server applies its own disco ID check; anything it rejects makes
+        // this scrape partial too, even when the extension reported none missing.
+        const skipped = await mergeExtensionSuggestions(suggestions);
+        if (skipped === null) {
+          console.log("[doc-detail] extension: server merge failed; nothing persisted, will retry"); // eslint-disable-line no-console
+          persisted = false;
+          partial = true;
+        } else if (skipped > 0) {
+          console.log("[doc-detail] extension: server skipped", skipped, "suggestion(s) with an invalid disco ID; will retry"); // eslint-disable-line no-console
+          partial = true;
+        }
       } catch (err) {
+        // Nothing landed either way, so this is never a completed load.
+        persisted = false;
+        // Whether to *retry* is a separate question from whether it persisted.
+        // An expired token isn't transient — apiFetch already surfaced the
+        // reauth toast, and retrying would just repeat it until the budget runs
+        // out. Anything else (5xx, network blip) is worth another attempt.
+        if (!isAuthError(err)) partial = true;
         console.log("[doc-detail] extension suggestions: server merge error", err); // eslint-disable-line no-console
       }
+
+      if (!partial && persisted) extensionSuggestionsLoaded.current = true;
+    }
+
+    if (partial) {
+      schedulePartialScrapeRetry();
+    } else if (persisted) {
+      // Complete scrape — disarm any pending retry before resetting the budget.
+      // A retry armed by an earlier partial is now redundant (this fetch got
+      // everything), and leaving it armed while zeroing the counter is what
+      // would let alternating partial/complete results re-arm a fresh budget
+      // indefinitely.
+      if (partialScrapeTimer.current) {
+        clearTimeout(partialScrapeTimer.current);
+        partialScrapeTimer.current = null;
+      }
+      // Reset so a later unrelated partial (a cross-tab event, the doc reopened
+      // elsewhere) gets its own full set of retries instead of inheriting a
+      // spent counter from earlier in this page's lifetime.
+      partialScrapeRetries.current = 0;
     }
 
     // Merge originalContentDeleted from extension into comment thread entries
@@ -461,10 +577,23 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
               try {
                 const raw = await getSuggestionFromDoc(googleDocId, googleCommentId);
                 if (!raw) return;
+                // Thread and suggestion content are display-only — the DB never
+                // stores reply text — so showing them doesn't depend on the merge.
                 setThreadMap(prev => ({ ...prev, [googleCommentId]: extensionToThread(raw) }));
                 setSuggestionContent(prev => ({ ...prev, [googleCommentId]: extensionToSuggestionContent(raw) }));
-                await mergeExtensionSuggestions([raw]);
-              } catch { /* best-effort */ }
+                // The merge persists the metadata. Don't discard its outcome:
+                // null (request failed) or a non-zero skip means the row wasn't
+                // updated, and the panel would otherwise imply it was.
+                const skipped = await mergeExtensionSuggestions([raw]);
+                if (skipped === null || skipped > 0) {
+                  console.log("[cross-tab] doc-detail: suggestion re-scrape not persisted —", // eslint-disable-line no-console
+                    skipped === null ? "merge request failed" : "server rejected the disco ID");
+                }
+              } catch (err) {
+                // Background refresh triggered by another tab — log rather than
+                // toast, since the user didn't initiate this here.
+                console.log("[cross-tab] doc-detail: suggestion re-scrape failed", err); // eslint-disable-line no-console
+              }
             })();
           } else if (isSuggestionEvent) {
             // Unexpected — suggestion events should always carry a disco ID

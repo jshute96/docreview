@@ -153,6 +153,20 @@ describe("mergeCommentsFromGmail", () => {
     expect(mockComment.create).not.toHaveBeenCalled();
   });
 
+  it("skips threads whose discussionId is malformed, not just empty", async () => {
+    // extractDiscoId is an unvalidated regex capture off the notification URL,
+    // so a mangled link yields a non-empty but malformed value. Storing it
+    // poisons googleCommentId exactly as the extension's old placeholder did:
+    // it can never match, and it blocks the row from being repaired later.
+    mockParse.mockReturnValue(makeNotification({
+      comments: [makeCommentThread({ discussionId: "not-a-disco-id" })],
+    }));
+
+    const result = await mergeCommentsFromGmail("d1", "gdoc1", email);
+    expect(result).toEqual({ inserted: 0, shouldUnarchive: false });
+    expect(mockComment.create).not.toHaveBeenCalled();
+  });
+
   it("uses reply timestamps for created/modified dates", async () => {
     mockParse.mockReturnValue(makeNotification({
       comments: [makeCommentThread({

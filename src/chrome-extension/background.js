@@ -638,19 +638,36 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
           target: { tabId: tabId },
           func: async function() {
             console.log('[docreview] getCommentsAndSuggestions: handler invoked');
+            // Leave headroom inside the caller's 8s bridge timeout for the
+            // response to make it back — loadAllComments() can burn several
+            // seconds on a cold doc before the scrape even starts.
+            var budget = Date.now() + 7000;
             await window.__docreviewDisco.loadAllComments();
-            var data = window.__docreviewDisco.getCommentsAndSuggestions();
+            // Retrying variant — items whose disco ID isn't extractable yet are
+            // dropped and reported as missingIdCount rather than given a fake ID.
+            var data = await window.__docreviewDisco.fetchCommentsAndSuggestions(budget);
             console.log('[docreview] getCommentsAndSuggestions: returning',
-              data.comments.length, 'comment(s) and', data.suggestions.length, 'suggestion(s)');
+              data.comments.length, 'comment(s) and', data.suggestions.length, 'suggestion(s)',
+              data.missingIdCount ? '(' + data.missingIdCount + ' item(s) dropped: no disco ID)' : '');
             return data;
           },
           world: 'MAIN'
         });
         var data = results && results[0] && results[0].result;
+        // No result means the injected script didn't complete (page navigated
+        // mid-call, frame torn down). Report failure rather than an empty
+        // success — the caller uses "complete scrape, no suggestions" to decide
+        // it can stop retrying, and this isn't that.
+        if (!data) {
+          console.warn('[background] getCommentsAndSuggestions: no result from injected script');
+          sendResponse({ success: false, error: 'No result from page' });
+          return;
+        }
         sendResponse({
           success: true,
-          suggestions: (data && data.suggestions) || [],
-          comments: (data && data.comments) || []
+          suggestions: data.suggestions || [],
+          comments: data.comments || [],
+          missingIdCount: data.missingIdCount || 0
         });
       } catch (err) {
         console.warn('[background] getCommentsAndSuggestions failed:', err.message);

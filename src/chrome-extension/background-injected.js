@@ -59,9 +59,43 @@ function findDocUrlsInFramesFunc() {
 // is used by both extractCommentIdFromPage and navigateToCommentInPage.
 
 // Injected once per page to set up the shared getDiscoId helper on window.
-// Idempotent — skips if already injected.
+// Idempotent — skips if the installed helpers are already at this version.
+//
+// Version it, don't just check for existence: a Google Docs tab that was open
+// when the extension reloaded keeps whatever object the *previous* build put on
+// its window. A bare `if (window.__docreviewDisco) return` would preserve that
+// stale object forever, so every method added by a newer build would be missing
+// at all of this file's injection sites until the user reloaded the tab.
+//
+// Bump VERSION whenever the shape of window.__docreviewDisco changes (methods
+// added, renamed, or given a different signature).
 function injectDiscoIdHelpers() {
-  if (window.__docreviewDisco) return;
+  var VERSION = 2;
+  if (window.__docreviewDisco) {
+    // `>=`, not `===`: with two builds loaded at once (an unpacked dev build
+    // alongside a packed one — a normal dev setup) a strict check makes each
+    // build tear the other down and reinstall on every single MAIN-world call,
+    // thrashing the observers and resetting the cached disco path. Yielding to
+    // an equal-or-newer install keeps whichever is furthest ahead.
+    //
+    // Trade-off: this makes downgrades impossible in-place. Rolling the
+    // extension back leaves already-open tabs on the newer helpers until they
+    // are reloaded. That's the right default — a tab is far more likely to be
+    // holding a *stale* build than a future one.
+    if (window.__docreviewDisco.version >= VERSION) return;
+    // A newer build is replacing an older one. Stop the old build's timers and
+    // observers first, or they keep running alongside ours — duplicate
+    // selection messages and a leaked polling interval.
+    //
+    // Builds before VERSION 2 have no teardown(), so upgrading from one leaves
+    // a single orphaned scanner + observer set in tabs that were already open.
+    // That's a one-time cost per tab, bounded and harmless (the observers are
+    // idempotent and the interval is a 5s querySelectorAll); it clears on the
+    // next tab reload.
+    if (typeof window.__docreviewDisco.teardown === 'function') {
+      try { window.__docreviewDisco.teardown(); } catch(e) {}
+    }
+  }
 
   // The disco ID for each comment listitem is stored in Google's Closure Library
   // component tree under minified property names (e.g., .Yd.Ai) that change when
@@ -205,6 +239,9 @@ function injectDiscoIdHelpers() {
     var results = [];
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
+      // Display-only placeholder — listComments() is a console debugging aid and
+      // its output never leaves the page. Data paths must drop ID-less items
+      // instead (see iterateItems).
       var id = getDiscoId(item) || '(no ID)';
       var label = item.getAttribute('aria-label') || '';
       var type = label.indexOf('Suggestions') === 0 ? 'suggestion' : 'comment';
@@ -373,9 +410,30 @@ function injectDiscoIdHelpers() {
   // parseFn for each unique item. Anchored items (richer DOM) are preferred
   // over stream items; stream items contribute tabName (only source).
   // parseFn(item, label, common) should return the entry to store, or null to skip.
+  //
+  // Returns { entries, missing }. Items whose disco ID can't be extracted are
+  // dropped and counted in `missing` — never given a placeholder ID. The disco
+  // ID is the only key we have for matching an item to its database row, to a
+  // Gmail notification, or back to the DOM for navigation, so a synthetic value
+  // would poison every one of those lookups. Callers should treat missing > 0
+  // as an incomplete scrape and retry (see fetchCommentsAndSuggestions).
+  //
+  // `missing` counts DOM nodes, not distinct comments, and it drives the retry
+  // decision — so be aware of two ways it can overstate the problem:
+  //   - A single item appears in both the anchored and stream views. If only one
+  //     copy yields an ID, the entry is fully captured yet still counted missing,
+  //     so the caller retries work that already succeeded. Bounded (the retry
+  //     budget caps it), but it means a doc with a persistently un-extractable
+  //     duplicate view never reports a complete scrape.
+  //   - Drops are counted before the `targetId` filter, so `missing` is only
+  //     meaningful when `targetId` is undefined. Single-item lookups go through
+  //     the array wrappers, which discard the count.
+  // Deduplicating properly would need the very ID we failed to extract, so this
+  // is accepted rather than fixed.
   function iterateItems(filterLabel, targetId, parseFn) {
     var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
     var byId = {};
+    var missing = 0;
     var myName = getMyName();
 
     for (var i = 0; i < items.length; i++) {
@@ -383,7 +441,8 @@ function injectDiscoIdHelpers() {
       var label = item.getAttribute('aria-label') || '';
       if (!filterLabel(label)) continue;
 
-      var id = getDiscoId(item) || '(no ID)';
+      var id = getDiscoId(item);
+      if (!id) { missing++; continue; }
       if (targetId && id !== targetId) continue;
 
       // Deduplicate: prefer anchored entries (richer DOM) over stream entries,
@@ -401,13 +460,13 @@ function injectDiscoIdHelpers() {
         byId[id] = entry;
       }
     }
-    return Object.values(byId);
+    return { entries: Object.values(byId), missing: missing };
   }
 
   var suggestionActions = { 'Suggestion accepted': 'accept', 'Suggestion rejected': 'reject' };
   var commentActions = { 'Marked as resolved': 'resolve', 'Re-opened': 'reopen' };
 
-  function getSuggestions(targetId) {
+  function getSuggestionsRaw(targetId) {
     return iterateItems(
       function(label) { return label.indexOf('Suggestions') === 0; },
       targetId,
@@ -458,7 +517,7 @@ function injectDiscoIdHelpers() {
     );
   }
 
-  function getComments(targetId) {
+  function getCommentsRaw(targetId) {
     return iterateItems(
       function(label) { return label.indexOf('Suggestions') !== 0; },
       targetId,
@@ -490,22 +549,77 @@ function injectDiscoIdHelpers() {
     );
   }
 
+  // Public array-returning wrappers — the debugging entry points and the
+  // singular getComment()/getSuggestion() helpers all want a plain list.
+  function getSuggestions(targetId) { return getSuggestionsRaw(targetId).entries; }
+  function getComments(targetId) { return getCommentsRaw(targetId).entries; }
+
   // Combined fetch: full suggestions + minimal comment info.
   // Used by the Docreview page to get both in a single round-trip.
+  // `missingIdCount` counts listitems whose disco ID couldn't be extracted and
+  // were therefore dropped — a non-zero value means this scrape is incomplete.
+  // It sums comments and suggestions: the two label filters are mutually
+  // exclusive so nothing is double-counted across them, and a comment-side miss
+  // is still evidence the pane isn't wired up yet, which implicates suggestions
+  // too — so it gates the whole scrape, not just the half it came from.
   function getCommentsAndSuggestions() {
-    var suggestions = getSuggestions();
-    var fullComments = getComments();
+    var suggestions = getSuggestionsRaw();
+    var fullComments = getCommentsRaw();
     // Strip comments down to just the fields the web app needs
     var comments = [];
-    for (var i = 0; i < fullComments.length; i++) {
-      var c = fullComments[i];
+    for (var i = 0; i < fullComments.entries.length; i++) {
+      var c = fullComments.entries[i];
       comments.push({
         id: c.id,
         originalContentDeleted: c.originalContentDeleted,
         tabName: c.tabName
       });
     }
-    return { suggestions: suggestions, comments: comments };
+    return {
+      suggestions: suggestions.entries,
+      comments: comments,
+      missingIdCount: suggestions.missing + fullComments.missing
+    };
+  }
+
+  // Async wrapper around getCommentsAndSuggestions that retries while any item
+  // is missing its disco ID.
+  //
+  // ID extraction walks Google's minified Closure listener objects, and the
+  // property path is discovered by diffing two listitems. Neither is available
+  // until the pane has finished wiring up its click handlers, so a scrape run
+  // too early can yield items we can't identify. That's transient: a short
+  // wait and a re-scrape recovers them within the same round-trip. Anything
+  // still missing after the last attempt is reported via `missingIdCount` so
+  // the caller can treat the result as partial and try again later.
+  //
+  // `deadline` (ms timestamp, optional) bounds the retries. The caller's bridge
+  // message has its own timeout, and loadAllComments() may already have spent
+  // most of it, so retrying blindly can push the whole round-trip past that
+  // limit — which would turn a partial result into no result at all. When
+  // there's no budget left for another wait, return what we have.
+  var SCRAPE_MAX_ATTEMPTS = 3;
+  var SCRAPE_RETRY_DELAY_MS = 200;
+  function fetchCommentsAndSuggestions(deadline) {
+    var attempt = 1;
+    function tryOnce() {
+      var data = getCommentsAndSuggestions();
+      if (!data.missingIdCount) return Promise.resolve(data);
+      var outOfTime = deadline && (Date.now() + SCRAPE_RETRY_DELAY_MS) >= deadline;
+      if (attempt >= SCRAPE_MAX_ATTEMPTS || outOfTime) {
+        console.warn('[docreview] getCommentsAndSuggestions: ' + data.missingIdCount +
+          ' item(s) still missing disco IDs after ' + attempt + ' attempt(s)' +
+          (outOfTime ? ' (out of time)' : '') + ' — returning partial result');
+        return Promise.resolve(data);
+      }
+      attempt++;
+      console.log('[docreview] getCommentsAndSuggestions: ' + data.missingIdCount +
+        ' item(s) missing disco IDs — retrying (attempt ' + attempt + ' of ' + SCRAPE_MAX_ATTEMPTS + ')');
+      return new Promise(function(resolve) {
+        setTimeout(resolve, SCRAPE_RETRY_DELAY_MS);
+      }).then(tryOnce);
+    }
+    return tryOnce();
   }
 
   // Get the disco ID of the currently selected/active comment.
@@ -775,6 +889,9 @@ function injectDiscoIdHelpers() {
           console.log('[docreview] loadAllComments: "Show all comments" button did not appear');
           return;
         }
+        // Same reasoning as the close below — an orphaned load must not drive
+        // the pane once a newer build has taken over.
+        if (tornDown) return;
         console.log('[docreview] loadAllComments: opening comments pane');
         await openCommentsPane();
       } else {
@@ -784,7 +901,10 @@ function injectDiscoIdHelpers() {
       var settled = await waitForPaneSettle();
       if (settled) _loadedSuccessfully = true;
 
-      if (!wasOpen) {
+      // Don't touch the pane if a newer build has taken over — this load is
+      // orphaned, and closing the pane now would yank it out from under
+      // whatever scrape the new build is running.
+      if (!wasOpen && !tornDown) {
         closeCommentsPane();
       }
 
@@ -800,11 +920,16 @@ function injectDiscoIdHelpers() {
   }
 
   window.__docreviewDisco = {
+    // Read by injectDiscoIdHelpers to decide whether this page's helpers are
+    // stale and need replacing — see VERSION at the top of this function.
+    version: VERSION,
+    teardown: teardown,
     getDiscoId: getDiscoId,
     listComments: listComments,
     getComments: getComments,
     getSuggestions: getSuggestions,
     getCommentsAndSuggestions: getCommentsAndSuggestions,
+    fetchCommentsAndSuggestions: fetchCommentsAndSuggestions,
     getActiveCommentId: getActiveCommentId,
     fullClick: fullClick,
     isCommentsPaneOpen: isCommentsPaneOpen,
@@ -841,6 +966,13 @@ function injectDiscoIdHelpers() {
   // Slides may have different structures.
   var currentActiveEl = null;
   var trackedStreams = new WeakSet();
+  // Registered so teardown() can stop them when a newer build re-injects.
+  var observers = [];
+  var timers = [];
+  // Set by teardown() so any of this build's async work that is still in flight
+  // knows to stop touching shared DOM — see the closeCommentsPane guard in
+  // _loadAllCommentsImpl.
+  var tornDown = false;
 
   // Query the DOM for the currently active comment and log changes.
   // Called on every mutation in a tracked stream view. Uses a global
@@ -870,9 +1002,11 @@ function injectDiscoIdHelpers() {
   function trackStream(stream) {
     if (trackedStreams.has(stream)) return;
     trackedStreams.add(stream);
-    new MutationObserver(function() {
+    var observer = new MutationObserver(function() {
       checkActive();
-    }).observe(stream, { attributes: true, attributeFilter: ['class'], childList: true, subtree: true });
+    });
+    observer.observe(stream, { attributes: true, attributeFilter: ['class'], childList: true, subtree: true });
+    observers.push(observer);
   }
 
   // Scan for #docos-stream-view elements and attach observers to any
@@ -886,10 +1020,30 @@ function injectDiscoIdHelpers() {
   }
   scanForStreams();
   var scanInterval = setInterval(scanForStreams, 250);
-  setTimeout(function() {
+  timers.push(scanInterval);
+  timers.push(setTimeout(function() {
     clearInterval(scanInterval);
-    setInterval(scanForStreams, 5000);
-  }, 5000);
+    timers.push(setInterval(scanForStreams, 5000));
+  }, 5000));
+
+  // Stop this injection's long-lived work so a newer build can take over
+  // without running in parallel with us: the stream-scanning intervals and the
+  // selection MutationObservers, which otherwise run for the life of the page.
+  //
+  // Short-lived timers inside loadAllComments/waitForSelector/waitForPaneSettle
+  // are deliberately not registered — each is self-bounded (≤5s) so nothing
+  // leaks. The one that matters is an in-flight loadAllComments, which would
+  // otherwise close the comments pane on completion; `tornDown` suppresses that.
+  //
+  // Timeouts and intervals share one ID space in browsers, so clearing both
+  // covers either kind of handle. Safe to call twice — the arrays are emptied.
+  function teardown() {
+    tornDown = true;
+    timers.forEach(function(t) { clearTimeout(t); clearInterval(t); });
+    observers.forEach(function(o) { o.disconnect(); });
+    timers = [];
+    observers = [];
+  }
 }
 
 // Injected into a Google Docs tab to select a comment by disco ID without

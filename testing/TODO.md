@@ -436,6 +436,7 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Disco-only row (Gmail/extension-first, has googleCommentId) merges with suggestion-only partner (Docs-API-first, has googleSuggestionId) when both reference the same suggestion — one row remains, no duplicates
 - [ ] Partner merge happens on all three sync paths (Drive, Gmail, Extension) when that path runs first after the two rows exist
 - [ ] Gmail merge only fills `suggestionContentHash` when missing (does not overwrite a hash written by Drive or Extension, since Gmail text is a stale snapshot)
+- [ ] A suggestion with a missing/malformed disco ID is skipped rather than written to `googleCommentId` — no row is inserted, no partner row is deleted, and the suggestion merges normally on the next scrape that carries a real ID
 
 ---
 
@@ -490,6 +491,20 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] `getSuggestion(discoId)` finds suggestion in anchored view without opening pane
 - [ ] `getSuggestion(discoId)` opens pane and retries when suggestion not in anchored view
 - [ ] `getComments()` / `getSuggestions()` / `getCommentsAndSuggestions()` load all comments before returning
+- [ ] Items whose disco ID can't be extracted are dropped and counted in `missingIdCount` — never returned with a placeholder ID
+- [ ] `fetchCommentsAndSuggestions()` retries in-page and recovers items whose disco ID wasn't extractable on the first pass (e.g. scrape run before the pane's click handlers are wired up)
+- [ ] Partial scrape (`missingIdCount > 0`) auto-retries on a timer and recovers without a manual Refresh — including when the doc tab was already open (so `docReady` has already fired and won't fire again)
+- [ ] Partial-scrape retries are bounded — a doc that never yields disco IDs stops retrying instead of looping forever
+- [ ] Suggestions rejected by the server's `isDiscoId()` check (non-zero `skipped`) also mark the fetch partial and trigger a retry, even when the extension reported nothing missing
+- [ ] Extension reload with a doc tab already open: the version guard replaces the stale `window.__docreviewDisco`, so methods added by the new build are available without reloading the tab
+- [ ] Re-injecting a newer helper build calls the old `teardown()` — no duplicate comment-selection messages and no leaked polling interval afterwards
+- [ ] Partial-scrape retry budget resets after a complete scrape (a later unrelated partial gets a fresh set of retries)
+- [ ] Per-suggestion Refresh whose disco ID the server rejects shows an error toast instead of silently appearing to save
+- [ ] Server merge failing outright (5xx / network) is treated as partial and retried — the page must not mark extension suggestions loaded when nothing was persisted
+- [ ] Expired token during the merge does NOT trigger the retry loop (reauth toast fires once; no repeated attempts)
+- [ ] Per-suggestion Refresh does not broadcast a cross-tab change when the merge failed or was rejected (other tabs shouldn't re-fetch for a change that never landed)
+- [ ] A complete scrape disarms a retry armed by an earlier partial (no redundant extension round-trip fires afterwards)
+- [ ] Gmail notification whose `disco=` value is malformed (not merely absent) doesn't write it to `googleCommentId` — the comment is skipped, the suggestion stores null and stays eligible for hash merging
 - [ ] `loadAllComments()` short-circuits on subsequent calls after a successful settle, while items remain in the DOM
 - [ ] `loadAllComments()` opens pane, waits for pane stream view to stop mutating (250ms settle), closes pane when pane was closed
 - [ ] `loadAllComments()` returns full comment list on slow-loading docs (pane populates incrementally — no early close)

@@ -144,9 +144,15 @@ Google API: Drive.
 POST `{ suggestions: ExtensionSuggestionInput[] }`. Receives suggestion data
 scraped from the Google Docs DOM by the Chrome extension and merges it into the
 database using content-hash matching (same algorithm as Gmail merge). Returns
-`{ success, result: { merged, inserted, skipped, resolved }, comments }` where
-`comments` is the full list of suggestion records for the doc after merging.
+`{ success, result: { merged, inserted, updated, resolved, skipped }, comments }`
+where `comments` is the full list of suggestion records for the doc after merging.
 Auto-unarchives the parent doc if a suggestion moves to INBOX.
+
+`skipped` counts suggestions dropped because their disco ID was missing or
+malformed — see "Missing disco IDs are transient, never placeholders" in
+`comment-tracking.md`. A fully-skipped payload still returns 200: a partial DOM
+scrape is a transient condition the page recovers from on the next fetch, not a
+client error.
 
 No Google API (Prisma only).
 

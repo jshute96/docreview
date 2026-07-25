@@ -57,6 +57,11 @@ See `docs/notes-on-comment-navigation.md` for detailed research notes on the Goo
 
 After editing extension files, click the refresh icon on the extension's card in `chrome://extensions`, then reload any open Google Docs/Drive/Gmail tabs.
 
+Reloading the tabs is still the reliable option, but the page-context helpers
+(`window.__docreviewDisco`) no longer require it: they carry a version number and are
+re-installed automatically on the next call when the extension's copy is newer. To check
+which build a tab is running, open its console and evaluate `__docreviewDisco.version`.
+
 ### Configuration
 
 By default, the extension connects to `http://localhost:3000`. To change this:

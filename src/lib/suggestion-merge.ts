@@ -3,6 +3,7 @@ import { logInfo, logWarning } from "@/lib/log";
 import { computeSuggestionHash, gmailActionToSuggestionType, extractHashTextsFromGmail } from "@/lib/suggestion-hash";
 import { bumpLastCommentActivity, findUnlinkedSuggestionsByHash } from "@/lib/sync-comments";
 import { parseGmailNotificationFromParsed, type ParsedEmail } from "@/lib/parse-gmail-notification";
+import { isDiscoId } from "@/lib/disco-id";
 import { CommentStatus, CommentType, type Comment } from "@prisma/client";
 
 // Merges suggestion data from a Gmail notification into existing suggestion records
@@ -41,11 +42,16 @@ export async function mergeSuggestionsFromGmail(
     const { deletedText, insertedText } = extractHashTextsFromGmail(suggestion);
     const contentHash = computeSuggestionHash(actionType, deletedText, insertedText);
 
-    // Check if this suggestion's comment ID is already in the DB (idempotency)
+    // Check if this suggestion's comment ID is already in the DB (idempotency).
+    // Validate rather than just checking for emptiness: `extractDiscoId` is an
+    // unvalidated regex capture off the notification URL, so a mangled link can
+    // produce a non-empty but malformed value, and storing that poisons the row
+    // the same way the extension's old `'(no ID)'` placeholder did.
+    const discoId = isDiscoId(suggestion.discussionId) ? suggestion.discussionId : null;
     let existingById: Comment | null = null;
-    if (suggestion.discussionId) {
+    if (discoId) {
       existingById = await prisma.comment.findFirst({
-        where: { docId, googleCommentId: suggestion.discussionId },
+        where: { docId, googleCommentId: discoId },
       });
       if (existingById) {
         const existing = existingById;
@@ -105,7 +111,7 @@ export async function mergeSuggestionsFromGmail(
         await tx.comment.update({
           where: { commentId: candidates[0].commentId },
           data: {
-            googleCommentId: suggestion.discussionId || null,
+            googleCommentId: discoId,
             replyCount: Math.max(suggestion.replies.length, candidates[0].replyCount),
             ...(gmailTime ? { driveCreatedAt: gmailTime } : {}),
             ...(newModified ? { driveModifiedAt: newModified } : {}),
@@ -124,7 +130,7 @@ export async function mergeSuggestionsFromGmail(
         await tx.comment.create({
           data: {
             docId,
-            googleCommentId: suggestion.discussionId || null,
+            googleCommentId: discoId,
             type: CommentType.SUGGESTION,
             suggestionType: actionType,
             suggestionContentHash: contentHash,

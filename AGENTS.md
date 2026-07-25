@@ -35,7 +35,7 @@ using different APIs and different IDs.  See `docs/comment-tracking.md` and
 
 - **Documentation**:
     - Keep `docs/*.md` design documents in sync with behavioral changes.
-    - Update `docs/file-index.md` when adding, renaming, or removing source files.
+    - Update `docs/file-index.md` when adding, renaming, or removing source files. This is just a brief statement of what the file contains, not a list of everything in it or details of how the code works.
     - When adding or changing user-facing functionality, review and update the help pages in `public/help/*.md` to keep them accurate. See `public/help/pages.json` for the page list.
 - **Database Safety**:
     - Ask for human review before making database schema changes or manual data updates.

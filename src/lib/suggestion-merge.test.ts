@@ -129,6 +129,29 @@ describe("mergeSuggestionsFromGmail", () => {
     expect(createCall.data.driveCreatedAt).toEqual(new Date("2026-03-20T15:00:00Z"));
   });
 
+  it("stores null rather than a malformed discussionId", async () => {
+    // A mangled notification URL yields a non-empty but malformed disco ID.
+    // It must land as null, not be written verbatim: a bad googleCommentId can
+    // never match anything, and it makes the row ineligible for the hash-merge
+    // repair path (which requires googleCommentId: null).
+    mockParse.mockReturnValue({
+      type: "comment",
+      subject: "", from: "", to: "", date_str: "",
+      documentId: "gdoc1", documentTitle: "Test", documentUrl: "https://docs.google.com/document/d/gdoc1/edit",
+      comments: [],
+      suggestions: [makeSuggestion({ discussionId: "not-a-disco-id" })],
+    });
+    mockComment.findFirst.mockResolvedValue(null);
+    mockComment.findMany.mockResolvedValue([]);
+
+    await mergeSuggestionsFromGmail("d1", "gdoc1", email);
+
+    expect(mockComment.create).toHaveBeenCalledTimes(1);
+    expect(mockComment.create.mock.calls[0][0].data.googleCommentId).toBeNull();
+    // The bad value must not be used as a lookup key either
+    expect(mockComment.findFirst).not.toHaveBeenCalled();
+  });
+
   it("skips when googleCommentId already exists in DB (idempotent)", async () => {
     mockParse.mockReturnValue({
       type: "comment",

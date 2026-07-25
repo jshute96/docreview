@@ -139,6 +139,19 @@ getSuggestions()
 // Single suggestion by disco ID
 getSuggestion('AAAC')
 
+// Both, in the shape sent to the web app. `missingIdCount` counts list items whose
+// disco ID couldn't be extracted — they're dropped, never given a placeholder.
+// A non-zero count means the scrape is incomplete (usually because the pane's
+// click handlers weren't wired up yet); the async
+// __docreviewDisco.fetchCommentsAndSuggestions() retries before reporting.
+__docreviewDisco.getCommentsAndSuggestions()
+
+// Which build of the page helpers this tab is running. If it's behind the
+// extension's current VERSION (see injectDiscoIdHelpers), the next MAIN-world
+// call re-installs them — useful when a method seems to be "missing" on a tab
+// that was open across an extension reload.
+__docreviewDisco.version
+
 // Currently selected comment's disco ID
 getActiveCommentId()
 

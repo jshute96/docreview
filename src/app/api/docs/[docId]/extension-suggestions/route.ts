@@ -12,7 +12,7 @@ import { unarchiveDocIfNeeded } from "@/lib/sync-comments";
  * Google Docs tab via the Chrome extension.
  *
  * Body: { suggestions: ExtensionSuggestionInput[] }
- * Returns: { success, result: { merged, inserted, updated, resolved }, comments }
+ * Returns: { success, result: { merged, inserted, updated, resolved, skipped }, comments }
  */
 export async function POST(
   req: NextRequest,
@@ -42,6 +42,9 @@ export async function POST(
     logInfo(`[Suggestions:Ext] POST /extension-suggestions for ${googleDocId}: ${suggestions.length} suggestions`);
 
     try {
+      // Suggestions with an unusable disco ID are dropped inside the merge and
+      // reported as `skipped` — a partial scrape is a transient condition, so
+      // we still return 200 and let the page re-fetch.
       const result = await mergeExtensionSuggestions(docId, googleDocId, suggestions, userEmail, doc);
       await unarchiveDocIfNeeded(doc.docId, doc.status, result.shouldUnarchive);
       return NextResponse.json({
@@ -51,6 +54,7 @@ export async function POST(
           inserted: result.inserted,
           updated: result.updated,
           resolved: result.resolved,
+          skipped: result.skipped,
         },
         comments: result.comments,
       });

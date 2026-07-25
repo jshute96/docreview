@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { logInfo } from "@/lib/log";
 import { bumpLastCommentActivity } from "@/lib/sync-comments";
 import { parseGmailNotificationFromParsed, type ParsedEmail } from "@/lib/parse-gmail-notification";
+import { isDiscoId } from "@/lib/disco-id";
 import { CommentStatus, CommentType } from "@prisma/client";
 
 /**
@@ -45,7 +46,12 @@ export async function mergeCommentsFromGmail(
   let shouldUnarchive = false;
 
   for (const thread of parsed.comments) {
-    if (!thread.discussionId) continue;
+    // `extractDiscoId` is an unvalidated regex capture off the notification URL,
+    // so a mangled link (quoted-printable damage, a truncated href) can yield a
+    // non-empty but malformed value. Validate rather than just checking for
+    // emptiness — this is the same join key the extension path guards, and a
+    // malformed value corrupts a row exactly as thoroughly as a placeholder.
+    if (!isDiscoId(thread.discussionId)) continue;
 
     // Idempotency: skip if this discussion ID is already in the DB
     const existing = await prisma.comment.findFirst({

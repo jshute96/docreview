@@ -350,6 +350,57 @@ Docs API uses a separate `suggest.xxx` ID format. When a suggestion has a `googl
 (from Gmail notification merge), Docreview uses it for `?disco=` deep links. Otherwise the
 doc opens without scrolling to the suggestion.
 
+### Missing disco IDs are transient, never placeholders
+
+Disco IDs are read out of Google's minified Closure listener objects, and the property path
+is discovered by diffing two list items. Neither is available until the comments pane has
+finished wiring up its click handlers, so a scrape that runs too early can produce list items
+whose ID can't be extracted.
+
+**No source may substitute a placeholder value for a missing disco ID.** The ID is the join
+key for every downstream lookup — the DB match in the merge paths, `findUnlinkedSuggestionsByHash`,
+and `?disco=` navigation — all of which use exact equality. A fabricated value can never match
+anything, but it does occupy `googleCommentId`, which permanently excludes the row from the
+hash-merge repair path (that query requires `googleCommentId: null`). The real suggestion then
+inserts a duplicate row and the two never reconcile.
+
+Instead, each layer drops the item and treats it as a transient failure:
+
+| Layer | Behavior |
+|---|---|
+| `iterateItems` (`background-injected.js`) | Drops the item, counts it in `missing` |
+| `fetchCommentsAndSuggestions` (`background-injected.js`) | Retries the scrape in-page (3 attempts, 200ms apart, bounded by a deadline), then reports `missingIdCount` |
+| `getCommentsAndSuggestionsFromDoc` (`bridge-to-extension.ts`) | Passes `missingIdCount` through to the caller |
+| `doc-detail.tsx` | Merges what it got, leaves `extensionSuggestionsLoaded` clear, and schedules a re-fetch (3 retries, 2s apart; the budget resets once a scrape comes back complete, so it's per-episode rather than per-page-load) |
+| `mergeExtensionSuggestions` | Filters with `isDiscoId()` and reports `skipped` — backstop against a stale extension build |
+
+Three subtleties in that chain:
+
+- **The client can't rely on `docReady` to trigger the retry.** The extension fires
+  `docReady` once per doc page load, so when the Google Doc tab was already open before the
+  comments page mounted, it has already fired and the handler never runs. Hence the explicit
+  timer in `doc-detail.tsx` — without it, the only recovery would be a manual Refresh.
+- **The extension's check and the server's `isDiscoId()` are not the same expression**, so a
+  suggestion can survive the scrape (not counted in `missingIdCount`) and still be rejected by
+  the server. `doc-detail.tsx` therefore treats a non-zero `skipped` in the merge response as a
+  partial result too, and retries on that signal as well.
+- **A merge that never happened counts as partial.** The client helper returns `null` (not
+  `0`) when the POST fails, so a 5xx or network blip can't be read as "nothing was skipped."
+  Without that distinction the most likely failure — the whole request failing — would mark
+  the load complete and switch off the retry path entirely. The exception is an expired
+  token: `apiFetch` throws `ApiAuthError` and the reauth toast has already fired, so that
+  case is guarded with `isAuthError` and deliberately does *not* retry.
+
+Merging a partial result is only safe because `mergeExtensionSuggestions` is purely
+additive — it never treats "absent from this payload" as resolved or deleted, so a short
+batch can't retract anything. Don't add deletion reconciliation there without revisiting
+this.
+
+The Gmail paths follow the same rule. `extractDiscoId` is an unvalidated regex capture off the
+notification URL, so it can return `""` *or* a non-empty malformed value from a mangled link —
+both are rejected by `isDiscoId()`: `comment-merge.ts` skips the thread, `suggestion-merge.ts`
+writes `googleCommentId: null` and doesn't use the bad value as a lookup key either.
+
 ### Extension sync implications
 
 When the Chrome extension detects user actions on comment buttons, it determines `commentType`

@@ -89,7 +89,8 @@
       "Bash(bash scripts/query_database.sh:*)",
       "Bash(bash scripts/query_test_database.sh:*)",
       "Bash(python3:*)",
-      "mcp__playwright__browser_close"
+      "mcp__playwright__browser_close",
+      "Bash(node --check:*)"
     ],
     "defaultMode": "acceptEdits"
   },

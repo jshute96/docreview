@@ -256,6 +256,20 @@ The comment `originalContentDeleted` flags are merged into the existing thread m
 so the "Original content deleted" warning appears for orphaned comments (see
 docs/comment-tracking.md).
 
+**Partial scrapes:** Disco ID extraction can fail on list items whose Closure click handlers
+aren't wired up yet. Those items are **dropped, never given a placeholder ID** — see
+"Missing disco IDs are transient, never placeholders" in docs/comment-tracking.md for why a
+synthetic ID corrupts the row permanently. The extension retries the scrape in-page (3
+attempts, 200ms apart, bounded by a deadline so the retries can't push the round-trip past
+the bridge timeout) and reports any remaining drops as `missingIdCount`. When
+`missingIdCount > 0`, `fetchExtensionCommentsAndSuggestions()` merges the suggestions it did
+get but leaves `extensionSuggestionsLoaded` clear and schedules a re-fetch (3 retries, 2s
+apart) rather than freezing the page on incomplete data. As a backstop,
+`mergeExtensionSuggestions()` independently filters ids with `isDiscoId()` (`src/lib/disco-id.ts`)
+and reports the count as `skipped` in the response, so a stale extension build can't write a
+bad ID into `googleCommentId`; a non-zero `skipped` also marks the fetch partial and triggers
+the same retry.
+
 **Timestamps:** The extension returns relative timestamps from the DOM (e.g., "6:29 PM Feb 21",
 "5:06 AM Yesterday"). These are parsed into `Date` objects for the created/modified columns
 where possible; unparseable strings are displayed as-is in the thread panel.

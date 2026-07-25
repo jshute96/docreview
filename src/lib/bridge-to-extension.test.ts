@@ -264,6 +264,46 @@ describe("getCommentsAndSuggestionsFromDoc", () => {
     expect(result).toEqual({
       suggestions: [{ id: "AAAB1s" }],
       comments: [{ id: "AAAB1c", originalContentDeleted: false }],
+      missingIdCount: 0,
+    });
+  });
+
+  it("allows more than the default 5s before timing out", async () => {
+    // This call runs loadAllComments() (up to ~5s on a cold doc) and only then
+    // starts scraping, with up to 3 in-page attempts. At the 5s used by the
+    // other extension messages it would time out mid-scrape and the caller
+    // would get null — discarding a usable partial result, which is the exact
+    // failure the longer timeout exists to prevent. Pin it.
+    const mod = await import("./bridge-to-extension");
+    const p = mod.getCommentsAndSuggestionsFromDoc("gdoc1");
+    let settled = false;
+    void p.then(() => { settled = true; });
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(settled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(await p).toBeNull();
+  });
+
+  it("passes through missingIdCount when the extension reports a partial scrape", async () => {
+    const mod = await import("./bridge-to-extension");
+    const p = mod.getCommentsAndSuggestionsFromDoc("gdoc1");
+    const out = win.outbound[0] as { id: number };
+    win.respond({
+      source: "docreview-extension", id: out.id,
+      response: {
+        success: true,
+        suggestions: [{ id: "AAAB1s" }],
+        comments: [],
+        missingIdCount: 2,
+      },
+    });
+    const result = await p;
+    expect(result).toEqual({
+      suggestions: [{ id: "AAAB1s" }],
+      comments: [],
+      missingIdCount: 2,
     });
   });
 

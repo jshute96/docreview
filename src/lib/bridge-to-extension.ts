@@ -254,23 +254,38 @@ export interface ExtensionCommentInfo {
  * Ask the extension to extract suggestions (full) and comment info (minimal)
  * from an open Google Docs tab in a single call.
  * Returns null if the extension isn't available or no doc tab is open.
+ *
+ * `missingIdCount` counts items the extension had to drop because their disco ID
+ * wasn't extractable (see `iterateItems` in `background-injected.js`). It is a
+ * transient condition — the extension already retried in-page, so a non-zero
+ * count means the returned data is partial and the caller should re-fetch
+ * later rather than treat this scrape as authoritative.
+ *
+ * The timeout is longer than the other extension calls: this one runs
+ * `loadAllComments()` (up to ~5s on a cold doc) and then may re-scrape a few
+ * times. Timing out here would discard a usable partial result entirely.
  */
 export async function getCommentsAndSuggestionsFromDoc(docId: string): Promise<{
   suggestions: ExtensionSuggestion[];
   comments: ExtensionCommentInfo[];
+  missingIdCount: number;
 } | null> {
   try {
     const result = await sendExtensionMessage<{
       success: boolean;
       suggestions?: ExtensionSuggestion[];
       comments?: ExtensionCommentInfo[];
+      missingIdCount?: number;
       error?: string;
-    }>({ type: "getCommentsAndSuggestions", docId }, 5000);
+    }>({ type: "getCommentsAndSuggestions", docId }, 8000);
     if (result.success) {
-      console.log("[extension] getCommentsAndSuggestions:", result.suggestions?.length ?? 0, "suggestions,", result.comments?.length ?? 0, "comments");
+      const missingIdCount = result.missingIdCount ?? 0;
+      console.log("[extension] getCommentsAndSuggestions:", result.suggestions?.length ?? 0, "suggestions,", result.comments?.length ?? 0, "comments",
+        missingIdCount ? `(${missingIdCount} dropped: no disco ID)` : "");
       return {
         suggestions: result.suggestions ?? [],
         comments: result.comments ?? [],
+        missingIdCount,
       };
     }
     console.log("[extension] getCommentsAndSuggestions: not available —", result.error ?? "unknown");
