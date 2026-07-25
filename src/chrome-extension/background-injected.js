@@ -68,9 +68,13 @@ function findDocUrlsInFramesFunc() {
 // at all of this file's injection sites until the user reloaded the tab.
 //
 // Bump VERSION whenever the shape of window.__docreviewDisco changes (methods
-// added, renamed, or given a different signature).
+// added, renamed, or given a different signature) or when the behavior of a
+// helper installed here changes in a way already-open tabs shouldn't keep the
+// old version of — the early return below means an unbumped fix never reaches
+// them. "Installed here" covers the window.* console helpers too, not just
+// __docreviewDisco: they're assigned below the same early return.
 function injectDiscoIdHelpers() {
-  var VERSION = 2;
+  var VERSION = 3;
   if (window.__docreviewDisco) {
     // `>=`, not `===`: with two builds loaded at once (an unpacked dev build
     // alongside a packed one — a normal dev setup) a strict check makes each
@@ -686,6 +690,12 @@ function injectDiscoIdHelpers() {
   // (docos-streamdocoview) include resolved and unanchored comments.
   // The same ID can appear in both an anchored and non-anchored entry.
   function findCommentByDiscoId(discoId) {
+    // A missing ID matches nothing. Defensive: every current caller pre-checks.
+    // Specifically an *explicit* null — getDiscoId() returns null for an item whose
+    // ID couldn't be extracted, and the `!==` below would compare it equal to a null
+    // discoId, returning an arbitrary unidentified item as a "match". (undefined and
+    // '' already mismatched, since getDiscoId() only ever returns a string or null.)
+    if (!discoId) return null;
     var items = document.querySelectorAll('#docos-stream-view [role="listitem"]');
     var nonAnchoredMatch = null;
     for (var i = 0; i < items.length; i++) {
@@ -940,8 +950,23 @@ function injectDiscoIdHelpers() {
     loadAllComments: loadAllComments
   };
   // Singular wrappers for debugging: return one item by disco ID, not an array.
-  function getComment(id) { return getComments(id)[0] || null; }
-  function getSuggestion(id) { return getSuggestions(id)[0] || null; }
+  // The ID is required. Without it the plural helpers apply no filter and return
+  // everything, so taking [0] would hand back an arbitrary item that looks like a
+  // match but isn't — call getComments()/getSuggestions() to list all instead.
+  function missingDiscoId(name, listAllName, id) {
+    if (id) return false;
+    console.warn('[docreview] ' + name + '(discoId) requires a disco ID — ' +
+      'call ' + listAllName + '() to list all items');
+    return true;
+  }
+  function getComment(id) {
+    if (missingDiscoId('getComment', 'getComments', id)) return null;
+    return getComments(id)[0] || null;
+  }
+  function getSuggestion(id) {
+    if (missingDiscoId('getSuggestion', 'getSuggestions', id)) return null;
+    return getSuggestions(id)[0] || null;
+  }
 
   // Expose debugging functions directly on window for convenience.
   // All are synchronous — they return data from the current DOM state.

@@ -491,6 +491,8 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] `getSuggestion(discoId)` finds suggestion in anchored view without opening pane
 - [ ] `getSuggestion(discoId)` opens pane and retries when suggestion not in anchored view
 - [ ] `getComments()` / `getSuggestions()` / `getCommentsAndSuggestions()` load all comments before returning
+- [ ] `getComment()` / `getSuggestion()` called with no ID return null and warn — they must not fall through to the unfiltered list and return an arbitrary item
+- [ ] `findCommentByDiscoId(null)` returns null — must not match an item whose disco ID couldn't be extracted (`getDiscoId()` returns null for those, which compared equal)
 - [ ] Items whose disco ID can't be extracted are dropped and counted in `missingIdCount` — never returned with a placeholder ID
 - [ ] `fetchCommentsAndSuggestions()` retries in-page and recovers items whose disco ID wasn't extractable on the first pass (e.g. scrape run before the pane's click handlers are wired up)
 - [ ] Partial scrape (`missingIdCount > 0`) auto-retries on a timer and recovers without a manual Refresh — including when the doc tab was already open (so `docReady` has already fired and won't fire again)
