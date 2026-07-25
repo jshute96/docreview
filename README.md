@@ -1,27 +1,68 @@
 # Docreview
 
-A personal tool for tracking Google Docs, Sheets, and Slides review 
-status, comments, and suggestions via the Google Drive API.
+Docreview makes reviewing Google Docs, Sheets, and Slides, and tracking your comment threads, manageable.
 
-## Tech Stack
+Docreview connects to Google Drive to find your documents, and to Gmail to get notifications on comment threads.
 
-- **Framework:** Next.js 16 (App Router) with React 19
-- **Styling:** Tailwind CSS 4 with Shadcn/UI primitives
-- **Database:** PostgreSQL managed via Prisma 5
-- **Authentication:** NextAuth.js v5 with Google OAuth
-- **APIs:** Google Drive API v3 and Google Docs API v1
+The main page is an Inbox view showing all documents with updated comment threads.
+
+Click a document to open its details page.
+The details page shows your active comment threads (all threads on your docs, and threads you've commented on in other docs).
+You can read, reply, or resolve comments from that page, or click Open to jump to the thread in Google Docs.
+
+Both pages support labeling, starring, and filtering the view by status.
+Docs or comments can be Archived to hide them from Inbox views.
+By default, docs re-enter your Inbox when there's new activity on your comment threads.
+
+There's an optional Chrome extension that pairs with Docreview, improving the interaction with the Google apps, with live updates and smoother navigation between Docreview and Docs windows.
+The extension also provides more complete status for comments and suggestions than the Docs or Drive APIs expose.
+
+## Status
+
+This is a personal tool primarily for my own use so far.
+There is no hosted instance currently.
+You can run your own instances, but setup is a bit complicated.
+
+## Permissions and privacy
+
+Docreview asks for three Google scopes:
+
+| Scope | Why |
+|-------|-----|
+| `drive` | Full Drive access. Read access alone isn't enough — replying to a comment and resolving a thread are writes, and there is no narrower Drive scope that permits them |
+| `documents.readonly` | Reads suggestions and document text, which the Drive API doesn't expose |
+| `gmail.readonly` | Reads Docs notification emails to catch comment activity. Nothing else in your mail is touched, and nothing is ever sent |
+
+`drive` and `gmail.readonly` are classed as sensitive/restricted by Google. A self-hosted
+instance that hasn't gone through Google's verification review shows an "unverified app"
+warning at sign-in and is limited to the test users you list on the OAuth consent screen
+(100 max). For personal use that's fine — add your own account as a test user and continue
+past the warning.
+
+**Where your data goes:** nowhere but your own machine. Docreview runs against your own
+PostgreSQL database and talks only to Google's APIs — there is no hosted instance and no
+third-party server involved.
+
+What's stored locally is metadata, not content (other than notes text you add). The `comments` table holds IDs, timestamps,
+counts, and flags (read, starred, resolved, mentioned) — no comment text, no author names.
+Document titles aren't stored either; they're cached in your browser's localStorage. Comment
+and document text is fetched from Google on page load and kept in memory only.
+
+**Restricting who can sign in:** set `ALLOWED_EMAILS` to a comma-separated list of addresses
+to reject sign-ins from anyone else. With it unset, anyone who can reach the server and pass
+Google OAuth gets an account — worth setting if you deploy anywhere public.
 
 ## Prerequisites
 
 - **Node.js 20+** (via nvm recommended)
 - **PostgreSQL 14+**
-- **Google Cloud project** with OAuth 2.0 credentials and Drive API enabled
+- **Google Cloud project** with OAuth 2.0 credentials and the Drive, Docs, and Gmail APIs enabled
 
 ## Setup
 
 1. **nvm setup** (if not set up in .profile / .bashrc)
    ```bash
-   . /home/jshute/.nvm/nvm.sh && nvm use 20
+   . $HOME/.nvm/nvm.sh && nvm use 20
    ```
 
 2. **Install dependencies** (each checkout needs its own node_modules):
@@ -31,30 +72,29 @@ status, comments, and suggestions via the Google Drive API.
 
 3. **Google Cloud setup:**
    - Enabled APIs & Services:
-     - Enable the **Google Drive API** and **Google Docs API** in
+     - Enable the **Google Drive API**, **Google Docs API**, and **Gmail API**
+       (Gmail is used only to pick up comment notification emails)
    - OAuth consent screen:
      - Client:
         - Create an OAuth 2.0 client (Web application type)
         - Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
      - Data Access:
-        - Add `drive` and `documents.readonly` scopes
+        - Add `drive`, `documents.readonly`, and `gmail.readonly` scopes
+          (see [Permissions and privacy](#permissions-and-privacy) for why each is needed)
       - Audience:
         - Set to External and add your Google account as a test user.
         - Leave as Internal for corp account.
 
-4. **Configure `.env`:**
+4. **Configure `.env`:** copy `.env.example` to `.env` and fill in at least these fields:
+   ```bash
+   cp .env.example .env
+   ```
    ```
    DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/docreview"
    AUTH_SECRET="..."         # generate with: npx auth secret
    AUTH_GOOGLE_ID="..."
    AUTH_GOOGLE_SECRET="..."
    ```
-
-   Optional:
-   ```
-   NEXT_PUBLIC_CHROME_EXTENSION_URL="..."  # link to Chrome extension info/install page
-   ```
-   Defaults to the GitHub source directory if not set.
 
 5. **Proxy & HTTPS Setup:**
    This is not necessary to access a server directly using http://localhost:3000.
@@ -98,6 +138,20 @@ status, comments, and suggestions via the Google Drive API.
    ```
    Visit `http://localhost:3000` and sign in with Google.
 
+## Chrome Extension
+
+The optional extension lives in this repo at `src/chrome-extension/`. It isn't published to
+the Chrome Web Store — load it unpacked:
+
+1. Open `chrome://extensions` and enable **Developer mode** (top right)
+2. Click **Load unpacked** and select the `src/chrome-extension/` directory
+3. Right-click the Docreview toolbar icon → **Options** to set your server URL
+   (defaults to `http://localhost:3000`)
+
+Docreview works without the extension, but works better with it.
+See `src/chrome-extension/README.md` for what it adds and
+how to configure it, and `docs/chrome-extension.md` for the design.
+
 ## Offline Mode
 
 Run without Google OAuth credentials (useful for UI development, testing, or CI):
@@ -113,30 +167,19 @@ In offline mode:
 
 All Google Drive/Docs API calls return 502 errors in this mode. Labels, doc metadata, filtering, and sorting work normally with local database data.
 
-## Running
-
-```bash
-npm run dev
-```
-
-To run a second instance (e.g. from a separate checkout), use the `-p` flag:
-
-```bash
-npm run dev -- -p 3001
-```
-
 ## Log files
 
 Log files are written to `logs/docreview-YYYY-MM-DD.log`.
 
-## Usage
+## Page URLs
 
 | Path | Description |
 |------|-------------|
 | `/docs` | Main document list — filters, sorting, bulk edit, refresh |
 | `/comments/[id]` | Document detail — comment threads, reply, resolve |
 | `/add` | Standalone add-document form — also accessible via the "Add doc" button on the doc list |
-| `/add?url=...` | Pre-fills the URL field and auto-validates — useful for browser extensions |
+| `/add?doc=...` | Pre-fills the URL field and auto-validates — useful for browser extensions. Accepts an optional `notes=...` param to pre-fill the notes field |
+| `/open?doc=...` | Opens a Google Doc URL in Docreview: redirects to the doc's detail page if it's already tracked, otherwise to `/add`. Follows URL shorteners. This is the entry point the Chrome extension uses |
 
 ## Testing
 
@@ -271,4 +314,16 @@ See [docs/gcp-deploy.md](docs/gcp-deploy.md) for full instructions on deploying 
 - **API Layer:** Next.js API routes (`src/app/api/...`) handle actions like syncing and label updates.
 - **Sync Engine:** `src/lib/sync-comments.ts` coordinates fetching comments and suggestions from Google APIs and syncing them with the local database.
 
-See `docs/*.md` for detailed architecture documentation.
+See `docs/*.md` for detailed documentation.
+
+## Tech Stack
+
+- **Framework:** Next.js 16 (App Router) with React 19
+- **Styling:** Tailwind CSS 4 with Shadcn/UI primitives
+- **Database:** PostgreSQL managed via Prisma 5
+- **Authentication:** NextAuth.js v5 with Google OAuth
+- **APIs:** Google Drive API v3, Google Docs API v1, and Gmail API v1
+
+## License
+
+MIT — see [LICENSE](LICENSE).
