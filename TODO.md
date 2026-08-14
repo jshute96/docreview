@@ -8,7 +8,6 @@ P0:
 
 P1:
 * handle gmail notifications
-  * share request emails - from me, to me
   * requesting your review
 * Rewrite help text content.  It's AI generated excepted the Getting Started page.
 * cache comments in the local DB
@@ -26,10 +25,6 @@ Easy:
 * keyboard shortcuts
 * consider saving loaded comments
 
-* hosting
-  * cloud run
-  * deployment scripts
-
 * permission request flows
   * auto-add a doc when I request permission to see it
   * record notes about where it came from, when I asked permission
@@ -37,15 +32,13 @@ Easy:
   * show pending permission requests somehow
 
 * chrome extension
-  * capture linked-from notes when requesting permission
-  * bi-directional linking - click a comment in the doc or docreview, focus that comment in the other too
-  * get better content for suggestions from open docs, vs limited info we have from the API
+  * bi-directional linking - clicking a comment in the doc should focus it in docreview
+    (docreview → doc already works via in-page comment navigation)
   * accept or reject suggestions by sending clicks to buttons in docs (there's no API for this)
-  * maybe: context-menu items for links to docs (maybe shortened links too) for docreview actions
   * maybe: inline/popup docreview status - labels, etc.
   * cosmetic: icon placement in title is glitchy while the page is loading and things move around
   * cosmetic: in drive, omit docreview links for files of unsupported types
-  * testing: get automated testing working. see `testing/chrome-extension.md`.
+  * testing: automate the remaining `[manual]` cases in `testing/chrome-extension.md`.
 
 * testing
   * UI testing working in offline mode - get more cases working, with live google apps, chrome extension
@@ -73,7 +66,9 @@ Easy:
 * for suggestions, there's minimal API support.
   * we can't see the replies, author, accept/reject state, etc.
   * we can't accept or remove via API
-* for comments, we can't tell if they're attached to deleted text
+* for comments, the API can't tell us if they're attached to deleted text
+  * the extension detects this from the doc's "Original content deleted" marker,
+    but there's no way to know from the API alone
   * the reported anchor location is immutable, from time of creation
   * the quoted text is also immutable
   * the quoted text doesn't pass through formatting, just plain text
