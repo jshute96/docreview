@@ -129,6 +129,12 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Mark read / unread toggle
 - [ ] "Open in Google Docs" link
 - [ ] Refresh action
+- [ ] Edit/delete menu appears only on my own comments and replies
+- [ ] Editing a comment saves the new text and shows it after the save completes
+- [ ] A failed edit keeps the editor open with the typed text and shows the error
+- [ ] Deleting a reply removes just that reply, leaving the thread
+- [ ] Deleting my first comment removes the whole thread row from the list
+- [ ] Suggestions have no edit/delete menu
 
 ### Suggestions Display
 - [ ] Suggestions appear in same table as comments

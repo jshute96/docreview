@@ -76,6 +76,7 @@ authentication. See [`docs/file-index.md`](./file-index.md) for the full list.
 **Comment endpoints** (`/api/docs/[docId]/comments/*`, `/api/docs/[docId]/threads/*`):
 - Fetch and update comment status, read state, stars
 - Fetch thread details, post replies, resolve/reopen threads
+- Edit and delete your own comments and replies (comments only — not suggestions)
 
 **Label endpoints** (`/api/labels/*`):
 - CRUD operations, reorder by position

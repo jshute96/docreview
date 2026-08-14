@@ -6,7 +6,7 @@ import { RefreshCw } from "lucide-react";
 import { CommentStatus, CommentType, SuggestionType, type Comment } from "@prisma/client";
 import type { CommentThread, ThreadMap, SuggestionContent } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
-import { CommentThreadPanel } from "@/components/comment-thread-panel";
+import { CommentThreadPanel, type DirtyKind } from "@/components/comment-thread-panel";
 import { highlightText } from "@/lib/highlight";
 import { FriendlyDate } from "@/components/friendly-date";
 import { StarButton } from "@/components/star-button";
@@ -24,6 +24,8 @@ interface CommentRowProps {
   suggestionContent?: SuggestionContent;
   initialThread?: CommentThread;
   onUpdate: (updated: Comment) => void;
+  /** Called when the comment no longer exists (its thread was deleted in Drive). */
+  onDelete?: (commentId: string) => void;
   onThreadUpdate?: (googleCommentId: string, thread: CommentThread) => void;
   isExiting?: boolean;
   searchFilter?: string;
@@ -44,7 +46,7 @@ function splitContent(raw: string): { author: string | null; text: string } {
   return { author: raw.slice(0, sep), text: raw.slice(sep + 2) };
 }
 
-export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal, isSelected, onSelectInDoc, onSuggestionRefresh, userName, emptyMessage }: CommentRowProps) {
+export function CommentRow({ comment, docId, driveUrl, content, suggestionContent, initialThread, onUpdate, onDelete, onThreadUpdate, isExiting, searchFilter, documentText, expandSignal, expandUnreadSignal, collapseSignal, isSelected, onSelectInDoc, onSuggestionRefresh, userName, emptyMessage }: CommentRowProps) {
   const isSuggestion = comment.type === CommentType.SUGGESTION;
   const currentModifiedMs = comment.driveModifiedAt
     ? new Date(comment.driveModifiedAt).getTime()
@@ -58,6 +60,9 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   const [loadingThreads, setLoadingThreads] = useState(false);
   const [refreshingThread, setRefreshingThread] = useState(false);
   const [hasDirtyReply, setHasDirtyReply] = useState(false);
+  // Which control holds the unsaved text, so the blocked-close toast can say
+  // what to clear (an unsent reply vs an open edit).
+  const [dirtyKind, setDirtyKind] = useState<DirtyKind>("reply");
   // Epoch ms of driveModifiedAt at the time threads were last fetched
   const fetchedModifiedMs = useRef<number | null>(initialThread ? currentModifiedMs : null);
 
@@ -321,7 +326,9 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       setExpanded(true);
     } else {
       if (hasDirtyReply) {
-        toast.error("Clear or send the reply before closing");
+        toast.error(dirtyKind === "edit"
+          ? "Save or cancel your edit before closing"
+          : "Clear or send the reply before closing");
         return;
       }
       setExpanded(false);
@@ -380,6 +387,70 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       "Reply posted",
     );
     await updateStatus(CommentStatus.ARCHIVED);
+  }
+
+  /** Normalizes a failed edit/delete response into an Error the thread panel
+   *  can show inline next to the Save/Delete buttons. */
+  async function editErrorFrom(res: Response, fallback: string): Promise<Error> {
+    const data = await res.json().catch(() => ({}));
+    return new Error(data.error || fallback);
+  }
+
+  /** Runs an edit/delete and normalizes its failure into the message the thread
+   *  panel shows inline. An expired token already raised its own reauth toast in
+   *  apiFetch, so that case carries an empty message and shows nothing inline
+   *  rather than a second, vaguer copy of it. */
+  async function entryWrite(fn: () => Promise<void>): Promise<void> {
+    try {
+      await fn();
+    } catch (err) {
+      if (isAuthError(err)) throw new Error("");
+      throw err instanceof Error ? err : new Error("");
+    }
+  }
+
+  function handleDirtyChange(dirty: boolean, kind?: DirtyKind) {
+    if (kind) setDirtyKind(kind);
+    setHasDirtyReply(dirty);
+  }
+
+  // Edit is offered only on entries the user wrote; Drive enforces the same
+  // rule server-side, so a 403 here means the UI and Drive disagree.
+  async function handleEditEntry(entryThreadId: string, replyId: string | null, content: string) {
+    const contextId = generateContextId();
+    const res = await apiFetch(`/api/docs/${docId}/threads/edit`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commentId: entryThreadId, replyId: replyId ?? undefined, content }),
+      contextId,
+    });
+    if (!res.ok) throw await editErrorFrom(res, "Failed to save the edit");
+    applyThreadUpdate(await res.json());
+    broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
+    toast.success(replyId ? "Reply updated" : "Comment updated");
+  }
+
+  async function handleDeleteEntry(entryThreadId: string, replyId: string | null) {
+    const contextId = generateContextId();
+    const res = await apiFetch(`/api/docs/${docId}/threads/edit`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commentId: entryThreadId, replyId: replyId ?? undefined }),
+      contextId,
+    });
+    if (!res.ok) throw await editErrorFrom(res, "Failed to delete");
+    const data = await res.json();
+    broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
+
+    // Deleting the first comment removes the whole thread, so the row goes with
+    // it. Deleting a reply leaves the thread, which comes back re-synced.
+    if (data.comment) {
+      applyThreadUpdate(data);
+      toast.success("Reply deleted");
+    } else {
+      toast.success(replyId ? "Reply deleted" : "Comment deleted");
+      onDelete?.(comment.commentId);
+    }
   }
 
   async function updateStatus(status: CommentStatus) {
@@ -736,13 +807,15 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   onResolve={isSuggestion ? undefined : handleResolve}
                   onReopen={isSuggestion ? undefined : handleReopen}
                   onReplyAndArchive={isSuggestion ? undefined : handleReplyAndArchive}
+                  onEditEntry={isSuggestion ? undefined : (t, r, c) => entryWrite(() => handleEditEntry(t, r, c))}
+                  onDeleteEntry={isSuggestion ? undefined : (t, r) => entryWrite(() => handleDeleteEntry(t, r))}
                   onArchive={() => updateStatus(isArchived ? CommentStatus.INBOX : CommentStatus.ARCHIVED)}
                   isArchived={isArchived}
                   onToggleRead={toggleRead}
                   isRead={comment.isRead}
                   onMute={() => updateStatus(isMuted ? CommentStatus.INBOX : CommentStatus.MUTED)}
                   isMuted={isMuted}
-                  onDirtyChange={isSuggestion ? undefined : setHasDirtyReply}
+                  onDirtyChange={isSuggestion ? undefined : handleDirtyChange}
                   searchFilter={searchFilter}
                   documentText={isSuggestion ? undefined : documentText}
                   isSelected={isSelected}

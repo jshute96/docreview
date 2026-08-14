@@ -56,6 +56,7 @@ Click a comment row to expand it and see the full thread. The expanded view show
 - All replies in chronological order.
 - A **reply textarea** -- type a response and press Enter (or click Send) to reply.
 - A **Resolve/Reopen button** to change the thread's resolved state.
+- A **menu button** next to your name on comments and replies you wrote, with **Edit** and **Delete**. Edit replaces the text with a box; Save writes the change to the document and the text only reappears once the save succeeds, so a failure leaves your text where you can fix it. Delete asks for confirmation first — deleting a reply removes just that reply, and deleting the first comment of a thread removes the whole thread, including everyone's replies. Both are permanent. The edit box works the same way as the reply box: you see and type plain text, and formatting like `**bold**` renders once saved.
 - Status controls to move the thread between Inbox, Archived, and Muted.
 - A link to **open the comment in Google Docs** (or Sheets/Slides), which navigates directly to the commented text.
 
@@ -66,6 +67,7 @@ All threads are pre-fetched when the page loads, so expanding a comment is insta
 Suggestions (tracked changes) appear in the same table as comments. They show the proposed insertion, deletion, or edit text. Suggestions have some limitations compared to comments:
 
 - You can't reply to suggestions directly from Docreview.
+- You can't edit or delete a suggestion from Docreview — Google's API doesn't offer it.
 - Creation and modification dates are approximate.
 - The "Mine" and "Replied" filters don't apply to suggestions.
 

@@ -3,6 +3,7 @@ import { suppressingErrors } from "@/test-utils";
 
 vi.mock("@/lib/prisma", () => {
   const comment = {
+    findFirst: vi.fn(),
     findMany: vi.fn(),
     createMany: vi.fn(),
     update: vi.fn(),
@@ -26,19 +27,21 @@ vi.mock("@/lib/google-drive", async () => {
     getDriveClient: vi.fn(),
     fetchCommentData: vi.fn(),
     fetchDocData: vi.fn(),
+    fetchThreadDetail: vi.fn(),
     // Pure helpers — use real implementations so error-code checks work
     isDriveErrorCode: actual.isDriveErrorCode,
     getDriveErrorCode: actual.getDriveErrorCode,
   };
 });
 
-import { syncComments } from "./sync-comments";
+import { syncComments, syncSingleComment } from "./sync-comments";
 import { prisma } from "@/lib/prisma";
-import { fetchCommentData, fetchDocData } from "@/lib/google-drive";
+import { fetchCommentData, fetchDocData, fetchThreadDetail } from "@/lib/google-drive";
 import { computeSuggestionHash } from "./suggestion-hash";
 import { SuggestionType, type Doc } from "@prisma/client";
 
 const mockComment = prisma.comment as unknown as {
+  findFirst: ReturnType<typeof vi.fn>;
   findMany: ReturnType<typeof vi.fn>;
   createMany: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
@@ -1087,5 +1090,64 @@ describe("syncComments deleted comment cleanup", () => {
     expect(mockComment.deleteMany).toHaveBeenCalledWith({
       where: { commentId: { in: ["cr1"] } },
     });
+  });
+});
+
+// --------------- self-edit (edit/delete made from Docreview) ---------------
+
+describe("syncSingleComment selfEdited", () => {
+  const thread = { id: "c1", author: "A", fromMe: true, content: "x", createdTime: "", resolved: false, replies: [] };
+
+  /** The user edited their own comment: Drive's modifiedTime moves, nothing else does. */
+  function editedOnly() {
+    vi.mocked(fetchThreadDetail).mockResolvedValue({
+      comment: driveComment({ driveModifiedAt: new Date("2024-06-20"), isRead: false }),
+      thread,
+    } as unknown as Awaited<ReturnType<typeof fetchThreadDetail>>);
+  }
+
+  it("leaves an archived comment archived and still read", async () => {
+    editedOnly();
+    mockComment.findFirst.mockResolvedValue(dbComment({ status: "ARCHIVED", isRead: true }));
+
+    await syncSingleComment(makeDoc({ role: "AUTHOR" }), "c1", driveAuth, { selfEdited: true });
+
+    const data = mockComment.update.mock.calls[0][0].data;
+    expect(data.status).toBe("ARCHIVED");
+    expect(data.isRead).toBe(true);
+    // The new timestamp is still recorded, so the next full sync sees no activity.
+    expect(data.driveModifiedAt).toEqual(new Date("2024-06-20"));
+  });
+
+  it("moves the same comment to INBOX without the flag — the flag is what differs", async () => {
+    editedOnly();
+    mockComment.findFirst.mockResolvedValue(dbComment({ status: "ARCHIVED", isRead: true }));
+
+    await syncSingleComment(makeDoc({ role: "AUTHOR" }), "c1", driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("INBOX");
+  });
+
+  // Someone else replies while the user is saving their own edit. That reply is
+  // real activity and must survive — this is the case a "restore the old status
+  // afterwards" approach would have clobbered.
+  it("still reacts to replies that arrive from someone else in the same window", async () => {
+    vi.mocked(fetchThreadDetail).mockResolvedValue({
+      comment: driveComment({
+        driveModifiedAt: new Date("2024-06-20"),
+        replyCount: 1,
+        isRead: false,
+        replyAuthorMeFlags: [false],
+        replyMentionedMeFlags: [true],
+      }),
+      thread,
+    } as unknown as Awaited<ReturnType<typeof fetchThreadDetail>>);
+    mockComment.findFirst.mockResolvedValue(dbComment({ status: "ARCHIVED", isRead: true, replyCount: 0 }));
+
+    await syncSingleComment(makeDoc({ role: "AUTHOR" }), "c1", driveAuth, { selfEdited: true });
+
+    const data = mockComment.update.mock.calls[0][0].data;
+    expect(data.status).toBe("INBOX");
+    expect(data.isRead).toBe(false);
   });
 });

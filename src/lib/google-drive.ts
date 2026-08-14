@@ -275,9 +275,10 @@ export function computeMentionedMeUnreplied(
 
 // Raw Drive API comment shape — loose type covering the superset of fields
 // that fetchCommentData may request.  Used only by the parsing helpers below.
-type RawDriveComment = {
+export type RawDriveComment = {
   id?: string | null;
   resolved?: boolean | null;
+  deleted?: boolean | null;
   content?: string | null;
   htmlContent?: string | null;
   quotedFileContent?: { mimeType?: string | null; value?: string | null } | null;
@@ -287,6 +288,8 @@ type RawDriveComment = {
   assigneeEmailAddress?: string | null;
   mentionedEmailAddresses?: string[] | null;
   replies?: Array<{
+    id?: string | null;
+    deleted?: boolean | null;
     content?: string | null;
     htmlContent?: string | null;
     createdTime?: string | null;
@@ -297,9 +300,16 @@ type RawDriveComment = {
   }> | null;
 };
 
+/** Replies that still exist. A deleted reply keeps its slot in the Drive
+ *  response with `deleted: true` and its content stripped; Google Docs hides
+ *  those, so Docreview does too — and they must not count toward replyCount. */
+export function liveReplies(c: RawDriveComment): NonNullable<RawDriveComment["replies"]> {
+  return (c.replies ?? []).filter((r) => r.deleted !== true);
+}
+
 // Parses a raw Drive comment into a DriveComment (sync metadata).
 function parseDriveComment(c: RawDriveComment, emailLower?: string): DriveComment {
-  const replies = c.replies ?? [];
+  const replies = liveReplies(c);
   const flags = deriveCommentFlags(c.author, replies);
 
   // Determine current assignee from the initial assignment (top-level field)
@@ -361,10 +371,11 @@ function parseDriveComment(c: RawDriveComment, emailLower?: string): DriveCommen
 // Parses a raw Drive comment into a CommentThread (UI display).
 // Returns null if the comment has no content (deleted/empty comment).
 function parseCommentThread(c: RawDriveComment): CommentThread | null {
-  if (c.content == null) return null;
-  const replies = c.replies ?? [];
+  if (c.content == null || c.deleted === true) return null;
+  const replies = liveReplies(c);
 
   const threadReplies: ThreadReply[] = replies.map((r) => ({
+    id: r.id ?? "",
     author: r.author?.displayName ?? "Unknown",
     fromMe: r.author?.me === true,
     content: r.content ?? "",
@@ -411,13 +422,15 @@ function buildCommentFields(options: FetchCommentDataOptions): string {
   const { sync, threads } = options;
   // Author fields
   const authorFields = threads ? "me, displayName" : "me";
-  // Reply fields
-  const replyParts = ["action", `author(${authorFields})`];
+  // Reply fields. `id` is needed to edit/delete a specific reply; `deleted` so
+  // deleted entries can be filtered out (comments.get returns them, unlike
+  // comments.list, which omits them unless includeDeleted is set).
+  const replyParts = ["id", "deleted", "action", `author(${authorFields})`];
   if (threads) replyParts.push("content", "htmlContent", "createdTime");
   if (sync) replyParts.push("assigneeEmailAddress", "mentionedEmailAddresses");
   // Comment fields
   const commentParts = [
-    "id", "resolved", "createdTime", "modifiedTime",
+    "id", "resolved", "deleted", "createdTime", "modifiedTime",
     `author(${authorFields})`,
     `replies(${replyParts.join(", ")})`,
   ];
@@ -799,6 +812,10 @@ export async function fetchDocData(
 
 // A single reply within a comment thread (not the initial comment).
 export interface ThreadReply {
+  /** Drive reply ID — needed to edit or delete this reply. Empty string for
+   *  replies synthesized from Gmail notifications or the browser extension,
+   *  which have no Drive ID; those are not editable. */
+  id: string;
   author: string;
   fromMe: boolean;
   content: string;
@@ -908,6 +925,115 @@ export async function replyToComment(
     requestBody: body,
   });
   logInfo(`[Drive] replies.create${tag} ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
+}
+
+// Edits the text of a comment. Drive only allows this on comments authored by
+// the authenticated user; anything else comes back as a 403.
+export async function editComment(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  googleDocId: string,
+  commentId: string,
+  content: string
+): Promise<void> {
+  const drive = createDrive({ version: "v3", auth });
+  const t0 = Date.now();
+  await drive.comments.update({
+    fileId: googleDocId,
+    commentId,
+    fields: "id",
+    requestBody: { content },
+  });
+  logInfo(`[Drive] comments.update ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
+}
+
+// Deletes a comment, which removes the whole thread (replies included).
+// Own comments only, same as editComment.
+export async function deleteComment(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  googleDocId: string,
+  commentId: string
+): Promise<void> {
+  const drive = createDrive({ version: "v3", auth });
+  const t0 = Date.now();
+  await drive.comments.delete({ fileId: googleDocId, commentId });
+  logInfo(`[Drive] comments.delete ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
+}
+
+// Edits the text of a single reply within a thread. Own replies only.
+export async function editReply(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  googleDocId: string,
+  commentId: string,
+  replyId: string,
+  content: string
+): Promise<void> {
+  const drive = createDrive({ version: "v3", auth });
+  const t0 = Date.now();
+  await drive.replies.update({
+    fileId: googleDocId,
+    commentId,
+    replyId,
+    fields: "id",
+    requestBody: { content },
+  });
+  logInfo(`[Drive] replies.update ${googleDocId} comment=${commentId} reply=${replyId} (${Date.now() - t0}ms)`);
+}
+
+// Deletes a single reply, leaving the rest of the thread intact. Own replies only.
+export async function deleteReply(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  googleDocId: string,
+  commentId: string,
+  replyId: string
+): Promise<void> {
+  const drive = createDrive({ version: "v3", auth });
+  const t0 = Date.now();
+  await drive.replies.delete({ fileId: googleDocId, commentId, replyId });
+  logInfo(`[Drive] replies.delete ${googleDocId} comment=${commentId} reply=${replyId} (${Date.now() - t0}ms)`);
+}
+
+/**
+ * Runs a comment write with the file's viewedByMeTime pinned: reads it before
+ * the write and restores it after. Without this, commenting from Docreview
+ * marks the doc as viewed in Drive, which would clear its unread state even
+ * though the user never opened it.
+ */
+export async function withViewedTimePinned<T>(
+  auth: Awaited<ReturnType<typeof getDriveClient>>,
+  googleDocId: string,
+  label: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const drive = createDrive({ version: "v3", auth });
+  const getViewed = async () => {
+    const r = await drive.files.get({
+      fileId: googleDocId,
+      fields: "viewedByMeTime",
+      supportsAllDrives: true,
+    });
+    return r.data.viewedByMeTime ?? null;
+  };
+  const fmt = (t: string | null) => (t ? formatDate(t) : "null");
+
+  const viewedBefore = await getViewed();
+  logInfo(`[ViewedPin] Before ${label}: viewedByMeTime=${fmt(viewedBefore)} (doc=${googleDocId})`);
+
+  const result = await fn();
+
+  const viewedAfter = await getViewed();
+  logInfo(`[ViewedPin] After ${label}: viewedByMeTime=${fmt(viewedAfter)} (was ${fmt(viewedBefore)})`);
+
+  if (viewedBefore) {
+    await drive.files.update({
+      fileId: googleDocId,
+      requestBody: { viewedByMeTime: viewedBefore },
+      fields: "viewedByMeTime",
+    });
+    const viewedRestored = await getViewed();
+    logInfo(`[ViewedPin] Restored viewedByMeTime to ${fmt(viewedBefore)}, verified ${fmt(viewedRestored)}`);
+  }
+
+  return result;
 }
 
 // Exports a Google Workspace file as plain text via the Drive API.

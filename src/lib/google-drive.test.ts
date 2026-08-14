@@ -5,6 +5,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 import {
   parseGoogleDocId,
   deriveCommentFlags,
+  liveReplies,
   isDriveErrorCode,
   getDriveErrorCode,
   isInvalidGrantError,
@@ -254,5 +255,28 @@ describe("isInvalidGrantError", () => {
     expect(isInvalidGrantError(new Error("some other error"))).toBe(false);
     expect(isInvalidGrantError({ code: 403 })).toBe(false);
     expect(isInvalidGrantError(null)).toBe(false);
+  });
+});
+
+describe("liveReplies", () => {
+  it("returns all replies when none are deleted", () => {
+    const replies = [{ content: "a" }, { content: "b", deleted: false }];
+    expect(liveReplies({ replies })).toHaveLength(2);
+  });
+
+  // comments.get returns deleted replies with deleted: true and their content
+  // stripped; Google Docs hides them, so they must not render or be counted.
+  it("drops replies marked deleted", () => {
+    const replies = [
+      { id: "r1", content: "kept" },
+      { id: "r2", content: "", deleted: true },
+      { id: "r3", content: "also kept" },
+    ];
+    expect(liveReplies({ replies }).map((r) => r.id)).toEqual(["r1", "r3"]);
+  });
+
+  it("returns an empty array when there are no replies", () => {
+    expect(liveReplies({})).toEqual([]);
+    expect(liveReplies({ replies: null })).toEqual([]);
   });
 });

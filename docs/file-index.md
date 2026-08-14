@@ -94,6 +94,8 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/[docId]/threads/route.ts` | `GET` fetch threads from Drive (all with `viewedByMeTime`, single, or checkOnly); `POST` refresh a single thread (updates DB) |
 | `docs/metadata/route.ts` | `POST` fetch current doc titles and owners from Google Drive for given IDs — used by client-side metadata cache for stale/missing entries |
 | `docs/[docId]/threads/reply/route.ts` | `POST` reply to / resolve / reopen a comment thread via Drive API; pins `viewedByMeTime` around the action (debug logging) |
+| `docs/[docId]/threads/edit/route.ts` | `PATCH` edit a comment or reply, `DELETE` delete a reply or a whole thread, via Drive API (own entries only; suggestions rejected) |
+| `docs/[docId]/threads/edit/route.test.ts` | Tests for comment/reply edit and delete — auth, ownership (403), suggestion rejection, thread-delete removes the record |
 | `docs/[docId]/viewed-time/route.ts` | `PUT` update `viewedByMeTime` on a Google Drive file |
 | `docs/[docId]/extension-suggestions/route.ts` | `POST` merge extension-scraped suggestions into the DB |
 | `docs/[docId]/extension-suggestions/route.test.ts` | Tests for auth/ownership, the `skipped` response field, and status codes |
@@ -113,9 +115,10 @@ One-line descriptions of every source file, grouped by layer.
 | `doc-row.tsx` | Single doc row in the table — star, title, comment counts, labels, archive/edit/open buttons |
 | `doc-detail.tsx` | Single doc detail view (client) — metadata panel, comment filters, comment table; pre-fetches all threads on load for instant expand |
 | `filter-bar.tsx` | Doc list filter bar — tri-state buttons for type/author/starred/labels/active/comments + title regex |
+| `hamburger-button.tsx` | Shared "more options" hamburger trigger for dropdown menus — one drawing for every menu, in three sizes (`default`, `compact`, `mini`) |
 | `comment-filter-bar.tsx` | Comment list filter bar — toggles for my threads/comments, starred, show mode, suggestions, unread |
 | `comment-row.tsx` | Single comment row — expandable, shows content preview, thread panel, status actions; preserves extension-sourced fields (tabName) across refreshes |
-| `comment-thread-panel.tsx` | Expanded thread view — shows all replies, reply textarea, resolve/reopen buttons |
+| `comment-thread-panel.tsx` | Expanded thread view — shows all replies, reply textarea, resolve/reopen buttons, and an edit/delete menu on your own comments and replies |
 | `add-doc-form.tsx` | Shared add/update/re-add doc form body — URL validation (Add mode) or fixed doc (Re-add mode), label picker, notes; used by dialogs and standalone page |
 | `add-doc-dialog.tsx` | Dialog wrapper for adding/updating a doc — renders `add-doc-form` inside a dialog, dynamic title and button text |
 | `add-doc-page-client.tsx` | Standalone add/update doc page (client) — renders `add-doc-form` in a card with cross-tab sync |

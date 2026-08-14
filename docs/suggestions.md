@@ -326,6 +326,15 @@ Clicking a row always opens the doc using `window.open` with a named window
 
 ## Limitations
 
+### No editing, deleting, accepting, or rejecting
+
+The Docs API offers only `documents.get` and `documents.batchUpdate`, and `batchUpdate`
+always writes direct edits — there is no operation to accept, reject, edit, or delete a
+suggestion, and no way to write one either. Drive's comment endpoints can't stand in,
+since they don't reliably surface suggestion threads (see above). So Docreview's
+edit/delete menu is offered on comments only, and `/api/docs/[docId]/threads/edit`
+rejects suggestion records with a 400.
+
 ### Limited navigation to specific suggestion
 
 Suggestions only get `?disco=` navigation when `googleCommentId` is set (from Gmail

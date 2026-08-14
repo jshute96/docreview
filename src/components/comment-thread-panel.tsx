@@ -4,6 +4,23 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { RefreshCw } from "lucide-react";
 import type { CommentThread } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
+import { HamburgerButton } from "@/components/hamburger-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 import { highlightText, highlightHtml } from "@/lib/highlight";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
@@ -30,6 +47,111 @@ function CommentContent({ htmlContent, content, searchFilter, className }: {
   return content ? <p className={className}>{highlightText(content, searchFilter)}</p> : null;
 }
 
+/** Hamburger menu shown on entries the user wrote, offering Edit and Delete. */
+function EntryMenu({ label, onEdit, onDelete }: {
+  label: string;
+  onEdit?: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <HamburgerButton
+          size="mini"
+          title={`Edit or delete this ${label}`}
+          // The enclosing thread box selects the comment in the Google Doc tab
+          // when clicked; opening the menu shouldn't also trigger that.
+          onClick={(e) => e.stopPropagation()}
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        {onEdit && (
+          <DropdownMenuItem onSelect={onEdit} title={`Edit the text of this ${label}`}>
+            Edit
+          </DropdownMenuItem>
+        )}
+        {onDelete && (
+          <DropdownMenuItem onSelect={onDelete} title={`Delete this ${label}`}>
+            Delete
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** In-place editor replacing an entry's text while it is being edited. The
+ *  caller keeps it open until the save round-trips, so the reader never sees
+ *  stale text presented as saved. */
+function EntryEditor({ value, onChange, onSave, onCancel, saving, error }: {
+  value: string;
+  onChange: (v: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saving: boolean;
+  error: string | null;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Open at the height of the text being edited — the entry was fully visible
+  // before the click, so the box should be about the same size — then grow with
+  // it as the user types. Scroll position is saved and restored because setting
+  // height to "auto" briefly collapses the box and shifts the page.
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const scrollParent = document.scrollingElement ?? document.documentElement;
+    const scrollTop = scrollParent.scrollTop;
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+    scrollParent.scrollTop = scrollTop;
+  }, [value]);
+
+  return (
+    // Swallows clicks so interacting with the editor doesn't also select the
+    // comment in the Google Doc tab.
+    <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={1}
+        disabled={saving}
+        autoFocus
+        className={`${TEXTAREA_CLASSES} w-full`}
+        style={{ overflow: "hidden" }}
+      />
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 px-3 text-xs"
+          title="Save this edit"
+          disabled={saving || value.trim().length === 0}
+          onClick={onSave}
+        >
+          Save
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 px-3 text-xs"
+          title="Discard this edit"
+          disabled={saving}
+          onClick={onCancel}
+        >
+          Cancel
+        </Button>
+        {saving && <span className="text-xs text-zinc-500">Saving...</span>}
+        {!saving && error && <span className="text-xs text-red-600">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+/** Which control is holding unsaved text. */
+export type DirtyKind = "reply" | "edit";
+
 interface CommentThreadPanelProps {
   threads: CommentThread[];
   loading: boolean;
@@ -47,13 +169,22 @@ interface CommentThreadPanelProps {
   onResolve?: (content: string) => Promise<void>;
   onReopen?: (content: string) => Promise<void>;
   onReplyAndArchive?: (content: string) => Promise<void>;
+  /** Edit an entry the user wrote. `replyId` is null for the thread's first
+   *  comment. Must not resolve until the new content has been read back, and
+   *  must reject with a user-readable message on failure. Omit to hide the
+   *  edit/delete menu entirely (e.g. for suggestions). */
+  onEditEntry?: (threadId: string, replyId: string | null, content: string) => Promise<void>;
+  /** Delete an entry the user wrote. `replyId` null deletes the whole thread. */
+  onDeleteEntry?: (threadId: string, replyId: string | null) => Promise<void>;
   onArchive?: () => void;
   isArchived?: boolean;
   onToggleRead?: () => void;
   isRead?: boolean;
   onMute?: () => void;
   isMuted?: boolean;
-  onDirtyChange?: (dirty: boolean) => void;
+  /** Reports unsaved work. `kind` says which control holds it, so the parent can
+   *  tell the user what to clear. */
+  onDirtyChange?: (dirty: boolean, kind?: DirtyKind) => void;
   searchFilter?: string;
   documentText?: string;
   isSelected?: boolean;
@@ -88,6 +219,8 @@ export function CommentThreadPanel({
   onResolve,
   onReopen,
   onReplyAndArchive,
+  onEditEntry,
+  onDeleteEntry,
   onArchive,
   isArchived,
   onToggleRead,
@@ -107,19 +240,35 @@ export function CommentThreadPanel({
 }: CommentThreadPanelProps) {
   const [replyText, setReplyText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Which entry is being edited, keyed by thread + reply (null replyId = the
+  // thread's first comment). Only one entry is editable at a time.
+  const [editing, setEditing] = useState<{ threadId: string; replyId: string | null } | null>(null);
+  const [editText, setEditText] = useState("");
+  // The text the editor opened with, so an untouched editor doesn't count as
+  // unsaved work.
+  const [editOriginal, setEditOriginal] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ threadId: string; replyId: string | null } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const prevDirtyRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const replyContainerRef = useRef<HTMLDivElement>(null);
 
-  // Notify parent when dirty state changes
-  const isDirty = replyText.trim().length > 0;
+  // Notify parent when dirty state changes. A changed editor counts as dirty so
+  // an in-progress edit gets the same unsaved-work warnings as a typed reply —
+  // but merely opening the editor doesn't, any more than an empty reply box does.
+  const editDirty = editing !== null && editText.trim() !== editOriginal.trim();
+  const isDirty = replyText.trim().length > 0 || editDirty;
+  const dirtyKind: DirtyKind = replyText.trim().length > 0 ? "reply" : "edit";
   useEffect(() => {
     if (isDirty !== prevDirtyRef.current) {
       prevDirtyRef.current = isDirty;
-      onDirtyChange?.(isDirty);
+      onDirtyChange?.(isDirty, isDirty ? dirtyKind : undefined);
     }
-  }, [isDirty, onDirtyChange]);
+  }, [isDirty, dirtyKind, onDirtyChange]);
 
   // Warn before closing/navigating away with unsaved reply
   useEffect(() => {
@@ -231,6 +380,116 @@ export function CommentThreadPanel({
       setSubmitting(false);
     }
   }
+
+  function startEdit(threadId: string, replyId: string | null, content: string) {
+    setEditing({ threadId, replyId });
+    setEditText(content);
+    setEditOriginal(content);
+    setEditError(null);
+  }
+
+  function cancelEdit() {
+    setEditing(null);
+    setEditText("");
+    setEditOriginal("");
+    setEditError(null);
+  }
+
+  // The entry being edited or deleted can disappear underneath us — another tab
+  // or a background refresh replaces `threads`. Without this the editor unmounts
+  // but `editing` stays set, leaving the row permanently "unsaved" and
+  // un-collapsible, and a stale confirm dialog would delete a missing entry.
+  useEffect(() => {
+    const stillPresent = (entry: { threadId: string; replyId: string | null }) => {
+      const thread = threads.find((t) => t.id === entry.threadId);
+      if (!thread) return false;
+      return entry.replyId === null || thread.replies.some((r) => r.id === entry.replyId);
+    };
+    if (editing && !stillPresent(editing)) cancelEdit();
+    if (pendingDelete && !deleting && !stillPresent(pendingDelete)) {
+      setPendingDelete(null);
+      setDeleteError(null);
+    }
+  }, [threads]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Stays in edit mode on failure so the typed text isn't lost, and until
+  // success so the entry only re-renders as text once the new content is live.
+  async function saveEdit() {
+    if (!onEditEntry || !editing || editText.trim().length === 0) return;
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      await onEditEntry(editing.threadId, editing.replyId, editText.trim());
+      setEditing(null);
+      setEditText("");
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Failed to save — please try again.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!onDeleteEntry || !pendingDelete) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await onDeleteEntry(pendingDelete.threadId, pendingDelete.replyId);
+      setPendingDelete(null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete — please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const isEditing = (threadId: string, replyId: string | null) =>
+    editing?.threadId === threadId && editing?.replyId === replyId;
+
+  /** Entries the user wrote can be edited; replies without a Drive ID (synthesized
+   *  from Gmail notifications or the extension) can't be addressed by the API. */
+  const canModify = (fromMe: boolean, replyId: string | null) =>
+    !!(onEditEntry || onDeleteEntry) && fromMe && replyId !== "";
+
+  const deleteDialog = (
+    <AlertDialog
+      open={pendingDelete !== null}
+      onOpenChange={(open) => {
+        if (!open && !deleting) {
+          setPendingDelete(null);
+          setDeleteError(null);
+        }
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {pendingDelete?.replyId ? "Delete this reply?" : "Delete this comment?"}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {pendingDelete?.replyId
+              ? "This reply will be removed from the document. This can't be undone."
+              : "This deletes the whole comment thread, including any replies, from the document. This can't be undone."}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={deleting}
+            onClick={(e) => {
+              // Keep the dialog open until the delete round-trips, so errors
+              // are shown here rather than vanishing with the dialog.
+              e.preventDefault();
+              confirmDelete();
+            }}
+          >
+            {deleting ? "Deleting..." : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 
   const replyBox = (
     <div ref={replyContainerRef} className="mt-3 pt-3 border-t border-zinc-200">
@@ -437,8 +696,26 @@ export function CommentThreadPanel({
                   {thread.author}
                 </span>
                 <FriendlyDate date={thread.createdTime} className="text-xs text-zinc-400" />
+                {canModify(thread.fromMe, null) && (
+                  <EntryMenu
+                    label="comment"
+                    onEdit={onEditEntry && (() => startEdit(thread.id, null, thread.content))}
+                    onDelete={onDeleteEntry && (() => setPendingDelete({ threadId: thread.id, replyId: null }))}
+                  />
+                )}
               </div>
-              <CommentContent htmlContent={thread.htmlContent} content={thread.content} searchFilter={searchFilter ?? ""} className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap" />
+              {isEditing(thread.id, null) ? (
+                <EntryEditor
+                  value={editText}
+                  onChange={setEditText}
+                  onSave={saveEdit}
+                  onCancel={cancelEdit}
+                  saving={editSaving}
+                  error={editError}
+                />
+              ) : (
+                <CommentContent htmlContent={thread.htmlContent} content={thread.content} searchFilter={searchFilter ?? ""} className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap" />
+              )}
             </div>
 
             {thread.replies.map((reply, i) => (
@@ -468,14 +745,35 @@ export function CommentThreadPanel({
                       Rejected
                     </span>
                   )}
+                  {/* Resolve/reopen markers carry no text of their own, so
+                      there's nothing to edit on them. */}
+                  {!reply.action && canModify(reply.fromMe, reply.id) && (
+                    <EntryMenu
+                      label="reply"
+                      onEdit={onEditEntry && (() => startEdit(thread.id, reply.id, reply.content))}
+                      onDelete={onDeleteEntry && (() => setPendingDelete({ threadId: thread.id, replyId: reply.id }))}
+                    />
+                  )}
                 </div>
-                {reply.content && <CommentContent htmlContent={reply.htmlContent} content={reply.content} searchFilter={searchFilter ?? ""} className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap" />}
+                {isEditing(thread.id, reply.id) ? (
+                  <EntryEditor
+                    value={editText}
+                    onChange={setEditText}
+                    onSave={saveEdit}
+                    onCancel={cancelEdit}
+                    saving={editSaving}
+                    error={editError}
+                  />
+                ) : (
+                  reply.content && <CommentContent htmlContent={reply.htmlContent} content={reply.content} searchFilter={searchFilter ?? ""} className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap" />
+                )}
               </div>
             ))}
           </div>
         ))}
       </div>
       {replyBox}
+      {deleteDialog}
     </div>
   );
 }

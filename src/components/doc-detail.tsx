@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
-import { RefreshCw, Menu, Trash2, Pencil, CircleHelp } from "lucide-react";
+import { RefreshCw, Trash2, Pencil, CircleHelp } from "lucide-react";
+import { HamburgerButton } from "@/components/hamburger-button";
 import { AccessState, CommentStatus, CommentType, DocRole, DocStatus, type Comment, type Label } from "@prisma/client";
 import type { DocWithComments, DocWithLabels } from "@/types";
 import type { CommentThread, ThreadMap, SuggestionContent } from "@/lib/google-drive";
@@ -932,6 +933,24 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
     setComments((prev) => prev.map((c) => (c.commentId === updated.commentId ? updated : c)));
   }
 
+  // The comment's thread was deleted in the document, so drop the row outright
+  // rather than animating it out like a filtered-away comment. Its threadMap
+  // entry goes too — otherwise the deleted thread's text lingers in the search
+  // index and preview map (the cross-tab path already clears it this way).
+  function handleCommentDelete(commentId: string) {
+    const gone = comments.find((c) => c.commentId === commentId);
+    setComments((prev) => prev.filter((c) => c.commentId !== commentId));
+    const key = gone?.googleCommentId ?? gone?.googleSuggestionId;
+    if (key) {
+      setThreadMap((prev) => {
+        if (!(key in prev)) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+  }
+
   const matcher = useMemo(() => createMatcher(searchFilter), [searchFilter]);
 
   const filteredComments = comments
@@ -1104,14 +1123,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
           </Button>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                title="More options"
-                className="px-2 text-zinc-900"
-              >
-                <Menu className="h-4 w-4" />
-              </Button>
+              <HamburgerButton title="More options" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => setShowHelp(true)} title="Open the help guide">
@@ -1327,14 +1339,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                     </Button>
                     <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-5 px-1 text-zinc-900"
-                          title="More actions"
-                        >
-                          <Menu className="h-3.5 w-3.5" />
-                        </Button>
+                        <HamburgerButton size="compact" title="More actions" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
@@ -1383,6 +1388,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                     : undefined}
                   initialThread={threadMap[commentKey(comment)] ?? (comment.googleCommentId ? threadMap[comment.googleCommentId] : undefined)}
                   onUpdate={handleCommentUpdate}
+                  onDelete={handleCommentDelete}
                   onThreadUpdate={handleThreadUpdate}
                   isExiting={exitingIds.has(comment.commentId)}
                   searchFilter={searchFilter}

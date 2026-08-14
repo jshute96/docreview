@@ -14,7 +14,8 @@ import { RefreshButton } from "@/components/refresh-button";
 import { LoadDialog } from "@/components/load-dialog";
 import { BulkEditDialog } from "@/components/bulk-edit-dialog";
 import { signOut } from "next-auth/react";
-import { Menu, RefreshCw, LogOut, HardDriveDownload, Mail, FileText, CircleHelp, Trash2 } from "lucide-react";
+import { RefreshCw, LogOut, HardDriveDownload, Mail, FileText, CircleHelp, Trash2 } from "lucide-react";
+import { HamburgerButton } from "@/components/hamburger-button";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -395,14 +396,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
           </Button>
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                title="More options"
-                className="px-2"
-              >
-                <Menu className="h-4 w-4" />
-              </Button>
+              <HamburgerButton title="More options" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem

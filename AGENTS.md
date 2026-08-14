@@ -96,7 +96,7 @@ using different APIs and different IDs.  See `docs/comment-tracking.md` and
 - **Warnings:** Use `logWarning(message, ...args)` from `src/lib/log.ts` — prints yellow with `WARNING:` prefix via `console.warn`.
 - **Info:** Use `logInfo(message, ...args)` from `src/lib/log.ts` — wraps `console.log` and writes to daily log files.
 - **Never** use raw `console.log()`, `console.error()`, or `console.warn()` in application code; always use the helpers in `log.ts`.
-- **Prefix** every log message with a bracketed tag: `[Drive]`, `[Gmail]`, `[Sync]`, `[Comments]`, `[Suggestions]`, `[Scan]`, `[Refresh]`, `[Prisma]`, `[Auth]`, `[API]`, `[GmailRefresh]`, `[Docs]`, `[Metadata]`.
+- **Prefix** every log message with a bracketed tag: `[Drive]`, `[Gmail]`, `[Sync]`, `[Comments]`, `[Suggestions]`, `[Scan]`, `[Refresh]`, `[Prisma]`, `[Auth]`, `[API]`, `[GmailRefresh]`, `[Docs]`, `[Metadata]`, `[ViewedPin]`.
 - **Include timing** for external API calls: `(${Date.now() - t0}ms)`.
 - **No PII in logs**: Never log document titles, user/owner names, email subjects, or comment content. Use Google Doc IDs instead of titles. The logged-in user's own email is the only exception (e.g., auth denial logs).
 - Client-side toasts don't need corresponding `console.log` — the server-side API route already logs the operation or error.

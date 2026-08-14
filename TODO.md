@@ -100,6 +100,7 @@ Easy:
 * help for URLs: where to reference /add?doc=ID, etc.
 * when the extension checks for redirect links, it briefly opens a tab to try loading the page.  There are alternative ways, but complicated and with caveats.
 * assembling suggestion text from docs content is complex with multi-fragment overlapping suggestions, and causes some bugs or caveats, including matching to gmail by content hash.
+* new comment detection is based on reply count, and can get confused when replies get deleted
 
 ## wishlish for google APIs
 * suggestions don't work in APIs at all

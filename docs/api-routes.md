@@ -139,6 +139,26 @@ Drive from auto-marking the doc as viewed.
 
 Google API: Drive.
 
+### `/api/docs/[docId]/threads/edit` — Edit or delete a comment
+
+`PATCH { commentId, replyId?, content }` edits the text of a comment or one of
+its replies. `DELETE { commentId, replyId? }` deletes a reply, or the whole
+thread when `replyId` is omitted. Both pin `viewedByMeTime` like the reply
+route.
+
+Drive only permits these on entries the signed-in user authored, so a Drive 403
+is returned as a 403 with an ownership message rather than a generic 502, and a
+Drive 404 (already deleted) as a 404.
+
+Editing and deleting a reply re-sync the thread and return `{ comment, threads }`.
+Deleting the whole thread deletes the `Comment` record and returns
+`{ deleted: true }`.
+
+Suggestions are rejected with a 400 — the Docs API has no edit or delete for
+them (see `docs/suggestions.md`).
+
+Google API: Drive.
+
 ### `/api/docs/[docId]/extension-suggestions` — Extension suggestion merge
 
 POST `{ suggestions: ExtensionSuggestionInput[] }`. Receives suggestion data

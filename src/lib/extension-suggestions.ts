@@ -67,6 +67,7 @@ export function extensionToThread(s: ExtensionSuggestion): CommentThread {
     createdTime: s.timestamp,
     resolved: s.status !== "open",
     replies: s.replies.map(r => ({
+      id: "", // scraped from the Docs UI, so no Drive reply ID — not editable
       author: r.author,
       fromMe: r.isMine,
       content: r.text,

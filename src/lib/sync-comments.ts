@@ -145,7 +145,7 @@ export async function syncSingleComment(
   doc: Doc,
   googleCommentId: string,
   driveAuth: Awaited<ReturnType<typeof getDriveClient>>,
-  options?: { expectRecentComment?: boolean; userEmail?: string },
+  options?: { expectRecentComment?: boolean; userEmail?: string; selfEdited?: boolean },
 ): Promise<SingleCommentResult> {
   // Fetch the comment from Drive (returns null if content is empty/deleted).
   // When expectRecentComment is set, the caller just observed (or performed)
@@ -212,7 +212,7 @@ export async function syncSingleComment(
   }
 
   // --- Update existing comment ---
-  const updateResult = await updateExistingComment(doc, c, existing);
+  const updateResult = await updateExistingComment(doc, c, existing, options?.selfEdited);
   return {
     comment: updateResult.comment,
     thread: result.thread,
@@ -535,13 +535,20 @@ async function updateExistingComment(
   doc: Doc,
   c: DriveComment,
   existing: Comment,
+  /** This sync follows an edit or delete the user just made from Docreview.
+   *  Their own edit bumps Drive's modifiedTime, but it isn't activity that
+   *  should pull the comment back into their Inbox or mark it unread — so the
+   *  modifiedTime test alone is skipped. Everything else still counts, so
+   *  replies that arrive from other people in the same window are handled
+   *  exactly as they would be on any other sync. */
+  selfEdited?: boolean,
 ): Promise<{ comment: Comment; updated: boolean; unarchive: boolean }> {
   const hasNewReplies = c.replyCount > existing.replyCount;
   const hasNewActivity =
     hasNewReplies ||
     (!existing.resolved && c.resolved) ||
     (existing.resolved && !c.resolved) ||
-    !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
+    (!selfEdited && !datesEqual(existing.driveModifiedAt, c.driveModifiedAt));
 
   // @-mention or assignment in new replies breaks out of MUTED
   // (see docs/inbox-states.md rule 2).
@@ -552,7 +559,7 @@ async function updateExistingComment(
 
   // MUTED fast-path: update metadata but preserve MUTED status unless @-mentioned or assigned
   if (existing.status === CommentStatus.MUTED && !newReplyMentionsMe && !newReplyAssignsMe) {
-    const { changed, data } = buildCommentUpdate(existing, c);
+    const { changed, data } = buildCommentUpdate(existing, c, undefined, hasNewActivity);
     let comment = existing;
     if (changed) {
       comment = await prisma.$transaction(async (tx) => {
@@ -580,7 +587,7 @@ async function updateExistingComment(
     if (previousStatus === CommentStatus.INBOX && c.resolved && !c.iResolvedIt) unarchive = true;
   }
 
-  const { changed, data } = buildCommentUpdate(existing, c, status);
+  const { changed, data } = buildCommentUpdate(existing, c, status, hasNewActivity);
   let comment = existing;
   if (changed) {
     comment = await prisma.$transaction(async (tx) => {
@@ -640,9 +647,15 @@ function buildCommentUpdate(
   existing: Comment,
   c: DriveComment,
   newStatus?: CommentStatus,
+  /** Whether the sync found activity worth reacting to. Defaults to "yes if the
+   *  timestamp moved", which is what every caller but the self-edit path means;
+   *  a self-edit moves the timestamp without being activity, and must not clear
+   *  the read flag. */
+  hasNewActivity?: boolean,
 ): { changed: boolean; data: Prisma.CommentUncheckedUpdateInput } {
   const modifiedChanged = !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
-  const effectiveIsRead = modifiedChanged ? c.isRead : existing.isRead;
+  const activity = hasNewActivity ?? modifiedChanged;
+  const effectiveIsRead = modifiedChanged && activity ? c.isRead : existing.isRead;
   const mentionedInThread = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
   const status = newStatus ?? existing.status;
 
