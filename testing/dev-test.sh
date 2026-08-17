@@ -88,4 +88,4 @@ exec env \
   NEXT_DIST_DIR=.next-test-interactive \
   ${OFFLINE_ENV:+"$OFFLINE_ENV"} \
   ${USER_ID_ENV:+"$USER_ID_ENV"} \
-  npx next dev --port "$PORT"
+  pnpm exec next dev --port "$PORT"

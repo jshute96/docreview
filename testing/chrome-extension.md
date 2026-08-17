@@ -1,7 +1,7 @@
 # Chrome Extension Test Cases
 
 > **Automation status:** Test cases marked **[auto]** are covered by the Playwright
-> DOM snapshot tests in `content-script.spec.ts` (`npm run test:e2e`). Cases marked
+> DOM snapshot tests in `content-script.spec.ts` (`pnpm test:e2e`). Cases marked
 > **[manual]** require the real extension loaded in Chrome and are not yet automated.
 > See `testing/README.md` for how the automated tests work.
 

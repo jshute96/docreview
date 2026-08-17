@@ -66,7 +66,7 @@ const allDeps = {
 const nodeModulesDir = path.join(rootDir, 'node_modules');
 if (!fs.existsSync(nodeModulesDir)) {
   logError('node_modules/ does not exist.');
-  console.log(`Run: ${COLORS.bold}npm install${COLORS.reset}\n`);
+  console.log(`Run: ${COLORS.bold}pnpm install${COLORS.reset}\n`);
   process.exit(1);
 }
 
@@ -81,7 +81,7 @@ if (missing.length > 0) {
   for (const dep of missing) {
     console.log(`  - ${dep}`);
   }
-  console.log(`\nRun: ${COLORS.bold}npm install${COLORS.reset}\n`);
+  console.log(`\nRun: ${COLORS.bold}pnpm install${COLORS.reset}\n`);
   process.exit(1);
 }
 

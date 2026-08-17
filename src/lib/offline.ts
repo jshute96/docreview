@@ -1,7 +1,7 @@
 export const OFFLINE_MODE = process.env.OFFLINE_MODE === "true";
 
 // Optional: impersonate an existing DB user by ID.
-// Pass as OFFLINE_USER_ID env var or inline: OFFLINE_USER_ID=abc123 npm run dev:offline
+// Pass as OFFLINE_USER_ID env var or inline: OFFLINE_USER_ID=abc123 pnpm dev:offline
 export const OFFLINE_USER_ID = process.env.OFFLINE_USER_ID ?? null;
 
 export class OfflineModeError extends Error {

@@ -8,13 +8,13 @@ extensions).
 ## Prerequisites
 
 1. Set up the test database: `testing/setup-test-db.sh`
-2. Install Playwright's bundled Chromium: `npx playwright install chromium`
+2. Install Playwright's bundled Chromium: `pnpm exec playwright install chromium`
 3. Chrome extension source in `src/chrome-extension/`
 
 ## Run
 
 ```bash
-npm run test:e2e:extension-live
+pnpm test:e2e:extension-live
 
 # Or a specific test file:
 scripts/run-test.sh testing/extension-live/toolbar.spec.ts

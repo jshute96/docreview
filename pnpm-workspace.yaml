@@ -1,0 +1,11 @@
+# pnpm settings.  pnpm 11 reads its config from this file rather than from a
+# "pnpm" field in package.json.
+#
+# pnpm blocks dependency install/postinstall scripts by default; these are the
+# ones this project needs.  Prisma's generate the query engine and the client
+# into node_modules/.prisma, without which every DB call fails at runtime.
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true
+  unrs-resolver: true

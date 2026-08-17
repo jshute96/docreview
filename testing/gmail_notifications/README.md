@@ -94,5 +94,5 @@ npx tsx scripts/extract-email-body.ts --all                           # all .eml
 
 Unit tests for the parser are in `src/lib/parse-gmail-notification.test.ts`. Run with:
 ```bash
-npx vitest run src/lib/parse-gmail-notification.test.ts
+pnpm exec vitest run src/lib/parse-gmail-notification.test.ts
 ```

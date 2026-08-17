@@ -6,8 +6,8 @@
  * config's `use` block — the `use` settings here are just for baseURL/defaults.
  *
  * Prerequisites:
- *   testing/setup-test-db.sh   # create and migrate the test database
- *   npx playwright install chromium  # bundled Chromium (system Chrome can't load extensions)
+ *   testing/setup-test-db.sh               # create and migrate the test database
+ *   pnpm exec playwright install chromium  # bundled Chromium (system Chrome can't load extensions)
  */
 
 import { defineConfig } from '@playwright/test';

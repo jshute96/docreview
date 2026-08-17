@@ -99,7 +99,7 @@ the tests.
 
 **Implemented:**
 - Snapshots for Google Docs, Sheets, Slides, Drive list view, Gmail inbox, Gmail message view
-- Automated Playwright tests (`npm run test:e2e`) that extract content script functions, inject them with mocked variables, and assert DOM state
+- Automated Playwright tests (`pnpm test:e2e`) that extract content script functions, inject them with mocked variables, and assert DOM state
 - Hostname check bypassed by shadowing `location` in the injection wrapper
 
 **Potential next steps:**

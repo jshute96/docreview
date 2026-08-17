@@ -111,7 +111,7 @@ gcloud run deploy docreview \
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string. Must include `@localhost` — Prisma's URL parser requires a host. The `?host=` parameter directs it to use the Cloud SQL Unix socket instead of TCP. |
-| `AUTH_SECRET` | Encrypts NextAuth sessions. Generate with `npx auth secret`. |
+| `AUTH_SECRET` | Encrypts NextAuth sessions. Generate with `pnpm dlx auth secret`. |
 | `AUTH_GOOGLE_ID` | Google OAuth client ID (from Cloud Console). |
 | `AUTH_GOOGLE_SECRET` | Google OAuth client secret. |
 | `AUTH_URL` | The public URL of the app. Required for OAuth callbacks to work behind Cloud Run's load balancer. |

@@ -263,7 +263,7 @@ scripts/run-test.sh testing/app-offline/
 scripts/run-test.sh testing/app-offline/labels-crosstab.spec.ts --headed
 
 # Run all suites
-npm run test:e2e
+pnpm test:e2e
 ```
 
 Test suites live in subdirectories under `testing/` — see `testing/README.md` for details.

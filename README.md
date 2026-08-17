@@ -67,8 +67,13 @@ Google OAuth gets an account — worth setting if you deploy anywhere public.
 
 2. **Install dependencies** (each checkout needs its own node_modules):
    ```bash
-   npm install
+   corepack enable   # once per machine, if you don't already have pnpm
+   pnpm install
    ```
+
+   This project uses **pnpm**, not npm. A `preinstall` guard rejects
+   `npm install`; if you run it by accident, delete the `package-lock.json`
+   it leaves behind before re-running `pnpm install`.
 
 3. **Google Cloud setup:**
    - Enabled APIs & Services:
@@ -91,7 +96,7 @@ Google OAuth gets an account — worth setting if you deploy anywhere public.
    ```
    ```
    DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/docreview"
-   AUTH_SECRET="..."         # generate with: npx auth secret
+   AUTH_SECRET="..."         # generate with: pnpm dlx auth secret
    AUTH_GOOGLE_ID="..."
    AUTH_GOOGLE_SECRET="..."
    ```
@@ -129,12 +134,12 @@ Google OAuth gets an account — worth setting if you deploy anywhere public.
 
 8. **Initialize the database:**
    ```bash
-   npx prisma migrate dev
+   pnpm exec prisma migrate dev
    ```
 
 9. **Start the dev server:**
    ```bash
-   npm run dev
+   pnpm dev
    ```
    Visit `http://localhost:3000` and sign in with Google.
 
@@ -157,7 +162,7 @@ how to configure it, and `docs/chrome-extension.md` for the design.
 Run without Google OAuth credentials (useful for UI development, testing, or CI):
 
 ```bash
-npm run dev:offline
+pnpm dev:offline
 ```
 
 In offline mode:
@@ -184,12 +189,12 @@ Log files are written to `logs/docreview-YYYY-MM-DD.log`.
 ## Testing
 
 ```bash
-npm test            # run all unit tests once
-npm run test:watch  # run unit tests in watch mode
-npm run typecheck   # type check without building
+pnpm test        # run all unit tests once
+pnpm test:watch  # run unit tests in watch mode
+pnpm typecheck   # type check without building
 ```
 
-A pre-commit hook (via Husky) runs `npm test` and `npm run typecheck` automatically before each commit.
+A pre-commit hook (via Husky) runs `pnpm test` and `pnpm typecheck` automatically before each commit.
 
 ### UI tests (Playwright)
 
@@ -199,7 +204,7 @@ are slower to run.
 
 ```bash
 testing/setup-test-db.sh                                # one-time DB setup
-npm run test:e2e                                        # run all UI test suites
+pnpm test:e2e                                           # run all UI test suites
 scripts/run-test.sh testing/app-offline/labels.spec.ts  # run a specific test file
 scripts/run-test.sh testing/app-offline/ --headed       # run a suite with visible browsers
 ```
@@ -218,7 +223,7 @@ corrupted. Fix by clearing it and restarting:
 ```bash
 # Stop the dev server (Ctrl+C), then:
 rm -rf .next
-npm run dev
+pnpm dev
 ```
 
 The first request after a cold start may take several seconds to compile routes
@@ -231,27 +236,27 @@ If the Prisma schema (`prisma/schema.prisma`) has changed, regenerate the Prisma
 restart the dev server:
 
 ```bash
-npx prisma generate
+pnpm exec prisma generate
 # Then restart the dev server — Next.js won't pick up the new client until restart
 ```
 
 If there are new migrations to apply:
 
 ```bash
-npx prisma migrate dev
+pnpm exec prisma migrate dev
 ```
 
 ## Database
 
 ```bash
 # Visual browser UI
-npx prisma studio
+pnpm exec prisma studio
 
 # Raw SQL via psql
 psql docreview
 
 # Raw SQL via Prisma (no psql required)
-echo "SELECT title, role, status FROM docs;" | npx prisma db execute --stdin
+echo "SELECT title, role, status FROM docs;" | pnpm exec prisma db execute --stdin
 ```
 
 ### Readonly database user
@@ -290,15 +295,15 @@ scripts/query_database.sh --help                             # full usage
 ## Commands
 
 ```bash
-npm run dev       # start dev server at http://localhost:3000
-npm run build     # production build (also runs type checking)
-npm run lint      # ESLint
-npm run test      # run tests
-npm run typecheck # type check without building
+pnpm dev       # start dev server at http://localhost:3000
+pnpm build     # production build (also runs type checking)
+pnpm lint      # ESLint
+pnpm test      # run tests
+pnpm typecheck # type check without building
 
-npx prisma migrate dev --name <name>  # create and apply a migration
-npx prisma studio                     # open DB browser at http://localhost:5555
-npx prisma generate                   # regenerate client after schema changes
+pnpm exec prisma migrate dev --name <name>  # create and apply a migration
+pnpm exec prisma studio                     # open DB browser at http://localhost:5555
+pnpm exec prisma generate                   # regenerate client after schema changes
 ```
 
 ## Deploying to Google Cloud

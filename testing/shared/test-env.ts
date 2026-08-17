@@ -52,7 +52,7 @@ export function buildServerCommand(opts: { offline?: boolean; userId?: string } 
     .join(' ');
 
   // Skip check-deps and check-db for faster startup in tests
-  return `${env} npx next dev --port ${TEST_PORT}`;
+  return `${env} pnpm exec next dev --port ${TEST_PORT}`;
 }
 
 /** Project root directory */

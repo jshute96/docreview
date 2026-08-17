@@ -59,7 +59,7 @@ function runPrismaMigrateStatus() {
   // Merge stderr into stdout so we capture all Prisma output (Prisma
   // sometimes writes status details to stderr rather than stdout).
   const result = execSync(
-    'npx prisma migrate status 2>&1',
+    'pnpm exec prisma migrate status 2>&1',
     { encoding: 'utf8', shell: true }
   );
   return result;
@@ -81,7 +81,7 @@ async function run() {
 
   if (!fs.existsSync(generatedSchemaPath)) {
     logError('Generated Prisma client not found.');
-    console.log(`Run: ${COLORS.bold}npx prisma generate${COLORS.reset}\n`);
+    console.log(`Run: ${COLORS.bold}pnpm exec prisma generate${COLORS.reset}\n`);
     hasError = true;
   } else {
     // Compare content instead of mtime to be more robust (e.g. after git pull)
@@ -90,7 +90,7 @@ async function run() {
 
     if (schemaContent !== generatedContent) {
       logError('Prisma client is out of date with schema.prisma.');
-      console.log(`Run: ${COLORS.bold}npx prisma generate${COLORS.reset} and restart your dev server.\n`);
+      console.log(`Run: ${COLORS.bold}pnpm exec prisma generate${COLORS.reset} and restart your dev server.\n`);
       hasError = true;
     } else {
       logSuccess('Prisma client is in sync with schema.');
@@ -106,12 +106,12 @@ async function run() {
     } else if (statusRes.includes('not been applied')) {
       logError('Database is OUT OF DATE (missing migrations).');
       console.log(statusRes);
-      console.log(`Run: ${COLORS.bold}npx prisma migrate dev${COLORS.reset}\n`);
+      console.log(`Run: ${COLORS.bold}pnpm exec prisma migrate dev${COLORS.reset}\n`);
       hasError = true;
     } else if (statusRes.includes('not yet been applied') || statusRes.includes('following migration')) {
       logError('Database has pending migrations.');
       console.log(statusRes);
-      console.log(`Run: ${COLORS.bold}npx prisma migrate dev${COLORS.reset}\n`);
+      console.log(`Run: ${COLORS.bold}pnpm exec prisma migrate dev${COLORS.reset}\n`);
       hasError = true;
     } else {
       logWarning('Unexpected output from prisma migrate status:');
@@ -134,7 +134,7 @@ async function run() {
     } else if (output.includes('not been applied') || output.includes('not yet been applied')) {
       logError('Database is OUT OF DATE (missing migrations).');
       console.log(output);
-      console.log(`Run: ${COLORS.bold}npx prisma migrate dev${COLORS.reset}\n`);
+      console.log(`Run: ${COLORS.bold}pnpm exec prisma migrate dev${COLORS.reset}\n`);
       hasError = true;
     } else if (output.includes('P1001') || output.includes('Can\'t reach database') || output.includes('ECONNREFUSED')) {
       logWarning('Could not connect to database (is it running?)');

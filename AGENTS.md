@@ -49,7 +49,7 @@ using different APIs and different IDs.  See `docs/comment-tracking.md` and
       scripts/query_database.sh -f query.sql                     # from file
       ```
 - **Commit Preparation**:
-  - Run `npm test` and `npm run typecheck` before committing code.
+  - Run `pnpm test` and `pnpm typecheck` before committing code.
   - Ensure `README.md` is updated if setup or debugging commands change.
   - Include all significant changes in the commit message.
 
@@ -71,7 +71,7 @@ using different APIs and different IDs.  See `docs/comment-tracking.md` and
   scripts/run-test.sh testing/app-offline/labels.spec.ts           # one test file
   scripts/run-test.sh testing/app-offline/                         # whole suite
   scripts/run-test.sh testing/app-offline/labels.spec.ts --headed  # visible browser
-  npm run test:e2e                                                 # all suites
+  pnpm test:e2e                                                    # all suites
   ```
   See `testing/README.md` for setup and details.
 - **Test coverage tracking**: `testing/TODO.md` lists user-facing behaviors that need e2e coverage. When adding or changing user-facing behaviors that don't yet have e2e tests, add an entry to this list.

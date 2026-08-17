@@ -49,7 +49,7 @@ Run the check script and report results. Do NOT fix anything or update files.
 
 2. **Run the tests:**
    ```
-   npx vitest run src/lib/parse-gmail-notification.test.ts
+   pnpm exec vitest run src/lib/parse-gmail-notification.test.ts
    ```
 
 3. **Report** the results:
@@ -100,7 +100,7 @@ Run checks, fix parser issues, update JSON files, and get everything passing.
 
 5. **Run the tests:**
    ```
-   npx vitest run src/lib/parse-gmail-notification.test.ts
+   pnpm exec vitest run src/lib/parse-gmail-notification.test.ts
    ```
    - If new features were added, add test cases to the test file.
    - Tests live at `src/lib/parse-gmail-notification.test.ts` and read examples from `testing/gmail_notifications/`.
@@ -160,7 +160,7 @@ Collect new notification examples from Gmail via Playwright.
 
 9. **Run the tests:**
    ```
-   npx vitest run src/lib/parse-gmail-notification.test.ts
+   pnpm exec vitest run src/lib/parse-gmail-notification.test.ts
    ```
    Consider adding test cases for any new features or email types.
 

@@ -56,7 +56,7 @@ drop_db() {
 run_migrations() {
   echo "Running Prisma migrations against docreview_test..."
   cd "$PROJECT_DIR"
-  npx prisma migrate deploy 2>&1
+  pnpm exec prisma migrate deploy 2>&1
   echo "Migrations complete."
 }
 
@@ -88,7 +88,7 @@ case "${1:-}" in
       echo "Database docreview_test exists."
       echo "DATABASE_URL=$DATABASE_URL"
       cd "$PROJECT_DIR"
-      npx prisma migrate status 2>&1
+      pnpm exec prisma migrate status 2>&1
     else
       echo "Database docreview_test does not exist."
       echo "Run: testing/setup-test-db.sh"

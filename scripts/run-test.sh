@@ -86,4 +86,4 @@ for t in "${TARGETS[@]}"; do
   [[ -f "$t" ]] && FILE_ARGS+=("$t")
 done
 
-exec npx playwright test --config "$CONFIG" "${FILE_ARGS[@]}" "${PW_ARGS[@]}"
+exec pnpm exec playwright test --config "$CONFIG" "${FILE_ARGS[@]}" "${PW_ARGS[@]}"

@@ -1,20 +1,27 @@
 # Stage 1: Install dependencies
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install -g pnpm@11.22.0
+# pnpm-workspace.yaml carries the allowBuilds list, without which pnpm skips
+# Prisma's postinstall and the query engine never lands in node_modules.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# --node-linker=hoisted produces a flat node_modules like npm's.  pnpm's
+# default layout symlinks each package into .pnpm/, and the stage-3 COPYs of
+# node_modules/{.prisma,@prisma,prisma} would then copy dangling symlinks.
+RUN pnpm install --frozen-lockfile --node-linker=hoisted
 
 # Stage 2: Build the application
 FROM node:20-alpine AS builder
 WORKDIR /app
+RUN npm install -g pnpm@11.22.0
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Generate Prisma client
-RUN npx prisma generate
+RUN pnpm exec prisma generate
 
 # Build the Next.js app
-RUN npm run build
+RUN pnpm build
 
 # Stage 3: Production runner
 FROM node:20-alpine AS runner

@@ -16,32 +16,32 @@ infrastructure they need.
 
 ```bash
 # Run the fast snapshot tests (no database needed)
-npm run test:e2e:snapshot
+pnpm test:e2e:snapshot
 
 # Set up the test database (one-time, or after schema changes)
 testing/setup-test-db.sh
 
 # Run offline app tests
-npm run test:e2e:app-offline
+pnpm test:e2e:app-offline
 
 # Run all suites that are ready
-npm run test:e2e
+pnpm test:e2e
 ```
 
-## npm scripts
+## pnpm scripts
 
 | Script | Runs |
 |--------|------|
-| `npm run test:e2e` | All ready suites (snapshot + app-offline) |
-| `npm run test:e2e:snapshot` | Extension snapshot tests only |
-| `npm run test:e2e:app-offline` | App offline tests only |
-| `npm run test:e2e:extension-live` | Extension + app tests |
-| `npm run test:e2e:app-live` | App with Google login tests |
-| `npm run dev:test-live` | Start dev server on port 3009, online mode (Google OAuth) |
-| `npm run dev:test-offline` | Start dev server on port 3009, offline mode (auto-login) |
-| `npm run test:open-browser` | Open an ephemeral Playwright browser (offline mode) |
-| `npm run test:open-browser-live` | Open a regular Chrome with saved profile (Google login survives across runs) |
-| `npm run test:open-browser-extension` | Open Chrome with extension loaded |
+| `pnpm test:e2e` | All ready suites (snapshot + app-offline) |
+| `pnpm test:e2e:snapshot` | Extension snapshot tests only |
+| `pnpm test:e2e:app-offline` | App offline tests only |
+| `pnpm test:e2e:extension-live` | Extension + app tests |
+| `pnpm test:e2e:app-live` | App with Google login tests |
+| `pnpm dev:test-live` | Start dev server on port 3009, online mode (Google OAuth) |
+| `pnpm dev:test-offline` | Start dev server on port 3009, offline mode (auto-login) |
+| `pnpm test:open-browser` | Open an ephemeral Playwright browser (offline mode) |
+| `pnpm test:open-browser-live` | Open a regular Chrome with saved profile (Google login survives across runs) |
+| `pnpm test:open-browser-extension` | Open Chrome with extension loaded |
 
 ## Running individual tests
 
@@ -61,7 +61,7 @@ scripts/run-test.sh testing/app-offline/labels.spec.ts --headed
 Or pass the config explicitly:
 
 ```bash
-npx playwright test --config testing/app-offline/playwright.config.ts testing/app-offline/labels.spec.ts
+pnpm exec playwright test --config testing/app-offline/playwright.config.ts testing/app-offline/labels.spec.ts
 ```
 
 ## Interactive testing
@@ -70,19 +70,19 @@ Start the test dev server on port 3009 and browse to it:
 
 ```bash
 # Online mode (Google OAuth) — use your regular browser at http://localhost:3009
-npm run dev:test-live
+pnpm dev:test-live
 
 # Offline mode (auto-login, no Google APIs)
-npm run dev:test-offline
+pnpm dev:test-offline
 
 # Offline mode, impersonate a specific user (by email from test_users.json)
-npm run dev:test-offline -- USER_EMAIL
+pnpm dev:test-offline -- USER_EMAIL
 
 # Open a Playwright browser (ephemeral — good for offline mode)
-npm run test:open-browser
+pnpm test:open-browser
 
 # Open a regular Chrome with saved profile (Google login saved across runs)
-npm run test:open-browser-live
+pnpm test:open-browser-live
 ```
 
 The dev-test server uses port 3009 and its own build directory
