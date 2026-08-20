@@ -9,6 +9,7 @@ import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 
 const USAGE =
   "Check that the Prisma schema, generated client, and database migrations are in sync.\n\n" +
@@ -65,6 +66,29 @@ function runPrismaMigrateStatus() {
   return result;
 }
 
+/**
+ * Locate the schema.prisma copy that `prisma generate` writes next to the
+ * generated client. With a flat node_modules (npm) that is
+ * node_modules/.prisma/client; with pnpm the client lives inside the .pnpm
+ * store, so resolve @prisma/client and look beside it instead.
+ * Returns the path, or null if no generated client was found.
+ */
+function findGeneratedSchema(rootDir) {
+  const candidates = [path.join(rootDir, 'node_modules', '.prisma', 'client', 'schema.prisma')];
+
+  try {
+    const require = createRequire(path.join(rootDir, 'package.json'));
+    // .../node_modules/@prisma/client/default.js -> .../node_modules
+    const clientEntry = require.resolve('@prisma/client');
+    const nodeModulesDir = path.resolve(path.dirname(clientEntry), '..', '..');
+    candidates.push(path.join(nodeModulesDir, '.prisma', 'client', 'schema.prisma'));
+  } catch {
+    // @prisma/client isn't installed; treated the same as a missing client.
+  }
+
+  return candidates.find(candidate => fs.existsSync(candidate)) ?? null;
+}
+
 async function run() {
   let hasError = false;
 
@@ -72,14 +96,14 @@ async function run() {
 
   // 1. Check if Prisma Client is in sync with schema.prisma
   const schemaPath = path.join(rootDir, 'prisma', 'schema.prisma');
-  const generatedSchemaPath = path.join(rootDir, 'node_modules', '.prisma', 'client', 'schema.prisma');
+  const generatedSchemaPath = findGeneratedSchema(rootDir);
 
   if (!fs.existsSync(schemaPath)) {
     logError('prisma/schema.prisma not found.');
     process.exit(1);
   }
 
-  if (!fs.existsSync(generatedSchemaPath)) {
+  if (!generatedSchemaPath) {
     logError('Generated Prisma client not found.');
     console.log(`Run: ${COLORS.bold}pnpm exec prisma generate${COLORS.reset}\n`);
     hasError = true;
