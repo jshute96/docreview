@@ -196,6 +196,8 @@ Update this list when adding or changing user-facing behaviors.
 ## Add Document Page (`/add`)
 
 - [ ] Paste Google Docs/Sheets/Slides URL, validates and shows title + owner
+- [ ] `?doc=` URL parameter auto-validates on load (title resolves, Add buttons enable) — must survive a React Strict Mode remount
+- [ ] Navigating from one `?doc=` URL to another without a reload re-validates the new doc
 - [ ] Accept doc ID as well as full URL
 - [ ] Accept redirect-service link
 - [ ] Set role (Author/Reviewer), labels, notes, star before adding

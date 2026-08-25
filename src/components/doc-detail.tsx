@@ -297,6 +297,11 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
   const partialScrapeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
     if (partialScrapeTimer.current) clearTimeout(partialScrapeTimer.current);
+    // Null it too, not just clear it: schedulePartialScrapeRetry() treats a
+    // non-null ref as "a retry is already pending" and would refuse to schedule
+    // another one if this component is ever remounted (React Strict Mode does
+    // exactly that in dev).
+    partialScrapeTimer.current = null;
   }, []);
 
   function schedulePartialScrapeRetry() {

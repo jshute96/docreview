@@ -110,7 +110,6 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const abortRef = useRef<AbortController | null>(null);
     const notesRef = useRef<HTMLTextAreaElement>(null);
-    const initialUrlTriggered = useRef(false);
     const resolveInFlight = useRef(false);
     const pastedRef = useRef(false);
     const validTitleRef = useRef<string | null>(validTitle);
@@ -212,6 +211,9 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
     }
 
     async function validateUrl(urlToValidate: string) {
+      // Supersede any validation already running, so a slower earlier response
+      // can't overwrite this one's result.
+      abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
       setValidationState("validating");
@@ -249,7 +251,11 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
           resolveInFlight.current = true;
           console.log("[extension] Resolving:", urlToValidate);
           const result = await resolveUrl(urlToValidate);
-          resolveInFlight.current = false;
+          // Only the current run may clear the flag: a superseded run's promise
+          // can land mid-way through a newer resolve, and clearing it there
+          // would make cleanup skip cancelResolve() and strand the extension's
+          // background tab.
+          if (!controller.signal.aborted) resolveInFlight.current = false;
           if (result.resolved) {
             console.log("[extension] Resolved to:", result.url);
           } else {
@@ -322,13 +328,19 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
       }
     }
 
-    // Auto-validate initialUrl on mount
+    // Validate `initialUrl` (the /add page's `?doc=` query param) on mount, and
+    // again whenever it changes — client-side navigation from one `?doc=` URL to
+    // another re-renders this form in place rather than remounting it.
+    // Deliberately no once-only ref guard: the unmount cleanup below aborts the
+    // in-flight request, and React Strict Mode (dev) mounts, unmounts, then
+    // remounts. A ref survives that remount, so guarding on one would leave the
+    // first run aborted and the second never started — the form stuck showing
+    // "validating" forever, with the Add buttons never enabling.
     useEffect(() => {
-      if (initialUrl && !initialUrlTriggered.current) {
-        initialUrlTriggered.current = true;
-        validateUrl(initialUrl);
-      }
-    }, [initialUrl]);
+      if (!initialUrl) return;
+      setUrl(initialUrl);
+      validateUrl(initialUrl);
+    }, [initialUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
     async function handleAction(): Promise<DocWithLabels | null> {
       setProcessing(true);
@@ -371,7 +383,10 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
       return () => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
         if (abortRef.current) abortRef.current.abort();
-        if (resolveInFlight.current) cancelResolve();
+        if (resolveInFlight.current) {
+          cancelResolve();
+          resolveInFlight.current = false;
+        }
       };
     }, []);
 
