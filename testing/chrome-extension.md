@@ -202,6 +202,39 @@ Context menus are native browser UI and cannot be tested via Playwright. Use `te
 1. Right-click an `http://` (not `https://`) link to a Google Doc.
 2. **Expect**: "Open in Docreview" appears (patterns use `*://` to match both schemes).
 
+## New tab placement (multi-window) [manual]
+
+Source: `src/chrome-extension/background-tabs.js` (`createTabNextTo`)
+
+Chrome's "current window" (what `chrome.tabs.create` uses when given no
+`windowId`) is its last-focused-window bookkeeping, which can name a window the
+user left earlier. Every tab the extension opens is placed relative to a
+concrete tab instead. This needs two real windows and can't be automated.
+
+### Toolbar click with a stale focused window [manual]
+
+1. Open two Chrome windows, A and B, ideally on different virtual desktops. Open
+   a Google Doc in window A.
+2. Make window B the last one Chrome saw focused (click in it), then switch back
+   to window A's doc tab using the OS/window manager rather than a Chrome click
+   — on some window managers Chrome never learns that focus moved.
+3. Click the Docreview toolbar icon.
+4. **Expect**: The `/open?doc=...` tab appears in window A, immediately to the
+   right of the doc tab. Nothing new appears in window B.
+
+### Link context menu in a background window [manual]
+
+1. With windows A and B as above, right-click a Google Doc link in window A and
+   choose "Open in Docreview".
+2. **Expect**: The new tab appears in window A next to the link's tab.
+
+### Comment navigation from a second window [manual]
+
+1. Open Docreview's comments page for a doc in window B, with no tab for that
+   doc open anywhere.
+2. Click "Open" on a comment.
+3. **Expect**: The Google Docs tab opens in window B next to the comments tab.
+
 ## Comment activity sync [manual]
 
 Source: `src/chrome-extension/content.js` (detection), `src/chrome-extension/background.js` (extraction + sync), `src/lib/sync-comments.ts` (`syncSingleComment`)

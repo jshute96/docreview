@@ -62,7 +62,7 @@ async function openDocFromGmailTab(tabId) {
   var tab = await chrome.tabs.get(tabId);
   var docUrls = await findDocUrlsInTab(tabId);
   if (docUrls.length === 1) {
-    chrome.tabs.create({ url: baseUrl + '/open?doc=' + encodeURIComponent(docUrls[0]), index: tab.index + 1 });
+    createTabNextTo(baseUrl + '/open?doc=' + encodeURIComponent(docUrls[0]), tab);
   } else if (docUrls.length > 1) {
     chrome.scripting.executeScript({
       target: { tabId: tabId },
@@ -129,7 +129,7 @@ async function handleToolbarClick(tab) {
   }
 
   var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
-  chrome.tabs.create({ url: baseUrl + '/open?doc=' + encodeURIComponent(tab.url), index: tab.index + 1 });
+  createTabNextTo(baseUrl + '/open?doc=' + encodeURIComponent(tab.url), tab);
 }
 
 chrome.action.onClicked.addListener(handleToolbarClick);
@@ -302,7 +302,7 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
         sendResponse({ resolved: false, error: 'disabled' });
         return;
       }
-      resolveUrlViaTab(msg.url, msg.pageId).then(function(result) {
+      resolveUrlViaTab(msg.url, msg.pageId, sender.tab).then(function(result) {
         sendResponse(result);
       });
     });
@@ -714,8 +714,7 @@ async function navigateToComment(docId, discoId, docUrl, resolved, senderTab) {
     // No existing tab — open a new one. Use disco= URL if we have an ID,
     // otherwise just open the doc at the top.
     console.log('[background] opening new tab:', { hasDisco: !!discoId });
-    var newTabIndex = senderTab ? senderTab.index + 1 : undefined;
-    var newTab = await chrome.tabs.create({ url: fallbackUrl, index: newTabIndex });
+    var newTab = await createTabNextTo(fallbackUrl, senderTab);
     await setDocTab(docId, newTab.id);
     // Set window.name so the web app's <a target="doc-{id}"> can find this tab.
     // Also set on subsequent interactions via focusDocTab and trackDocTab.
@@ -749,14 +748,13 @@ async function navigateToComment(docId, discoId, docUrl, resolved, senderTab) {
       console.log('[background] tracked tab is in diff/version history view, opening new adjacent tab:', { docId, tabId });
       try {
         var diffTab = await chrome.tabs.get(tabId);
-        var newTab = await chrome.tabs.create({ url: fallbackUrl, index: diffTab.index + 1, windowId: diffTab.windowId });
+        var newTab = await createTabNextTo(fallbackUrl, diffTab);
         await setDocTab(docId, newTab.id);
         setDocTabName(newTab.id, docId);
         return { success: true, opened: true };
       } catch (e) {
         console.warn('[background] diff view tab disappeared, falling back to new tab:', e);
-        var newTabIndex = senderTab ? senderTab.index + 1 : undefined;
-        var newTab = await chrome.tabs.create({ url: fallbackUrl, index: newTabIndex });
+        var newTab = await createTabNextTo(fallbackUrl, senderTab);
         await setDocTab(docId, newTab.id);
         setDocTabName(newTab.id, docId);
         return { success: true, opened: true };
@@ -831,9 +829,13 @@ function cancelResolveTabs(pageId) {
   });
 }
 
-function resolveUrlViaTab(url, pageId) {
+function resolveUrlViaTab(url, pageId, senderTab) {
   return new Promise(function(resolve) {
-    chrome.tabs.create({ url: url, active: false }, function(tab) {
+    // Background tab, kept in the requesting Docreview tab's window so it can't
+    // surface in some other one (see createTabNextTo). Not placed adjacent —
+    // the user didn't ask for this tab and it's removed within seconds; opening
+    // it next to their current tab would shuffle the tab strip twice.
+    createTabInWindowOf(url, senderTab, { active: false }).then(function(tab) {
       var tabId = tab.id;
 
       function cleanup() {
@@ -874,6 +876,10 @@ function resolveUrlViaTab(url, pageId) {
 
       chrome.tabs.onUpdated.addListener(listener);
       pendingResolveTabs.set(tabId, { pageId: pageId, timeout: timeout, listener: listener, resolve: resolve });
+    }).catch(function(err) {
+      // e.g. the sender's window closed between the request and the create
+      console.warn('[background] resolveUrlViaTab failed to open tab:', err);
+      resolve({ resolved: false, error: 'tab-create-failed' });
     });
   });
 }
@@ -1042,16 +1048,25 @@ async function reinjectContentScripts() {
   }
 }
 
-chrome.contextMenus.onClicked.addListener(async function(info) {
+// Context menu click. Chrome hands us the tab the menu was opened on; place the
+// new tab next to it rather than querying for the active tab, which resolves
+// through the unreliable last-focused-window bookkeeping (see createTabNextTo).
+chrome.contextMenus.onClicked.addListener(async function(info, tab) {
   var { baseUrl } = await chrome.storage.sync.get({ baseUrl: DEFAULTS.baseUrl });
-  var [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  var newIndex = activeTab ? activeTab.index + 1 : undefined;
+
+  // `tab` is documented as optional (absent if the click wasn't in a tab), and
+  // the toolbar-icon items use contexts: ['action']. Fall back to the active
+  // tab so we at least have a window to place against.
+  if (!tab) {
+    var [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    tab = activeTab;
+  }
 
   if (info.menuItemId === 'open-docreview') {
-    chrome.tabs.create({ url: baseUrl, index: newIndex });
+    createTabNextTo(baseUrl, tab);
   } else if (info.menuItemId === 'add-page') {
-    chrome.tabs.create({ url: baseUrl + '/add', index: newIndex });
+    createTabNextTo(baseUrl + '/add', tab);
   } else if (info.menuItemId === 'open-link-in-docreview') {
-    chrome.tabs.create({ url: baseUrl + '/open?doc=' + encodeURIComponent(info.linkUrl), index: newIndex });
+    createTabNextTo(baseUrl + '/open?doc=' + encodeURIComponent(info.linkUrl), tab);
   }
 });

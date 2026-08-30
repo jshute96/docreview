@@ -37,7 +37,7 @@ One-line descriptions of every source file, grouped by layer.
 | `manifest.json` | Manifest V3 config — permissions, host permissions, content script registration, service worker |
 | `background.js` | Service worker main — toolbar click, context menus, message handler, comment navigation, URL resolution, bridge registration |
 | `background-injected.js` | Functions injected into page context — disco ID helpers, comment selection/navigation, Gmail doc URL extraction, comment/suggestion data extraction with header info (tab name) |
-| `background-tabs.js` | Doc tab tracking — maps docId → tabId for in-page comment navigation |
+| `background-tabs.js` | Doc tab tracking — maps docId → tabId for in-page comment navigation; `createTabNextTo()` / `createTabInWindowOf()` place new tabs relative to a known tab instead of the last-focused window |
 | `background-comments.js` | Comment sync state — pre-extracted comment IDs, debounce logic, server sync |
 | `content.js` | Content script — injects Docreview icons into Docs titlebar, Drive file lists, Gmail notification emails |
 | `content-comments.js` | Comment activity detection (Docs only) — detects comment/suggestion actions, relays selection changes, sends docReady when stream view is populated |

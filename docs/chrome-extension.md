@@ -63,7 +63,7 @@ Context menus:
 
 Shared item iteration lives in `iterateItems()`, which dedupes list items by disco ID and returns `{ entries, missing }`. Items whose disco ID can't be extracted are dropped and counted, never assigned a placeholder — a fabricated ID can't match anything downstream but does block the row from being repaired later (see `comment-tracking.md`). `getComments()` / `getSuggestions()` are the exposed entry points and return plain arrays (the shape the console helpers and singular `getComment()` / `getSuggestion()` want); the internal `getCommentsRaw()` / `getSuggestionsRaw()` carry the count and aren't on `window.__docreviewDisco`.
 
-**`background-tabs.js`** — Doc tab tracking. Maps docId → tabId in `chrome.storage.session` to survive MV3 service worker restarts. Provides `findDocTab()`, `setDocTab()`, `setDocTabName()`, and cleanup listeners for tab removal/navigation.
+**`background-tabs.js`** — Doc tab tracking. Maps docId → tabId in `chrome.storage.session` to survive MV3 service worker restarts. Provides `findDocTab()`, `setDocTab()`, `setDocTabName()`, and cleanup listeners for tab removal/navigation. Also provides `createTabNextTo()` / `createTabInWindowOf()` — see [New tab placement](#new-tab-placement).
 
 **`background-comments.js`** — Comment sync state. Manages pre-extracted comment IDs (`pendingCommentIds`) and debounced comment sync (`fireCommentSync`, `commentSyncTimers`). `notifyDocreviewTabs` sends the `commentSynced` message to the first available docreview tab, trying each tab in order until one accepts — if the first tab's bridge content script is orphaned (extension was reloaded), it falls back to the next tab. Logs elapsed time for each sync fetch.
 
@@ -125,6 +125,42 @@ The extension bridges this gap via `focusDocTab`: the web app asks the extension
 
 The extension sets `window.name = 'doc-{id}'` on Google Docs tabs it tracks (via `setDocTabName`), so that future named-target links from the web app can find them. This is called from `focusDocTab`, `trackDocTab`, `navigateToComment` (new tabs), and the toolbar click handler. The `if (!window.name)` guard avoids overwriting names set by the web app's `<a target>`.
 
+### New tab placement
+
+Every tab the extension opens goes through `createTabNextTo(url, nearTab, options)`
+in `background-tabs.js`, which sets both `index` and `windowId` from a tab we
+already know about. `createTabInWindowOf()` is the same thing minus the `index`,
+for tabs the user didn't ask for.
+
+`chrome.tabs.create()` with an `index` but no `windowId` puts the tab in
+Chrome's *current window*. From a service worker there is no current window, so
+that resolves to Chrome's last-focused-window bookkeeping (maintained from
+`windows.onFocusChanged`) — which is not "the window the user's gesture came
+from". With several windows open, especially across virtual desktops where the
+window manager may not deliver the focus changes Chrome expects, it can name a
+window the user left earlier, and the click doesn't correct it. The new tab then
+appears at an arbitrary index in a window the user isn't looking at, so the
+action looks like it did nothing.
+
+The reference tab is always something concrete:
+
+- toolbar click — the `tab` argument `chrome.action.onClicked` hands us;
+- Gmail open — the Gmail tab itself, fetched with `chrome.tabs.get` (this path
+  is also reachable from the content script's `openDocInDocreview` message, not
+  only from a toolbar click);
+- context menu items — the `tab` argument `chrome.contextMenus.onClicked` hands
+  us, rather than an active-tab query. That argument is optional, so an
+  active-tab query remains as a fallback for the case where Chrome doesn't
+  supply one;
+- `navigateToComment` — `sender.tab`, the Docreview tab that asked, or the
+  tracked doc tab when stepping around a diff view;
+- `resolveUrlViaTab`'s throwaway background tab — `sender.tab`, window only.
+
+`nearTab` may be missing (no gesture or sender tab), in which case Chrome's
+default placement is all there is. Naming a `windowId` also means the create can
+fail if that window has closed in the meantime; `createTabNextTo` catches that
+and retries with default placement, so the user's action still happens.
+
 ### Key files
 
 | File | Role |
@@ -132,7 +168,7 @@ The extension sets `window.name = 'doc-{id}'` on Google Docs tabs it tracks (via
 | `src/lib/tab-targets.ts` | Named target helpers: `commentsTarget()`, `docTarget()`, `openCommentsPage()`, `openDocPage()` |
 | `src/lib/bridge-to-extension.ts` | `focusDocTab()`, `handleOpenDocClick()`, `navigateToComment()`, `selectCommentInDoc()`, `setCommentSelectionHandler()` |
 | `src/chrome-extension/background.js` | Message handler, `navigateToComment()`, `focusDocTab` handler, `selectComment` handler |
-| `src/chrome-extension/background-tabs.js` | `findDocTab()`, `findAllDocTabs()`, `setDocTab()`, `setDocTabName()` |
+| `src/chrome-extension/background-tabs.js` | `findDocTab()`, `findAllDocTabs()`, `setDocTab()`, `setDocTabName()`, `createTabNextTo()`, `createTabInWindowOf()` |
 | `src/chrome-extension/background-injected.js` | `navigateToCommentInPage()`, `selectCommentInPage()`, `injectDiscoIdHelpers()` |
 
 ## Comment navigation implementation

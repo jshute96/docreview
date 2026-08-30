@@ -459,6 +459,7 @@ Update this list when adding or changing user-facing behaviors.
 - [x] On non-doc page, shows error alert
 - [ ] On a google doc, go to /open for that doc
 - [ ] On gmail, go to /open for that doc if it's a notification email
+- [ ] New tabs open in the clicked tab's own window (toolbar, context menu, comment navigation), not in whatever window Chrome last recorded as focused — needs two windows where Chrome's last-focused window is not the one the gesture came from
 
 ### Content Script Injection
 
