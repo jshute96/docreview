@@ -241,6 +241,8 @@ Looks up doc by Google doc ID, calls `syncComments()` with optional hints. With 
 - `commentType='comment'` without `googleCommentId`: skips Docs API suggestion fetch, does full `comments.list`.
 - `commentType='suggestion'`: skips Drive API comment fetch, syncs only suggestions from Docs API.
 - Hint-based syncs don't stamp `commentsLastSyncedAt` — the periodic full sync handles reconciliation.
+- If the targeted fetch hits a Drive 403 (comment access revoked), the fast path falls through to
+  the full sync, which stamps sync time and reports `permissionDenied` instead of erroring.
 - Without hints: full sync of all comments and suggestions (original behavior).
 
 **Step 5 — Notify docreview tabs** (`background.js` → `bridge-to-docreview.js` → `bridge-to-extension.ts`)

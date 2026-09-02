@@ -39,6 +39,12 @@ Google API: Drive or Gmail.
 GET `?url=...`. Resolves shortened links, fetches Drive metadata, checks whether
 the doc is already tracked. Used by the Add dialog to preview a URL before adding.
 
+A Drive 403/404 (and offline mode) returns `permissionDenied: true` with
+placeholder metadata so the doc can still be added; any other Drive failure is a
+502 (`error: "lookup_failed"`) rather than a doc added under a fake title. `addDoc`
+applies the same rule, so the placeholder record is never written for a transient
+failure.
+
 Google API: Drive.
 
 ### `/api/docs/add` — Add single doc
@@ -137,14 +143,31 @@ GET modes:
 
 All responses return threads as `Record<id, CommentThread>`.
 
+If Drive returns 403 or 404 for the file (no comment access, deleted, or access
+revoked — Drive returns 404 for the last two indistinguishably), GET responds
+`{ threads: {}, forbidden: true }` with a warning log rather than a 502, and the
+UI shows "Comments not visible on this document." This route deliberately does not
+update the doc's `accessState` — the refresh route owns that state machine (see
+`docs/access-states.md`).
+
 POST with `?commentId=X` forces a fresh fetch and syncs the DB comment record.
-Returns `{ comment, threads }`.
+Returns `{ comment, threads }`, or a 403 if comment access was revoked — an empty
+200 would make the client erase the thread it is showing. A Drive 404 on the
+comment means it was deleted and removes the DB row; a 403 leaves the row alone
+(it says nothing about whether the comment still exists).
 
 ### `/api/docs/[docId]/threads/reply` — Reply to thread
 
 POST `{ commentId, content?, resolve? }`. Posts a reply, optionally resolving
 or reopening the thread. Pins `viewedByMeTime` before and after to prevent
 Drive from auto-marking the doc as viewed.
+
+As with the edit route, a Drive 403 returns a 403 ("You don't have permission to
+comment on this document.") and a 404 a 404, rather than a generic 502. Once the
+reply itself has landed, nothing after it (restoring `viewedByMeTime`, re-reading
+the thread) is reported as a failure — those return a 502 saying the reply was
+posted but couldn't be re-read, so the user doesn't post it twice. Offline mode
+returns 503. The client shows the route's message, falling back to a generic one.
 
 Google API: Drive.
 

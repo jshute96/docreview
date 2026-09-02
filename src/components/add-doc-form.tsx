@@ -22,22 +22,26 @@ import { useLabels } from "@/contexts/label-context";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StarButton } from "@/components/star-button";
 import { getExtensionStatus, pingExtension, resolveUrl, cancelResolve } from "@/lib/bridge-to-extension";
+import { DocErrorCode } from "@/lib/doc-error-codes";
 
 type ValidationState = "idle" | "validating" | "valid" | "invalid";
 
+/**
+ * Wording for the `{ error: <code> }` codes the validate/add routes return. The
+ * server sends codes rather than prose so the message lives with the UI showing
+ * it. `code` stays a plain string because it arrives from an untyped response
+ * body; anything unrecognized falls back to the generic message.
+ */
+const ERROR_MESSAGES: Record<DocErrorCode, string> = {
+  [DocErrorCode.InvalidUrl]: "Not a recognized Google Drive URL or doc ID",
+  [DocErrorCode.InvalidMimeType]: "Only Docs, Sheets, and Slides are supported",
+  [DocErrorCode.Trashed]: "This document is in the trash",
+  [DocErrorCode.NoAccess]: "Document not found or you don't have access",
+  [DocErrorCode.LookupFailed]: "Couldn't reach Google Drive — try again",
+};
+
 function errorMessageForCode(code: string): string {
-  switch (code) {
-    case "invalid_url":
-      return "Not a recognized Google Drive URL or doc ID";
-    case "invalid_mime_type":
-      return "Only Docs, Sheets, and Slides are supported";
-    case "trashed":
-      return "This document is in the trash";
-    case "no_access":
-      return "Document not found or you don't have access";
-    default:
-      return "Validation failed";
-  }
+  return ERROR_MESSAGES[code as DocErrorCode] ?? "Validation failed";
 }
 
 /** Check if a URL's hostname is in the extension's resolve hosts list. */
@@ -167,7 +171,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
           setValidTitle((data.title as string) ?? "Unknown title");
           setValidMimeType((data.mimeType as string) ?? null);
           setValidationState("valid");
-          setValidationError("Document not found or you don't have access");
+          setValidationError(errorMessageForCode(DocErrorCode.NoAccess));
         } else {
           setPermissionDenied(false);
           setValidTitle((data.title as string) ?? null);
@@ -277,13 +281,13 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
           } else {
             // Extension couldn't resolve — restore the server's invalid result
             setValidationState("invalid");
-            setValidationError(errorMessageForCode("invalid_url"));
+            setValidationError(errorMessageForCode(DocErrorCode.InvalidUrl));
           }
         } catch (err) {
           resolveInFlight.current = false;
           // Restore the server's invalid result
           setValidationState("invalid");
-          setValidationError(errorMessageForCode("invalid_url"));
+          setValidationError(errorMessageForCode(DocErrorCode.InvalidUrl));
         }
       }
     }

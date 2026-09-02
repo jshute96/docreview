@@ -146,8 +146,13 @@ async function resyncAfterWrite(
   ...args: Parameters<typeof syncSingleComment>
 ): Promise<Awaited<ReturnType<typeof syncSingleComment>>> {
   try {
-    return await syncSingleComment(...args);
+    const result = await syncSingleComment(...args);
+    // A 403 here doesn't undo the write — report it the same way as a thrown
+    // failure so the user is told their change was saved.
+    if (result.permissionDenied) throw new PostWriteError(new Error("comment access denied (403)"));
+    return result;
   } catch (err) {
+    if (err instanceof PostWriteError) throw err;
     throw new PostWriteError(err);
   }
 }

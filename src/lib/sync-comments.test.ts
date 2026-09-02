@@ -1220,6 +1220,59 @@ describe("syncComments read tracking", () => {
   });
 });
 
+// --------------- revoked comment access (Drive 403) ---------------
+
+describe("syncSingleComment permission denied", () => {
+  function denied(code: number) {
+    return Object.assign(new Error(`code ${code}`), { code });
+  }
+
+  it("reports permissionDenied and leaves the DB record untouched on 403", async () => {
+    vi.mocked(fetchThreadDetail).mockRejectedValue(denied(403));
+    const existing = dbComment();
+    mockComment.findFirst.mockResolvedValue(existing);
+
+    const result = await syncSingleComment(makeDoc({ role: "AUTHOR" }), "c1", driveAuth);
+
+    expect(result.permissionDenied).toBe(true);
+    expect(result.deleted).toBe(false);
+    expect(result.comment).toBe(existing);
+    // A 403 says nothing about whether the comment still exists — unlike a 404,
+    // it must not delete the row.
+    expect(mockComment.delete).not.toHaveBeenCalled();
+    expect(mockComment.update).not.toHaveBeenCalled();
+  });
+
+  it("still deletes the record on 404, which does mean the comment is gone", async () => {
+    vi.mocked(fetchThreadDetail).mockRejectedValue(denied(404));
+    mockComment.findFirst.mockResolvedValue(dbComment());
+
+    const result = await syncSingleComment(makeDoc({ role: "AUTHOR" }), "c1", driveAuth);
+
+    expect(result.permissionDenied).toBeUndefined();
+    expect(result.deleted).toBe(true);
+    expect(mockComment.delete).toHaveBeenCalled();
+  });
+});
+
+// A hint-driven sync that hits a 403 must still run the full sync, which is what
+// stamps sync time and reports permissionDenied to the caller.
+describe("syncComments single-comment hint on denied access", () => {
+  it("falls through to the full sync", async () => {
+    vi.mocked(fetchThreadDetail).mockRejectedValue(Object.assign(new Error("code 403"), { code: 403 }));
+    mockComment.findFirst.mockResolvedValue(dbComment());
+    vi.mocked(fetchCommentData).mockRejectedValue(Object.assign(new Error("code 403"), { code: 403 }));
+
+    const result = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth, undefined, undefined, {
+      commentType: "comment",
+      googleCommentId: "c1",
+    });
+
+    expect(fetchCommentData).toHaveBeenCalled();
+    expect(result.permissionDenied).toBe(true);
+  });
+});
+
 // --------------- self-edit (edit/delete made from Docreview) ---------------
 
 describe("syncSingleComment selfEdited", () => {

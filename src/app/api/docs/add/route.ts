@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { parseGoogleDocId, driveUrlFor } from "@/lib/google-drive";
 import { addDoc, validateDocInputs } from "@/lib/add-doc";
 import { docWithCountsInclude, withCommentCounts, stripServerOnly } from "@/lib/doc-queries";
+import { DocErrorCode } from "@/lib/doc-error-codes";
 import { runWithRequestId } from "@/lib/request-context";
 import { DocRole, DocStatus } from "@prisma/client";
 
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const fileId = parseGoogleDocId(url);
   if (!fileId) {
-    return NextResponse.json({ error: "invalid_url" }, { status: 400 });
+    return NextResponse.json({ error: DocErrorCode.InvalidUrl }, { status: 400 });
   }
 
   const existing = await prisma.doc.findUnique({

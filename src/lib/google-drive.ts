@@ -667,7 +667,9 @@ export async function fetchDocData(
       const isPermission = isDriveErrorCode(err, 403) || isDriveErrorCode(err, 404) ||
         /permission|forbidden|not found/i.test(message);
       if (isPermission) {
-        logError(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms): ${message || err}`);
+        // Expected whenever the doc was deleted or access was revoked (Drive
+        // returns 404 for both) — a warning, not an error.
+        logWarning(`[Docs] documents.get ${googleDocId} unavailable (${Date.now() - t0}ms): ${message || err}`);
       } else {
         logError(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
       }
@@ -1055,7 +1057,12 @@ export async function fetchFileTextViaExport(
     logInfo(`[Drive] files.export ${fileId} (plain text, ${text.length} chars) (${Date.now() - t0}ms)`);
     return text;
   } catch (err) {
-    logError(`[Drive] files.export ${fileId} (plain text) failed (${Date.now() - t0}ms):`, err);
+    // 403/404 just mean the file is gone or access was revoked — expected, not an error.
+    if (isDriveErrorCode(err, 403) || isDriveErrorCode(err, 404)) {
+      logWarning(`[Drive] files.export ${fileId} unavailable (code ${getDriveErrorCode(err)}) (${Date.now() - t0}ms)`);
+    } else {
+      logError(`[Drive] files.export ${fileId} (plain text) failed (${Date.now() - t0}ms):`, err);
+    }
     return null;
   }
 }

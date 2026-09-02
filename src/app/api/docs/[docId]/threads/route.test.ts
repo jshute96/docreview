@@ -174,6 +174,36 @@ describe("GET /api/docs/[docId]/threads", () => {
     expect(data.viewedByMeTime).toBe("2026-03-01T12:00:00Z");
   });
 
+  it("returns forbidden when the file is not found in Drive (404)", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue(docRecord);
+    mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
+    mockFetchCommentData.mockResolvedValue({ threads: [] });
+    mockFilesGet.mockRejectedValue(Object.assign(new Error("File not found: gdoc1"), { code: 404 }));
+
+    const req = new NextRequest("http://localhost/api/docs/d1/threads");
+    const res = await GET(req, makeParams("d1"));
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.threads).toEqual({});
+    expect(data.forbidden).toBe(true);
+  });
+
+  it("returns forbidden when Drive denies access (403)", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue(docRecord);
+    mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
+    mockFetchCommentData.mockResolvedValue({ threads: [] });
+    mockFilesGet.mockRejectedValue(Object.assign(new Error("Forbidden"), { code: 403 }));
+
+    const req = new NextRequest("http://localhost/api/docs/d1/threads");
+    const res = await GET(req, makeParams("d1"));
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.threads).toEqual({});
+    expect(data.forbidden).toBe(true);
+  });
+
   it("returns 502 when Drive API fails", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);
@@ -418,6 +448,22 @@ describe("POST /api/docs/[docId]/threads", () => {
     );
     const res = await POST(req, makeParams("d1"));
     expect(res.status).toBe(404);
+  });
+
+  it("returns 403 when comment access was revoked, rather than an empty 200", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue(docRecord);
+    mockComment.findFirst.mockResolvedValue({ commentId: "x", type: "COMMENT", status: "INBOX", resolved: false });
+    mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
+    mockSyncSingleComment.mockResolvedValue({
+      comment: null, created: false, updated: false, deleted: false,
+      shouldUnarchive: false, permissionDenied: true,
+    } as unknown as Awaited<ReturnType<typeof syncSingleComment>>);
+
+    const req = new NextRequest("http://localhost/api/docs/d1/threads?commentId=c1", { method: "POST" });
+    const res = await POST(req, makeParams("d1"));
+    // A 200 with empty threads would wipe the thread the client is showing.
+    expect(res.status).toBe(403);
   });
 
   it("returns 502 when Drive API fails for comment", async () => {

@@ -19,17 +19,23 @@ vi.mock("@/lib/prisma", () => {
   };
 });
 
-vi.mock("@/lib/google-drive", () => ({
-  getDriveClient: vi.fn(),
-  createDriveService: vi.fn(),
-  invalidGrantResponse: vi.fn(() => null),
-  driveUrlFor: vi.fn((fileId: string, link?: string | null) => link ?? `https://docs.google.com/document/d/${fileId}/edit`),
-  SUPPORTED_MIME_TYPES: new Set([
-    "application/vnd.google-apps.document",
-    "application/vnd.google-apps.spreadsheet",
-    "application/vnd.google-apps.presentation",
-  ]),
-}));
+vi.mock("@/lib/google-drive", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/google-drive")>("@/lib/google-drive");
+  return {
+    getDriveClient: vi.fn(),
+    createDriveService: vi.fn(),
+    invalidGrantResponse: vi.fn(() => null),
+    // Pure helpers — use the real implementations so error-code checks work
+    getDriveErrorCode: actual.getDriveErrorCode,
+    isDriveErrorCode: actual.isDriveErrorCode,
+    driveUrlFor: vi.fn((fileId: string, link?: string | null) => link ?? `https://docs.google.com/document/d/${fileId}/edit`),
+    SUPPORTED_MIME_TYPES: new Set([
+      "application/vnd.google-apps.document",
+      "application/vnd.google-apps.spreadsheet",
+      "application/vnd.google-apps.presentation",
+    ]),
+  };
+});
 
 vi.mock("@/lib/sync-comments", () => ({
   syncComments: vi.fn(),
@@ -327,6 +333,22 @@ describe("addDoc", () => {
     expect(data.lastModifiedInDrive).toEqual(new Date("2026-02-02"));
     // No comment sync when permission denied
     expect(mockSyncComments).not.toHaveBeenCalled();
+  });
+
+  it("returns 502 without creating a record when the Drive lookup fails for another reason", async () => {
+    mockCreateDriveService.mockReturnValue({
+      files: {
+        get: vi.fn().mockRejectedValue(Object.assign(new Error("backend error"), { code: 500 })),
+      },
+    } as unknown as ReturnType<typeof createDriveService>);
+    mockDoc.findUnique.mockResolvedValue(null);
+
+    const res = await addDoc({ userId, googleDocId, labelIds: [], fallback: makeFallback() });
+
+    expect(res.status).toBe(502);
+    // Persisting the fallback here would leave a doc titled "Unknown title"
+    // marked DENIED, which isn't what happened.
+    expect(mockDoc.create).not.toHaveBeenCalled();
   });
 
   it("returns early with the reauth response when Drive token is invalid", async () => {

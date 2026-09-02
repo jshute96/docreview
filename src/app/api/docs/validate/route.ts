@@ -8,7 +8,12 @@ import {
   SUPPORTED_MIME_TYPES,
   invalidGrantResponse,
   driveUrlFor,
+  isDriveErrorCode,
+  getDriveErrorCode,
 } from "@/lib/google-drive";
+import { OfflineModeError } from "@/lib/offline";
+import { logError, logWarning } from "@/lib/log";
+import { DocErrorCode } from "@/lib/doc-error-codes";
 import { runWithRequestId } from "@/lib/request-context";
 import { tryResolveRedirect } from "@/lib/url-utils";
 import { DocRole } from "@prisma/client";
@@ -39,7 +44,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!fileId) {
-    return NextResponse.json({ error: "invalid_url" }, { status: 400 });
+    return NextResponse.json({ error: DocErrorCode.InvalidUrl }, { status: 400 });
   }
 
   const existingRow = await prisma.doc.findUnique({
@@ -65,7 +70,18 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
+    // Anything other than "gone or no access" is a real failure — reporting it
+    // as permission-denied would add a doc with placeholder metadata. Offline
+    // mode keeps the fallback: adding by URL has to work with no Drive access.
+    const noAccess = isDriveErrorCode(err, 403) || isDriveErrorCode(err, 404) || err instanceof OfflineModeError;
+    if (!noAccess) {
+      logError(`[Drive] files.get ${fileId} failed during validate:`, err);
+      return NextResponse.json({ error: DocErrorCode.LookupFailed }, { status: 502 });
+    }
     // Not found or permission denied — still allow adding
+    if (!(err instanceof OfflineModeError)) {
+      logWarning(`[Drive] No access to ${fileId} during validate (code ${getDriveErrorCode(err)})`);
+    }
     return NextResponse.json({
       googleDocId: fileId,
       title: existing?.title ?? "Unknown title",
@@ -85,7 +101,7 @@ export async function GET(req: NextRequest) {
 
   if (f.trashed) {
     return NextResponse.json({
-      error: "trashed",
+      error: DocErrorCode.Trashed,
       title: f.name ?? "",
       mimeType: f.mimeType,
       driveUrl: driveUrlFor(fileId, f.webViewLink),
@@ -94,7 +110,7 @@ export async function GET(req: NextRequest) {
 
   if (!f.mimeType || !SUPPORTED_MIME_TYPES.has(f.mimeType)) {
     return NextResponse.json({
-      error: "invalid_mime_type",
+      error: DocErrorCode.InvalidMimeType,
       title: f.name ?? "",
       mimeType: f.mimeType,
       driveUrl: driveUrlFor(fileId, f.webViewLink),

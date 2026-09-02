@@ -365,7 +365,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       contextId,
     });
     if (!res.ok) {
-      toast.error(errorMsg);
+      // The route explains Drive's own refusals (no permission, comment gone,
+      // reply posted but not re-readable); fall back to the generic message.
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || errorMsg);
       throw new Error("Failed");
     }
     applyThreadUpdate(await res.json());

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, createDriveService, fetchThreadDetail, fetchDocData, fetchCommentData, invalidGrantResponse, isDriveErrorCode } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, fetchThreadDetail, fetchDocData, fetchCommentData, invalidGrantResponse, isDriveErrorCode, getDriveErrorCode } from "@/lib/google-drive";
 import { OfflineModeError } from "@/lib/offline";
 import type { ThreadMap } from "@/lib/google-drive";
 import { bumpLastCommentActivity, syncSingleComment } from "@/lib/sync-comments";
@@ -100,9 +100,13 @@ export async function GET(
     }
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
-    // 403 Forbidden — user doesn't have comment access to this doc
-    if (isDriveErrorCode(err, 403)) {
-      logWarning(`[API] Forbidden — no comment access for doc ${docId}`);
+    // 403 Forbidden — user doesn't have comment access to this doc.
+    // 404 is ambiguous: the file was deleted, or Drive is hiding it because
+    // access was revoked. Either way the threads aren't reachable, so report it
+    // the same way rather than logging an error and returning a 502.
+    const code = getDriveErrorCode(err);
+    if (code === 403 || code === 404) {
+      logWarning(`[API] Comments unavailable for doc ${docId} (code ${code})`);
       return NextResponse.json({ threads: {}, forbidden: true });
     }
     logError(`[API] Failed to fetch threads for doc ${docId}:`, err);
@@ -184,6 +188,15 @@ export async function POST(
     // Comments: use syncSingleComment for targeted fetch + DB update
     const userEmail = session.user.email ?? undefined;
     const result = await syncSingleComment(doc, commentId, driveAuth, { userEmail });
+    if (result.permissionDenied) {
+      // Comment access was revoked. This has to be an error status, not an empty
+      // 200: the client replaces its thread state with whatever comes back, so a
+      // 200 would silently erase the thread it is showing.
+      return NextResponse.json(
+        { error: "Comments are no longer visible on this document." },
+        { status: 403 }
+      );
+    }
     if (!result.comment) {
       return NextResponse.json({ error: "Comment not found in Drive" }, { status: 404 });
     }

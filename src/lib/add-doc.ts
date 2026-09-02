@@ -12,10 +12,14 @@ import {
   SUPPORTED_MIME_TYPES,
   invalidGrantResponse,
   driveUrlFor,
+  getDriveErrorCode,
+  isDriveErrorCode,
 } from "@/lib/google-drive";
+import { OfflineModeError } from "@/lib/offline";
 import { syncComments } from "@/lib/sync-comments";
 import { docWithCountsInclude, withCommentCounts, stripServerOnly } from "@/lib/doc-queries";
-import { logWarning } from "@/lib/log";
+import { DocErrorCode } from "@/lib/doc-error-codes";
+import { logError, logWarning } from "@/lib/log";
 import { AccessState, DocRole, DocStatus } from "@prisma/client";
 
 /** Fallback metadata used when Drive access is denied. */
@@ -100,17 +104,26 @@ export async function addDoc(params: AddDocParams): Promise<NextResponse> {
   } catch (err) {
     const reauth = invalidGrantResponse(err);
     if (reauth) return reauth;
-    const errStatus = (err as { status?: number }).status;
-    logWarning(`[Drive] No access to ${googleDocId} (status ${errStatus ?? "?"})`);
+    // Only "gone or no access" justifies the placeholder record — any other
+    // failure would persist a doc titled "Unknown title" with a wrong
+    // accessState (see docs/access-states.md).
+    const noAccess = isDriveErrorCode(err, 403) || isDriveErrorCode(err, 404) || err instanceof OfflineModeError;
+    if (!noAccess) {
+      logError(`[Drive] files.get ${googleDocId} failed while adding:`, err);
+      return NextResponse.json({ error: DocErrorCode.LookupFailed }, { status: 502 });
+    }
+    if (!(err instanceof OfflineModeError)) {
+      logWarning(`[Drive] No access to ${googleDocId} (code ${getDriveErrorCode(err) ?? "?"})`);
+    }
     permissionDenied = true;
   }
 
   if (!permissionDenied) {
     if (f!.trashed) {
-      return NextResponse.json({ error: "trashed" }, { status: 400 });
+      return NextResponse.json({ error: DocErrorCode.Trashed }, { status: 400 });
     }
     if (!f!.mimeType || !SUPPORTED_MIME_TYPES.has(f!.mimeType)) {
-      return NextResponse.json({ error: "invalid_mime_type" }, { status: 400 });
+      return NextResponse.json({ error: DocErrorCode.InvalidMimeType }, { status: 400 });
     }
   }
 

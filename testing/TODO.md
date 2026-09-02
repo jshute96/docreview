@@ -646,6 +646,10 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] View-only doc: extension fetches (getComment, getSuggestion) return gracefully (no 5s hang)
 - [ ] Doc with no comments: comments page shows empty state
 - [ ] No-comment-permission doc: comments page shows "Comments not visible on this document." (not "No comments")
+- [ ] Deleted/inaccessible doc (Drive 404): comments page shows "Comments not visible on this document." (not a load error)
+- [ ] Reply on a doc where comment access was revoked: shows the permission message, not a generic failure
+- [ ] Reply that posts but can't be re-read: message says it was posted (so the user doesn't post twice) and the thread stays on screen
+- [ ] Add by URL when Drive lookup fails transiently: shows an error instead of adding a doc titled "Unknown title"
 - [ ] No-comment-permission doc: Gmail-sourced comments appear in the comment list with placeholder suggestion details
 - [ ] Doc with no comments: extension fetches return empty results quickly (zero-state detection)
 

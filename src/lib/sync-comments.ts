@@ -131,6 +131,9 @@ export interface SingleCommentResult {
   updated: boolean;
   deleted: boolean;
   shouldUnarchive: boolean;
+  /** Drive returned 403 — comment access was revoked, so nothing was synced.
+   *  Distinct from a 404, which means the comment itself is gone. */
+  permissionDenied?: boolean;
 }
 
 /**
@@ -158,6 +161,7 @@ export async function syncSingleComment(
 
   let result: ThreadDetailResult | null;
   let driveDeleted = false;
+  let drivePermissionDenied = false;
   try {
     const freshAfter = Date.now() - FRESH_CUTOFF;
     result = await fetchThreadDetail(driveAuth, doc.googleDocId, googleCommentId, options?.userEmail);
@@ -177,6 +181,14 @@ export async function syncSingleComment(
     if (isDriveErrorCode(err, 404)) {
       result = null;
       driveDeleted = true;
+    } else if (isDriveErrorCode(err, 403)) {
+      // Comment access was revoked. Unlike a 404 this says nothing about
+      // whether the comment still exists, so leave the DB record alone. (A full
+      // sync may still delete it later if comments.list succeeds without it —
+      // but that path has seen the whole list, and this one hasn't.)
+      logWarning(`[Comments] permission denied for ${doc.googleDocId} comment ${googleCommentId} (code 403)`);
+      result = null;
+      drivePermissionDenied = true;
     } else {
       throw err;
     }
@@ -186,6 +198,17 @@ export async function syncSingleComment(
   const existing = await prisma.comment.findFirst({
     where: { docId: doc.docId, googleCommentId, type: CommentType.COMMENT },
   });
+
+  if (drivePermissionDenied) {
+    return {
+      comment: existing,
+      created: false,
+      updated: false,
+      deleted: false,
+      shouldUnarchive: false,
+      permissionDenied: true,
+    };
+  }
 
   // --- Comment deleted from Drive ---
   if (!result) {
@@ -245,16 +268,20 @@ export async function syncComments(
   if (!skipComments && hints?.googleCommentId) {
     try {
       const result = await syncSingleComment(doc, hints.googleCommentId, driveAuth, { expectRecentComment: true, userEmail });
-      logInfo(`[Comments] ${doc.googleDocId}: single-comment sync ${hints.googleCommentId} (${result.created ? "created" : result.updated ? "updated" : result.deleted ? "deleted" : "unchanged"})`);
-      return {
-        ...EMPTY_RESULT,
-        commentsCreated: result.created ? 1 : 0,
-        commentsUpdated: result.updated ? 1 : 0,
-        shouldUnarchive: result.shouldUnarchive,
-        thread: result.thread,
-      };
+      // A 403 on the targeted fetch says nothing about the rest of the doc, so
+      // fall through to the full sync — it stamps sync time and flags the denial.
+      if (!result.permissionDenied) {
+        logInfo(`[Comments] ${doc.googleDocId}: single-comment sync ${hints.googleCommentId} (${result.created ? "created" : result.updated ? "updated" : result.deleted ? "deleted" : "unchanged"})`);
+        return {
+          ...EMPTY_RESULT,
+          commentsCreated: result.created ? 1 : 0,
+          commentsUpdated: result.updated ? 1 : 0,
+          shouldUnarchive: result.shouldUnarchive,
+          thread: result.thread,
+        };
+      }
     } catch (err) {
-      // Fall back to full sync on unexpected error (e.g., 403)
+      // Fall back to full sync on unexpected error (403 is handled above)
       logWarning(`[Comments] single-comment sync failed for ${hints.googleCommentId}, falling back to full sync:`, err);
     }
   }
