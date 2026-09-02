@@ -343,6 +343,50 @@ runs `syncSingleComment`, which applies the usual status rules, so a click that 
 the DB hadn't seen can move the comment to `INBOX` and unarchive its doc. That's the same outcome
 any other refresh would produce on finding those replies.
 
+### Folding away read messages
+
+A thread expanded with unread messages hides the middle of its read run, so the new activity is
+what you land on. The messages that always stay are the head comment — what everyone is replying
+to — and the last read message, so the first unread reply has its antecedent on screen. Anything
+between them (indices 1 through `readMessageCount - 2`) is replaced by a grey "N hidden" rule
+with a button that reveals them.
+
+Two or more messages in the run always fold — the "N hidden" line costs less space than they do.
+A run of exactly one folds only if that message is long: at least `MIN_LINES_TO_HIDE_ONE` (8)
+estimated display lines, since folding a one-line reply behind a one-line rule gains nothing.
+The estimate wraps the text at roughly 7px per character against the panel's own width (its `p-4`
+padding and the replies' `ml-8` indent subtracted), so it's window-width dependent by design: a
+narrow window wraps more and buries the unread messages further down. Both the estimate and the
+decision live in `src/lib/thread-fold.ts` rather than in the component, so the threshold and the
+boundaries are unit-tested.
+
+The width comes from a callback ref that measures and re-observes whenever the node changes —
+not an effect, because the panel usually mounts into its "Loading comments..." branch and swaps
+to the real one once the fetch lands. Measuring happens before paint, so nothing flashes in and
+back out.
+
+Suggestions fold too — it's the same panel — but rarely do: only extension-synced suggestions have
+real replies, and a synthesized single-message suggestion fails both conditions. The suggestion
+summary in `headerContent` is never folded, since it isn't a message. The fold measures the live
+thread and clamps `readMessageCount` to it, so a suggestion's high-water-mark `replyCount` can't
+distort it.
+
+**What folds is decided once per open, and after that the fold can only go away.** `CommentRow`
+bumps an `expandId` on every expand and the panel re-decides on the first render after it where
+the thread and the width measurement are both available; nothing re-decides for the rest of that
+open. If any of the folded run has to come back on screen — a "Mark unread" inside it, a deleted
+reply, a search that has to show every match — the whole fold is dropped rather than resized.
+Showing the run in full is easier to follow than watching "5 hidden" quietly become "2 hidden".
+
+The upshot is that the fold only ever appears as a thread opens. Marking a message read
+mid-thread, replying, refreshing in new replies, or clearing the search box can never make a
+message that was on screen disappear.
+
+The panel doesn't own the shown/hidden state either: `CommentRow` passes `showReadMessages` and
+resets it to false on every expand, so re-opening a row folds again. **Expand all** sets it to
+true — "all" means all the way, including on rows that were already open and folded — while a
+row click and **Expand unread** leave it false.
+
 ---
 
 ## MUTED Behavior

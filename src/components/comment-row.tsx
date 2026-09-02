@@ -56,6 +56,13 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   const [loading, setLoading] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  // Whether the panel shows every read message, or folds a long read run away.
+  // Reset on each expand, so re-opening a row re-hides them.
+  const [showReadMessages, setShowReadMessages] = useState(false);
+  // Bumped on each expand. The panel decides what to fold once per open, so a
+  // reply or a read-point change while the thread is on screen can't fold
+  // messages away under the reader.
+  const [expandId, setExpandId] = useState(0);
   const [hasBeenExpanded, setHasBeenExpanded] = useState(false);
   const [threads, setThreads] = useState<CommentThread[]>(initialThread ? [initialThread] : []);
   const [loadingThreads, setLoadingThreads] = useState(false);
@@ -298,10 +305,16 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     fetchThread();
   }, [expanded, currentModifiedMs]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Expand All — just set UI state; thread data is already pre-fetched
+  // Expand All — just set UI state; thread data is already pre-fetched.
+  // "All" means all the way: read messages are shown too, not folded away.
   useEffect(() => {
-    if (!expandSignal || expanded) return;
+    if (!expandSignal) return;
+    // Unfolds a thread that was already open too — "all the way" has to mean
+    // the same thing whether or not the row was expanded already.
+    setShowReadMessages(true);
+    if (expanded) return;
     setHasBeenExpanded(true);
+    setExpandId((n) => n + 1);
     setExpanded(true);
   }, [expandSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -309,6 +322,8 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   useEffect(() => {
     if (!expandUnreadSignal || expanded || isRead) return;
     setHasBeenExpanded(true);
+    setShowReadMessages(false);
+    setExpandId((n) => n + 1);
     setExpanded(true);
   }, [expandUnreadSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -340,6 +355,8 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         }
       }
       setHasBeenExpanded(true);
+      setShowReadMessages(false);
+      setExpandId((n) => n + 1);
       setExpanded(true);
     } else {
       if (hasDirtyReply) {
@@ -894,6 +911,9 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   // rather than loading — without it a second click during the
                   // sync would race the first.
                   readPointDisabled={loading || refreshingThread}
+                  showReadMessages={showReadMessages}
+                  onShowReadMessages={() => setShowReadMessages(true)}
+                  expandId={expandId}
                   onMute={() => updateStatus(isMuted ? CommentStatus.INBOX : CommentStatus.MUTED)}
                   isMuted={isMuted}
                   onDirtyChange={isSuggestion ? undefined : handleDirtyChange}

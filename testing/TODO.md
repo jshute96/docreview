@@ -371,6 +371,12 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Per-message read-point control: hovering a message reveals "Mark read" on an unread one and "Mark unread" on a read one; clicking reads through that message, or makes it the first unread one
 - [ ] Read-point control on the head comment marks the thread fully unread; on the last message marks it fully read
 - [ ] Read point past the stored reply count syncs the thread first, and warns when the stored count still comes back lower than asked
+- [ ] Folded read messages: a thread with two or more read messages between the head comment and the last read one, and something still unread, hides them behind an "N hidden" button; the head comment and last read message stay visible, and clicking shows the rest
+- [ ] A single read message in the middle folds only when it's long (8+ display lines); a short one doesn't. No fold when the thread is fully read
+- [ ] Folding happens only on open: marking a message read, replying, refreshing in new replies, or clearing the search box while the thread is expanded never folds messages away
+- [ ] Marking a message unread inside a folded run shows the whole run again, not part of it
+- [ ] "Expand all" unfolds a thread that was already open and folded
+- [ ] "Expand all" opens threads with no fold; "Expand unread" and a row click fold; collapsing and re-opening folds again; an active search shows everything
 
 ### Suggestion Updates (Chrome extension sync only — only source with reply-authorship data)
 - [ ] Suggestion read count set from my last action: my reply/accept/reject → read; theirs → unread

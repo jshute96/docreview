@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { RefreshCw } from "lucide-react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { ChevronDown, RefreshCw } from "lucide-react";
 import type { CommentThread } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
 import { HamburgerButton } from "@/components/hamburger-button";
@@ -24,6 +24,7 @@ import {
 import { highlightText, highlightHtml } from "@/lib/highlight";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { cn } from "@/lib/utils";
+import { foldEnd as foldThread } from "@/lib/thread-fold";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { FriendlyDate } from "@/components/friendly-date";
 
@@ -190,6 +191,16 @@ interface CommentThreadPanelProps {
   /** Disables the read-point controls while a write or its preceding sync is in
    *  flight, so a second click can't race the first. */
   readPointDisabled?: boolean;
+  /** When false, a long run of already-read messages in the middle of an unread
+   *  thread is replaced by an "N hidden" line. The parent owns this so it can
+   *  reset it each time the row is expanded. */
+  showReadMessages?: boolean;
+  /** Reveals the hidden read messages. Omit to never hide any. */
+  onShowReadMessages?: () => void;
+  /** Bumped by the parent each time the row is expanded. What gets folded is
+   *  decided once per open, so a reply or a read-point change while the thread
+   *  is on screen never folds messages away under the reader. */
+  expandId?: number;
   onMute?: () => void;
   isMuted?: boolean;
   /** Reports unsaved work. `kind` says which control holds it, so the parent can
@@ -306,6 +317,9 @@ export function CommentThreadPanel({
   readMessageCount,
   onSetReadCount,
   readPointDisabled,
+  showReadMessages,
+  onShowReadMessages,
+  expandId,
   onMute,
   isMuted,
   onDirtyChange,
@@ -347,6 +361,100 @@ export function CommentThreadPanel({
       />
     );
   };
+  /** Width in pixels available to a reply's text, measured off the panel: its
+   *  own padding (p-4, both sides) plus the replies' ml-8 indent.
+   *
+   *  A callback ref rather than an effect, because the panel can mount into its
+   *  loading branch and swap to the real one later — an effect with an empty
+   *  dep array would bail on the null ref and never measure that row again. */
+  const [replyTextWidth, setReplyTextWidth] = useState(0);
+  const widthObserver = useRef<ResizeObserver | null>(null);
+  const panelRef = useCallback((el: HTMLDivElement | null) => {
+    widthObserver.current?.disconnect();
+    widthObserver.current = null;
+    if (!el) return;
+    const measure = () => setReplyTextWidth(Math.max(0, el.clientWidth - 32 - 32));
+    // Runs before paint, so the fold is decided on the panel's first frame and
+    // nothing flashes into view and then away again.
+    measure();
+    widthObserver.current = new ResizeObserver(measure);
+    widthObserver.current.observe(el);
+  }, []);
+  useEffect(() => () => widthObserver.current?.disconnect(), []);
+
+  /** The last message index folded away in the first thread, 0 for none.
+   *  Decided once per open (see `expandId`); after that it can only be dropped,
+   *  so nothing on screen disappears under the reader. */
+  const [foldEnd, setFoldEnd] = useState(0);
+  // -1 is "not decided yet": it can't collide with a real `expandId`, and it
+  // keeps the check honest when the prop is omitted.
+  const decidedFor = useRef<number | undefined>(-1);
+  useLayoutEffect(() => {
+    if (decidedFor.current === expandId) return;
+    const thread = threads[0];
+    // Wait for the thread and the width measurement before deciding, so a
+    // still-loading panel doesn't settle on "nothing to fold".
+    if (loading || !thread || !replyTextWidth) return;
+    decidedFor.current = expandId;
+    setFoldEnd(foldThread(
+      readMessageCount,
+      thread.replies.length + 1,
+      thread.replies[0]?.content ?? "",
+      replyTextWidth,
+    ));
+  }); // no dep array: re-checks each render until the thread and width are there
+
+  /** Drops the fold as soon as any of it has to come back on screen: a "Mark
+   *  unread" inside the run, a deleted reply, or a search that has to show
+   *  every match. Showing the whole run is easier to follow than watching
+   *  "5 hidden" quietly become "2 hidden", and either way nothing that was on
+   *  screen disappears — the fold only ever goes away, never grows. */
+  useLayoutEffect(() => {
+    if (!foldEnd) return;
+    const stillFoldable = !searchFilter
+      && readMessageCount - 2 >= foldEnd
+      && (threads[0]?.replies.length ?? 0) >= foldEnd;
+    if (!stillFoldable) setFoldEnd(0);
+  }, [foldEnd, searchFilter, readMessageCount, threads]);
+
+  const hiddenRead = (!foldEnd || showReadMessages || !onShowReadMessages)
+    ? null
+    : { start: 1, end: foldEnd };
+
+  const isHidden = (threadIndex: number, messageIndex: number) =>
+    threadIndex === 0 && hiddenRead !== null
+    && messageIndex >= hiddenRead.start && messageIndex <= hiddenRead.end;
+
+  /** The "N hidden" rule standing in for the folded read messages, drawn once
+   *  at the top of the run. Grey, to read as skipped rather than new, and
+   *  always visible rather than hover-revealed like the read-point buttons —
+   *  it's the only way to reach content that isn't on screen. */
+  const hiddenDivider = (threadIndex: number, messageIndex: number) => {
+    if (!hiddenRead || !isHidden(threadIndex, messageIndex)) return null;
+    if (messageIndex !== hiddenRead.start) return null;
+    const n = hiddenRead.end - hiddenRead.start + 1;
+    return (
+      <div className="mt-3 mb-1 flex items-center gap-2">
+        {/* Same 1:2 split as the unread rule, so the two labels line up. */}
+        <hr className="flex-1 border-zinc-300" />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          title={`Show ${n} hidden read message${n === 1 ? "" : "s"}`}
+          // More padding on the left than the right: the chevron carries its
+          // own visual space, the text doesn't.
+          className="h-5 pl-2 pr-1 text-xs font-normal text-zinc-500"
+          onClick={(e) => { e.stopPropagation(); onShowReadMessages?.(); }}
+        >
+          {n} hidden
+          <ChevronDown className="!size-3" />
+        </Button>
+        <hr className="flex-[2] border-zinc-300" />
+      </div>
+    );
+  };
+
   /** The "N unread" rule drawn above the first unread message. Returns null
    *  above the head comment, since a divider needs a read part above it to
    *  separate from, and on a fully-read thread, where no index matches.
@@ -748,9 +856,11 @@ export function CommentThreadPanel({
     </div>
   );
 
+  // Every branch carries `panelRef`: the panel often mounts into the loading
+  // branch, and the width has to be measured whichever one is on screen.
   if (loading) {
     return (
-      <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
+      <div ref={panelRef} className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
         <p className="text-sm text-zinc-400">Loading comments...</p>
       </div>
     );
@@ -758,7 +868,7 @@ export function CommentThreadPanel({
 
   if (threads.length === 0) {
     return (
-      <div className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
+      <div ref={panelRef} className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
         {headerContent}
         <p className="text-sm text-zinc-400">{emptyMessage ?? "No comments on this document."}</p>
         {footerContent}
@@ -768,7 +878,7 @@ export function CommentThreadPanel({
   }
 
   return (
-    <div className={`mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4${isSelected ? " ring-2 ring-blue-400" : ""}`}>
+    <div ref={panelRef} className={`mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4${isSelected ? " ring-2 ring-blue-400" : ""}`}>
       {headerContent}
       {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- click to select comment in Google Doc */}
       <div className={`divide-y divide-zinc-200${onSelectInDoc ? " cursor-pointer" : ""}`} onClick={onSelectInDoc}>
@@ -849,6 +959,12 @@ export function CommentThreadPanel({
             </div>
 
             {thread.replies.map((reply, i) => {
+              if (isHidden(threadIndex, i + 1)) {
+                // Only the first folded message draws the rule; the rest render
+                // nothing at all rather than an empty wrapper.
+                const divider = hiddenDivider(threadIndex, i + 1);
+                return divider && <div key={i}>{divider}</div>;
+              }
               const unread = isUnread(threadIndex, i + 1);
               return (
                 <div key={i}>

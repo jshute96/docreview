@@ -61,6 +61,7 @@ Click a comment row to expand it and see the full thread. The expanded view show
 
 - The original comment text with the quoted document text it refers to.
 - All replies in chronological order. Unread messages have a blue bar on their left edge and a bold author name, and an "N unread" line separates them from the messages above that you've already read.
+- If a thread has unread messages with a lot of already-read text before them, the middle of that read run is folded away so the new activity is what you land on. A grey **N hidden** button stands in for it -- click to show them. The first message and the last read message always stay visible, so you can see what the new replies are answering. A single read message in the middle is only folded if it's long (about eight lines or more) -- folding one short reply wouldn't gain you anything. Folding only happens as a thread opens: nothing you do to a thread that's already on screen -- marking a message read, replying, refreshing, searching -- will fold anything away under you. Marking a message unread inside the folded part shows the whole folded run again. Collapsing and re-opening the thread folds again, and searching shows everything so matches aren't hidden.
 - Hover over any message to reveal a small blue **Mark read** or **Mark unread** button at the end of its author line, which moves the read/unread boundary to that message. It does the same job as the Mark read/unread button below the thread, but over a narrower range: on an unread message it marks that message and everything above it read; on a message you've already read it marks that message and everything below it unread. So using it on a first message you have already read marks the whole thread unread, and using it on a last message you have not read yet marks the whole thread read.
 - A **reply textarea** -- type a response and press Enter (or click Send) to reply.
 - A **Resolve/Reopen button** to change the thread's resolved state.
@@ -89,8 +90,8 @@ The toolbar above the comment list provides bulk operations. All of them act on 
 currently visible -- whatever your filters and search have left on screen -- not on the whole
 document.
 
-- **Expand unread** -- Opens all comment threads that have unread activity. Greyed out when everything visible is read.
-- **Expand all** -- Opens every visible comment thread.
+- **Expand unread** -- Opens all comment threads that have unread activity, folding away long runs of already-read messages inside them. Greyed out when everything visible is read.
+- **Expand all** -- Opens every visible comment thread, all the way: no messages are folded away.
 - **Collapse all** -- Closes all expanded threads.
 - **Mark all read** -- Marks every visible thread as fully read. Greyed out when nothing visible is unread.
 - **Archive all** -- Archives every visible comment that is still in the Inbox.
