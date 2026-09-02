@@ -572,6 +572,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
               setThreadMap(threadData.threads ?? {});
             }
             if (threadData.viewedByMeTime !== undefined) setViewedByMeTime(threadData.viewedByMeTime);
+            // Only the full-list fetch speaks for the doc; a targeted fetch can be
+            // refused for reasons specific to that one comment.
+            if (!googleCommentId) setThreadsForbidden(threadData.forbidden ?? false);
           }
           setDoc(updated);
           setComments(updated.comments);
@@ -701,7 +704,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       const res = await apiFetch(`/api/docs/${doc.docId}/refresh`, { method: "POST", contextId });
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-      const { threads, viewedByMeTime: vbmt, suggestionContent, documentText, ...updated } = data;
+      const { threads, viewedByMeTime: vbmt, suggestionContent, documentText, forbidden, ...updated } = data;
       setDoc(updated as DocWithComments);
       setComments(updated.comments);
       setSortActive(true);
@@ -711,6 +714,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       // provides richer suggestion threads and descriptions that Drive doesn't have.
       // Extension sync runs right after and will refresh its entries too.
       if (threads !== undefined) setThreadMap(prev => mergeThreads(prev, threads));
+      // Present only when the refresh learned something about comment access —
+      // set either way, so regaining access clears the message too.
+      if (forbidden !== undefined) setThreadsForbidden(forbidden);
       if (vbmt !== undefined) setViewedByMeTime(vbmt);
       if (suggestionContent !== undefined) setSuggestionContent(prev => ({ ...prev, ...suggestionContent }));
       if (documentText !== undefined) setDocumentText(documentText);
@@ -1278,7 +1284,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       {filteredComments.length === 0 ? (
         <p className="py-12 text-center text-sm text-zinc-400">
           {comments.length === 0
-            ? 'No comments yet. Click "Refresh" to sync.'
+            ? threadsForbidden
+              // Refreshing will never produce comments for this doc, so don't suggest it.
+              ? "Comments not visible on this document."
+              : 'No comments yet. Click "Refresh" to sync.'
             : "No comments match the current filters."}
         </p>
       ) : (

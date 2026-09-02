@@ -172,6 +172,25 @@ describe("GET /api/docs/[docId]/threads", () => {
     expect(data.threads["c1"]).toBeDefined();
     expect(data.threads["c2"]).toBeDefined();
     expect(data.viewedByMeTime).toBe("2026-03-01T12:00:00Z");
+    expect(data.forbidden).toBeUndefined();
+  });
+
+  it("returns forbidden when the file is readable but its comments are not", async () => {
+    // comments.list is refused while files.get succeeds: fetchCommentData
+    // swallows that 403 and reports it, so the UI can say "not visible"
+    // rather than "no comments".
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue(docRecord);
+    mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
+    mockFetchCommentData.mockResolvedValue({ threads: [], permissionDenied: true });
+    mockFilesGet.mockResolvedValue({ data: { viewedByMeTime: null } });
+
+    const req = new NextRequest("http://localhost/api/docs/d1/threads");
+    const res = await GET(req, makeParams("d1"));
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.threads).toEqual({});
+    expect(data.forbidden).toBe(true);
   });
 
   it("returns forbidden when the file is not found in Drive (404)", async () => {

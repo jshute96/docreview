@@ -2,7 +2,13 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
+const { commentsList } = vi.hoisted(() => ({ commentsList: vi.fn() }));
+vi.mock("@googleapis/drive", () => ({
+  drive: vi.fn(() => ({ comments: { list: commentsList } })),
+}));
+
 import {
+  fetchCommentData,
   parseGoogleDocId,
   deriveCommentFlags,
   liveReplies,
@@ -278,5 +284,43 @@ describe("liveReplies", () => {
   it("returns an empty array when there are no replies", () => {
     expect(liveReplies({})).toEqual([]);
     expect(liveReplies({ replies: null })).toEqual([]);
+  });
+});
+
+describe("fetchCommentData permission handling", () => {
+  const auth = {} as Parameters<typeof fetchCommentData>[0];
+
+  function rejectWith(code: number) {
+    commentsList.mockReset();
+    commentsList.mockRejectedValue(Object.assign(new Error(`code ${code}`), { code }));
+  }
+
+  it("reports a 403 on the threads-only path instead of throwing", async () => {
+    // The doc itself is readable — only its comments aren't — so the page still
+    // loads, and the flag is what lets it say so.
+    rejectWith(403);
+    await expect(fetchCommentData(auth, "gdoc1", { threads: true }))
+      .resolves.toEqual({ threads: [], permissionDenied: true });
+  });
+
+  it("propagates a 403 when syncing, so the sync can stamp and flag it itself", async () => {
+    rejectWith(403);
+    await expect(fetchCommentData(auth, "gdoc1", { sync: true, userEmail: "me@example.com" }))
+      .rejects.toThrow();
+    rejectWith(403);
+    await expect(fetchCommentData(auth, "gdoc1", { sync: true, threads: true }))
+      .rejects.toThrow();
+  });
+
+  it("propagates any other error", async () => {
+    rejectWith(500);
+    await expect(fetchCommentData(auth, "gdoc1", { threads: true })).rejects.toThrow();
+  });
+
+  it("leaves the flag off when the fetch succeeds", async () => {
+    commentsList.mockReset();
+    commentsList.mockResolvedValue({ data: { comments: [], nextPageToken: null } });
+    const result = await fetchCommentData(auth, "gdoc1", { threads: true });
+    expect(result.permissionDenied).toBeUndefined();
   });
 });

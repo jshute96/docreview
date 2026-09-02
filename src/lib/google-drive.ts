@@ -409,6 +409,9 @@ export interface FetchCommentDataOptions {
 export interface CommentDataResult {
   comments?: DriveComment[];
   threads?: CommentThread[];
+  /** Set on the threads-only path when Drive refused comment access, so the
+   *  caller can tell "no comments" apart from "comments not visible". */
+  permissionDenied?: boolean;
 }
 
 // Builds the per-comment Drive API fields string based on which outputs are
@@ -496,7 +499,7 @@ export async function fetchCommentData(
     // handle it (e.g. stamping sync time, flagging permissionDenied).
     if (isDriveErrorCode(err, 403) && threads && !sync) {
       logWarning(`[Drive] Permission denied for comments on ${googleDocId}.`);
-      return { threads: [] };
+      return { threads: [], permissionDenied: true };
     }
     throw err;
   }

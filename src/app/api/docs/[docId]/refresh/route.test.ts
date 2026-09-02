@@ -85,6 +85,37 @@ describe("Single-doc Refresh API", () => {
     );
   });
 
+  it("reports comment access denial so the client can show it (and clear it)", async () => {
+    const dbDoc = { docId, userId, googleDocId };
+    vi.mocked(prisma.doc.findUnique).mockResolvedValue(dbDoc as any);
+    vi.mocked(getDriveClient).mockResolvedValue({} as any);
+    vi.mocked(createDriveService).mockReturnValue({
+      files: { get: vi.fn().mockResolvedValue({ data: { id: googleDocId, name: "Title", owners: [{ me: true }] } }) },
+    } as any);
+    vi.mocked(upsertDocsAndSyncComments).mockResolvedValue({} as any);
+    // With sync requested the 403 propagates rather than being swallowed.
+    vi.mocked(fetchCommentData).mockRejectedValue(Object.assign(new Error("code 403"), { code: 403 }));
+
+    const req = new NextRequest(`http://localhost/api/docs/${docId}/refresh`, { method: "POST" });
+    const res = await POST(req, makeParams());
+    expect(res.status).toBe(200);
+    expect((await res.json()).forbidden).toBe(true);
+  });
+
+  it("clears the denial flag when comments come back", async () => {
+    const dbDoc = { docId, userId, googleDocId };
+    vi.mocked(prisma.doc.findUnique).mockResolvedValue(dbDoc as any);
+    vi.mocked(getDriveClient).mockResolvedValue({} as any);
+    vi.mocked(createDriveService).mockReturnValue({
+      files: { get: vi.fn().mockResolvedValue({ data: { id: googleDocId, name: "Title", owners: [{ me: true }] } }) },
+    } as any);
+    vi.mocked(upsertDocsAndSyncComments).mockResolvedValue({} as any);
+
+    const req = new NextRequest(`http://localhost/api/docs/${docId}/refresh`, { method: "POST" });
+    const res = await POST(req, makeParams());
+    expect((await res.json()).forbidden).toBe(false);
+  });
+
   it("marks as deleted on 404 from Drive", async () => {
     const dbDoc = { docId, userId, googleDocId };
     vi.mocked(prisma.doc.findUnique).mockResolvedValue(dbDoc as any);

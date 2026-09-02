@@ -146,9 +146,14 @@ All responses return threads as `Record<id, CommentThread>`.
 If Drive returns 403 or 404 for the file (no comment access, deleted, or access
 revoked — Drive returns 404 for the last two indistinguishably), GET responds
 `{ threads: {}, forbidden: true }` with a warning log rather than a 502, and the
-UI shows "Comments not visible on this document." This route deliberately does not
-update the doc's `accessState` — the refresh route owns that state machine (see
-`docs/access-states.md`).
+UI shows "Comments not visible on this document." The same flag is returned when
+the file itself is readable but `comments.list` is refused — `fetchCommentData`
+swallows that 403 on the threads-only path and reports it as `permissionDenied`
+(the name its own sync result already uses). `POST /refresh` reports the same
+condition the same way, and sets `forbidden: false` once comments come back, so a
+refresh can clear the message as well as raise it. This route deliberately does
+not update the doc's `accessState` — the refresh route owns that state machine
+(see `docs/access-states.md`).
 
 POST with `?commentId=X` forces a fresh fetch and syncs the DB comment record.
 Returns `{ comment, threads }`, or a 403 if comment access was revoked — an empty

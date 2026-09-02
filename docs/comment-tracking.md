@@ -148,6 +148,12 @@ When Gmail notifications reference docs where the user lacks comment access
 (`noCommentsPermission` in the parsed email), `mergeCommentsFromGmail()` in
 `comment-merge.ts` inserts comment records from the email body. This is the only
 source of comment data for these docs — Drive's `comments.list` returns 403.
+`fetchCommentData()` reports that 403 back as `permissionDenied` — the same flag
+name the comment sync result uses — so the comments page can say "Comments not
+visible on this document." rather than its ordinary empty state. That message
+covers both shapes this takes: the doc-level empty state when Gmail hasn't
+supplied any rows, and the thread panel of a Gmail-sourced row that has no Drive
+thread behind it (see `docs/api-routes.md`).
 
 Each comment is keyed by `discussionId` (the `disco=` URL parameter). Duplicate
 detection uses `findFirst` by docId + googleCommentId. Fields are populated from

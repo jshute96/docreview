@@ -83,6 +83,9 @@ export async function POST(
   }
 
   let threadMap: ThreadMap | undefined;
+  // Whether Drive refused comment access on this pass. Reported to the client so
+  // a refresh can both raise and clear the "comments not visible" state.
+  let commentsForbidden: boolean | undefined;
   let uiContent: { suggestions: Record<string, SuggestionContent>; documentText: string | null } | null = null;
 
   if (driveDoc) {
@@ -94,6 +97,13 @@ export async function POST(
       const mimeType = driveDoc.mimeType ?? doc.mimeType;
       const [commentResult, docDataResult] = await Promise.all([
         fetchCommentData(driveAuth, doc.googleDocId, { sync: true, threads: true, userEmail }).catch((err) => {
+          // A 403 propagates here rather than being swallowed (that only happens
+          // on the threads-only path), so record it for the response.
+          if (isDriveErrorCode(err, 403)) {
+            logWarning(`[Refresh] no comment access for doc ${docId} (code 403)`);
+            commentsForbidden = true;
+            return null;
+          }
           logWarning("[Refresh] fetchCommentData failed, will fall back to individual fetches:", err);
           return null;
         }),
@@ -121,6 +131,7 @@ export async function POST(
       });
 
       // Build thread map keyed by thread ID for the client response.
+      if (commentResult && !commentResult.permissionDenied) commentsForbidden = false;
       if (commentResult?.threads) {
         threadMap = {};
         for (const t of commentResult.threads) threadMap[t.id] = t;
@@ -141,6 +152,7 @@ export async function POST(
     ...docData,
     // Extra fields so the client can skip separate /comments + /content fetches
     ...(threadMap !== undefined && { threads: threadMap }),
+    ...(commentsForbidden !== undefined && { forbidden: commentsForbidden }),
     viewedByMeTime,
     ...(uiContent && {
       suggestionContent: uiContent.suggestions,

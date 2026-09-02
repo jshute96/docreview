@@ -91,6 +91,10 @@ export async function GET(
     return NextResponse.json({
       threads,
       viewedByMeTime: fileRes.data.viewedByMeTime ?? null,
+      // comments.list can be refused while files.get succeeds — the doc is
+      // readable, its comments aren't. Without this the UI would show the
+      // ordinary "no comments" empty state.
+      ...(threadResult.permissionDenied ? { forbidden: true } : {}),
     });
   } catch (err) {
     if (err instanceof OfflineModeError) {
