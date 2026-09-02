@@ -43,6 +43,7 @@ vi.mock("@/lib/extension-suggestions", () => ({
 import { mergeExtensionSuggestions, type ExtensionSuggestionInput } from "./extension-suggestion-merge";
 import { prisma } from "@/lib/prisma";
 import { computeSuggestionHash } from "@/lib/suggestion-hash";
+import { isThreadRead } from "@/lib/read-state";
 
 const mockComment = prisma.comment as unknown as {
   findFirst: ReturnType<typeof vi.fn>;
@@ -161,7 +162,7 @@ describe("mergeExtensionSuggestions", () => {
       mockComment.findFirst.mockResolvedValue({
         commentId: "discoRow", docId: "d1", googleCommentId: "(no ID)",
         googleSuggestionId: null, status: CommentStatus.INBOX, replyCount: 0,
-        resolved: false, isRead: false,
+        resolved: false, readMessageCount: 0,
       });
       mockComment.findMany.mockResolvedValue([
         { commentId: "realRow", googleCommentId: null, googleSuggestionId: "suggest.xyz" },
@@ -228,7 +229,7 @@ describe("mergeExtensionSuggestions", () => {
       isReplyAuthor: false,
       mentionedMe: false,
       mentionedMeUnreplied: false,
-      isRead: false,
+      readMessageCount: 0,
       driveCreatedAt: new Date("2026-03-20T15:00:00.000Z"),
       driveModifiedAt: new Date("2026-03-20T15:00:00.000Z"),
     });
@@ -616,17 +617,17 @@ describe("mergeExtensionSuggestions", () => {
     expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
   });
 
-  // ---------- isRead computation ----------
+  // ---------- read state (readMessageCount) ----------
 
-  describe("isRead", () => {
+  describe("read state", () => {
     it("marks new suggestion as read when it's my own with no replies", async () => {
       await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({ isMine: true })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
-      expect(mockComment.create.mock.calls[0][0].data.isRead).toBe(true);
+      expect(isThreadRead(mockComment.create.mock.calls[0][0].data)).toBe(true);
     });
 
     it("marks new suggestion as unread when it's someone else's with no replies", async () => {
       await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({ isMine: false })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
-      expect(mockComment.create.mock.calls[0][0].data.isRead).toBe(false);
+      expect(isThreadRead(mockComment.create.mock.calls[0][0].data)).toBe(false);
     });
 
     it("marks new suggestion as read when my reply is the last one", async () => {
@@ -637,7 +638,7 @@ describe("mergeExtensionSuggestions", () => {
           { author: "Me", isMine: true, timestamp: "4:00 PM Mar 20", text: "reply" },
         ],
       })], userEmail, makeDoc());
-      expect(mockComment.create.mock.calls[0][0].data.isRead).toBe(true);
+      expect(isThreadRead(mockComment.create.mock.calls[0][0].data)).toBe(true);
     });
 
     it("marks new suggestion as unread when someone else's reply is the last one", async () => {
@@ -648,7 +649,7 @@ describe("mergeExtensionSuggestions", () => {
           { author: "Alice", isMine: false, timestamp: "4:00 PM Mar 20", text: "reply" },
         ],
       })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
-      expect(mockComment.create.mock.calls[0][0].data.isRead).toBe(false);
+      expect(isThreadRead(mockComment.create.mock.calls[0][0].data)).toBe(false);
     });
 
     it("marks new suggestion as read when I accepted my own suggestion (last action is mine)", async () => {
@@ -657,68 +658,131 @@ describe("mergeExtensionSuggestions", () => {
         status: "accepted",
         replies: [{ author: "Me", isMine: true, timestamp: "4:00 PM Mar 20", text: "", action: "accept" }],
       })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
-      expect(mockComment.create.mock.calls[0][0].data.isRead).toBe(true);
+      expect(isThreadRead(mockComment.create.mock.calls[0][0].data)).toBe(true);
     });
 
     it("marks existing suggestion read when a new reply from me arrives", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, isRead: false,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 0,
       });
       await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         replies: [{ author: "Me", isMine: true, timestamp: "4:00 PM Mar 20", text: "reply" }],
       })], userEmail, makeDoc());
-      expect(mockComment.update.mock.calls[0][0].data.isRead).toBe(true);
+      expect(isThreadRead(mockComment.update.mock.calls[0][0].data)).toBe(true);
     });
 
     it("marks existing suggestion unread when a new reply from someone else arrives", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, isRead: true,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 1,
       });
       await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         replies: [{ author: "Alice", isMine: false, timestamp: "4:00 PM Mar 20", text: "reply" }],
       })], userEmail, makeDoc());
-      expect(mockComment.update.mock.calls[0][0].data.isRead).toBe(false);
+      expect(isThreadRead(mockComment.update.mock.calls[0][0].data)).toBe(false);
     });
 
-    it("preserves manually-toggled isRead when no new activity", async () => {
-      // User manually marked as read, no new replies or state change → keep isRead=true
+    it("preserves a manually-toggled read count when no new activity", async () => {
+      // User manually marked as read, no new replies or state change → stays read
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, isRead: true,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 1,
       });
       await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({ isMine: false })], userEmail, makeDoc());
-      expect(mockComment.update.mock.calls[0][0].data.isRead).toBe(true);
+      expect(isThreadRead(mockComment.update.mock.calls[0][0].data)).toBe(true);
     });
 
-    it("flips isRead when resolve state changes (my suggestion accepted by someone else)", async () => {
+    it("marks unread when resolve state changes (my suggestion accepted by someone else)", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, isRead: true,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 1,
       });
       // Reply arrives: my suggestion, they accepted it (the accept reply is theirs)
       await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         isMine: true, status: "accepted",
         replies: [{ author: "Alice", isMine: false, timestamp: "4:00 PM Mar 20", text: "", action: "accept" }],
       })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
-      expect(mockComment.update.mock.calls[0][0].data.isRead).toBe(false);
+      expect(isThreadRead(mockComment.update.mock.calls[0][0].data)).toBe(false);
     });
 
-    it("sets isRead on hash-match merge into a Drive-first row", async () => {
+    it("sets the read count on hash-match merge into a Drive-first row", async () => {
       mockComment.findFirst.mockResolvedValue(null);
       mockComment.findMany.mockResolvedValueOnce([{
         commentId: "cr1", googleCommentId: null, suggestionContentHash: computeSuggestionHash(SuggestionType.INSERT, "", "new text"),
-        status: CommentStatus.ARCHIVED, replyCount: 0, resolved: false, isRead: false,
+        status: CommentStatus.ARCHIVED, replyCount: 0, resolved: false, readMessageCount: 0,
       }]);
       await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         isMine: true,
       })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
-      // New row was my own with no replies → isRead=true
-      expect(mockComment.update.mock.calls[0][0].data.isRead).toBe(true);
+      // New row was my own with no replies → fully read
+      expect(isThreadRead(mockComment.update.mock.calls[0][0].data)).toBe(true);
+    });
+
+    // The assertions above collapse the count back to a boolean, which would
+    // hide an off-by-one. These pin the exact numbers.
+    it("seeds an exact partial count through my last reply", async () => {
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        isMine: false,
+        replies: [
+          { author: "Me", isMine: true, timestamp: "3:01 PM Mar 20", text: "mine" },
+          { author: "Alice", isMine: false, timestamp: "3:02 PM Mar 20", text: "theirs" },
+          { author: "Alice", isMine: false, timestamp: "3:03 PM Mar 20", text: "theirs again" },
+        ],
+      })], userEmail, makeDoc());
+
+      const data = mockComment.create.mock.calls[0][0].data;
+      // Their suggestion + my reply read; the two replies after mine are not.
+      expect(data.readMessageCount).toBe(2);
+      expect(data.replyCount).toBe(3);
+    });
+
+    it("carries the count forward unchanged when someone else replies", async () => {
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 1, resolved: false, readMessageCount: 2,
+      });
+
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        replies: [
+          { author: "Me", isMine: true, timestamp: "3:01 PM Mar 20", text: "mine" },
+          { author: "Alice", isMine: false, timestamp: "4:00 PM Mar 20", text: "theirs" },
+        ],
+      })], userEmail, makeDoc());
+
+      // Was 2 of 2; now 2 of 3 — exactly their new reply is unread.
+      expect(mockComment.update.mock.calls[0][0].data.readMessageCount).toBe(2);
+    });
+
+    it("marks the last message unread on a resolve flip with no new replies", async () => {
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 1,
+      });
+
+      // Someone else's suggestion, accepted without any discussion reply. The
+      // resolve is activity I didn't perform and can't be localized to a
+      // message, so the thread's last message goes unread.
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        isMine: false, status: "accepted", replies: [],
+      })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
+
+      expect(mockComment.update.mock.calls[0][0].data.readMessageCount).toBe(0);
+    });
+
+    it("clamps a stored count that exceeds the thread after replies disappear", async () => {
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 4, resolved: false, readMessageCount: 5,
+      });
+
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        status: "accepted",
+        replies: [{ author: "Alice", isMine: false, timestamp: "4:00 PM Mar 20", text: "", action: "accept" }],
+      })], userEmail, makeDoc());
+
+      // Clamped to 2, then the no-new-replies rule leaves the last message unread.
+      expect(mockComment.update.mock.calls[0][0].data.readMessageCount).toBe(1);
     });
   });
 
-  // ---------- shouldUnarchive gating on isRead ----------
+  // ---------- shouldUnarchive gating on read state ----------
 
   describe("shouldUnarchive gating", () => {
-    it("does NOT unarchive when I inserted my own suggestion (isRead=true)", async () => {
+    it("does NOT unarchive when I inserted my own suggestion (already read)", async () => {
       const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({ isMine: true })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
       expect(res.inserted).toBe(1);
       expect(res.shouldUnarchive).toBe(false);
@@ -728,7 +792,7 @@ describe("mergeExtensionSuggestions", () => {
       mockComment.findFirst.mockResolvedValue(null);
       mockComment.findMany.mockResolvedValueOnce([{
         commentId: "cr1", googleCommentId: null, suggestionContentHash: computeSuggestionHash(SuggestionType.INSERT, "", "new text"),
-        status: CommentStatus.ARCHIVED, replyCount: 0, resolved: false, isRead: false,
+        status: CommentStatus.ARCHIVED, replyCount: 0, resolved: false, readMessageCount: 0,
       }]);
       const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({ isMine: true })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
       expect(res.shouldUnarchive).toBe(false);
@@ -736,7 +800,7 @@ describe("mergeExtensionSuggestions", () => {
 
     it("unarchives when existing INBOX suggestion gets new reply from someone else (rule 2)", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 1, resolved: false, isRead: true,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 1, resolved: false, readMessageCount: 2,
       });
       const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         isMine: true,
@@ -750,7 +814,7 @@ describe("mergeExtensionSuggestions", () => {
 
     it("does NOT unarchive when existing INBOX suggestion gets new reply but I was the one who accepted (rule 2 exception)", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, isRead: false,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 0,
       });
       const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         isMine: false, status: "accepted",
@@ -762,7 +826,7 @@ describe("mergeExtensionSuggestions", () => {
 
     it("unarchives when my INBOX suggestion is accepted by someone else (rule 3)", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, isRead: true,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 1,
       });
       const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         isMine: true, status: "accepted",
@@ -777,7 +841,7 @@ describe("mergeExtensionSuggestions", () => {
 
     it("does NOT unarchive when my INBOX suggestion is silently accepted by someone else (archive transition)", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, isRead: true,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 1,
       });
       const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         isMine: true, status: "accepted",
@@ -787,9 +851,9 @@ describe("mergeExtensionSuggestions", () => {
       expect(res.shouldUnarchive).toBe(false);
     });
 
-    it("does NOT unarchive when existing INBOX suggestion has no new activity and isRead is preserved", async () => {
+    it("does NOT unarchive when existing INBOX suggestion has no new activity and the read count is preserved", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 2, resolved: false, isRead: true,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 2, resolved: false, readMessageCount: 3,
       });
       const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         replies: [

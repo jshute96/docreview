@@ -21,6 +21,7 @@ import { computeMentionedMeUnreplied } from "@/lib/google-drive";
 import { bumpLastCommentActivity, computeInitialInboxStatus, datesEqual, findUnlinkedSuggestionsByHash } from "@/lib/sync-comments";
 import { parseExtensionTimestamp } from "@/lib/extension-suggestions";
 import { isDiscoId } from "@/lib/disco-id";
+import { initialReadMessageCount, isThreadRead, nextReadMessageCount } from "@/lib/read-state";
 import { CommentStatus, CommentType, DocRole, Prisma, type Comment, type Doc } from "@prisma/client";
 
 /** Shape of a single extension suggestion as received from the API request body. */
@@ -97,31 +98,37 @@ function computeMentionFlags(
 }
 
 /**
- * For rows the extension has already enriched (disco ID already set), preserve
- * a manually-toggled `isRead` when nothing new happened (no new replies, resolve
- * state unchanged) — parallels comment sync's
- * `effectiveIsRead = modifiedChanged ? c.isRead : existing.isRead`. We gate on
- * reply-count/resolve transitions rather than the `driveModifiedAt` timestamp
- * because extension timestamps are DOM-parsed and imprecise.
+ * For rows the extension has already enriched (disco ID already set), carry the
+ * stored `readMessageCount` forward — parallels comment sync's read handling in
+ * `buildCommentUpdate` (see `src/lib/read-state.ts` for the counting
+ * convention). New replies from other people need no write: the preserved count
+ * already compares them as unread, which is what keeps manual Mark
+ * read/unread toggles sticky. We gate on reply-count/resolve transitions rather
+ * than the `driveModifiedAt` timestamp because extension timestamps are
+ * DOM-parsed and imprecise.
  *
  * This is NOT used for the Drive-first / Gmail-first enrichment path. Those
- * rows land here with the schema-default `isRead: false`, which isn't a real
- * manual toggle worth preserving. The hash-match branch uses the freshly
- * computed `isRead` directly, so read-state and unarchive signals still land
+ * rows land here with the schema-default `readMessageCount: 0`, which isn't a
+ * real manual toggle worth preserving. The hash-match branch uses the freshly
+ * computed count directly, so read-state and unarchive signals still land
  * correctly on the first enrichment — e.g., if Drive sync seeded a suggestion
  * and someone else then replied, the extension picks it up as unread and
  * unarchives the doc; if I seeded it and nothing has happened, it's marked
  * read and the doc stays archived.
  */
-function effectiveIsReadForUpdate(
-  existing: Pick<Comment, "isRead" | "replyCount" | "resolved">,
+function effectiveReadMessageCountForUpdate(
+  existing: Pick<Comment, "readMessageCount" | "replyCount" | "resolved">,
   isRead: boolean,
   isResolved: boolean,
   newReplyCount: number,
-): boolean {
-  const hasNewActivity =
-    newReplyCount > existing.replyCount || existing.resolved !== isResolved;
-  return hasNewActivity ? isRead : existing.isRead;
+): number {
+  return nextReadMessageCount({
+    storedCount: existing.readMessageCount,
+    oldReplyCount: existing.replyCount,
+    newReplyCount,
+    hasActivity: newReplyCount > existing.replyCount || existing.resolved !== isResolved,
+    iActedLast: isRead,
+  });
 }
 
 /**
@@ -265,7 +272,7 @@ function buildExtensionSuggestionUpdate(
   existing: Comment,
   commentData: SuggestionCommentData,
   contentHash: string,
-  effectiveIsRead: boolean,
+  effectiveReadMessageCount: number,
   newStatus: CommentStatus | undefined,
 ): { changed: boolean; data: Prisma.CommentUncheckedUpdateInput } {
   const status = newStatus ?? existing.status;
@@ -276,7 +283,7 @@ function buildExtensionSuggestionUpdate(
     existing.isReplyAuthor !== commentData.isReplyAuthor ||
     existing.mentionedMe !== commentData.mentionedMe ||
     existing.mentionedMeUnreplied !== commentData.mentionedMeUnreplied ||
-    existing.isRead !== effectiveIsRead ||
+    existing.readMessageCount !== effectiveReadMessageCount ||
     existing.status !== status ||
     existing.suggestionContentHash !== contentHash ||
     !datesEqual(existing.driveCreatedAt, commentData.driveCreatedAt) ||
@@ -285,7 +292,7 @@ function buildExtensionSuggestionUpdate(
   const data: Prisma.CommentUncheckedUpdateInput = {
     ...commentData,
     suggestionContentHash: contentHash,
-    isRead: effectiveIsRead,
+    readMessageCount: effectiveReadMessageCount,
     ...(newStatus ? { status: newStatus } : {}),
   };
 
@@ -349,6 +356,9 @@ export async function mergeExtensionSuggestions(
     // Common fields for all DB writes
     const isResolved = s.status === "accepted" || s.status === "rejected";
     const isRead = computeSuggestionIsRead(s.isMine, s.replies);
+    // Read count for rows seeded from this payload: messages through my last
+    // contribution (see initialReadMessageCount).
+    const readMessageCount = initialReadMessageCount(s.isMine, s.replies.map((r) => r.isMine));
     const commentData: SuggestionCommentData = {
       replyCount: s.replies.length,
       resolved: isResolved,
@@ -404,19 +414,21 @@ export async function mergeExtensionSuggestions(
     if (existingById) {
       if (commentData.resolved && !existingById.resolved) resolved++;
       const newStatus = computeSuggestionStatusUpdate(doc, existingById, commentData, mention, iResolvedIt, lastResolveReply);
-      const effectiveIsRead = effectiveIsReadForUpdate(existingById, isRead, isResolved, s.replies.length);
+      const effectiveReadMessageCount = effectiveReadMessageCountForUpdate(
+        existingById, isRead, isResolved, s.replies.length,
+      );
       if (suggestionShouldUnarchive({
         previousStatus: existingById.status,
         targetStatus: newStatus ?? existingById.status,
         hasNewReplies: s.replies.length > existingById.replyCount,
         isResolved,
         iResolvedIt,
-        isRead: effectiveIsRead,
+        isRead: isThreadRead({ readMessageCount: effectiveReadMessageCount, replyCount: s.replies.length }),
       })) shouldUnarchive = true;
       // Skip the DB write when nothing would change — extension re-syncs run on
       // every pane snapshot and most suggestions are unchanged between syncs.
       const { changed, data } = buildExtensionSuggestionUpdate(
-        existingById, commentData, contentHash, effectiveIsRead, newStatus,
+        existingById, commentData, contentHash, effectiveReadMessageCount, newStatus,
       );
       if (!changed) continue;
       logInfo(`[Suggestions:Ext] ${googleDocId}: ${s.id} already exists as ${existingById.commentId} — updating metadata`);
@@ -455,9 +467,9 @@ export async function mergeExtensionSuggestions(
           if (shouldBe === CommentStatus.INBOX) newStatus = CommentStatus.INBOX;
         }
         // First enrichment: the Drive/Gmail-first row had no authorship data so
-        // its isRead is the schema default (false), not a manual toggle worth
-        // preserving. Use the freshly computed value — matches how we re-evaluate
-        // status here via computeInitialInboxStatus.
+        // its readMessageCount is the schema default (0), not a manual toggle
+        // worth preserving. Use the freshly computed value — matches how we
+        // re-evaluate status here via computeInitialInboxStatus.
         if (suggestionShouldUnarchive({
           previousStatus: existing.status,
           targetStatus: newStatus ?? existing.status,
@@ -472,7 +484,7 @@ export async function mergeExtensionSuggestions(
             data: {
               googleCommentId: s.id,
               ...commentData,
-              isRead,
+              readMessageCount,
               ...(newStatus ? { status: newStatus } : {}),
             },
           });
@@ -507,7 +519,7 @@ export async function mergeExtensionSuggestions(
               suggestionType: actionType,
               suggestionContentHash: contentHash,
               status,
-              isRead,
+              readMessageCount,
               ...commentData,
             },
           });

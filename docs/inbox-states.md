@@ -70,7 +70,7 @@ These comment changes trigger moving the document to Inbox:
 
 The same three unarchive rules apply to suggestions when the Chrome extension
 provides reply-authorship data (accept/reject counts as a reply, and the user's
-`isMine` flag on the last reply sets `isRead`). Without the extension, suggestion
+`isMine` flag on the last reply marks the thread read). Without the extension, suggestion
 unarchive falls back to "new suggestion on my own doc" since the Docs API and
 Gmail merge paths can't identify the authors.
 

@@ -15,6 +15,7 @@ vi.mock("@/lib/prisma", () => ({
     comment: {
       updateMany: vi.fn(),
     },
+    $executeRaw: vi.fn(),
   },
 }));
 
@@ -25,6 +26,7 @@ const mockDoc = prisma.doc as unknown as {
 const mockComment = prisma.comment as unknown as {
   updateMany: ReturnType<typeof vi.fn>;
 };
+const mockExecuteRaw = prisma.$executeRaw as unknown as ReturnType<typeof vi.fn>;
 
 function makeParams(docId: string) {
   return { params: Promise.resolve({ docId }) };
@@ -90,6 +92,39 @@ describe("PATCH /api/docs/[docId]/comments", () => {
         docId: "d1",
       },
       data: { status: "ARCHIVED" },
+    });
+  });
+
+  // Marking read is the one branch that can't go through updateMany: it sets
+  // read_message_count from each row's own reply_count.
+  it("marks read via raw SQL so each thread gets its own message count", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue({ docId: "d1", userId: "u1" });
+    mockExecuteRaw.mockResolvedValue(2);
+
+    const [req, params] = makePatchReq("d1", { commentIds: ["c1", "c2"], isRead: true });
+    const res = await PATCH(req, params);
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).count).toBe(2);
+    expect(mockComment.updateMany).not.toHaveBeenCalled();
+    const sql = mockExecuteRaw.mock.calls[0][0].join("?");
+    expect(sql).toContain("read_message_count = reply_count + 1");
+  });
+
+  it("marks unread by zeroing the read count", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue({ docId: "d1", userId: "u1" });
+    mockComment.updateMany.mockResolvedValue({ count: 2 });
+
+    const [req, params] = makePatchReq("d1", { commentIds: ["c1", "c2"], isRead: false });
+    const res = await PATCH(req, params);
+
+    expect(res.status).toBe(200);
+    expect(mockExecuteRaw).not.toHaveBeenCalled();
+    expect(mockComment.updateMany).toHaveBeenCalledWith({
+      where: { commentId: { in: ["c1", "c2"] }, docId: "d1" },
+      data: { readMessageCount: 0 },
     });
   });
 });

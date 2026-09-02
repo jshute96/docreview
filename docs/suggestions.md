@@ -120,13 +120,13 @@ stripped before storage.
 | `isThreadAuthor` | false | — | false |
 | `isReplyAuthor` | false | — | false |
 | `mentionedMe` | false | — | false |
-| `isRead` | false (default) | false (default) | Extension authoritative (last-actor-is-me) |
+| `readMessageCount` | 0 (default) | 0 (default) | Extension authoritative (messages through my last contribution) |
 
 **Extension source:** When extension suggestions are merged into the DB, the merge also
 populates `isThreadAuthor` and `isReplyAuthor` from the `isMine` flag, `mentionedMe` and
 `mentionedMeUnreplied` by checking reply HTML for the user's email address, `resolved`
-from the accepted/rejected status, and `isRead` from whether the last action (reply or
-accept/reject) was mine. The extension merge also applies comment-like inbox status
+from the accepted/rejected status, and `readMessageCount` from where my last action (reply
+or accept/reject) falls in the thread — see docs/comment-tracking.md#read-tracking. The extension merge also applies comment-like inbox status
 rules (see docs/inbox-states.md): new suggestions get status based on mention, doc
 role, and participation; existing suggestions are promoted to INBOX on new activity
 when relevant (e.g., new replies mentioning me, or new activity on a suggestion I'm
@@ -138,8 +138,8 @@ all sources are caught up. The Docs API path refreshes the hash on the same
 grounds. Gmail merge, by contrast, only fills the hash when it is missing: Gmail
 notification text is a point-in-time snapshot (often truncated with an ellipsis),
 so it should not override a fresh hash written by Drive or Extension.
-Doc-level unarchive is gated on `!isRead` so my own last action (typing a reply,
-accepting/rejecting) won't resurface an archived doc.
+Doc-level unarchive is gated on the thread being unread, so my own last action (typing a
+reply, accepting/rejecting) won't resurface an archived doc.
 
 **Future:** `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, and `resolved` could
 potentially be derived from parsed Gmail notifications but are left for later.

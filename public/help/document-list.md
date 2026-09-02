@@ -7,7 +7,7 @@ Each row in the document list shows:
 - **Role badge** -- Author (blue) or Reviewer (violet).
 - **Star** -- Click to toggle. Use the star filter to find starred documents quickly.
 - **Comment counts** -- Three numbers showing comment activity:
-  - **Unread** (gray) -- Comments where someone else was the last to act (you haven't replied yet).
+  - **Unread** (gray) -- Comments with messages you have not read yet (usually because someone else commented last).
   - **Inbox** (bold blue) -- Comment threads in your Inbox that you started or participated in.
   - **Open** (light blue) -- All unresolved Inbox comment threads, including ones you haven't participated in.
 - **Labels** -- Colored pills showing applied labels.

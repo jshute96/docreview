@@ -2,6 +2,7 @@
  * Shared Prisma include clauses and transform for docs.
  */
 import { CommentStatus } from "@prisma/client";
+import { isThreadRead } from "@/lib/read-state";
 
 /** Labels with their label relation, ordered by position */
 export const labelInclude = {
@@ -22,7 +23,8 @@ export const docWithCountsInclude = {
     select: {
       resolved: true,
       status: true,
-      isRead: true,
+      readMessageCount: true,
+      replyCount: true,
       assignedToMe: true,
       mentionedMeUnreplied: true,
     },
@@ -51,19 +53,22 @@ export function stripServerOnly<T extends { title: string }>(doc: T): T {
 /** Add counts of comments in different states for the docs list page, and strip the raw comments array */
 export function withCommentCounts<
   T extends {
-    comments: { resolved: boolean; status: string; isRead: boolean; assignedToMe: boolean; mentionedMeUnreplied: boolean }[]
+    comments: { resolved: boolean; status: string; readMessageCount: number; replyCount: number; assignedToMe: boolean; mentionedMeUnreplied: boolean }[]
   },
 >(doc: T) {
   const { comments, ...rest } = doc;
   const isInbox = (c: (typeof comments)[number]) => c.status === CommentStatus.INBOX;
+  // "Unread" counts threads with any unread message, not unread messages —
+  // the docs table shows a per-thread count.
+  const isUnread = (c: (typeof comments)[number]) => !isThreadRead(c);
   return {
     ...rest,
     _count: {
-      unreadComments: comments.filter((c) => isInbox(c) && !c.isRead).length,
+      unreadComments: comments.filter((c) => isInbox(c) && isUnread(c)).length,
       inboxComments: comments.filter(isInbox).length,
       openComments: comments.filter((c) => !c.resolved).length,
       assignedComments: comments.filter((c) => isInbox(c) && c.assignedToMe && !c.resolved).length,
-      mentionedComments: comments.filter((c) => isInbox(c) && c.mentionedMeUnreplied && !c.isRead && !c.resolved).length,
+      mentionedComments: comments.filter((c) => isInbox(c) && c.mentionedMeUnreplied && isUnread(c) && !c.resolved).length,
     },
   };
 }

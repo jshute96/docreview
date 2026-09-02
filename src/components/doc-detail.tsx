@@ -15,6 +15,7 @@ import { DeleteReAddDialog } from "@/components/delete-readd-dialog";
 import { ROLE_COLORS } from "@/lib/role-colors";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
+import { isThreadRead, totalMessageCount } from "@/lib/read-state";
 import { CommentRow } from "@/components/comment-row";
 import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, setDocReadyHandler, getCommentsAndSuggestionsFromDoc, getSuggestionFromDoc, type ExtensionSuggestion, type ExtensionCommentInfo } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
@@ -673,8 +674,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
     if (resolvedFilter === "exclude" && c.resolved) return true;
     if (suggestionsFilter === "include" && c.type !== CommentType.SUGGESTION) return true;
     if (suggestionsFilter === "exclude" && c.type === CommentType.SUGGESTION) return true;
-    if (unreadFilter === "include" && c.isRead) return true;
-    if (unreadFilter === "exclude" && !c.isRead) return true;
+    if (unreadFilter === "include" && isThreadRead(c)) return true;
+    if (unreadFilter === "exclude" && !isThreadRead(c)) return true;
     if (isStarredFilter === "include" && !c.isStarred) return true;
     if (isStarredFilter === "exclude" && c.isStarred) return true;
     return false;
@@ -870,7 +871,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
   }
 
   async function handleBulkReadChange(targetIsRead: boolean) {
-    const targets = filteredComments.filter((c) => c.isRead !== targetIsRead);
+    const targets = filteredComments.filter((c) => isThreadRead(c) !== targetIsRead);
+    // Mirrors how the server turns the isRead request field into a count.
+    const readCountFor = (c: Comment) => (targetIsRead ? totalMessageCount(c.replyCount) : 0);
     if (targets.length === 0) return;
 
     const setBusy = targetIsRead ? setBulkMarkingRead : setBulkMarkingUnread;
@@ -890,13 +893,13 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       const { count } = await res.json();
       setComments((prev) =>
         prev.map((c) =>
-          commentIds.includes(c.commentId) ? { ...c, isRead: targetIsRead } : c
+          commentIds.includes(c.commentId) ? { ...c, readMessageCount: readCountFor(c) } : c
         )
       );
 
       // Trigger exit animations for comments that would be filtered out
       targets.forEach((c) => {
-        const updated = { ...c, isRead: targetIsRead };
+        const updated = { ...c, readMessageCount: readCountFor(c) };
         if (wouldBeFilteredOut(updated)) {
           setExitingIds((prev) => new Set(prev).add(updated.commentId));
         }
@@ -1328,7 +1331,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                       className="h-5 px-1.5 text-[10px] text-zinc-900"
                       title="Mark all visible comments as read"
                       onClick={handleMarkAllRead}
-                      disabled={bulkMarkingRead || !filteredComments.some((c) => !c.isRead)}
+                      disabled={bulkMarkingRead || !filteredComments.some((c) => !isThreadRead(c))}
                     >
                       {bulkMarkingRead ? "Marking..." : "Mark all read"}
                     </Button>
@@ -1349,7 +1352,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
                           onSelect={() => setExpandUnreadSignal((n) => n + 1)}
-                          disabled={!filteredComments.some((c) => !c.isRead)}
+                          disabled={!filteredComments.some((c) => !isThreadRead(c))}
                           title="Expand all unread comment threads"
                         >
                           Expand all unread
@@ -1370,7 +1373,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={handleMarkAllUnread}
-                          disabled={bulkMarkingUnread || !filteredComments.some((c) => c.isRead)}
+                          disabled={bulkMarkingUnread || !filteredComments.some((c) => isThreadRead(c))}
                           title="Mark all visible read comments as unread"
                         >
                           {bulkMarkingUnread ? "Marking..." : "Mark all unread"}

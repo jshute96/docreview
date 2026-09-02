@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { fetchCommentData, fetchDocData, fetchThreadDetail, getDriveClient, isDriveErrorCode } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { computeSuggestionHash } from "@/lib/suggestion-hash";
+import { initialReadMessageCount, nextReadMessageCount } from "@/lib/read-state";
 import { CommentStatus, CommentType, DocRole, DocStatus, type Doc, type Comment, type Prisma } from "@prisma/client";
 import type { DriveComment, DriveSuggestion, CommentThread, ThreadDetailResult } from "@/lib/google-drive";
 
@@ -510,7 +511,7 @@ function buildNewComment(
     resolved: c.resolved,
     isThreadAuthor: c.isThreadAuthor,
     isReplyAuthor: c.isReplyAuthor,
-    isRead: c.isRead,
+    readMessageCount: initialReadMessageCount(c.isThreadAuthor, c.replyAuthorMeFlags),
     assignedToMe: c.assignedToMe,
     mentionedMe: mentionedInThread,
     mentionedMeUnreplied: c.mentionedMeUnreplied,
@@ -655,14 +656,25 @@ function buildCommentUpdate(
 ): { changed: boolean; data: Prisma.CommentUncheckedUpdateInput } {
   const modifiedChanged = !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
   const activity = hasNewActivity ?? modifiedChanged;
-  const effectiveIsRead = modifiedChanged && activity ? c.isRead : existing.isRead;
+  // Read tracking: the rules live in nextReadMessageCount, shared with the
+  // extension suggestion merge. `c.isRead` is Drive's "I authored the last
+  // message". A timestamp move that isn't real activity (a self-edit) doesn't
+  // count, which is what keeps the user's own edit from marking their thread
+  // unread.
+  const effectiveReadMessageCount = nextReadMessageCount({
+    storedCount: existing.readMessageCount,
+    oldReplyCount: existing.replyCount,
+    newReplyCount: c.replyCount,
+    hasActivity: modifiedChanged && activity,
+    iActedLast: c.isRead,
+  });
   const mentionedInThread = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
   const status = newStatus ?? existing.status;
 
   const changed =
     existing.resolved !== c.resolved ||
     existing.isReplyAuthor !== c.isReplyAuthor ||
-    existing.isRead !== effectiveIsRead ||
+    existing.readMessageCount !== effectiveReadMessageCount ||
     existing.assignedToMe !== c.assignedToMe ||
     existing.mentionedMe !== mentionedInThread ||
     existing.mentionedMeUnreplied !== c.mentionedMeUnreplied ||
@@ -674,7 +686,7 @@ function buildCommentUpdate(
   const data: Prisma.CommentUncheckedUpdateInput = {
     resolved: c.resolved,
     isReplyAuthor: c.isReplyAuthor,
-    isRead: effectiveIsRead,
+    readMessageCount: effectiveReadMessageCount,
     assignedToMe: c.assignedToMe,
     mentionedMe: mentionedInThread,
     mentionedMeUnreplied: c.mentionedMeUnreplied,

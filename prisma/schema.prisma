@@ -190,7 +190,10 @@ model Comment {
   resolved           Boolean        @default(false)
   isThreadAuthor     Boolean        @default(false) @map("is_thread_author")
   isReplyAuthor      Boolean        @default(false) @map("is_reply_author")
-  isRead             Boolean        @default(false) @map("is_read")
+  // Number of messages in the thread the user has read, counting the head
+  // comment plus replies (fully read = replyCount + 1; 0 = nothing read).
+  // Compare with >= since replyCount can shrink when replies are deleted.
+  readMessageCount   Int            @default(0) @map("read_message_count")
   isStarred          Boolean        @default(false) @map("is_starred")
   assignedToMe       Boolean        @default(false) @map("assigned_to_me")
   mentionedMe        Boolean        @default(false) @map("mentioned_me")

@@ -105,12 +105,16 @@ PATCH only. Bulk-updates comment `status` or `isRead` for multiple comments.
 
 Body: `{ commentIds: string[], status?: CommentStatus, isRead?: boolean }`
 
+The `isRead` boolean is stored as a message count (`readMessageCount`) — true means every
+known message in the thread, false means none. See docs/comment-tracking.md#read-tracking.
+
 No Google API (Prisma only).
 
 ### `/api/docs/[docId]/comments/[commentId]` — Single comment update
 
 PATCH. Updates a single comment's `status`, `isRead`, or `isStarred` in the
-database. Auto-unarchives the parent doc if a comment moves to INBOX.
+database (`isRead` is stored as a message count — see the bulk route above).
+Auto-unarchives the parent doc if a comment moves to INBOX.
 
 No Google API (Prisma only).
 

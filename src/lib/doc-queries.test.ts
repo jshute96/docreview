@@ -1,9 +1,29 @@
 import { describe, it, expect } from "vitest";
 import { withCommentCounts } from "./doc-queries";
 
-/** Shorthand: creates a comment with defaults for the new fields */
-function c(overrides: { status: string; resolved: boolean; isRead: boolean; assignedToMe?: boolean; mentionedMeUnreplied?: boolean }) {
-  return { assignedToMe: false, mentionedMeUnreplied: false, ...overrides };
+/**
+ * Shorthand: creates a comment with defaults for the new fields. `isRead` is a
+ * convenience for the two ends of the read-count range (fully read / fully
+ * unread); pass `replyCount` + `readMessageCount` to model a partially-read
+ * thread.
+ */
+function c(overrides: {
+  status: string;
+  resolved: boolean;
+  isRead?: boolean;
+  replyCount?: number;
+  readMessageCount?: number;
+  assignedToMe?: boolean;
+  mentionedMeUnreplied?: boolean;
+}) {
+  const { isRead, replyCount = 0, readMessageCount, ...rest } = overrides;
+  return {
+    assignedToMe: false,
+    mentionedMeUnreplied: false,
+    replyCount,
+    readMessageCount: readMessageCount ?? (isRead ? replyCount + 1 : 0),
+    ...rest,
+  };
 }
 
 describe("withCommentCounts", () => {
@@ -76,6 +96,34 @@ describe("withCommentCounts", () => {
     expect(result._count.inboxComments).toBe(3);
     expect(result._count.unreadComments).toBe(2);
     expect(result._count.openComments).toBe(3);
+  });
+
+  // The count is per thread, not per message: a thread with any unread message
+  // counts once. Threads read exactly to the end don't count.
+  it("counts a partially-read thread as unread", () => {
+    const doc = {
+      docId: "d1",
+      comments: [
+        c({ status: "INBOX", resolved: false, replyCount: 4, readMessageCount: 3 }), // 2 unread
+        c({ status: "INBOX", resolved: false, replyCount: 4, readMessageCount: 5 }), // fully read
+        // Replies were deleted since it was read — still read, not unread.
+        c({ status: "INBOX", resolved: false, replyCount: 2, readMessageCount: 6 }),
+      ],
+    };
+    const result = withCommentCounts(doc);
+    expect(result._count.unreadComments).toBe(1);
+  });
+
+  it("counts a partially-read thread toward mentionedComments", () => {
+    const doc = {
+      docId: "d1",
+      comments: [
+        c({ status: "INBOX", resolved: false, replyCount: 3, readMessageCount: 2, mentionedMeUnreplied: true }),
+        c({ status: "INBOX", resolved: false, replyCount: 3, readMessageCount: 4, mentionedMeUnreplied: true }),
+      ],
+    };
+    const result = withCommentCounts(doc);
+    expect(result._count.mentionedComments).toBe(1);
   });
 
   it("strips the comments array from the result", () => {

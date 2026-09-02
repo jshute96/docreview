@@ -3,6 +3,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { CommentStatus, DocStatus } from "@prisma/client";
 import { runWithRequestId } from "@/lib/request-context";
+import { totalMessageCount } from "@/lib/read-state";
 
 export async function PATCH(
   req: NextRequest,
@@ -53,9 +54,16 @@ export async function PATCH(
 
   // Update comment and (if needed) doc status in a single transaction
   const updated = await prisma.$transaction(async (tx) => {
-    const data: { status?: CommentStatus; isRead?: boolean; isStarred?: boolean } = {};
+    const data: { status?: CommentStatus; readMessageCount?: number; isStarred?: boolean } = {};
     if (status !== undefined) data.status = status;
-    if (isRead !== undefined) data.isRead = isRead;
+    // The wire format stays a boolean — there's no UI for partial read state
+    // yet. "Read" means every known message (see src/lib/read-state.ts); the
+    // reply count is the one the DB knew about at click time, which may lag the
+    // thread if it hasn't been synced. Replies discovered later land above the
+    // stored count and correctly show as unread.
+    if (isRead !== undefined) {
+      data.readMessageCount = isRead ? totalMessageCount(comment.replyCount) : 0;
+    }
     if (isStarred !== undefined) data.isStarred = isStarred;
 
     const result = await tx.comment.update({

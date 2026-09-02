@@ -280,11 +280,26 @@ into one `INSERT ... VALUES (...)`, reducing round-trips and Postgres parse/plan
 overhead. Most beneficial on initial doc load when many comments exist; after that, new
 comments typically trickle in one or two at a time.
 
-**Fields fetched per comment:** `id, resolved, createdTime, modifiedTime, author(me), replies(action, author(me))`
+**Fields fetched per comment** (sync mode; `buildCommentFields` in `google-drive.ts` adds
+content/display fields when threads are also requested): `id, resolved, deleted, createdTime,
+modifiedTime, author(me), assigneeEmailAddress, mentionedEmailAddresses, replies(id, deleted,
+action, author(me), assigneeEmailAddress, mentionedEmailAddresses)`
 
-**Fields stored per comment:** `driveCreatedAt`, `driveModifiedAt`, `replyCount` (= number
-of replies), plus `resolved`, `isThreadAuthor`, `isReplyAuthor`, `iResolvedIt`. All Drive API
-results are stored as `type: "COMMENT"`.
+**Fields stored per comment:** `driveCreatedAt`, `driveModifiedAt`, `replyCount` (= number of
+live replies), `resolved`, `isThreadAuthor`, `isReplyAuthor`, `assignedToMe`, `mentionedMe`,
+`mentionedMeUnreplied`, `status`, and `readMessageCount`. All Drive API results are stored as
+`type: "COMMENT"`.
+
+Note that `iResolvedIt` and `isRead` are **not** columns — they're derived per sync on the
+`DriveComment` object and used to compute `status` and `readMessageCount`. Read state is
+stored as a message count; see [Read Tracking](./comment-tracking.md#read-tracking).
+
+**Read state during sync:** someone else's new replies produce **no read-state write** at
+all — the stored count stays put while `replyCount` grows, which is what makes exactly the
+new replies unread and lets a manual "mark unread" survive. Sync only writes the count when
+the user authored the latest message (fully read) or when a thread changed without gaining
+replies (last message marked unread). New threads are seeded with the messages up through the
+user's last contribution.
 
 **Deleted comment cleanup:** After processing all Drive results, any COMMENT records in the DB
 whose `googleCommentId` was not returned by Drive are deleted. We don't store comment text
@@ -325,7 +340,9 @@ a doc's `lastCommentActivity` is older than the cutoff, unarchive is skipped eve
 load mode, and manual actions are not affected.
 
 See [Doc Unarchive Rules](./comment-tracking.md#doc-unarchive-rules) for the full logic
-(`isInteresting` check, MUTED handling, self-resolved exceptions).
+(the per-comment `shouldUnarchive` triggers, MUTED handling, self-resolved exceptions). All
+of those triggers are gated on the thread being unread, so the user's own activity never
+resurfaces a doc they archived.
 
 ---
 

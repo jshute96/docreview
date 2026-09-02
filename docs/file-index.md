@@ -88,7 +88,7 @@ One-line descriptions of every source file, grouped by layer.
 | `docs/[docId]/refresh/route.ts` | `POST` refresh single doc — updates Drive metadata and syncs comments via shared logic in `refresh.ts` |
 | `docs/[docId]/refresh/route.test.ts` | Tests for single-doc metadata refresh and comment sync |
 | `docs/sync-comments/[googleDocId]/route.ts` | `POST` sync comments+suggestions for a single doc by Google doc ID — called by Chrome extension when comment activity is detected on a Google Docs page |
-| `docs/[docId]/comments/route.ts` | `PATCH` bulk update comment status or isRead |
+| `docs/[docId]/comments/route.ts` | `PATCH` bulk update comment status or read state |
 | `docs/[docId]/content/route.ts` | `GET` fetch document text and suggestion content (slow path — Docs API `documents.get` with `includeTabsContent` or Drive `files.export`); for Docs, uses a single `SUGGESTIONS_INLINE` call for both |
 | `docs/[docId]/comments/[commentId]/route.ts` | `PATCH` update a comment's status (INBOX/ARCHIVED/MUTED), read state, or star |
 | `docs/[docId]/threads/route.ts` | `GET` fetch threads from Drive (all with `viewedByMeTime`, single, or checkOnly); `POST` refresh a single thread (updates DB) |
@@ -203,10 +203,11 @@ Shadcn/ui components:
 | `disco-id.ts` | Disco ID validation — `isDiscoId()` for the `AAAB…` comment/suggestion identifier |
 | `bridge-to-extension.ts` | Client-side bridge for communicating with the Chrome extension — handles pinging, URL resolution, in-page comment navigation, and fetching suggestion and comment data (including tabName) from open doc tabs |
 | `extension-suggestions.ts` | Converts extension-scraped suggestion data into display objects — timestamp parsing, CommentThread/SuggestionContent creation (including tabName) for thread panel display |
-| `extension-suggestion-merge.ts` | Server-side merge of extension suggestions into DB — content-hash matching (same algorithm as Gmail merge), inserts or updates suggestion records with disco IDs, author data, computed `isRead` from last-actor-is-me, and comment-parallel unarchive rules |
+| `extension-suggestion-merge.ts` | Server-side merge of extension suggestions into DB — content-hash matching (same algorithm as Gmail merge), inserts or updates suggestion records with disco IDs, author data, computed `readMessageCount`, and comment-parallel unarchive rules |
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
 | `doc-filters.ts` | Client-side doc filtering (tri-state logic for inbox/comments/author/starred/mimeType/labels/title regex) and sorting; accepts optional cached titles map for when `doc.title` is empty |
 | `browser-cache.ts` | Generic localStorage cache — namespaced key-value store with JSON values, batch operations, and staleness-based eviction |
+| `read-state.ts` | Per-thread read tracking helpers — `isThreadRead()`, `totalMessageCount()`, `initialReadMessageCount()` over the stored `readMessageCount` (shared by server sync and client UI) |
 | `doc-queries.ts` | Shared Prisma include constants (`labelInclude`, `docWithCountsInclude`, `docWithCommentsInclude`) + `withCommentCounts` transform + `stripServerOnly` (strips titles from API responses for privacy) |
 | `highlight.tsx` | `highlightText()` — regex/substring highlighter for plain text; `highlightHtml()` — same for HTML strings (highlights text outside tags, returns null if no match); `matchesFilter()` — centralized dual regex/substring search; `createMatcher()` — compiled reusable matcher |
 | `label-validation.ts` | Shared label validation helpers — `isValidColor()` (hex color regex), `MAX_LABEL_NAME_LENGTH` constant |

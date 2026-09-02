@@ -26,7 +26,7 @@ filter and sort controls.
 | `driveCreatedAt` | Drive | When the comment was originally created |
 | `driveModifiedAt` | Drive | When the comment (or any reply) was last modified |
 | `replyCount` | Drive | Number of replies to the comment (not counting the original) |
-| `isRead` | Drive / User | Whether I've read this thread (see below) |
+| `readMessageCount` | Docreview | How many of the thread's messages I've read (see [Read Tracking](#read-tracking)) |
 | `assignedToMe` | Drive | The comment was assigned to me (derived from comment + reply `assigneeEmailAddress`; see limitation below) |
 | `mentionedMe` | Drive | I was @mentioned anywhere in the thread (comment or any reply). Cleared when `assignedToMe` is true (assignment takes precedence) |
 | `mentionedMeUnreplied` | Drive | `mentionedMe` is true and there's no reply/resolve by me after the last mention. Cleared when `assignedToMe` is true |
@@ -111,24 +111,24 @@ const hasNewActivity =
   (!selfEdited && !datesEqual(existing.driveModifiedAt, c.driveModifiedAt));
 ```
 
-Every other trigger still counts. The status and `isRead` that `computeCommentStatus` and
-`buildCommentUpdate` produce are therefore already correct, and the sync's single `comment.update`
-writes them — there is no second write walking a status change back, and no window in which the
-comment sits in the wrong state.
+Every other trigger still counts. The status and `readMessageCount` that `computeCommentStatus`
+and `buildCommentUpdate` produce are therefore already correct, and the sync's single
+`comment.update` writes them — there is no second write walking a status change back, and no
+window in which the comment sits in the wrong state.
 
 Two cases follow from this:
 
 - **You edit, nothing else happened.** `hasNewActivity` is false, so `computeCommentStatus`
-  returns `previousStatus` and `isRead` is carried over from the existing record. The new
-  `driveModifiedAt` is still stored, so the next full sync compares equal and likewise finds no
-  activity — the state holds without needing the flag again.
+  returns `previousStatus` and `readMessageCount` is carried over from the existing record. The
+  new `driveModifiedAt` is still stored, so the next full sync compares equal and likewise finds
+  no activity — the state holds without needing the flag again.
 - **Someone else replies while you're saving.** `hasNewReplies` is true, so `hasNewActivity` is
   true regardless of the flag and the reply is handled exactly as on any other sync: `INBOX`,
   unread, @-mention rules and all. Their activity is never lost to your edit.
 
-The flag reaches `buildCommentUpdate` as well, because `isRead` was previously cleared on any
-timestamp change; it now clears only when there is real activity. Every other caller passes the
-timestamp comparison itself, so their behavior is unchanged.
+The flag reaches `buildCommentUpdate` as well, because without it a self-edit would count as
+activity without new replies, which marks the thread's last message unread. Every other caller
+passes the timestamp comparison itself, so their behavior is unchanged.
 
 Not covered, deliberately: `driveModifiedAt`, `replyCount`, and the doc's `lastCommentActivity`
 all reflect the edit, so the doc still sorts as recently active.
@@ -182,10 +182,10 @@ reflects current state.
 **For all other statuses (INBOX, ARCHIVED, or MUTED with @-mention/assignment)**, apply
 this logic (first matching rule wins):
 
-1. Compare `resolved`, `isReplyAuthor`, `status`, `driveCreatedAt`,
-   `driveModifiedAt`, and `replyCount` against the existing record. `isRead` is only
-   compared when `driveModifiedAt` has changed (preserving manual toggles). Skip the
-   update if all match.
+1. Compare `resolved`, `isReplyAuthor`, `assignedToMe`, `mentionedMe`,
+   `mentionedMeUnreplied`, `status`, `driveCreatedAt`, `driveModifiedAt`, and `replyCount`
+   against the existing record, along with the `readMessageCount` the read rules produce
+   (see [Read Tracking](#read-tracking)). Skip the update if all match.
 2. If a **new reply @-mentions or assigns me** → `INBOX` (overrides all other rules,
    including MUTED).
 3. If `resolved = true` AND I was the one who resolved it → set status to `ARCHIVED`.
@@ -205,6 +205,82 @@ this logic (first matching rule wins):
 
 The effect: threads you close yourself get archived quietly. Manual archiving is preserved.
 Activity only surfaces in Inbox when it's relevant to you — not all activity on every thread.
+
+---
+
+## Read Tracking
+
+Read state is stored per thread as **`readMessageCount`**: how many of the thread's messages
+have been read, counting from the start. A thread's messages are the head comment plus its
+replies, so a thread with `replyCount` replies has `replyCount + 1` messages, and:
+
+- `readMessageCount = 0` — nothing read.
+- `readMessageCount >= replyCount + 1` — fully read.
+- Anything between — the messages after `readMessageCount` are unread.
+
+The helpers live in `src/lib/read-state.ts` (`isThreadRead`, `totalMessageCount`,
+`initialReadMessageCount`) and are shared by server and client. Always compare with `>=`:
+deleting a reply shrinks `replyCount`, so a stored count can exceed the current total.
+
+**Google provides no read signal.** Neither Drive nor the Docs API reports whether a comment
+has been seen, and Docreview doesn't try to infer one from the Google Docs UI. This is purely
+Docreview-managed state: it means "read *in Docreview*", advanced by your own activity in the
+thread and by the Mark read/unread buttons.
+
+### How the count is set
+
+| Situation | Result |
+|---|---|
+| New thread, first sync | Messages through my last contribution — see below |
+| I authored the latest message (the derived `isRead`, see below) | Fully read |
+| Someone else replied | **No write.** The preserved count already makes the new replies unread |
+| Activity with no new replies (edit, deleted reply, resolve flip) | Last message marked unread |
+| No activity | Preserved (clamped down if `replyCount` shrank) |
+| "Mark read" button | Fully read, using the `replyCount` the DB knew at click time |
+| "Mark unread" button | 0 (whole thread) |
+
+`initialReadMessageCount` seeds a new thread with the messages up through my last contribution,
+on the reasoning that writing a message implies having read what came before it. A thread I
+acted last on is therefore fully read, one I never posted in is fully unread, and one where
+others replied after me lands partially read — my reply followed by two replies I've never
+seen seeds as "2 unread".
+
+That "no write when someone else replies" row is what makes manual toggles sticky: nothing
+overwrites the count, so a thread you marked unread stays unread even as replies arrive, and a
+thread you'd read shows only the new replies as unread.
+
+### Suggestions
+
+`readMessageCount` on a suggestion only gets meaningful values from the Chrome extension, the
+only source with per-reply authorship (accept/reject actions count as replies, so the units
+match comments). The Docs API never writes `replyCount` or `readMessageCount`; Gmail merges
+write `replyCount` only. A suggestion Docreview has only ever seen via the Docs API therefore
+sits at `0/1` and reads as unread.
+
+### Gmail raises the total without touching the count
+
+`mergeSuggestionsFromGmail` updates an existing row's `replyCount` (to
+`max(notification replies, stored)`) and never writes read state. Because the total is
+`replyCount + 1`, a notification about new replies makes a read suggestion show exactly those
+new replies as unread, with no read-state write anywhere — the two fields stay consistent by
+construction, so this path never has to reason about read state at all.
+
+`mergeCommentsFromGmail` has no such interaction: it only inserts threads Drive couldn't
+supply (docs where `comments.list` returns 403) and is a no-op when the row already exists,
+so Gmail never revises an existing comment's reply count.
+
+### Not tracked
+
+The count is a position, not a set of message identities, so **deleting a reply below the read
+boundary shifts the boundary down with it** and credits one previously-unread message as read.
+A thread with 5 replies read up to 2 has 4 unread; delete reply 0 and it has 3. Fixing this
+would mean storing per-message IDs, which no sync path provides for replies.
+
+There is no partial-read *UI* yet: the thread panel always renders the whole thread, "Mark
+read" always means the whole thread, and "Mark unread" always resets to 0. The stored count is
+displayed in the grayed-out debug line at the top of an expanded thread (`read N/M`) for both
+comments and suggestions. Marking read is an assertion that you're done with the thread, not
+that you looked at each message, so it credits messages you never expanded as read.
 
 ---
 
@@ -259,9 +335,9 @@ in inbox when first synced. See [Phase 3.5 — Smart Unarchive](./refresh.md#pha
    extension) that gets INBOX status triggers unarchive.
 6. **Existing suggestion with new activity** — the suggestion mirror of comment rules
    2–4: a suggestion moving ARCHIVED → INBOX, a new non-self reply on an already-INBOX
-   suggestion, or someone else accepting/rejecting it triggers unarchive. Gated on
-   `!isRead` so my own last action (typing a reply, accepting/rejecting myself) won't
-   resurface the doc.
+   suggestion, or someone else accepting/rejecting it triggers unarchive. Gated on the
+   thread being unread, so my own last action (typing a reply, accepting/rejecting myself)
+   won't resurface the doc.
 
 **New suggestion** (not previously in DB):
 - **Docs API path**: `status: "INBOX"` when `doc.role === "AUTHOR"`; otherwise `"ARCHIVED"`.
@@ -269,22 +345,22 @@ in inbox when first synced. See [Phase 3.5 — Smart Unarchive](./refresh.md#pha
 - **Extension path**: applies comment-like rules — `@-mention → INBOX`, `resolved → ARCHIVED`,
   `doc author or participant → INBOX`, otherwise `ARCHIVED`.
 - **Extension enrichment**: when the extension first enriches a Docs API-created suggestion
-  (adding the disco ID), both the initial status and `isRead` are re-evaluated with the
-  now-available participation data. This corrects cases like "my suggestion on a REVIEWER
-  doc" from ARCHIVED to INBOX, and sets `isRead` from the last-actor-is-me rule.
+  (adding the disco ID), both the initial status and `readMessageCount` are re-evaluated with
+  the now-available participation data. This corrects cases like "my suggestion on a REVIEWER
+  doc" from ARCHIVED to INBOX, and seeds the read count from the per-reply authorship flags.
 - **Gmail-first inserts**: always `"INBOX"` (notification = interesting activity).
 - Gmail merge promotes `ARCHIVED` suggestions to `INBOX`; `MUTED` stays `MUTED`.
 - Extension merge applies activity-based status transitions on existing suggestions
   (same rules as comments: new reply @-mention breaks MUTED, new activity + relevance
   promotes ARCHIVED → INBOX).
 
-**Suggestion `isRead`** (extension merge only — Docs API and Gmail have no authorship data):
-- `isRead = replies[last].isMine` when there are replies (including accept/reject actions);
-  otherwise `isRead = isMine` on the suggestion itself. Mirrors the rule `deriveCommentFlags`
-  uses for comments.
-- Preserved across updates when there's no new activity (no new replies, no resolve-state
-  change), so manual "mark unread" toggles stick.
-- Doc-level unarchive rules for suggestions mirror comments and are gated on `!isRead`:
+**Suggestion read state** (extension merge only — Docs API and Gmail have no authorship data):
+- Seeded with `initialReadMessageCount`: messages through my last contribution, where the
+  accept/reject action counts as a reply. Mirrors what `deriveCommentFlags` feeds comment sync.
+- Preserved across updates when there is no new activity (no new replies, no resolve-state
+  change), so manual "mark unread" toggles stick. See [Read Tracking](#read-tracking).
+- Doc-level unarchive rules for suggestions mirror comments and are gated on the thread being
+  unread:
   (1) transition to INBOX, (2) existing INBOX with new replies (unless I resolved it),
   (3) INBOX resolved by someone else. Rules 2 and 3 additionally require the target
   status to be INBOX — when silent-accept sends a suggestion to ARCHIVED, the doc is
@@ -345,7 +421,7 @@ The doc detail page provides three ways to narrow the comment table:
 - **Assigned** — filter by `assignedToMe` (comment assigned to me). Only shown when any comment has this status.
 - **@Mentioned** — filter by `mentionedMe` (I was @mentioned in the thread). Only shown when any comment has this status.
 - **Resolved** — filter by `resolved`
-- **Unread** — filter by `!isRead` (someone else was the last to act)
+- **Unread** — filter by threads with any unread message (`!isThreadRead`)
 - **Starred** — tri-state star filter (off/starred-only/unstarred-only)
 - **Suggestions** — filter by `type = SUGGESTION`
 
@@ -399,7 +475,7 @@ table but syncs from different APIs:
 | **DB type** | `COMMENT` | `SUGGESTION` |
 | **ID format** | `googleCommentId` — Drive comment ID (`AAAB...`) | `googleSuggestionId` — Docs API ID (`suggest.xxx`) |
 | **Replies** | Full thread with reply count, author tracking, @mentions | Not tracked by Docs API; available when Chrome extension provides DOM data |
-| **Status fields** | `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, `isRead`, etc. from Drive | Default to `false` from Docs API; `isThreadAuthor`/`isReplyAuthor`/`mentionedMe`/`isRead` populated by extension merge when available |
+| **Status fields** | `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, `readMessageCount`, etc. from Drive | Default to `false`/`0` from Docs API; `isThreadAuthor`/`isReplyAuthor`/`mentionedMe`/`readMessageCount` populated by extension merge when available |
 | **Resolution** | Resolved/reopened via Drive API | Accepted/rejected — disappears from doc body |
 | **Navigation** | `?disco=` with `googleCommentId` | `?disco=` with `googleCommentId` when available (see below) |
 
@@ -497,7 +573,7 @@ For full suggestion sync details, see [`suggestions.md`](./suggestions.md).
 
 - **Endpoint**: `GET /drive/v3/files/{fileId}/comments`
 - **`fields` is mandatory** — Drive returns nothing without it.
-- **Fields used for sync**: `id, resolved, createdTime, modifiedTime, author(me), assigneeEmailAddress, mentionedEmailAddresses, replies(action, author(me), assigneeEmailAddress, mentionedEmailAddresses)`
+- **Fields used for sync**: `id, resolved, deleted, createdTime, modifiedTime, author(me), assigneeEmailAddress, mentionedEmailAddresses, replies(id, deleted, action, author(me), assigneeEmailAddress, mentionedEmailAddresses)`. `deleted` on both levels is what lets the parsing helpers drop deleted entries (see above); reply `id` is needed to edit or delete a specific reply.
 - **Fields used for thread display**: adds `content, htmlContent, quotedFileContent(mimeType, value), author(displayName), replies(content, htmlContent, createdTime, author(displayName))`
 - **`htmlContent`**: Read-only field with HTML formatting of comment/reply text (bold, italics, @mention links). The API recommends displaying `htmlContent` over plain `content`. The thread panel renders it via `dangerouslySetInnerHTML`, passing it through `sanitizeHtml()` (`src/lib/sanitize-html.ts`, a DOMPurify wrapper) first — Drive already escapes user text, so this is defense in depth. `quotedFileContent.value` is sanitized the same way.
 - **`quotedFileContent`**: The document text the comment was anchored to at creation time. MIME type is typically `text/html` but in practice the value appears to contain no formatting markup. This is a snapshot — the text may have been edited or deleted since. The Drive API may also truncate long quoted text (the truncation format is undocumented). The thread panel shows one of three warnings when the quoted text doesn't match the current document, based on `originalContentDeleted` (a tri-state from the Chrome extension: `true` = deleted, `false` = checked & not deleted, `undefined` = not checked):
@@ -527,12 +603,11 @@ once and used for three derived fields:
   involved at all".
 - **`iResolvedIt`** — find the last reply where `action === "resolve"`; true if
   `author.me === true`.
-- **`isRead`** — Initial value from Drive: if `replies.length > 0`,
-  `replies[last].author.me === true`; otherwise `comment.author.me === true`. Can also be
-  toggled manually via the "Mark read/unread" button on the comments page. Manual changes
-  are sticky: sync only overwrites `isRead` when `driveModifiedAt` changes (i.e., new
-  activity on the thread). Used for the **Unreplied** filter, green row highlighting, and
-  the unread comment count on the docs page.
+- **`isRead`** — transient, computed per sync, never stored: if `replies.length > 0`,
+  `replies[last].author.me === true`; otherwise `comment.author.me === true`. It answers
+  "was I the last to act", which sync uses to advance `readMessageCount` and to gate the
+  doc-level unarchive rules. Stored read state lives in `readMessageCount` — see
+  [Read Tracking](#read-tracking).
 - **`replyCount`** — `replies.length`: total number of replies to the original comment,
   including resolve actions. No extra API call; derived from the already-fetched replies.
 - **`assignedToMe`** — whether the comment is assigned to the current user. Derived from

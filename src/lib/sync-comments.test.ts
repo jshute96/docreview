@@ -91,16 +91,22 @@ beforeEach(() => {
 
 // Helper: a DB comment record (from Prisma findMany) with sensible defaults
 function dbComment(overrides: Record<string, unknown> = {}) {
+  // Tests express stored read state with the `isRead` boolean the UI still
+  // uses; it's translated to the stored message count here (see
+  // src/lib/read-state.ts). Override `readMessageCount` directly to model a
+  // partially-read thread.
+  const { isRead, ...rest } = overrides;
+  const replyCount = (rest.replyCount as number | undefined) ?? 0;
   return {
     commentId: "cr1", docId: "d1", googleCommentId: "c1",
     type: "COMMENT", suggestionType: null,
     resolved: false, isThreadAuthor: false, isReplyAuthor: false,
-    isRead: false, isStarred: false,
+    readMessageCount: isRead ? replyCount + 1 : 0, isStarred: false,
     assignedToMe: false, mentionedMe: false, mentionedMeUnreplied: false,
     status: "INBOX", driveCreatedAt: new Date("2024-06-01"),
-    driveModifiedAt: new Date("2024-06-10"), replyCount: 0,
+    driveModifiedAt: new Date("2024-06-10"), replyCount,
     createdAt: new Date(), updatedAt: new Date(),
-    ...overrides,
+    ...rest,
   };
 }
 
@@ -1093,6 +1099,127 @@ describe("syncComments deleted comment cleanup", () => {
   });
 });
 
+// --------------- read tracking (readMessageCount) ---------------
+
+describe("syncComments read tracking", () => {
+  /** The readMessageCount written by the single update call. */
+  function updatedReadCount() {
+    return mockComment.update.mock.calls[0][0].data.readMessageCount;
+  }
+
+  it("seeds a new comment as fully read when I posted last", async () => {
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({ isThreadAuthor: true, replyCount: 2, replyAuthorMeFlags: [false, true] })],
+    });
+
+    await syncComments(makeDoc(), driveAuth);
+
+    // My comment, their reply, my reply — all 3 messages read.
+    expect(mockComment.createMany.mock.calls[0][0].data[0].readMessageCount).toBe(3);
+  });
+
+  it("seeds a new comment as fully unread when I never posted", async () => {
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({ replyCount: 2, replyAuthorMeFlags: [false, false] })],
+    });
+
+    await syncComments(makeDoc(), driveAuth);
+
+    expect(mockComment.createMany.mock.calls[0][0].data[0].readMessageCount).toBe(0);
+  });
+
+  it("seeds partial read state through my last reply", async () => {
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({ replyCount: 3, replyAuthorMeFlags: [true, false, false] })],
+    });
+
+    await syncComments(makeDoc(), driveAuth);
+
+    // Their comment + my reply read; the two replies after mine are not.
+    expect(mockComment.createMany.mock.calls[0][0].data[0].readMessageCount).toBe(2);
+  });
+
+  it("leaves the read count alone when someone else replies, so only new replies are unread", async () => {
+    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 2, readMessageCount: 3 })]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 4,
+        replyAuthorMeFlags: [false, false, false, false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    // Was 3 of 3; now 3 of 5 — exactly the two new replies are unread.
+    expect(updatedReadCount()).toBe(3);
+  });
+
+  it("keeps a manual mark-unread across a later reply", async () => {
+    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 1, readMessageCount: 0 })]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 2,
+        replyAuthorMeFlags: [false, false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(updatedReadCount()).toBe(0);
+  });
+
+  it("marks the thread fully read when my own reply is the latest activity", async () => {
+    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 1, readMessageCount: 0 })]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 2,
+        isRead: true, // Drive-derived: I authored the last reply
+        replyAuthorMeFlags: [false, true],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(updatedReadCount()).toBe(3);
+  });
+
+  it("marks the last message unread when a thread changes without new replies", async () => {
+    // Someone edited a message or deleted a reply: activity we can't localize,
+    // so the thread resurfaces as unread.
+    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 2, readMessageCount: 3 })]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 2,
+        replyAuthorMeFlags: [false, false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(updatedReadCount()).toBe(2);
+  });
+
+  it("clamps a stored count that exceeds the thread after replies are deleted", async () => {
+    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 4, readMessageCount: 5 })]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 2,
+        replyAuthorMeFlags: [false, false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    // Clamped to 3, then the no-new-replies rule leaves the last message unread.
+    expect(updatedReadCount()).toBe(2);
+  });
+});
+
 // --------------- self-edit (edit/delete made from Docreview) ---------------
 
 describe("syncSingleComment selfEdited", () => {
@@ -1114,7 +1241,7 @@ describe("syncSingleComment selfEdited", () => {
 
     const data = mockComment.update.mock.calls[0][0].data;
     expect(data.status).toBe("ARCHIVED");
-    expect(data.isRead).toBe(true);
+    expect(data.readMessageCount).toBe(1); // still fully read (1 of 1 messages)
     // The new timestamp is still recorded, so the next full sync sees no activity.
     expect(data.driveModifiedAt).toEqual(new Date("2024-06-20"));
   });
@@ -1148,6 +1275,8 @@ describe("syncSingleComment selfEdited", () => {
 
     const data = mockComment.update.mock.calls[0][0].data;
     expect(data.status).toBe("INBOX");
-    expect(data.isRead).toBe(false);
+    // The head comment stays read and their reply is the one unread message.
+    expect(data.readMessageCount).toBe(1);
+    expect(data.replyCount).toBe(1);
   });
 });

@@ -115,4 +115,51 @@ describe("PATCH /api/docs/[docId]/comments/[commentId]", () => {
     expect(res.status).toBe(200);
     expect(mockDoc.update).not.toHaveBeenCalled();
   });
+
+  // The wire format is still a boolean; the route translates it to a message
+  // count using the reply count the DB has (see src/lib/read-state.ts).
+  describe("isRead translation", () => {
+    function existingComment(replyCount: number) {
+      mockAuth.mockResolvedValue({ user: { id: "u1" } });
+      mockComment.findUnique.mockResolvedValue({
+        commentId: "c1",
+        docId: "d1",
+        replyCount,
+        doc: { userId: "u1", status: "INBOX" },
+      });
+      mockComment.update.mockResolvedValue({ commentId: "c1" });
+    }
+
+    it("marks read as every message in the thread", async () => {
+      existingComment(4);
+
+      await PATCH(patchRequest("d1", "c1", { isRead: true }), { params: params("d1", "c1") });
+
+      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readMessageCount: 5 });
+    });
+
+    it("marks a reply-less thread read with just the head comment", async () => {
+      existingComment(0);
+
+      await PATCH(patchRequest("d1", "c1", { isRead: true }), { params: params("d1", "c1") });
+
+      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readMessageCount: 1 });
+    });
+
+    it("marks unread by zeroing the count", async () => {
+      existingComment(4);
+
+      await PATCH(patchRequest("d1", "c1", { isRead: false }), { params: params("d1", "c1") });
+
+      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readMessageCount: 0 });
+    });
+
+    it("leaves the read count alone when only status changes", async () => {
+      existingComment(4);
+
+      await PATCH(patchRequest("d1", "c1", { status: "ARCHIVED" }), { params: params("d1", "c1") });
+
+      expect(mockComment.update.mock.calls[0][0].data).not.toHaveProperty("readMessageCount");
+    });
+  });
 });

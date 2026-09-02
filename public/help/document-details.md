@@ -25,7 +25,7 @@ Below the show mode buttons, badge filters let you narrow the list further. Each
 - **Assigned** -- Comments assigned to you (only shown if any exist).
 - **@Mentioned** -- Threads where you were @mentioned (only shown if any exist).
 - **Resolved** -- Filter by resolved/unresolved state.
-- **Unread** -- Comments where someone else acted last.
+- **Unread** -- Comments with messages you have not read yet (usually because someone else commented last).
 - **Starred** -- Comment-level stars.
 - **Suggestions** -- Tracked changes from Google Docs suggestion mode.
 

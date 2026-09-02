@@ -15,6 +15,7 @@ import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { navigateToComment, supportsCommentNavigation, getSuggestionFromDoc, getCommentFromDoc, getExtensionStatus, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
 import { docTarget } from "@/lib/tab-targets";
+import { isThreadRead, totalMessageCount } from "@/lib/read-state";
 
 interface CommentRowProps {
   comment: Comment;
@@ -106,6 +107,11 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       : currentModifiedMs;
     fetchedModifiedMs.current = modMs;
   }, [initialThread]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Read state is derived from how many of the thread's messages have been read
+  // (see src/lib/read-state.ts). There's no partial-read UI yet, so everything
+  // here still asks the whole-thread question.
+  const isRead = isThreadRead(comment);
 
   // The thread/suggestion API identifier — googleCommentId for comments, googleSuggestionId
   // for suggestions. Extension-sourced suggestions only have googleCommentId (disco ID).
@@ -290,7 +296,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
 
   // Expand All Unread — only expand if this comment is unread
   useEffect(() => {
-    if (!expandUnreadSignal || expanded || comment.isRead) return;
+    if (!expandUnreadSignal || expanded || isRead) return;
     setHasBeenExpanded(true);
     setExpanded(true);
   }, [expandUnreadSignal]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -482,7 +488,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       const res = await apiFetch(`/api/docs/${docId}/comments/${comment.commentId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isRead: !comment.isRead }),
+        body: JSON.stringify({ isRead: !isRead }),
         contextId,
       });
       if (!res.ok) throw new Error("Failed");
@@ -526,14 +532,14 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   const cellPy = hasContentRow ? "pt-1.5 pb-0" : "py-1.5";
   const { author, text } = content ? splitContent(content) : { author: null, text: "" };
   const isAssignedHighlight = comment.status === CommentStatus.INBOX && comment.assignedToMe && !comment.resolved;
-  const isMentionedHighlight = !isAssignedHighlight && comment.status === CommentStatus.INBOX && comment.mentionedMeUnreplied && !comment.isRead && !comment.resolved;
+  const isMentionedHighlight = !isAssignedHighlight && comment.status === CommentStatus.INBOX && comment.mentionedMeUnreplied && !isRead && !comment.resolved;
   const rowBg = isSelected
     ? (hovered ? "bg-blue-200" : "bg-blue-100")
     : isAssignedHighlight
     ? (hovered ? "bg-red-200" : "bg-red-100")
     : isMentionedHighlight
     ? (hovered ? "bg-amber-200" : "bg-amber-100")
-    : hovered ? (comment.isRead ? "bg-green-100" : "bg-zinc-50") : (comment.isRead ? "bg-green-50" : "");
+    : hovered ? (isRead ? "bg-green-100" : "bg-zinc-50") : (isRead ? "bg-green-50" : "");
   const rowCls = isExiting ? "pointer-events-none" : "transition-colors";
   const cellWrap = `grid${isExiting ? " transition-[grid-template-rows] duration-200 ease-out" : ""}`;
   const cellWrapStyle = { gridTemplateRows: isExiting ? "0fr" : "1fr" };
@@ -734,11 +740,11 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             variant="outline"
             size="sm"
             className="h-6 px-2 text-xs"
-            title={comment.isRead ? "Mark as unread" : "Mark as read"}
+            title={isRead ? "Mark as unread" : "Mark as read"}
             onClick={toggleRead}
             disabled={loading}
           >
-            {comment.isRead ? "Mark unread" : "Mark read"}
+            {isRead ? "Mark unread" : "Mark read"}
           </Button>
           <Button
             variant="outline"
@@ -812,7 +818,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   onArchive={() => updateStatus(isArchived ? CommentStatus.INBOX : CommentStatus.ARCHIVED)}
                   isArchived={isArchived}
                   onToggleRead={toggleRead}
-                  isRead={comment.isRead}
+                  isRead={isRead}
                   onMute={() => updateStatus(isMuted ? CommentStatus.INBOX : CommentStatus.MUTED)}
                   isMuted={isMuted}
                   onDirtyChange={isSuggestion ? undefined : handleDirtyChange}
@@ -822,13 +828,20 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   onSelectInDoc={onSelectInDoc ? doSelectInDoc : undefined}
                   isSuggestion={isSuggestion}
                   buttonsRowRef={buttonsRowRef}
-                  headerContent={isSuggestion ? (
+                  headerContent={(
+                    /* Debug line: IDs (suggestions only, where the two ID
+                       formats matter) plus read state for both types.
+                       TODO: drop the `read N/M` part once partial-read has real
+                       UI — it's here to make the stored count observable. It
+                       can read e.g. `6/4` on a thread whose replies were
+                       deleted; see docs/comment-tracking.md#read-tracking. */
                     <p className="mb-1 text-xs text-zinc-300 font-mono">
-                      {comment.googleSuggestionId && <span>suggest: {comment.googleSuggestionId} </span>}
-                      {comment.googleCommentId && <span>disco: {comment.googleCommentId}</span>}
-                      {!comment.googleSuggestionId && !comment.googleCommentId && <span>(no IDs)</span>}
+                      {isSuggestion && comment.googleSuggestionId && <span>suggest: {comment.googleSuggestionId} </span>}
+                      {isSuggestion && comment.googleCommentId && <span>disco: {comment.googleCommentId} </span>}
+                      {isSuggestion && !comment.googleSuggestionId && !comment.googleCommentId && <span>(no IDs) </span>}
+                      <span>read {comment.readMessageCount}/{totalMessageCount(comment.replyCount)}</span>
                     </p>
-                  ) : undefined}
+                  )}
                   footerContent={isSynthesizedThread ? (
                     <p className="mt-0 mb-3 text-xs text-zinc-400 italic">{
                       !extensionAvailable
