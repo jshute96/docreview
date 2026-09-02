@@ -285,10 +285,54 @@ rule above the first unread message when there is a read part above it to separa
 (`CommentThreadPanel`'s `readMessageCount` prop). The rail is a border and the green "by me"
 tint is a background, so a message of yours that was manually marked unread shows both.
 
-There is no UI to set a partial position: "Mark read" always means the whole thread and "Mark
-unread" always resets to 0. Expanding a thread never changes the count. Marking read is an
+Every message in an expanded thread carries a read-point control, revealed on hover at the end
+of its author row: a small blue button reading **Mark read** on an unread message and **Mark
+unread** on a read one — the same wording as the whole-thread button in the panel footer, since
+it does the same thing over a narrower range. Clicking it on an unread message marks that message
+and everything above it read (`readMessageCount = index + 1`); clicking it on a read message
+makes that message the first unread one (`readMessageCount = index`). The controls appear on the
+head comment and the last reply too, so the boundary reaches either end: using it on an
+already-read head comment marks the whole thread unread, and on a still-unread last message
+marks the whole thread read.
+(The other direction on those two messages is unremarkable — it reads just the head comment, or
+unreads just the last message.)
+
+Suggestions get the same controls. A suggestion with no Drive thread renders as a single
+synthesized message, where the only reachable values are 0 and 1 — both meaningful, and the
+Unread column keeps counting against the stored `replyCount` either way. Note that a
+suggestion's `replyCount` is a high-water mark (`suggestion-merge.ts` stores
+`Math.max(replies.length, stored)`), so it can exceed the messages the panel renders; the
+per-message control then can't reach "fully read" from the last visible message, and the
+footer's whole-thread button is the way to get there.
+
+The control sends an absolute `readMessageCount` to `PATCH /api/docs/[docId]/comments/[commentId]`,
+counted from the thread the panel fetched. The route clamps it to the thread's stored size, so a
+stored read count never exceeds the thread it belongs to. Sending it together with `isRead` is
+rejected, since both write the same field.
+
+That clamp needs the stored size to be current, and it isn't always: expanding a thread fetches it
+live from Drive (`GET .../threads?commentId=`) without writing anything back, so a reply posted
+since the last sync shows in the panel while `replyCount` still lags. So before sending a count
+past the stored size, the client first syncs that thread (the `POST` refresh, which runs
+`syncSingleComment`) and only then writes. The clamp therefore caps against a current count in the
+normal case.
+
+A suggestion syncs through the extension instead of Drive, and only when the extension is there
+to ask. Either kind can still come back short — the sync can fail, and a suggestion's stored
+count can exceed what the panel renders — and the clamp then puts the read point somewhere other
+than where the click asked for. The client says so rather than leaving rails that didn't move,
+except when the sync itself already reported a failure.
+
+The footer's "Mark read"/"Mark unread" buttons remain whole-thread: read means every known
+message, unread resets to 0. Expanding a thread never changes the count. Marking read is an
 assertion that you're done with the thread, not that you looked at each message, so it credits
 messages you never expanded as read.
+
+The read-point write itself never changes the comment's status — it won't unarchive or re-inbox a
+thread, matching the whole-thread buttons. The sync that can precede it is a different matter: it
+runs `syncSingleComment`, which applies the usual status rules, so a click that turns up replies
+the DB hadn't seen can move the comment to `INBOX` and unarchive its doc. That's the same outcome
+any other refresh would produce on finding those replies.
 
 ---
 

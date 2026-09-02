@@ -118,7 +118,7 @@ One-line descriptions of every source file, grouped by layer.
 | `hamburger-button.tsx` | Shared "more options" hamburger trigger for dropdown menus — one drawing for every menu, in three sizes (`default`, `compact`, `mini`) |
 | `comment-filter-bar.tsx` | Comment list filter bar — toggles for my threads/comments, starred, show mode, suggestions, unread |
 | `comment-row.tsx` | Single comment row — expandable, shows content preview, thread panel, status actions; preserves extension-sourced fields (tabName) across refreshes |
-| `comment-thread-panel.tsx` | Expanded thread view — shows all replies, unread markers (rail + "N unread" divider), reply textarea, resolve/reopen buttons, and an edit/delete menu on your own comments and replies |
+| `comment-thread-panel.tsx` | Expanded thread view — shows all replies, unread markers (rail + "N unread" divider) and per-message read-point controls, reply textarea, resolve/reopen buttons, and an edit/delete menu on your own comments and replies |
 | `add-doc-form.tsx` | Shared add/update/re-add doc form body — URL validation (Add mode) or fixed doc (Re-add mode), label picker, notes; used by dialogs and standalone page |
 | `add-doc-dialog.tsx` | Dialog wrapper for adding/updating a doc — renders `add-doc-form` inside a dialog, dynamic title and button text |
 | `add-doc-page-client.tsx` | Standalone add/update doc page (client) — renders `add-doc-form` in a card with cross-tab sync |

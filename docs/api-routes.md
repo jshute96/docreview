@@ -112,8 +112,13 @@ No Google API (Prisma only).
 
 ### `/api/docs/[docId]/comments/[commentId]` — Single comment update
 
-PATCH. Updates a single comment's `status`, `isRead`, or `isStarred` in the
-database (`isRead` is stored as a message count — see the bulk route above).
+PATCH. Updates a single comment's `status`, `isRead`, `readMessageCount`, or `isStarred` in
+the database (`isRead` is stored as a message count — see the bulk route above).
+`readMessageCount` sets the read point directly, for the expanded thread's per-message
+controls; it must be a non-negative integer, is clamped to the thread's stored size, and is
+rejected alongside `isRead` since both write the same field. The client syncs the thread before
+sending a count past that size, so the clamp caps against a current count — see
+`docs/comment-tracking.md`.
 Auto-unarchives the parent doc if a comment moves to INBOX.
 
 No Google API (Prisma only).

@@ -15,7 +15,7 @@ import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { navigateToComment, supportsCommentNavigation, getSuggestionFromDoc, getCommentFromDoc, getExtensionStatus, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
 import { docTarget } from "@/lib/tab-targets";
-import { isThreadRead, unreadMessageCount } from "@/lib/read-state";
+import { isThreadRead, totalMessageCount, unreadMessageCount } from "@/lib/read-state";
 
 interface CommentRowProps {
   comment: Comment;
@@ -109,8 +109,9 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   }, [initialThread]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Read state is derived from how many of the thread's messages have been read
-  // (see src/lib/read-state.ts). There's no partial-read UI yet, so everything
-  // here still asks the whole-thread question.
+  // (see src/lib/read-state.ts). These two ask the whole-thread question, for
+  // the footer button and the Unread column; the expanded thread's per-message
+  // controls work with the raw count instead.
   const isRead = isThreadRead(comment);
   const unreadCount = unreadMessageCount(comment);
 
@@ -207,7 +208,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     });
   }
 
-  async function refreshThread() {
+  /** Returns whether the sync actually landed, so a caller that syncs as a
+   *  precondition can skip its own follow-up complaint — this one already
+   *  toasted the failure. */
+  async function refreshThread(): Promise<boolean> {
     setRefreshingThread(true);
     const contextId = generateContextId();
     try {
@@ -223,8 +227,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       if (comment.googleCommentId) {
         mergeCommentInfo(await getCommentFromDoc(googleDocId, comment.googleCommentId));
       }
+      return true;
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to refresh comment");
+      return false;
     } finally {
       setRefreshingThread(false);
     }
@@ -482,24 +488,62 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     }
   }
 
-  async function toggleRead() {
+  /** Shared PATCH for the read-state controls. The footer button sends the
+   *  whole-thread boolean; the per-message controls in the expanded thread send
+   *  an absolute count, which the server clamps to the thread's known size. */
+  async function patchRead(body: { isRead: boolean } | { readMessageCount: number }): Promise<Comment | null> {
     setLoading(true);
     const contextId = generateContextId();
     try {
       const res = await apiFetch(`/api/docs/${docId}/comments/${comment.commentId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isRead: !isRead }),
+        body: JSON.stringify(body),
         contextId,
       });
       if (!res.ok) throw new Error("Failed");
       const updated: Comment = await res.json();
       onUpdate(updated);
       broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
+      return updated;
     } catch (err) {
       if (!isAuthError(err)) toast.error("Failed to update comment");
+      return null;
     } finally {
       setLoading(false);
+    }
+  }
+
+  const toggleRead = () => patchRead({ isRead: !isRead });
+
+  /** Moves the read point to an absolute message count from the expanded thread.
+   *
+   *  The panel counts messages from the thread it fetched, and the expand-time
+   *  thread GET doesn't write to the DB, so a reply posted since the last sync
+   *  shows in the panel while `replyCount` still lags. Syncing that thread first
+   *  brings the stored size up to date, so the server's clamp caps against the
+   *  real thread rather than a stale count — and the DB never ends up holding a
+   *  read count larger than the thread it belongs to.
+   *
+   *  A suggestion syncs through the extension instead, and only when it's there
+   *  to ask; a comment syncs through Drive. Either can come back still short —
+   *  the extension may be missing, the sync may fail, and a suggestion's stored
+   *  `replyCount` is a high-water mark (`suggestion-merge.ts`) that can exceed
+   *  the messages the panel renders. Then the clamp moves the point somewhere
+   *  other than where it was asked to go, so say so rather than leaving the user
+   *  looking at rails that didn't move. A failed sync has already complained on
+   *  its own, so don't pile a second toast on top of it. */
+  async function setReadCount(count: number) {
+    let synced = true;
+    if (count > totalMessageCount(comment.replyCount)) {
+      if (!isSuggestion) synced = await refreshThread();
+      else if (!suggestionRefreshDisabled) await refreshSuggestion();
+    }
+    const updated = await patchRead({ readMessageCount: count });
+    // Neutral wording: this fires in the mark-unread direction too, where a
+    // clamp leaves *more* unread than the click asked for.
+    if (synced && updated && updated.readMessageCount !== count) {
+      toast.warning("Read point set as far as the synced messages — refresh the thread to include the rest");
     }
   }
 
@@ -824,6 +868,11 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   onToggleRead={toggleRead}
                   isRead={isRead}
                   readMessageCount={comment.readMessageCount}
+                  onSetReadCount={setReadCount}
+                  // The pre-sync is the slow part, and it sets refreshingThread
+                  // rather than loading — without it a second click during the
+                  // sync would race the first.
+                  readPointDisabled={loading || refreshingThread}
                   onMute={() => updateStatus(isMuted ? CommentStatus.INBOX : CommentStatus.MUTED)}
                   isMuted={isMuted}
                   onDirtyChange={isSuggestion ? undefined : handleDirtyChange}

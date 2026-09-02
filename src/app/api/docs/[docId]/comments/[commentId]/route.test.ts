@@ -116,8 +116,8 @@ describe("PATCH /api/docs/[docId]/comments/[commentId]", () => {
     expect(mockDoc.update).not.toHaveBeenCalled();
   });
 
-  // The wire format is still a boolean; the route translates it to a message
-  // count using the reply count the DB has (see src/lib/read-state.ts).
+  // isRead is the whole-thread form; the route translates it to a message count
+  // using the reply count the DB has (see src/lib/read-state.ts).
   describe("isRead translation", () => {
     function existingComment(replyCount: number) {
       mockAuth.mockResolvedValue({ user: { id: "u1" } });
@@ -160,6 +160,77 @@ describe("PATCH /api/docs/[docId]/comments/[commentId]", () => {
       await PATCH(patchRequest("d1", "c1", { status: "ARCHIVED" }), { params: params("d1", "c1") });
 
       expect(mockComment.update.mock.calls[0][0].data).not.toHaveProperty("readMessageCount");
+    });
+  });
+
+  // The per-message read-point controls send an absolute count instead.
+  describe("readMessageCount", () => {
+    function existingComment(replyCount: number) {
+      mockAuth.mockResolvedValue({ user: { id: "u1" } });
+      mockComment.findUnique.mockResolvedValue({
+        commentId: "c1",
+        docId: "d1",
+        replyCount,
+        doc: { userId: "u1", status: "INBOX" },
+      });
+      mockComment.update.mockResolvedValue({ commentId: "c1" });
+    }
+
+    it("stores a partial count", async () => {
+      existingComment(4);
+
+      await PATCH(patchRequest("d1", "c1", { readMessageCount: 2 }), { params: params("d1", "c1") });
+
+      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readMessageCount: 2 });
+    });
+
+    it("stores zero as fully unread", async () => {
+      existingComment(4);
+
+      await PATCH(patchRequest("d1", "c1", { readMessageCount: 0 }), { params: params("d1", "c1") });
+
+      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readMessageCount: 0 });
+    });
+
+    // The client syncs the thread before sending a count past the stored size,
+    // so this only bites when that sync couldn't run. Clamping keeps the stored
+    // count from exceeding the thread; the client reports the shortfall.
+    it("clamps a count past the thread's known size instead of rejecting", async () => {
+      existingComment(2);
+
+      const res = await PATCH(patchRequest("d1", "c1", { readMessageCount: 9 }), { params: params("d1", "c1") });
+
+      expect(res.status).toBe(200);
+      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readMessageCount: 3 });
+    });
+
+    it("rejects a negative count", async () => {
+      existingComment(4);
+
+      const res = await PATCH(patchRequest("d1", "c1", { readMessageCount: -1 }), { params: params("d1", "c1") });
+
+      expect(res.status).toBe(400);
+      expect(mockComment.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects a non-integer count", async () => {
+      existingComment(4);
+
+      const res = await PATCH(patchRequest("d1", "c1", { readMessageCount: 1.5 }), { params: params("d1", "c1") });
+
+      expect(res.status).toBe(400);
+      expect(mockComment.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects isRead and readMessageCount together", async () => {
+      existingComment(4);
+
+      const res = await PATCH(patchRequest("d1", "c1", { isRead: true, readMessageCount: 2 }), {
+        params: params("d1", "c1"),
+      });
+
+      expect(res.status).toBe(400);
+      expect(mockComment.update).not.toHaveBeenCalled();
     });
   });
 });

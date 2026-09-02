@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { highlightText, highlightHtml } from "@/lib/highlight";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import { cn } from "@/lib/utils";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { FriendlyDate } from "@/components/friendly-date";
 
@@ -183,6 +184,12 @@ interface CommentThreadPanelProps {
   /** How many messages of the first thread (head comment + replies, in order)
    *  the user has read. Messages from this index on are marked unread. */
   readMessageCount: number;
+  /** Sets the read point of the first thread to an absolute message count
+   *  (0 = nothing read). Omit to hide the per-message read-point controls. */
+  onSetReadCount?: (count: number) => void;
+  /** Disables the read-point controls while a write or its preceding sync is in
+   *  flight, so a second click can't race the first. */
+  readPointDisabled?: boolean;
   onMute?: () => void;
   isMuted?: boolean;
   /** Reports unsaved work. `kind` says which control holds it, so the parent can
@@ -216,6 +223,63 @@ interface CommentThreadPanelProps {
 const railClass = (unread: boolean) =>
   unread ? "border-l-2 border-blue-400 -ml-[10px] pl-2" : "";
 
+/** Moves the read/unread boundary to this message. The message itself is always
+ *  included: on an unread message everything from here up becomes read, on a
+ *  read message everything from here down becomes unread. Hidden until the
+ *  message is hovered, so it stays out of the way of the text.
+ *
+ *  Wears the same Mark read/unread wording as the whole-thread button in the
+ *  footer, since it does the same thing to a narrower range. Blue ties it to
+ *  the rest of the unread marking; the outline box matches the `HamburgerButton`
+ *  it can sit next to on the same author line, a step taller to fit the text.
+ *
+ *  The label alone repeats on every message, so the accessible name carries the
+ *  position too — otherwise a screen reader announces N identical buttons. */
+function ReadPointButton({ unread, disabled, position, total, onClick }: {
+  unread: boolean;
+  disabled?: boolean;
+  /** 1-based position of this message in the thread. */
+  position: number;
+  /** How many messages the panel is showing for the thread. */
+  total: number;
+  onClick: () => void;
+}) {
+  const label = unread ? "Mark read" : "Mark unread";
+  return (
+    // The reveal lives on this wrapper, not on the button: `Button` carries
+    // `disabled:opacity-50`, which outranks an `opacity-0` on the same element,
+    // so while a write is in flight every hidden control in the thread would
+    // fade halfway in. Hiding the wrapper keeps them out of sight whatever
+    // state the button is in.
+    //
+    // focus-within, not focus: a mouse click focuses the button, and plain
+    // `focus:` would leave it showing on a message the pointer has since left,
+    // so two would be visible at once. Keyboard focus still reveals it.
+    <span className="inline-flex opacity-0 transition-opacity focus-within:opacity-100 group-hover/msg:opacity-100">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        title={unread
+          ? "Mark this message and everything above it read"
+          : "Mark this message and everything below it unread"}
+        aria-label={unread
+          ? `${label} through message ${position} of ${total}`
+          : `${label} from message ${position} of ${total}`}
+        disabled={disabled}
+        // Sits inline after the date rather than out at the right edge, so it
+        // stays next to the message it acts on even on a wide panel.
+        className="h-5 px-1.5 text-xs font-normal text-blue-600"
+        // The enclosing thread box selects the comment in the Google Doc tab when
+        // clicked; moving the read point shouldn't also trigger that.
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+      >
+        {label}
+      </Button>
+    </span>
+  );
+}
+
 export function CommentThreadPanel({
   threads,
   loading,
@@ -240,6 +304,8 @@ export function CommentThreadPanel({
   onToggleRead,
   isRead,
   readMessageCount,
+  onSetReadCount,
+  readPointDisabled,
   onMute,
   isMuted,
   onDirtyChange,
@@ -264,6 +330,23 @@ export function CommentThreadPanel({
   const isUnread = (threadIndex: number, messageIndex: number) =>
     threadIndex === 0 && messageIndex >= readMessageCount;
   const authorWeight = (unread: boolean) => (unread ? "font-bold" : "font-medium");
+  /** The read-point control for one message, on the first thread only. Clicking
+   *  an unread message reads through it (count = index + 1); clicking a read one
+   *  makes it the first unread message (count = index). Both ends are offered:
+   *  the head comment sets the thread fully unread, the last message fully read. */
+  const readPointButton = (threadIndex: number, messageIndex: number, thread: CommentThread) => {
+    if (threadIndex !== 0 || !onSetReadCount) return null;
+    const unread = isUnread(threadIndex, messageIndex);
+    return (
+      <ReadPointButton
+        unread={unread}
+        disabled={readPointDisabled}
+        position={messageIndex + 1}
+        total={thread.replies.length + 1}
+        onClick={() => onSetReadCount(unread ? messageIndex + 1 : messageIndex)}
+      />
+    );
+  };
   /** The "N unread" rule drawn above the first unread message. Returns null
    *  above the head comment, since a divider needs a read part above it to
    *  separate from, and on a fully-read thread, where no index matches.
@@ -735,7 +818,7 @@ export function CommentThreadPanel({
               })()}
               {/* Rail wraps only the author line and text — not the quoted
                   document snippet above, which isn't a message. */}
-              <div className={railClass(isUnread(threadIndex, 0))}>
+              <div className={cn("group/msg", railClass(isUnread(threadIndex, 0)))}>
                 <div className="flex items-center gap-2">
                   <span className={`text-sm ${authorWeight(isUnread(threadIndex, 0))} text-zinc-900`}>
                     {thread.author}
@@ -748,6 +831,7 @@ export function CommentThreadPanel({
                       onDelete={onDeleteEntry && (() => setPendingDelete({ threadId: thread.id, replyId: null }))}
                     />
                   )}
+                  {readPointButton(threadIndex, 0, thread)}
                 </div>
                 {isEditing(thread.id, null) ? (
                   <EntryEditor
@@ -770,7 +854,7 @@ export function CommentThreadPanel({
                 <div key={i}>
                   {unreadDivider(threadIndex, i + 1, thread)}
                   <div className={`mt-2 ml-8 ${reply.fromMe ? "bg-green-50 -mr-4 pr-4 pt-2 pb-1" : ""}`}>
-                    <div className={railClass(unread)}>
+                    <div className={cn("group/msg", railClass(unread))}>
                       <div className="flex items-center gap-2">
                         <span className={`text-sm ${authorWeight(unread)} text-zinc-900`}>
                           {reply.author}
@@ -805,6 +889,7 @@ export function CommentThreadPanel({
                             onDelete={onDeleteEntry && (() => setPendingDelete({ threadId: thread.id, replyId: reply.id }))}
                           />
                         )}
+                        {readPointButton(threadIndex, i + 1, thread)}
                       </div>
                       {isEditing(thread.id, reply.id) ? (
                         <EntryEditor
