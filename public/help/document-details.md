@@ -41,6 +41,7 @@ Each row shows:
 - **Created** -- When the thread was started.
 - **Modified** -- When the last reply was added ("--" if no replies).
 - **Responses** -- Number of replies in the thread.
+- **Unread** -- Number of messages in the thread you haven't read, counting the original comment (so an unread comment with no replies shows 1). Empty when the whole thread is read.
 
 ### Row highlighting
 
@@ -53,7 +54,7 @@ Like the document list, comment rows are highlighted for urgency:
 Click a comment row to expand it and see the full thread. The expanded view shows:
 
 - The original comment text with the quoted document text it refers to.
-- All replies in chronological order.
+- All replies in chronological order. Unread messages have a blue bar on their left edge and a bold author name, and an "N unread" line separates them from the messages above that you've already read.
 - A **reply textarea** -- type a response and press Enter (or click Send) to reply.
 - A **Resolve/Reopen button** to change the thread's resolved state.
 - A **menu button** next to your name on comments and replies you wrote, with **Edit** and **Delete**. Edit replaces the text with a box; Save writes the change to the document and the text only reappears once the save succeeds, so a failure leaves your text where you can fix it. Delete asks for confirmation first — deleting a reply removes just that reply, and deleting the first comment of a thread removes the whole thread, including everyone's replies. Both are permanent. The edit box works the same way as the reply box: you see and type plain text, and formatting like `**bold**` renders once saved.

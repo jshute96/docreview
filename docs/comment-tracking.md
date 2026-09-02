@@ -276,11 +276,19 @@ boundary shifts the boundary down with it** and credits one previously-unread me
 A thread with 5 replies read up to 2 has 4 unread; delete reply 0 and it has 3. Fixing this
 would mean storing per-message IDs, which no sync path provides for replies.
 
-There is no partial-read *UI* yet: the thread panel always renders the whole thread, "Mark
-read" always means the whole thread, and "Mark unread" always resets to 0. The stored count is
-displayed in the grayed-out debug line at the top of an expanded thread (`read N/M`) for both
-comments and suggestions. Marking read is an assertion that you're done with the thread, not
-that you looked at each message, so it credits messages you never expanded as read.
+### Display
+
+The comment table's **Unread** column shows `unreadMessageCount` (total minus read, clamped at
+0), which counts the head comment, so an untouched zero-reply thread shows 1. An expanded thread
+marks each unread message with a blue left rail and bold author name, and draws an "N unread"
+rule above the first unread message when there is a read part above it to separate from
+(`CommentThreadPanel`'s `readMessageCount` prop). The rail is a border and the green "by me"
+tint is a background, so a message of yours that was manually marked unread shows both.
+
+There is no UI to set a partial position: "Mark read" always means the whole thread and "Mark
+unread" always resets to 0. Expanding a thread never changes the count. Marking read is an
+assertion that you're done with the thread, not that you looked at each message, so it credits
+messages you never expanded as read.
 
 ---
 

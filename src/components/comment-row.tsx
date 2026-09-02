@@ -15,7 +15,7 @@ import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { navigateToComment, supportsCommentNavigation, getSuggestionFromDoc, getCommentFromDoc, getExtensionStatus, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
 import { docTarget } from "@/lib/tab-targets";
-import { isThreadRead, totalMessageCount } from "@/lib/read-state";
+import { isThreadRead, unreadMessageCount } from "@/lib/read-state";
 
 interface CommentRowProps {
   comment: Comment;
@@ -112,6 +112,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   // (see src/lib/read-state.ts). There's no partial-read UI yet, so everything
   // here still asks the whole-thread question.
   const isRead = isThreadRead(comment);
+  const unreadCount = unreadMessageCount(comment);
 
   // The thread/suggestion API identifier — googleCommentId for comments, googleSuggestionId
   // for suggestions. Extension-sourced suggestions only have googleCommentId (disco ID).
@@ -679,6 +680,9 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       {cell(`${cellPy} pr-4 text-sm text-zinc-500 tabular-nums`,
         comment.replyCount > 0 ? comment.replyCount : ""
       )}
+      {cell(`${cellPy} pr-4 text-sm tabular-nums font-medium text-blue-600`,
+        unreadCount > 0 ? unreadCount : ""
+      )}
       {cell(`${cellPy} flex`,
         // stopPropagation + self-stretch: non-clickable buffer around star/badges
         // so near-miss clicks don't accidentally expand/collapse the row
@@ -765,7 +769,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         onClick={handleRowClick}
         {...hoverHandlers}
       >
-        <td colSpan={5} className="max-w-0 overflow-hidden">
+        <td colSpan={6} className="max-w-0 overflow-hidden">
           <div className={cellWrap} style={cellWrapStyle}>
             <div className="overflow-hidden min-h-0 pt-0.5 pb-2 pl-4 pr-4">
           {isSuggestion ? (
@@ -789,7 +793,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             width (textarea, buttons) from leaking into the table's auto-layout
             column-width calculation. Without this, expanding a thread or
             typing in the reply box shifts the header row's columns. */}
-        <td colSpan={5} className="max-w-0 overflow-hidden p-0">
+        <td colSpan={6} className="max-w-0 overflow-hidden p-0">
           <div
             className="grid transition-[grid-template-rows] duration-200 ease-out"
             style={{ gridTemplateRows: expanded && !isExiting ? "1fr" : "0fr" }}
@@ -819,6 +823,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   isArchived={isArchived}
                   onToggleRead={toggleRead}
                   isRead={isRead}
+                  readMessageCount={comment.readMessageCount}
                   onMute={() => updateStatus(isMuted ? CommentStatus.INBOX : CommentStatus.MUTED)}
                   isMuted={isMuted}
                   onDirtyChange={isSuggestion ? undefined : handleDirtyChange}
@@ -828,20 +833,14 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   onSelectInDoc={onSelectInDoc ? doSelectInDoc : undefined}
                   isSuggestion={isSuggestion}
                   buttonsRowRef={buttonsRowRef}
-                  headerContent={(
-                    /* Debug line: IDs (suggestions only, where the two ID
-                       formats matter) plus read state for both types.
-                       TODO: drop the `read N/M` part once partial-read has real
-                       UI — it's here to make the stored count observable. It
-                       can read e.g. `6/4` on a thread whose replies were
-                       deleted; see docs/comment-tracking.md#read-tracking. */
+                  headerContent={isSuggestion ? (
+                    /* Debug line: suggestion IDs, where the two ID formats matter. */
                     <p className="mb-1 text-xs text-zinc-300 font-mono">
-                      {isSuggestion && comment.googleSuggestionId && <span>suggest: {comment.googleSuggestionId} </span>}
-                      {isSuggestion && comment.googleCommentId && <span>disco: {comment.googleCommentId} </span>}
-                      {isSuggestion && !comment.googleSuggestionId && !comment.googleCommentId && <span>(no IDs) </span>}
-                      <span>read {comment.readMessageCount}/{totalMessageCount(comment.replyCount)}</span>
+                      {comment.googleSuggestionId && <span>suggest: {comment.googleSuggestionId} </span>}
+                      {comment.googleCommentId && <span>disco: {comment.googleCommentId} </span>}
+                      {!comment.googleSuggestionId && !comment.googleCommentId && <span>(no IDs) </span>}
                     </p>
-                  )}
+                  ) : undefined}
                   footerContent={isSynthesizedThread ? (
                     <p className="mt-0 mb-3 text-xs text-zinc-400 italic">{
                       !extensionAvailable

@@ -180,6 +180,9 @@ interface CommentThreadPanelProps {
   isArchived?: boolean;
   onToggleRead?: () => void;
   isRead?: boolean;
+  /** How many messages of the first thread (head comment + replies, in order)
+   *  the user has read. Messages from this index on are marked unread. */
+  readMessageCount: number;
   onMute?: () => void;
   isMuted?: boolean;
   /** Reports unsaved work. `kind` says which control holds it, so the parent can
@@ -201,6 +204,17 @@ interface CommentThreadPanelProps {
    *  when this comment is selected from the Google Doc tab. */
   buttonsRowRef?: React.RefObject<HTMLDivElement | null>;
 }
+
+// Unread messages get a blue rail on their left edge. The rail's 2px plus its
+// padding replace the same amount of existing margin/padding so text stays
+// aligned with read messages. Green ("by me") is a background and the rail is
+// a border, so the two can coexist on one message.
+/** Blue left rail marking an unread message. Its 2px border plus 8px padding
+ *  is offset by an equal negative margin, so railed and unrailed text line up.
+ *  The rail goes on an inner element so the green "by me" background keeps its
+ *  own edge, and the two cues can show on the same message. */
+const railClass = (unread: boolean) =>
+  unread ? "border-l-2 border-blue-400 -ml-[10px] pl-2" : "";
 
 export function CommentThreadPanel({
   threads,
@@ -225,6 +239,7 @@ export function CommentThreadPanel({
   isArchived,
   onToggleRead,
   isRead,
+  readMessageCount,
   onMute,
   isMuted,
   onDirtyChange,
@@ -243,6 +258,33 @@ export function CommentThreadPanel({
   // Which entry is being edited, keyed by thread + reply (null replyId = the
   // thread's first comment). Only one entry is editable at a time.
   const [editing, setEditing] = useState<{ threadId: string; replyId: string | null } | null>(null);
+
+  // Read markers apply to the first thread only — that's the one the stored
+  // count belongs to. Message index 0 is the head comment, reply i is i + 1.
+  const isUnread = (threadIndex: number, messageIndex: number) =>
+    threadIndex === 0 && messageIndex >= readMessageCount;
+  const authorWeight = (unread: boolean) => (unread ? "font-bold" : "font-medium");
+  /** The "N unread" rule drawn above the first unread message. Returns null
+   *  above the head comment, since a divider needs a read part above it to
+   *  separate from, and on a fully-read thread, where no index matches.
+   *
+   *  The count here comes from the live thread, while the table's Unread column
+   *  comes from the stored `replyCount`. The two can differ briefly when the
+   *  thread has been refreshed from Drive but the row hasn't been re-synced. */
+  const unreadDivider = (threadIndex: number, messageIndex: number, thread: CommentThread) => {
+    if (threadIndex !== 0 || messageIndex === 0) return null;
+    if (messageIndex !== readMessageCount) return null;
+    const n = thread.replies.length + 1 - readMessageCount;
+    return (
+      <div className="mt-3 mb-1 flex items-center gap-2" title="Messages below this line are unread">
+        {/* 1:2 split puts the label a third of the way across, so it stays
+            near the text on short comments instead of far out to the right. */}
+        <hr className="flex-1 border-blue-300" />
+        <span className="text-xs font-medium text-blue-600">{n} unread</span>
+        <hr className="flex-[2] border-blue-300" />
+      </div>
+    );
+  };
   const [editText, setEditText] = useState("");
   // The text the editor opened with, so an untouched editor doesn't count as
   // unsaved work.
@@ -691,71 +733,23 @@ export function CommentThreadPanel({
                   )}
                 </>;
               })()}
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-zinc-900">
-                  {thread.author}
-                </span>
-                <FriendlyDate date={thread.createdTime} className="text-xs text-zinc-400" />
-                {canModify(thread.fromMe, null) && (
-                  <EntryMenu
-                    label="comment"
-                    onEdit={onEditEntry && (() => startEdit(thread.id, null, thread.content))}
-                    onDelete={onDeleteEntry && (() => setPendingDelete({ threadId: thread.id, replyId: null }))}
-                  />
-                )}
-              </div>
-              {isEditing(thread.id, null) ? (
-                <EntryEditor
-                  value={editText}
-                  onChange={setEditText}
-                  onSave={saveEdit}
-                  onCancel={cancelEdit}
-                  saving={editSaving}
-                  error={editError}
-                />
-              ) : (
-                <CommentContent htmlContent={thread.htmlContent} content={thread.content} searchFilter={searchFilter ?? ""} className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap" />
-              )}
-            </div>
-
-            {thread.replies.map((reply, i) => (
-              <div key={i} className={`mt-2 ml-8 ${reply.fromMe ? "bg-green-50 -mr-4 pr-4 pt-2 pb-1" : ""}`}>
+              {/* Rail wraps only the author line and text — not the quoted
+                  document snippet above, which isn't a message. */}
+              <div className={railClass(isUnread(threadIndex, 0))}>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-zinc-900">
-                    {reply.author}
+                  <span className={`text-sm ${authorWeight(isUnread(threadIndex, 0))} text-zinc-900`}>
+                    {thread.author}
                   </span>
-                  <FriendlyDate date={reply.createdTime} className="text-xs text-zinc-400" />
-                  {reply.action === "resolve" && (
-                    <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-600">
-                      Resolved
-                    </span>
-                  )}
-                  {reply.action === "reopen" && (
-                    <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
-                      Reopened
-                    </span>
-                  )}
-                  {reply.action === "accept" && (
-                    <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
-                      Accepted
-                    </span>
-                  )}
-                  {reply.action === "reject" && (
-                    <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
-                      Rejected
-                    </span>
-                  )}
-                  {/* Resolve/reopen markers carry no text of their own, so
-                      there's nothing to edit on them. */}
-                  {!reply.action && canModify(reply.fromMe, reply.id) && (
+                  <FriendlyDate date={thread.createdTime} className="text-xs text-zinc-400" />
+                  {canModify(thread.fromMe, null) && (
                     <EntryMenu
-                      label="reply"
-                      onEdit={onEditEntry && (() => startEdit(thread.id, reply.id, reply.content))}
-                      onDelete={onDeleteEntry && (() => setPendingDelete({ threadId: thread.id, replyId: reply.id }))}
+                      label="comment"
+                      onEdit={onEditEntry && (() => startEdit(thread.id, null, thread.content))}
+                      onDelete={onDeleteEntry && (() => setPendingDelete({ threadId: thread.id, replyId: null }))}
                     />
                   )}
                 </div>
-                {isEditing(thread.id, reply.id) ? (
+                {isEditing(thread.id, null) ? (
                   <EntryEditor
                     value={editText}
                     onChange={setEditText}
@@ -765,10 +759,70 @@ export function CommentThreadPanel({
                     error={editError}
                   />
                 ) : (
-                  reply.content && <CommentContent htmlContent={reply.htmlContent} content={reply.content} searchFilter={searchFilter ?? ""} className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap" />
+                  <CommentContent htmlContent={thread.htmlContent} content={thread.content} searchFilter={searchFilter ?? ""} className="mt-1 text-sm text-zinc-700 whitespace-pre-wrap" />
                 )}
               </div>
-            ))}
+            </div>
+
+            {thread.replies.map((reply, i) => {
+              const unread = isUnread(threadIndex, i + 1);
+              return (
+                <div key={i}>
+                  {unreadDivider(threadIndex, i + 1, thread)}
+                  <div className={`mt-2 ml-8 ${reply.fromMe ? "bg-green-50 -mr-4 pr-4 pt-2 pb-1" : ""}`}>
+                    <div className={railClass(unread)}>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm ${authorWeight(unread)} text-zinc-900`}>
+                          {reply.author}
+                        </span>
+                        <FriendlyDate date={reply.createdTime} className="text-xs text-zinc-400" />
+                        {reply.action === "resolve" && (
+                          <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-600">
+                            Resolved
+                          </span>
+                        )}
+                        {reply.action === "reopen" && (
+                          <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
+                            Reopened
+                          </span>
+                        )}
+                        {reply.action === "accept" && (
+                          <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
+                            Accepted
+                          </span>
+                        )}
+                        {reply.action === "reject" && (
+                          <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
+                            Rejected
+                          </span>
+                        )}
+                        {/* Resolve/reopen markers carry no text of their own, so
+                            there's nothing to edit on them. */}
+                        {!reply.action && canModify(reply.fromMe, reply.id) && (
+                          <EntryMenu
+                            label="reply"
+                            onEdit={onEditEntry && (() => startEdit(thread.id, reply.id, reply.content))}
+                            onDelete={onDeleteEntry && (() => setPendingDelete({ threadId: thread.id, replyId: reply.id }))}
+                          />
+                        )}
+                      </div>
+                      {isEditing(thread.id, reply.id) ? (
+                        <EntryEditor
+                          value={editText}
+                          onChange={setEditText}
+                          onSave={saveEdit}
+                          onCancel={cancelEdit}
+                          saving={editSaving}
+                          error={editError}
+                        />
+                      ) : (
+                        reply.content && <CommentContent htmlContent={reply.htmlContent} content={reply.content} searchFilter={searchFilter ?? ""} className="mt-0.5 text-sm text-zinc-700 whitespace-pre-wrap" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>

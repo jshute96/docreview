@@ -23,6 +23,15 @@ export function isThreadRead(c: { readMessageCount: number; replyCount: number }
 }
 
 /**
+ * Messages the user hasn't read yet, counting the head comment — a fully
+ * unread thread with no replies has 1. Clamped at 0 because the stored count
+ * can exceed the total after replies are deleted.
+ */
+export function unreadMessageCount(c: { readMessageCount: number; replyCount: number }): number {
+  return Math.max(0, totalMessageCount(c.replyCount) - c.readMessageCount);
+}
+
+/**
  * The read count to store for a thread that already exists in the DB. Shared by
  * comment sync (`buildCommentUpdate`) and extension suggestion merge, which
  * apply the same rules but compute `hasActivity` differently — Drive has a

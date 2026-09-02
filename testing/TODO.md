@@ -366,6 +366,8 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Mark read/unread from the doc detail page sets the whole thread read / fully unread
 - [ ] "Mark all read" sets each thread's own message count (the one raw-SQL write, whose
       column names aren't checked against the Prisma schema by any unit test)
+- [ ] Unread column: shows 1 for an unread zero-reply thread, blank when fully read, sortable
+- [ ] Expanded partially-read thread: "N unread" divider above the first unread message, blue rail + bold author on each unread message, no divider when the whole thread is unread
 
 ### Suggestion Updates (Chrome extension sync only — only source with reply-authorship data)
 - [ ] Suggestion read count set from my last action: my reply/accept/reject → read; theirs → unread

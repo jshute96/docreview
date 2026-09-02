@@ -118,7 +118,7 @@ One-line descriptions of every source file, grouped by layer.
 | `hamburger-button.tsx` | Shared "more options" hamburger trigger for dropdown menus — one drawing for every menu, in three sizes (`default`, `compact`, `mini`) |
 | `comment-filter-bar.tsx` | Comment list filter bar — toggles for my threads/comments, starred, show mode, suggestions, unread |
 | `comment-row.tsx` | Single comment row — expandable, shows content preview, thread panel, status actions; preserves extension-sourced fields (tabName) across refreshes |
-| `comment-thread-panel.tsx` | Expanded thread view — shows all replies, reply textarea, resolve/reopen buttons, and an edit/delete menu on your own comments and replies |
+| `comment-thread-panel.tsx` | Expanded thread view — shows all replies, unread markers (rail + "N unread" divider), reply textarea, resolve/reopen buttons, and an edit/delete menu on your own comments and replies |
 | `add-doc-form.tsx` | Shared add/update/re-add doc form body — URL validation (Add mode) or fixed doc (Re-add mode), label picker, notes; used by dialogs and standalone page |
 | `add-doc-dialog.tsx` | Dialog wrapper for adding/updating a doc — renders `add-doc-form` inside a dialog, dynamic title and button text |
 | `add-doc-page-client.tsx` | Standalone add/update doc page (client) — renders `add-doc-form` in a card with cross-tab sync |
@@ -207,7 +207,7 @@ Shadcn/ui components:
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
 | `doc-filters.ts` | Client-side doc filtering (tri-state logic for inbox/comments/author/starred/mimeType/labels/title regex) and sorting; accepts optional cached titles map for when `doc.title` is empty |
 | `browser-cache.ts` | Generic localStorage cache — namespaced key-value store with JSON values, batch operations, and staleness-based eviction |
-| `read-state.ts` | Per-thread read tracking helpers — `isThreadRead()`, `totalMessageCount()`, `initialReadMessageCount()` over the stored `readMessageCount` (shared by server sync and client UI) |
+| `read-state.ts` | Per-thread read tracking helpers — `isThreadRead()`, `totalMessageCount()`, `unreadMessageCount()`, `initialReadMessageCount()` over the stored `readMessageCount` (shared by server sync and client UI) |
 | `doc-queries.ts` | Shared Prisma include constants (`labelInclude`, `docWithCountsInclude`, `docWithCommentsInclude`) + `withCommentCounts` transform + `stripServerOnly` (strips titles from API responses for privacy) |
 | `highlight.tsx` | `highlightText()` — regex/substring highlighter for plain text; `highlightHtml()` — same for HTML strings (highlights text outside tags, returns null if no match); `matchesFilter()` — centralized dual regex/substring search; `createMatcher()` — compiled reusable matcher |
 | `label-validation.ts` | Shared label validation helpers — `isValidColor()` (hex color regex), `MAX_LABEL_NAME_LENGTH` constant |

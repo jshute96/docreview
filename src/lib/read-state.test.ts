@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isThreadRead, totalMessageCount, initialReadMessageCount, nextReadMessageCount } from "./read-state";
+import { isThreadRead, totalMessageCount, unreadMessageCount, initialReadMessageCount, nextReadMessageCount } from "./read-state";
 
 describe("totalMessageCount", () => {
   it("counts the head comment plus its replies", () => {
@@ -19,6 +19,21 @@ describe("isThreadRead", () => {
   it("stays read when replies are deleted out from under the stored count", () => {
     // Thread was fully read at 5 replies; two were deleted since.
     expect(isThreadRead({ readMessageCount: 6, replyCount: 3 })).toBe(true);
+  });
+});
+
+describe("unreadMessageCount", () => {
+  it("counts the head comment, so an unread thread with no replies has 1", () => {
+    expect(unreadMessageCount({ readMessageCount: 0, replyCount: 0 })).toBe(1);
+  });
+  it("is 0 when fully read", () => {
+    expect(unreadMessageCount({ readMessageCount: 3, replyCount: 2 })).toBe(0);
+  });
+  it("reports the messages past the read position", () => {
+    expect(unreadMessageCount({ readMessageCount: 3, replyCount: 4 })).toBe(2);
+  });
+  it("clamps at 0 when replies were deleted below a stored count", () => {
+    expect(unreadMessageCount({ readMessageCount: 6, replyCount: 3 })).toBe(0);
   });
 });
 
