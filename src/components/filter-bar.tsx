@@ -11,11 +11,12 @@ import {
   TRISTATE_COLORS,
 } from "@/components/tri-state-button";
 import { TriStateStarButton } from "@/components/star-button";
+import { GoogleMimeType, MIME_TYPE_LABELS } from "@/lib/mime-types";
 
 const DOC_TYPES = [
-  { mimeType: "application/vnd.google-apps.document", label: "Docs", color: "#4285F4" },
-  { mimeType: "application/vnd.google-apps.spreadsheet", label: "Sheets", color: "#34A853" },
-  { mimeType: "application/vnd.google-apps.presentation", label: "Slides", color: "#FBBC04" },
+  { mimeType: GoogleMimeType.Doc, label: MIME_TYPE_LABELS[GoogleMimeType.Doc], color: "#4285F4" },
+  { mimeType: GoogleMimeType.Sheet, label: MIME_TYPE_LABELS[GoogleMimeType.Sheet], color: "#34A853" },
+  { mimeType: GoogleMimeType.Slides, label: MIME_TYPE_LABELS[GoogleMimeType.Slides], color: "#FBBC04" },
 ] as const;
 
 interface FilterBarProps {

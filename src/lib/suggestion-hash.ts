@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { SuggestionType } from "@prisma/client";
 import type { Suggestion } from "@/lib/parse-gmail-notification";
+import { SuggestionLabel } from "@/lib/suggestion-labels";
 
 // Computes a content hash for a suggestion to enable matching across data sources
 // (Docs API, Gmail notifications, and the Chrome extension scraping the Docs UI).
@@ -50,9 +51,9 @@ export function gmailActionToSuggestionType(
   action: string,
 ): SuggestionType {
   switch (action) {
-    case "Add": return SuggestionType.INSERT;
-    case "Delete": return SuggestionType.DELETE;
-    case "Replace": return SuggestionType.EDIT;
+    case SuggestionLabel.Add: return SuggestionType.INSERT;
+    case SuggestionLabel.Delete: return SuggestionType.DELETE;
+    case SuggestionLabel.Replace: return SuggestionType.EDIT;
     default: return SuggestionType.OTHER;
   }
 }
@@ -65,11 +66,11 @@ export function extractHashTextsFromGmail(
   s: Pick<Suggestion, "action" | "text" | "oldText" | "newText">,
 ): { deletedText: string; insertedText: string } {
   switch (s.action) {
-    case "Add":
+    case SuggestionLabel.Add:
       return { deletedText: "", insertedText: s.text };
-    case "Delete":
+    case SuggestionLabel.Delete:
       return { deletedText: s.text, insertedText: "" };
-    case "Replace":
+    case SuggestionLabel.Replace:
       return { deletedText: s.oldText ?? "", insertedText: s.newText ?? "" };
     default:
       return { deletedText: "", insertedText: "" };
@@ -77,9 +78,8 @@ export function extractHashTextsFromGmail(
 }
 
 // Split an extension-scraped suggestion's text fields the same way, using the
-// already-separated oldText/newText fields the extension provides. The Gmail
-// action labels ("Add"/"Delete"/"Replace") are reused — the extension sends
-// the same strings in its `suggestionType` field.
+// already-separated oldText/newText fields the extension provides — the
+// extension sends the same SuggestionLabel strings in its `suggestionType`.
 export function extractHashTextsFromExtension(
   action: string,
   oldText: string,

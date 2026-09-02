@@ -3,9 +3,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getDriveClient, fetchDocData, fetchFileTextViaExport, invalidGrantResponse } from "@/lib/google-drive";
 import { runWithRequestId } from "@/lib/request-context";
-
-const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
-const SLIDES_MIME_TYPE = "application/vnd.google-apps.presentation";
+import { GoogleMimeType } from "@/lib/mime-types";
 
 export async function GET(
   _req: NextRequest,
@@ -35,8 +33,8 @@ export async function GET(
   }
 
   try {
-    const isDoc = doc.mimeType === DOCS_MIME_TYPE;
-    const isSlides = doc.mimeType === SLIDES_MIME_TYPE;
+    const isDoc = doc.mimeType === GoogleMimeType.Doc;
+    const isSlides = doc.mimeType === GoogleMimeType.Slides;
 
     if (isDoc) {
       const { documentText, suggestionContent } = await fetchDocData(driveAuth, doc.googleDocId);

@@ -7,6 +7,8 @@
 
 import type { CommentThread, SuggestionContent } from "@/lib/google-drive";
 import type { ExtensionSuggestion } from "@/lib/bridge-to-extension";
+import { ExtSuggestionStatus, parseExtSuggestionStatus } from "@/lib/extension-wire";
+import { SuggestionLabel } from "@/lib/suggestion-labels";
 
 // ---------------------------------------------------------------------------
 // Timestamp parsing
@@ -55,9 +57,9 @@ export function parseExtensionTimestamp(ts: string): Date | null {
 /** Convert an extension suggestion to a CommentThread for the thread panel. */
 export function extensionToThread(s: ExtensionSuggestion): CommentThread {
   const content =
-    s.suggestionType === "Replace" ? `Replace "${s.oldText}" with "${s.newText}"` :
-    s.suggestionType === "Add" ? `Add "${s.newText}"` :
-    s.suggestionType === "Delete" ? `Delete "${s.oldText}"` :
+    s.suggestionType === SuggestionLabel.Replace ? `Replace "${s.oldText}" with "${s.newText}"` :
+    s.suggestionType === SuggestionLabel.Add ? `Add "${s.newText}"` :
+    s.suggestionType === SuggestionLabel.Delete ? `Delete "${s.oldText}"` :
     s.description || s.suggestionType;
   return {
     id: s.id,
@@ -65,7 +67,7 @@ export function extensionToThread(s: ExtensionSuggestion): CommentThread {
     fromMe: s.isMine,
     content,
     createdTime: s.timestamp,
-    resolved: s.status !== "open",
+    resolved: parseExtSuggestionStatus(s.status) !== ExtSuggestionStatus.Open,
     replies: s.replies.map(r => ({
       id: "", // scraped from the Docs UI, so no Drive reply ID — not editable
       author: r.author,

@@ -49,6 +49,8 @@ function outboundOf(win: MockWindow, type: string) {
 
 let win: MockWindow;
 let consoleLogSpy: ReturnType<typeof vi.spyOn>;
+/** Messages the module posts to the cross-tab BroadcastChannel. */
+let broadcasts: unknown[] = [];
 
 beforeEach(async () => {
   vi.resetModules();
@@ -60,9 +62,10 @@ beforeEach(async () => {
   vi.stubGlobal("window", win);
   // BroadcastChannel — not exercised by these tests but bridge imports
   // reference it via commentSynced listener setup at module load.
+  broadcasts = [];
   vi.stubGlobal("BroadcastChannel", class {
     constructor(_name: string) {}
-    postMessage() {}
+    postMessage(msg: unknown) { broadcasts.push(msg); }
     close() {}
     addEventListener() {}
   });
@@ -510,5 +513,37 @@ describe("handleOpenDocClick", () => {
     await vi.advanceTimersByTimeAsync(0);
 
     expect(win.open).toHaveBeenCalledWith("https://docs.google.com/document/d/gdoc1/edit", "doc-gdoc1");
+  });
+});
+
+// ---------- commentSynced relay ----------
+
+// The extension notifies the page that a server-side sync finished, and the
+// bridge re-broadcasts it to every tab. The value it carries has to arrive as
+// the CommentType the cross-tab listener compares against — a mismatch here is
+// invisible at runtime: suggestion events just quietly take the comment path.
+describe("commentSynced listener", () => {
+  async function deliver(data: Record<string, unknown>) {
+    await import("./bridge-to-extension");
+    win.respond({ source: "docreview-extension", type: "commentSynced", ...data });
+    return broadcasts[broadcasts.length - 1] as Record<string, unknown> | undefined;
+  }
+
+  it("relays a suggestion sync as CommentType.SUGGESTION", async () => {
+    // Exactly what background-comments.js sends — it uppercases before posting.
+    const msg = await deliver({ docId: "d1", googleCommentId: "disco1", commentType: "SUGGESTION" });
+    expect(msg).toMatchObject({ type: "comments", docId: "d1", googleCommentId: "disco1", commentType: "SUGGESTION" });
+  });
+
+  it("relays a comment sync as CommentType.COMMENT, with inline threads", async () => {
+    const threads = { disco1: { id: "disco1" } };
+    const msg = await deliver({ docId: "d1", commentType: "comment", threads });
+    expect(msg).toMatchObject({ type: "comments", docId: "d1", commentType: "COMMENT", threads });
+  });
+
+  it("drops a commentType it doesn't recognize rather than passing it through", async () => {
+    const msg = await deliver({ docId: "d1", commentType: "whatever" });
+    expect(msg).toMatchObject({ type: "comments", docId: "d1" });
+    expect(msg?.commentType).toBeUndefined();
   });
 });

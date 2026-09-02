@@ -654,6 +654,7 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] No-comment-permission doc: comments page shows "Comments not visible on this document." (not "No comments")
 - [ ] Deleted/inaccessible doc (Drive 404): comments page shows "Comments not visible on this document." (not a load error)
 - [ ] Reply on a doc where comment access was revoked: shows the permission message, not a generic failure
+- [ ] Extension suggestion sync: the cross-tab event is recognized as a suggestion (re-scrapes the extension, no Drive thread fetch for a disco ID Drive doesn't know)
 - [ ] Reply that posts but can't be re-read: message says it was posted (so the user doesn't post twice) and the thread stays on screen
 - [ ] Add by URL when Drive lookup fails transiently: shows an error instead of adding a doc titled "Unknown title"
 - [ ] No-comment-permission doc: Gmail-sourced comments appear in the comment list with placeholder suggestion details

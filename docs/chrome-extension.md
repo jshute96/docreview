@@ -249,7 +249,7 @@ Looks up doc by Google doc ID, calls `syncComments()` with optional hints. With 
 
 1. Background parses the sync response and sends `commentSynced` (with `docId`, optional `googleCommentId`, `commentType`, and `threads` display data) to first open docreview tab via `chrome.tabs.sendMessage`.
 2. Bridge content script relays to page via `window.postMessage`.
-3. Extension bridge posts to `BroadcastChannel` (using a separate short-lived instance so the receiving tab also gets it — the shared singleton suppresses self-delivery by spec).
+3. Extension bridge posts to `BroadcastChannel` (using a separate short-lived instance so the receiving tab also gets it — the shared singleton suppresses self-delivery by spec). `commentType` is uppercased to the Prisma spelling in `notifyDocreviewTabs` (unlike the sync request body, which carries the lowercase form), and the page parses it back rather than trusting it — the cross-tab listener compares it against `CommentType.SUGGESTION`.
 4. All docreview tabs receive via `useCrossTabListener`.
 5. When inline `threads` data is present (single-comment sync), the client uses it directly — no additional Drive API call.
 6. When no thread data is available (non-suggestion event, missing ID, or non-extension triggers), falls back to fetching from `GET /api/docs/{docId}/threads`.

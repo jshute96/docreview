@@ -3,6 +3,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { addDoc } from "@/lib/add-doc";
 import { runWithRequestId } from "@/lib/request-context";
+import { GoogleMimeType } from "@/lib/mime-types";
 import { DocStatus } from "@prisma/client";
 
 export async function POST(
@@ -52,7 +53,7 @@ export async function POST(
       fallback: {
         title: oldDoc.title || "Unknown title",
         driveUrl: oldDoc.driveUrl,
-        mimeType: oldDoc.mimeType ?? "application/vnd.google-apps.document",
+        mimeType: oldDoc.mimeType ?? GoogleMimeType.Doc,
         role: oldDoc.role,
         lastModifiedInDrive: oldDoc.lastModifiedInDrive,
         createdTimeInDrive: oldDoc.createdTimeInDrive,

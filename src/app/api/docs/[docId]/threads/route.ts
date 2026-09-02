@@ -7,9 +7,8 @@ import type { ThreadMap } from "@/lib/google-drive";
 import { bumpLastCommentActivity, syncSingleComment } from "@/lib/sync-comments";
 import { logError, logWarning } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
+import { GoogleMimeType } from "@/lib/mime-types";
 import { CommentStatus, CommentType } from "@prisma/client";
-
-const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 
 export async function GET(
   req: NextRequest,
@@ -159,7 +158,7 @@ export async function POST(
 
     // Suggestions live in the Docs API, not Drive comments
     if (commentRecord.type === CommentType.SUGGESTION) {
-      if (doc.mimeType !== DOCS_MIME_TYPE) {
+      if (doc.mimeType !== GoogleMimeType.Doc) {
         return NextResponse.json({ comment: commentRecord, threads: {} });
       }
       const docData = await fetchDocData(driveAuth, doc.googleDocId);

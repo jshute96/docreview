@@ -8,12 +8,9 @@ import { OFFLINE_MODE, OfflineModeError } from "@/lib/offline";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { withProgressLogging } from "./promise-utils";
 import { formatDate } from "./utils";
+import { GoogleMimeType, SUPPORTED_MIME_TYPES } from "@/lib/mime-types";
 
-export const SUPPORTED_MIME_TYPES = new Set([
-  "application/vnd.google-apps.document",
-  "application/vnd.google-apps.spreadsheet",
-  "application/vnd.google-apps.presentation",
-]);
+export { SUPPORTED_MIME_TYPES };
 
 /** Detect expired/revoked OAuth refresh token (Google returns 400 invalid_grant) */
 export function isInvalidGrantError(err: unknown): boolean {
@@ -1264,7 +1261,7 @@ export async function listRecentDocs(
   const safeCutoff = cutoff && !isNaN(cutoff.getTime()) ? cutoff : null;
   // Build query
   const qParts = [
-    "(mimeType='application/vnd.google-apps.document' or mimeType='application/vnd.google-apps.spreadsheet' or mimeType='application/vnd.google-apps.presentation')",
+    `(${Object.values(GoogleMimeType).map((m) => `mimeType='${m}'`).join(" or ")})`,
     "trashed = false",
   ];
   if (safeCutoff) {

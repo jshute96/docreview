@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getDriveClient, invalidGrantResponse } from "@/lib/google-drive";
 import { syncComments, unarchiveDocIfNeeded } from "@/lib/sync-comments";
 import { logError, logInfo } from "@/lib/log";
+import { parseExtCommentType } from "@/lib/extension-wire";
 import { runWithRequestId } from "@/lib/request-context";
 
 /**
@@ -27,9 +28,9 @@ export async function POST(
     // Parse optional sync hints from the request body (sent by the extension
     // to narrow the sync to a single comment or skip irrelevant API calls).
     const body = await req.json().catch(() => ({}));
-    // Unrecognized commentType values are safe — they won't match 'comment' or
-    // 'suggestion', so both skip flags stay false, resulting in a full sync.
-    const commentType = body.commentType as string | undefined;  // 'comment' | 'suggestion'
+    // Unrecognized values are dropped here, which leaves both skip flags false
+    // and results in a full sync.
+    const commentType = parseExtCommentType(body.commentType);
     const googleCommentId = body.googleCommentId as string | undefined;
 
     const doc = await prisma.doc.findFirst({ where: { googleDocId, userId } });

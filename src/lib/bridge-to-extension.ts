@@ -3,6 +3,10 @@
 // The extension's bridge-to-docreview.js content script relays messages between
 // the web page and the extension's background worker via window.postMessage.
 
+import { ExtSuggestionStatus, parseCommentType } from "@/lib/extension-wire";
+import type { CrossTabEvent } from "@/lib/cross-tab";
+import type { ThreadMap } from "@/lib/google-drive";
+
 export interface ExtensionStatus {
   version: number;
   baseUrl: string;
@@ -184,8 +188,10 @@ export function selectCommentInDoc(docId: string, discoId: string): void {
 /** Shape of a suggestion returned by the extension's getSuggestions() DOM scraper. */
 export interface ExtensionSuggestion {
   id: string;              // disco ID (AAA[A-Z]... format)
-  suggestionType: string;  // "Replace", "Add", "Delete", or non-text types like "Format", "Add link"
-  status: string;          // "open", "accepted", "rejected"
+  /** Label scraped from the doc — "Replace", "Add", "Delete", or an open-ended
+   *  non-text label like "Format" or "Add link", so not a closed set. */
+  suggestionType: string;
+  status: ExtSuggestionStatus;
   oldText: string;
   newText: string;
   description: string;     // Full description for non-text suggestions (e.g. "Format: Bold")
@@ -369,12 +375,16 @@ function setupCommentSyncedListener() {
     // as a valid recipient, so the singleton listener in this tab will fire.
     const docId = event.data.docId;
     const googleCommentId: string | undefined = event.data.googleCommentId;
-    const commentType: string | undefined = event.data.commentType;
+    // Already the Prisma spelling — background-comments.js uppercases it before
+    // sending — but parsed rather than cast, since it arrives untyped.
+    const commentType = parseCommentType(event.data.commentType);
     const threads: Record<string, unknown> | undefined = event.data.threads;
     // eslint-disable-next-line no-console -- extension bridge diagnostic, not server-side app code
     console.log("[bridge-to-extension] commentSynced received, broadcasting for", docId);
     const ch = new BroadcastChannel("docreview-sync");
-    ch.postMessage({ type: "comments", docId, googleCommentId, commentType, threads });
+    // Typed so this stays in step with what useCrossTabListener expects.
+    const message: CrossTabEvent = { type: "comments", docId, googleCommentId, commentType, threads: threads as ThreadMap | undefined };
+    ch.postMessage(message);
     ch.close();
   });
 }

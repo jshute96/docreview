@@ -58,7 +58,7 @@ The `docIds` field on `docs` events is optional because some operations affect m
 
 The `comments` event has optional fields for targeted updates:
 - `googleCommentId` — the specific comment thread that changed (omitted for bulk operations or full sync).
-- `commentType` — `"COMMENT"` or `"SUGGESTION"` (uppercase, matching the Prisma enum). Used to determine whether to attempt a targeted thread fetch (suggestions use a different API and ID scheme).
+- `commentType` — `"COMMENT"` or `"SUGGESTION"` (uppercase, matching the Prisma enum). Used to determine whether to attempt a targeted thread fetch (suggestions use a different API and ID scheme). The Chrome extension already sends this spelling in its `commentSynced` message; `bridge-to-extension.ts` parses it (accepting either case) rather than passing it through — see `src/lib/extension-wire.ts`.
 - `threads` — inline `CommentThread` display data from the sync response. When present, receiving tabs can merge this directly into their thread map without making any Drive API call. Currently only populated by the Chrome extension comment sync path (see below).
 
 ## Wire Format

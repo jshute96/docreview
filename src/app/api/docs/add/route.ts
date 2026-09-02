@@ -5,6 +5,7 @@ import { parseGoogleDocId, driveUrlFor } from "@/lib/google-drive";
 import { addDoc, validateDocInputs } from "@/lib/add-doc";
 import { docWithCountsInclude, withCommentCounts, stripServerOnly } from "@/lib/doc-queries";
 import { DocErrorCode } from "@/lib/doc-error-codes";
+import { GoogleMimeType } from "@/lib/mime-types";
 import { runWithRequestId } from "@/lib/request-context";
 import { DocRole, DocStatus } from "@prisma/client";
 
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
     fallback: {
       title: customTitle || "Unknown title",
       driveUrl: driveUrlFor(fileId),
-      mimeType: "application/vnd.google-apps.document",
+      mimeType: GoogleMimeType.Doc,
       role: DocRole.REVIEWER,
       lastModifiedInDrive: now,
       createdTimeInDrive: now,

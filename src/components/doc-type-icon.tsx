@@ -1,10 +1,12 @@
+import { GoogleMimeType } from "@/lib/mime-types";
+
 interface DocTypeIconProps {
   mimeType: string | null;
   className?: string;
 }
 
 export function DocTypeIcon({ mimeType, className = "h-4 w-4" }: DocTypeIconProps) {
-  if (mimeType === "application/vnd.google-apps.document") {
+  if (mimeType === GoogleMimeType.Doc) {
     return (
       <svg className={className} viewBox="0 0 24 24" role="img" aria-label="Google Doc">
         <rect width="24" height="24" rx="3" fill="#4285F4" />
@@ -15,7 +17,7 @@ export function DocTypeIcon({ mimeType, className = "h-4 w-4" }: DocTypeIconProp
     );
   }
 
-  if (mimeType === "application/vnd.google-apps.spreadsheet") {
+  if (mimeType === GoogleMimeType.Sheet) {
     return (
       <svg className={className} viewBox="0 0 24 24" role="img" aria-label="Google Sheet">
         <rect width="24" height="24" rx="3" fill="#34A853" />
@@ -27,7 +29,7 @@ export function DocTypeIcon({ mimeType, className = "h-4 w-4" }: DocTypeIconProp
     );
   }
 
-  if (mimeType === "application/vnd.google-apps.presentation") {
+  if (mimeType === GoogleMimeType.Slides) {
     return (
       <svg className={className} viewBox="0 0 24 24" role="img" aria-label="Google Slide">
         <rect width="24" height="24" rx="3" fill="#FBBC04" />

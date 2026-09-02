@@ -18,6 +18,8 @@
 // Types
 // ---------------------------------------------------------------------------
 
+import { SuggestionLabel } from "@/lib/suggestion-labels";
+
 export interface CommentReply {
   author: string;
   time_str: string;      // original formatted string from email, e.g. "6:34 PM, Mar 7 (UTC)"
@@ -42,7 +44,10 @@ export interface Suggestion {
   author: string;
   time_str: string;      // original formatted string from email
   time?: string;          // ISO 8601 if parseable
-  action: string; // "Delete", "Add", "Replace", "Other"
+  /** Label Gmail used for the suggestion. `SuggestionLabel` covers the ones the
+   *  code branches on; other labels ("Edit", or "" when the details weren't
+   *  visible) pass through as-is. */
+  action: string;
   text: string;
   oldText?: string; // for Replace
   newText?: string; // for Replace
@@ -475,7 +480,7 @@ function parseCommentNotification(email: ParsedEmail): CommentNotification {
         // and put the original label + details in text
         const label = stripTags(otherDiv[1]).replace(/:$/, "");
         const details = stripTags(decodeHtmlEntities(otherDiv[2])).trim();
-        suggestionAction = "Other";
+        suggestionAction = SuggestionLabel.Other;
         text = details ? `${label}: ${details}` : label;
       }
 

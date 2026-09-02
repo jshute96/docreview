@@ -6,11 +6,9 @@ import type { ThreadMap, SuggestionContent, DriveSuggestion, DriveDoc } from "@/
 import { upsertDocsAndSyncComments } from "@/lib/refresh";
 import { docWithCommentsInclude, stripServerOnly } from "@/lib/doc-queries";
 import { logError, logWarning } from "@/lib/log";
+import { GoogleMimeType } from "@/lib/mime-types";
 import { runWithRequestId } from "@/lib/request-context";
 import { AccessState, DocRole } from "@prisma/client";
-
-const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
-const SLIDES_MIME_TYPE = "application/vnd.google-apps.presentation";
 
 export async function POST(
   _req: NextRequest,
@@ -99,12 +97,12 @@ export async function POST(
           logWarning("[Refresh] fetchCommentData failed, will fall back to individual fetches:", err);
           return null;
         }),
-        (mimeType === DOCS_MIME_TYPE
+        (mimeType === GoogleMimeType.Doc
           ? fetchDocData(driveAuth, doc.googleDocId).catch((err) => {
               logWarning("[Refresh] fetchDocData failed:", err);
               return null;
             })
-          : mimeType === SLIDES_MIME_TYPE
+          : mimeType === GoogleMimeType.Slides
             ? fetchFileTextViaExport(driveAuth, doc.googleDocId).then(
                 (text) => ({ suggestions: [] as DriveSuggestion[], suggestionContent: {} as Record<string, SuggestionContent>, documentText: text }),
               ).catch(() => null)

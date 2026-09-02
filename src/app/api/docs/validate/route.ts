@@ -14,6 +14,7 @@ import {
 import { OfflineModeError } from "@/lib/offline";
 import { logError, logWarning } from "@/lib/log";
 import { DocErrorCode } from "@/lib/doc-error-codes";
+import { GoogleMimeType } from "@/lib/mime-types";
 import { runWithRequestId } from "@/lib/request-context";
 import { tryResolveRedirect } from "@/lib/url-utils";
 import { DocRole } from "@prisma/client";
@@ -85,7 +86,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       googleDocId: fileId,
       title: existing?.title ?? "Unknown title",
-      mimeType: existing?.mimeType ?? "application/vnd.google-apps.document",
+      mimeType: existing?.mimeType ?? GoogleMimeType.Doc,
       driveUrl: driveUrlFor(fileId),
       permissionDenied: true,
       ...(existing ? {

@@ -1,12 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { fetchCommentData, fetchDocData, fetchThreadDetail, getDriveClient, isDriveErrorCode } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
+import { ExtCommentType } from "@/lib/extension-wire";
+import { GoogleMimeType } from "@/lib/mime-types";
 import { computeSuggestionHash } from "@/lib/suggestion-hash";
 import { initialReadMessageCount, nextReadMessageCount } from "@/lib/read-state";
 import { CommentStatus, CommentType, DocRole, DocStatus, type Doc, type Comment, type Prisma } from "@prisma/client";
 import type { DriveComment, DriveSuggestion, CommentThread, ThreadDetailResult } from "@/lib/google-drive";
-
-const DOCS_MIME_TYPE = "application/vnd.google-apps.document";
 
 // Extract Prisma's interactive-transaction client type from $transaction's callback signature.
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -115,8 +115,8 @@ export interface SyncPrefetchedData {
  * the affected comment instead of all comments.
  */
 export interface SyncHints {
-  /** 'comment' for actions on comment threads, 'suggestion' for actions on suggestion threads. */
-  commentType?: string;
+  /** Which kind of thread the user acted on, in the extension's own spelling. */
+  commentType?: ExtCommentType;
   /** Google Drive comment ID (disco ID) — fetch only this comment instead of all. */
   googleCommentId?: string;
 }
@@ -260,8 +260,8 @@ export async function syncComments(
   // the sync will have timestamps after this, ensuring the next sync covers them.
   const syncStartedAt = new Date();
 
-  const skipComments = hints?.commentType === "suggestion";
-  const skipSuggestions = hints?.commentType === "comment";
+  const skipComments = hints?.commentType === ExtCommentType.Suggestion;
+  const skipSuggestions = hints?.commentType === ExtCommentType.Comment;
 
   // --- Fast path: single-comment sync via syncSingleComment ---
   // Uses a targeted DB lookup + single Drive API call instead of batch-fetching.
@@ -325,7 +325,7 @@ export async function syncComments(
   // --- Phase 3: Sync suggestions from Docs API ---
   // (only for Google Docs, and only if the suggestion fetch succeeded)
 
-  if (skipSuggestions || doc.mimeType !== DOCS_MIME_TYPE) {
+  if (skipSuggestions || doc.mimeType !== GoogleMimeType.Doc) {
     // Hint-based syncs don't stamp commentsLastSyncedAt — let the periodic
     // full sync handle reconciliation of the skipped phase.
     if (!hints) await stampSyncTime(doc.docId, syncStartedAt);
@@ -400,7 +400,7 @@ async function fetchDocsSuggestions(
   doc: Doc,
   driveAuth: Awaited<ReturnType<typeof getDriveClient>>,
 ): Promise<{ suggestions: DriveSuggestion[]; failed: boolean; denied: boolean }> {
-  if (doc.mimeType !== DOCS_MIME_TYPE) {
+  if (doc.mimeType !== GoogleMimeType.Doc) {
     return { suggestions: [], failed: false, denied: false };
   }
   try {

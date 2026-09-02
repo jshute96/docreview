@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import type { Label } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import { useCrossTabListener, crossTabReason, broadcastChange, type CrossTabReceivedEvent } from "@/lib/cross-tab";
+import { mimeTypeLabel } from "@/lib/mime-types";
 import { pingExtension } from "@/lib/bridge-to-extension";
 import type { TriState } from "@/lib/tri-state";
 import { DocRow } from "@/components/doc-row";
@@ -110,15 +111,10 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
 
   // Compute page title from active filters
   const pageTitle = useMemo(() => {
-    const MIME_NAMES: Record<string, string> = {
-      "application/vnd.google-apps.document": "Docs",
-      "application/vnd.google-apps.spreadsheet": "Sheets",
-      "application/vnd.google-apps.presentation": "Slides",
-    };
     const parts: string[] = [];
 
     for (const [mime, state] of Object.entries(mimeTypes)) {
-      const name = MIME_NAMES[mime] ?? mime;
+      const name = mimeTypeLabel(mime);
       if (state === "include") parts.push(name);
       else if (state === "exclude") parts.push(`!${name}`);
     }

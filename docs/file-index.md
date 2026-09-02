@@ -209,6 +209,9 @@ Shadcn/ui components:
 | `browser-cache.ts` | Generic localStorage cache — namespaced key-value store with JSON values, batch operations, and staleness-based eviction |
 | `thread-fold.ts` | Decides which already-read messages an expanded thread folds away — `estimateLines()`, `foldEnd()` |
 | `read-state.ts` | Per-thread read tracking helpers — `isThreadRead()`, `totalMessageCount()`, `unreadMessageCount()`, `initialReadMessageCount()` over the stored `readMessageCount` (shared by server sync and client UI) |
+| `extension-wire.ts` | `ExtCommentType` / `ExtSuggestionStatus` — the values the Chrome extension sends, with parsers for each boundary (the sync body uses the lowercase spelling, `commentSynced` the Prisma one) |
+| `suggestion-labels.ts` | `SuggestionLabel` — Google's Add/Delete/Replace/Other labels, shared by the Gmail parser and the extension scrape |
+| `mime-types.ts` | `GoogleMimeType` — the Doc/Sheet/Slides MIME types, plus `SUPPORTED_MIME_TYPES` and UI labels; client-safe (no Drive imports) |
 | `doc-error-codes.ts` | `DocErrorCode` — the `{ error: <code> }` values the doc validate/add routes return, shared with the client that words them |
 | `doc-queries.ts` | Shared Prisma include constants (`labelInclude`, `docWithCountsInclude`, `docWithCommentsInclude`) + `withCommentCounts` transform + `stripServerOnly` (strips titles from API responses for privacy) |
 | `highlight.tsx` | `highlightText()` — regex/substring highlighter for plain text; `highlightHtml()` — same for HTML strings (highlights text outside tags, returns null if no match); `matchesFilter()` — centralized dual regex/substring search; `createMatcher()` — compiled reusable matcher |

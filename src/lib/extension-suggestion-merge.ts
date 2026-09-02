@@ -23,12 +23,15 @@ import { parseExtensionTimestamp } from "@/lib/extension-suggestions";
 import { isDiscoId } from "@/lib/disco-id";
 import { initialReadMessageCount, isThreadRead, nextReadMessageCount } from "@/lib/read-state";
 import { CommentStatus, CommentType, DocRole, Prisma, type Comment, type Doc } from "@prisma/client";
+import { ExtSuggestionStatus, parseExtSuggestionStatus } from "@/lib/extension-wire";
 
 /** Shape of a single extension suggestion as received from the API request body. */
 export interface ExtensionSuggestionInput {
   id: string;              // disco ID
-  suggestionType: string;  // "Replace", "Add", "Delete", or non-text types like "Format"
-  status: string;          // "open", "accepted", "rejected"
+  /** Label scraped from the doc — "Replace", "Add", "Delete", or an open-ended
+   *  non-text label like "Format", so not a closed set. */
+  suggestionType: string;
+  status: ExtSuggestionStatus;
   oldText: string;
   newText: string;
   description: string;     // Full description for non-text suggestions (e.g. "Format: Bold")
@@ -354,7 +357,9 @@ export async function mergeExtensionSuggestions(
     const mention = computeMentionFlags(s.replies, emailLower);
 
     // Common fields for all DB writes
-    const isResolved = s.status === "accepted" || s.status === "rejected";
+    // The request body is cast, not validated, so an unrecognized status must
+    // not read as resolved.
+    const isResolved = parseExtSuggestionStatus(s.status) !== ExtSuggestionStatus.Open;
     const isRead = computeSuggestionIsRead(s.isMine, s.replies);
     // Read count for rows seeded from this payload: messages through my last
     // contribution (see initialReadMessageCount).
