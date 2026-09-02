@@ -79,10 +79,21 @@ You can still archive, mute, star, and filter suggestions like regular comments.
 
 ## Bulk actions
 
-The toolbar provides bulk operations:
+The toolbar above the comment list provides bulk operations. All of them act on the comments
+currently visible -- whatever your filters and search have left on screen -- not on the whole
+document.
 
-- **Expand all unread** -- Opens all comment threads that have unread activity.
+- **Expand unread** -- Opens all comment threads that have unread activity. Greyed out when everything visible is read.
+- **Expand all** -- Opens every visible comment thread.
 - **Collapse all** -- Closes all expanded threads.
+- **Mark all read** -- Marks every visible thread as fully read. Greyed out when nothing visible is unread.
+- **Archive all** -- Archives every visible comment that is still in the Inbox.
+
+The menu button at the end of the toolbar holds the less-used bulk actions:
+
+- **Archive all resolved** -- Archives only the visible Inbox comments that are marked Resolved.
+- **Unarchive all** -- Moves every visible archived comment back to the Inbox.
+- **Mark all unread** -- Marks every visible read thread as unread.
 
 ## Sort behavior
 

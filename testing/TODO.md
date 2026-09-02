@@ -154,7 +154,7 @@ Update this list when adding or changing user-facing behaviors.
 
 ### Bulk Actions
 - [ ] Expand/Collapse all threads
-- [ ] Expand all unread threads
+- [ ] "Expand unread" toolbar button opens only the unread threads, and is disabled when everything visible is read
 - [ ] Archive/unarchive all read
 - [ ] Mark all read/unread
 - [ ] Archive all resolved

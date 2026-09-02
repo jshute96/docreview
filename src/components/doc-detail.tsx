@@ -1311,7 +1311,20 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                   <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide" title="Comment status">Status</span>
                 </th>
                 <th className="pr-4 py-2.5 text-right">
-                  <div className="flex items-center justify-end gap-2">
+                  {/* Wraps rather than pushing the page into horizontal
+                      scrolling: six buttons plus the menu don't fit beside the
+                      column headings much below a full-width window. */}
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-5 px-1.5 text-[10px] text-zinc-900"
+                      title="Expand all unread comment threads"
+                      onClick={() => setExpandUnreadSignal((n) => n + 1)}
+                      disabled={!filteredComments.some((c) => !isThreadRead(c))}
+                    >
+                      Expand unread
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -1355,13 +1368,6 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                         <HamburgerButton size="compact" title="More actions" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onSelect={() => setExpandUnreadSignal((n) => n + 1)}
-                          disabled={!filteredComments.some((c) => !isThreadRead(c))}
-                          title="Expand all unread comment threads"
-                        >
-                          Expand all unread
-                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onSelect={handleArchiveAllResolved}
                           disabled={bulkArchivingResolved || !filteredComments.some((c) => c.status === CommentStatus.INBOX && c.resolved)}
