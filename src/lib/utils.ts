@@ -16,9 +16,8 @@ export function contrastText(hex: string): string {
   return luminance > 0.5 ? "#18181b" : "#fafafa";
 }
 
-export function formatDate(d: Date | string | null, omitSeconds = false, omitTime = false): string {
-  if (!d) return "—";
-  const dt = new Date(d);
+export function formatDate(d: Date | null, omitSeconds = false, omitTime = false): string {
+  if (!d || isNaN(d.getTime())) return "—";
 
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
@@ -28,7 +27,7 @@ export function formatDate(d: Date | string | null, omitSeconds = false, omitTim
     hourCycle: "h23",
   });
 
-  const parts = formatter.formatToParts(dt);
+  const parts = formatter.formatToParts(d);
   const get = (t: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === t)!.value;
 
   const dateStr = `${get("year")}-${get("month")}-${get("day")}`;
@@ -38,11 +37,36 @@ export function formatDate(d: Date | string | null, omitSeconds = false, omitTim
   return !omitSeconds ? `${base}:${get("second")}` : base;
 }
 
+/**
+ * Screen for free-form date strings arriving from outside (JSON payloads,
+ * DOM-scraped text) before they are turned into a Date. True when the string
+ * can't be parsed into a correct absolute date on its own, and so should be
+ * displayed verbatim instead. Two cases:
+ *   - It doesn't parse at all (garbage).
+ *   - It has no year. Year-less Docs timestamps ("6:29 PM Feb 21") mean the
+ *     current year, but V8 parses them as year 2001, so a string that reached
+ *     here without going through parseExtensionTimestamp() would render as
+ *     2001. Showing the scraped text is better than showing a wrong date.
+ * Only FriendlyDate needs this: the formatting helpers below take real Dates.
+ */
+export function isUnparseableDateString(s: string): boolean {
+  return isNaN(new Date(s).getTime()) || !hasYear(s);
+}
+
+/**
+ * Heuristic "does this date string carry its own year": any 4-digit run. Not a
+ * real year check, but enough for the inputs we see (ISO strings and timestamps
+ * scraped from the Docs UI), and shared so the two callers can't drift.
+ */
+export function hasYear(s: string): boolean {
+  return /\d{4}/.test(s);
+}
+
 /** Friendly relative date: HH:MM (today), Wed, HH:MM (<6d), YYYY-MM-DD (older). */
-export function formatDateFriendly(d: Date | string | null, now?: number): { text: string; tooltip: string } {
-  if (!d) return { text: "—", tooltip: "" };
-  const dt = new Date(d);
-  const tooltip = formatDate(dt);
+export function formatDateFriendly(d: Date | null, now?: number): { text: string; tooltip: string } {
+  // An invalid Date would make Intl throw RangeError below, so screen it here.
+  if (!d || isNaN(d.getTime())) return { text: "—", tooltip: "" };
+  const tooltip = formatDate(d);
 
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
@@ -51,7 +75,7 @@ export function formatDateFriendly(d: Date | string | null, now?: number): { tex
     weekday: "short",
     hourCycle: "h23",
   });
-  const parts = formatter.formatToParts(dt);
+  const parts = formatter.formatToParts(d);
   const get = (t: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === t)!.value;
 
   const nowMs = now ?? Date.now();
@@ -62,7 +86,7 @@ export function formatDateFriendly(d: Date | string | null, now?: number): { tex
   const nowGet = (t: Intl.DateTimeFormatPartTypes) => nowParts.find(p => p.type === t)!.value;
   const isToday = get("year") === nowGet("year") && get("month") === nowGet("month") && get("day") === nowGet("day");
 
-  const diffMs = nowMs - dt.getTime();
+  const diffMs = nowMs - d.getTime();
   const diffHours = diffMs / (1000 * 60 * 60);
 
   let text: string;

@@ -1015,7 +1015,7 @@ export async function withViewedTimePinned<T>(
     });
     return r.data.viewedByMeTime ?? null;
   };
-  const fmt = (t: string | null) => (t ? formatDate(t) : "null");
+  const fmt = (t: string | null) => (t ? formatDate(new Date(t)) : "null");
 
   const viewedBefore = await getViewed();
   logInfo(`[ViewedPin] Before ${label}: viewedByMeTime=${fmt(viewedBefore)} (doc=${googleDocId})`);

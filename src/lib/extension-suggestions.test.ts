@@ -60,6 +60,12 @@ describe("parseExtensionTimestamp", () => {
     expect(parseExtensionTimestamp("3:15 PM TODAY")).toBeInstanceOf(Date);
   });
 
+  it("returns null for year-less strings the known formats don't cover", () => {
+    // V8 would parse these as year 2001; null is better than a wrong year.
+    expect(parseExtensionTimestamp("Feb 21")).toBeNull();
+    expect(parseExtensionTimestamp("6:29:00 PM Feb 21")).toBeNull();
+  });
+
   it("returns null for unparseable string", () => {
     expect(parseExtensionTimestamp("not a date")).toBeNull();
   });
@@ -112,6 +118,42 @@ describe("extensionToThread", () => {
   it("falls back to suggestionType when no description", () => {
     const t = extensionToThread({ ...baseSuggestion, suggestionType: "Format", oldText: "", newText: "", description: "" });
     expect(t.content).toBe("Format");
+  });
+
+  it("converts scraped timestamps to ISO strings", () => {
+    const t = extensionToThread({ ...baseSuggestion, replies: [
+      { author: "A", isMine: false, timestamp: "1:00 PM Mar 1", text: "comment" },
+    ]});
+    // The scraped text has no year; createdTime must be a real ISO timestamp.
+    expect(t.createdTime).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
+    const created = new Date(t.createdTime);
+    expect(created.getFullYear()).toBeGreaterThan(2020);
+    expect(created.getMonth()).toBe(1); // February
+    expect(created.getDate()).toBe(21);
+    expect(created.getHours()).toBe(18);
+    const replied = new Date(t.replies[0].createdTime);
+    expect(replied.getFullYear()).toBeGreaterThan(2020);
+    expect(replied.getMonth()).toBe(2); // March
+    expect(replied.getDate()).toBe(1);
+  });
+
+  it("does not invent a year-2001 date for unrecognized year-less formats", () => {
+    // "Feb 21" misses both regexes; V8 would parse it as 2001, so it must stay raw.
+    const t = extensionToThread({ ...baseSuggestion, timestamp: "Feb 21" });
+    expect(t.createdTime).toBe("Feb 21");
+  });
+
+  it("resolves relative Today/Yesterday timestamps", () => {
+    const t = extensionToThread({ ...baseSuggestion, timestamp: "3:15 PM Today" });
+    expect(new Date(t.createdTime).toDateString()).toBe(new Date().toDateString());
+  });
+
+  it("passes through timestamps it can't parse", () => {
+    const t = extensionToThread({ ...baseSuggestion, timestamp: "some time ago", replies: [
+      { author: "A", isMine: false, timestamp: "a while back", text: "comment" },
+    ]});
+    expect(t.createdTime).toBe("some time ago");
+    expect(t.replies[0].createdTime).toBe("a while back");
   });
 
   it("includes replies with action field", () => {

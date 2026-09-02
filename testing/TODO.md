@@ -146,6 +146,7 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Non-text suggestions show "Suggestion: description" with anchor text blockquote
 - [ ] Non-text suggestions show "on ..." suffix in collapsed row
 - [ ] Expanded suggestion renders like a comment: anchor blockquote, author+date, content (green if mine)
+- [ ] Extension-sourced suggestion dates render in the same format as comment dates (scraped year-less timestamps like "6:29 PM Feb 21" are resolved to a real date, not shown raw or as year 2001)
 - [ ] Unknown author shows "Unknown author" in expanded view
 - [ ] User's own name shown (not "Unknown author") for own suggestions when userName available
 - [ ] Synthesized thread hint: "process in doc" when no extension, "synced from Drive" when no disco ID, "open the doc" when extension available

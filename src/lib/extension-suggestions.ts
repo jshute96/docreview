@@ -9,6 +9,7 @@ import type { CommentThread, SuggestionContent } from "@/lib/google-drive";
 import type { ExtensionSuggestion } from "@/lib/bridge-to-extension";
 import { ExtSuggestionStatus, parseExtSuggestionStatus } from "@/lib/extension-wire";
 import { SuggestionLabel } from "@/lib/suggestion-labels";
+import { hasYear } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // Timestamp parsing
@@ -20,6 +21,9 @@ import { SuggestionLabel } from "@/lib/suggestion-labels";
  *   - "6:29 PM Feb 21"    — time + month day (current year, rolls back if future)
  *   - "5:06 AM Yesterday" — time + relative day
  *   - "3:15 PM Today"     — time + relative day
+ * The wall-clock time is interpreted in the runtime's local timezone (the
+ * browser on the thread-panel path, the server on the merge path), which is
+ * only exactly right when that matches the timezone the Docs UI rendered in.
  * Returns null if unparseable.
  */
 export function parseExtensionTimestamp(ts: string): Date | null {
@@ -45,9 +49,23 @@ export function parseExtensionTimestamp(ts: string): Date | null {
     return parsed;
   }
 
-  // Fallback: let Date parse it
+  // Fallback: let Date parse it, but only if it carries its own year. A
+  // year-less string V8 doesn't recognize (e.g. "Feb 21", or a Docs locale
+  // format the regexes above miss) parses to year 2001 — silently wrong, and
+  // worse than returning null, which shows the scraped text verbatim instead.
+  if (!hasYear(ts)) return null;
   const fallback = new Date(ts);
   return isNaN(fallback.getTime()) ? null : fallback;
+}
+
+/**
+ * Scraped timestamp -> ISO string, so the UI formats it the same way as
+ * Drive-sourced comment timestamps. Falls back to the raw scraped text if it
+ * can't be parsed (FriendlyDate then displays it verbatim).
+ */
+function toIsoTimestamp(ts: string): string {
+  const d = parseExtensionTimestamp(ts);
+  return d ? d.toISOString() : ts;
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +84,7 @@ export function extensionToThread(s: ExtensionSuggestion): CommentThread {
     author: s.author,
     fromMe: s.isMine,
     content,
-    createdTime: s.timestamp,
+    createdTime: toIsoTimestamp(s.timestamp),
     resolved: parseExtSuggestionStatus(s.status) !== ExtSuggestionStatus.Open,
     replies: s.replies.map(r => ({
       id: "", // scraped from the Docs UI, so no Drive reply ID — not editable
@@ -74,7 +92,7 @@ export function extensionToThread(s: ExtensionSuggestion): CommentThread {
       fromMe: r.isMine,
       content: r.text,
       htmlContent: r.html,
-      createdTime: r.timestamp,
+      createdTime: toIsoTimestamp(r.timestamp),
       action: r.action,
     })),
     ...(s.originalContentDeleted ? { originalContentDeleted: true } : {}),

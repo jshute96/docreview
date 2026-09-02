@@ -271,8 +271,12 @@ bad ID into `googleCommentId`; a non-zero `skipped` also marks the fetch partial
 the same retry.
 
 **Timestamps:** The extension returns relative timestamps from the DOM (e.g., "6:29 PM Feb 21",
-"5:06 AM Yesterday"). These are parsed into `Date` objects for the created/modified columns
-where possible; unparseable strings are displayed as-is in the thread panel.
+"5:06 AM Yesterday"). `parseExtensionTimestamp()` resolves these to real
+`Date`s (assuming the current year, rolling back a year if that lands in the future), used
+both for the created/modified columns and for the thread panel, so extension-sourced
+timestamps are formatted the same way as Drive-sourced ones. Unparseable strings (including any year-less
+format the parser doesn't recognize, which would otherwise land in year 2001) are shown
+verbatim in the thread panel; the created/modified columns show a dash for them.
 
 **Per-suggestion refresh:** The expanded suggestion panel has a Refresh button that
 re-scrapes a single suggestion by disco ID from the doc tab via `getSuggestionFromDoc()`.

@@ -1176,7 +1176,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
             {viewedByMeTime ? <FriendlyDate date={viewedByMeTime} /> : "—"}
             <button
               onClick={() => {
-                setViewedTimeInput(viewedByMeTime ? formatDate(viewedByMeTime) : "");
+                setViewedTimeInput(viewedByMeTime ? formatDate(new Date(viewedByMeTime)) : "");
                 setShowViewedTimeDialog(true);
               }}
               className="text-zinc-400 hover:text-zinc-600 transition-colors"

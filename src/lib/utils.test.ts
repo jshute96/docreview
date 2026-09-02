@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appendNotes, contrastText, formatDate, formatDateFriendly } from "./utils";
+import { appendNotes, contrastText, formatDate, formatDateFriendly, isUnparseableDateString } from "./utils";
 
 describe("appendNotes", () => {
   it("returns addition when existing is null", () => {
@@ -103,6 +103,13 @@ describe("formatDate", () => {
   });
 });
 
+describe("invalid Date inputs", () => {
+  it("render as an em dash instead of throwing from Intl", () => {
+    expect(formatDate(new Date("garbage"))).toBe("—");
+    expect(formatDateFriendly(new Date("garbage")).text).toBe("—");
+  });
+});
+
 describe("formatDateFriendly", () => {
   // Use a fixed "now" of 2024-06-15 12:00:00 PST = 2024-06-15T19:00:00Z
   const now = new Date("2024-06-15T19:00:00Z").getTime();
@@ -156,5 +163,28 @@ describe("formatDateFriendly", () => {
     const d = new Date("2024-06-15T07:30:00Z");
     const { text } = formatDateFriendly(d, now);
     expect(text).toBe("00:30");
+  });
+});
+
+describe("isUnparseableDateString", () => {
+  it("is false for strings with a year", () => {
+    expect(isUnparseableDateString("2026-02-21T18:29:00Z")).toBe(false);
+    expect(isUnparseableDateString("Feb 21, 2026")).toBe(false);
+  });
+
+  it("is true for year-less scraped timestamps", () => {
+    // These mean "this year", but V8 parses them as year 2001, so they must not
+    // be formatted as dates if they reached the UI unresolved.
+    expect(isUnparseableDateString("6:29 PM Feb 21")).toBe(true);
+    expect(isUnparseableDateString("2:04 PM Mar 3")).toBe(true);
+  });
+
+  it("is true for the empty string", () => {
+    expect(isUnparseableDateString("")).toBe(true);
+  });
+
+  it("is true for garbage strings", () => {
+    expect(isUnparseableDateString("yesterday")).toBe(true);
+    expect(isUnparseableDateString("not a date")).toBe(true);
   });
 });

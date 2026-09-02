@@ -136,7 +136,7 @@ One-line descriptions of every source file, grouped by layer.
 | `manage-labels-dialog.tsx` | Dialog to create/delete/reorder/recolor labels with pointer-based drag reorder; includes delete confirmation with usage count and hover tooltips |
 | `color-picker.tsx` | Popover color grid for label color selection |
 | `dialog-buttons.tsx` | Reusable Save/Cancel button pair for dialogs |
-| `friendly-date.tsx` | `<FriendlyDate>` — renders relative timestamps: time-only (today), weekday + time (<6d), date (older); full timestamp on hover |
+| `friendly-date.tsx` | `<FriendlyDate>` — renders relative timestamps: time-only (today), weekday + time (<6d), date (older); full timestamp on hover; the one place date strings are converted to Dates |
 | `doc-type-icon.tsx` | SVG icons for Google Docs/Sheets/Slides by mime type |
 | `x-icon.tsx` | Small X (close) icon used in badges and buttons |
 | `help-dialog.tsx` | Multi-page help viewer dialog — iframe + pages.json navigation, keyboard shortcuts, page dropdown |
@@ -237,7 +237,7 @@ Shadcn/ui components:
 | `tooltips.ts` | Shared tooltip text constants for UI components |
 | `tri-state.ts` | `TriState` type (`off`/`include`/`exclude`), cycle function, partition helper |
 | `url-utils.ts` | `isPublicShortenerUrl()` — server-side redirect whitelist; `tryResolveRedirect()` — follows shortener URLs to resolve Google Doc links |
-| `utils.ts` | `cn()` (clsx+twMerge), `contrastText()` for label colors, `formatDate()` (full timestamp with omitSeconds/omitTime support), `formatDateFriendly()` (relative display format), `appendNotes()` (append text to existing notes with newline separator) |
+| `utils.ts` | `cn()` (clsx+twMerge), `contrastText()` for label colors, `formatDate()` (full timestamp with omitSeconds/omitTime support), `formatDateFriendly()` (relative display format; both take real Dates), `isUnparseableDateString()` (screens free-form date strings), `appendNotes()` (append text to existing notes with newline separator) |
 | `__mocks__/prisma.ts` | Vitest mock of PrismaClient for unit tests |
 
 ## Types (`src/types/`)
