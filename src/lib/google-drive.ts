@@ -8,6 +8,7 @@ import { OFFLINE_MODE, OfflineModeError } from "@/lib/offline";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { withProgressLogging } from "./promise-utils";
 import { formatDate } from "./utils";
+import { commentEditedTime } from "./comment-edits";
 
 export const SUPPORTED_MIME_TYPES = new Set([
   "application/vnd.google-apps.document",
@@ -293,6 +294,7 @@ export type RawDriveComment = {
     content?: string | null;
     htmlContent?: string | null;
     createdTime?: string | null;
+    modifiedTime?: string | null;
     action?: string | null;
     author?: { me?: boolean | null; displayName?: string | null } | null;
     assigneeEmailAddress?: string | null;
@@ -373,6 +375,7 @@ function parseDriveComment(c: RawDriveComment, emailLower?: string): DriveCommen
 function parseCommentThread(c: RawDriveComment): CommentThread | null {
   if (c.content == null || c.deleted === true) return null;
   const replies = liveReplies(c);
+  const editedTime = commentEditedTime(c.createdTime, c.modifiedTime, c.replies ?? []);
 
   const threadReplies: ThreadReply[] = replies.map((r) => ({
     id: r.id ?? "",
@@ -381,6 +384,10 @@ function parseCommentThread(c: RawDriveComment): CommentThread | null {
     content: r.content ?? "",
     ...(r.htmlContent ? { htmlContent: r.htmlContent } : {}),
     createdTime: r.createdTime ?? "",
+    // Carried whenever Drive supplies it, even when equal to createdTime (i.e.
+    // never edited): its absence tells the display helpers that this thread came
+    // from a source without per-reply edit times. See comment-edits.ts.
+    ...(r.modifiedTime ? { modifiedTime: r.modifiedTime } : {}),
     ...(r.action === "resolve" || r.action === "reopen" ? { action: r.action } : {}),
   }));
 
@@ -392,6 +399,9 @@ function parseCommentThread(c: RawDriveComment): CommentThread | null {
     ...(c.htmlContent ? { htmlContent: c.htmlContent } : {}),
     createdTime: c.createdTime ?? "",
     ...(c.modifiedTime ? { modifiedTime: c.modifiedTime } : {}),
+    // Computed here rather than in the UI because it needs the raw reply list
+    // *including deleted replies*, which `replies` above has already dropped.
+    ...(editedTime ? { editedTime } : {}),
     resolved: c.resolved === true,
     replies: threadReplies,
     quotedFileContent: extractQuotedFileContent(c.quotedFileContent, c.id),
@@ -426,7 +436,7 @@ function buildCommentFields(options: FetchCommentDataOptions): string {
   // deleted entries can be filtered out (comments.get returns them, unlike
   // comments.list, which omits them unless includeDeleted is set).
   const replyParts = ["id", "deleted", "action", `author(${authorFields})`];
-  if (threads) replyParts.push("content", "htmlContent", "createdTime");
+  if (threads) replyParts.push("content", "htmlContent", "createdTime", "modifiedTime");
   if (sync) replyParts.push("assigneeEmailAddress", "mentionedEmailAddresses");
   // Comment fields
   const commentParts = [
@@ -475,6 +485,12 @@ export async function fetchCommentData(
           fileId: googleDocId,
           fields,
           pageSize: 100,
+          // Deleted replies are needed to tell a head-comment edit apart from a
+          // reply deletion: both bump the comment's modifiedTime, and without
+          // the deleted reply there is nothing left to explain the newer
+          // timestamp (see parseCommentThread). Deleted *comments* come back
+          // too and are skipped below, so nothing else sees them.
+          ...(threads ? { includeDeleted: true } : {}),
           ...(pageToken ? { pageToken } : {}),
         }),
         `[Drive] comments.list ${googleDocId} (${mode}${pageToken ? " page" : ""})`
@@ -483,6 +499,9 @@ export async function fetchCommentData(
       for (const c of res.data.comments ?? []) {
         if (!c.id) continue;
         const raw = c as RawDriveComment;
+        // Only reachable with includeDeleted (above); without it Drive omits
+        // deleted comments entirely, and neither parser should ever see one.
+        if (raw.deleted === true) continue;
         if (sync) commentsList.push(parseDriveComment(raw, emailLower));
         if (threads) {
           const thread = parseCommentThread(raw);
@@ -823,6 +842,9 @@ export interface ThreadReply {
   content: string;
   htmlContent?: string;
   createdTime: string;
+  /** Drive's per-reply modifiedTime; equal to createdTime when the reply was
+   *  never edited. Absent on threads synthesized without Drive data. */
+  modifiedTime?: string;
   action?: "resolve" | "reopen" | "accept" | "reject";
 }
 
@@ -836,7 +858,14 @@ export interface CommentThread {
   content: string;
   htmlContent?: string;
   createdTime: string;
+  /** Drive's comment-level modifiedTime: the last time the comment OR ANY OF ITS
+   *  REPLIES was modified, so it cannot by itself tell you the initial comment
+   *  was edited — `editedTime` is the field for that. */
   modifiedTime?: string;
+  /** When the initial comment itself was edited after posting, where that could
+   *  be established (see `commentEditedTime` in `comment-edits.ts`). Absent on
+   *  threads not built from Drive data. */
+  editedTime?: string;
   resolved: boolean;
   replies: ThreadReply[];
   quotedFileContent?: { mimeType: string; value: string } | null;

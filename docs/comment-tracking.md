@@ -679,7 +679,41 @@ For full suggestion sync details, see [`suggestions.md`](./suggestions.md).
 - **Endpoint**: `GET /drive/v3/files/{fileId}/comments`
 - **`fields` is mandatory** — Drive returns nothing without it.
 - **Fields used for sync**: `id, resolved, deleted, createdTime, modifiedTime, author(me), assigneeEmailAddress, mentionedEmailAddresses, replies(id, deleted, action, author(me), assigneeEmailAddress, mentionedEmailAddresses)`. `deleted` on both levels is what lets the parsing helpers drop deleted entries (see above); reply `id` is needed to edit or delete a specific reply.
-- **Fields used for thread display**: adds `content, htmlContent, quotedFileContent(mimeType, value), author(displayName), replies(content, htmlContent, createdTime, author(displayName))`
+- **Fields used for thread display**: adds `content, htmlContent, quotedFileContent(mimeType, value), author(displayName), replies(content, htmlContent, createdTime, modifiedTime, author(displayName))`
+- **Edit timestamps** (`modifiedTime`) mean different things at the two levels:
+  - **Reply `modifiedTime`** covers that reply alone — it differs from `createdTime` if and
+    only if the reply was edited (or deleted) after posting. `parseCommentThread` carries it
+    onto `ThreadReply.modifiedTime` whenever Drive supplies it, so the UI can compare the two.
+  - **Comment `modifiedTime`** is the newest timestamp anywhere in the thread (the initial
+    comment *or* any reply, including a reply's deletion), so it moves on every reply and
+    cannot by itself show that the initial comment was edited.
+
+  `src/lib/comment-edits.ts` turns this into `replyEditedTime()` (a direct comparison, exact)
+  and `commentEditedTime()` (an inference for the initial comment). The thread panel renders
+  `<timestamp> (edited <timestamp>)` from them.
+
+  **`commentEditedTime()` is deliberately conservative.** It reports an edit only when the
+  comment's `modifiedTime` is strictly later than every reply's timestamps *and* every reply
+  supplied a `modifiedTime`. Consequences:
+  - A comment with no replies reports its edits exactly — the common case.
+  - An edit made *before* a later reply is unreportable: the reply overwrites the only
+    evidence. The marker is silent rather than wrong. Drive offers no per-comment edit time
+    to close this gap (the Docs API doesn't expose comments at all), so this is a limitation
+    of the API, not of the implementation.
+  - **Deleted replies must be included in the inference.** Deleting a reply stamps the
+    deletion time on both the reply and the comment; drop the tombstone and the deletion
+    reads as an edit of the head comment. This is why `fetchCommentData` passes
+    `includeDeleted: true` when threads are requested, and why `parseCommentThread` computes
+    `CommentThread.editedTime` server-side from the *raw* reply list rather than leaving it
+    to the UI, which only ever sees `liveReplies()`. `includeDeleted` also returns deleted
+    comments, which `fetchCommentData` skips explicitly so that neither parser sees one.
+  - Not verified exhaustively: whether Drive ever bumps a comment's `modifiedTime` for
+    something that isn't a content edit (anchor repair when the quoted text moves, say). On a
+    reply-less comment that would surface as a false "(edited)".
+
+  Threads built by `extensionToThread` (Chrome extension) carry no Drive timestamps at all,
+  so both helpers report nothing for them — as do suggestions, which have no comment API
+  timestamps (see [suggestions.md](./suggestions.md)).
 - **`htmlContent`**: Read-only field with HTML formatting of comment/reply text (bold, italics, @mention links). The API recommends displaying `htmlContent` over plain `content`. The thread panel renders it via `dangerouslySetInnerHTML`, passing it through `sanitizeHtml()` (`src/lib/sanitize-html.ts`, a DOMPurify wrapper) first — Drive already escapes user text, so this is defense in depth. `quotedFileContent.value` is sanitized the same way.
 - **`quotedFileContent`**: The document text the comment was anchored to at creation time. MIME type is typically `text/html` but in practice the value appears to contain no formatting markup. This is a snapshot — the text may have been edited or deleted since. The Drive API may also truncate long quoted text (the truncation format is undocumented). The thread panel shows one of three warnings when the quoted text doesn't match the current document, based on `originalContentDeleted` (a tri-state from the Chrome extension: `true` = deleted, `false` = checked & not deleted, `undefined` = not checked):
   - **`true`**: "Original content deleted. This comment/suggestion is not visible in the document." — definitive orphaned warning from the extension's aria-label detection.

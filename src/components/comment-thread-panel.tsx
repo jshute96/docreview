@@ -27,6 +27,18 @@ import { cn } from "@/lib/utils";
 import { foldEnd as foldThread } from "@/lib/thread-fold";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { FriendlyDate } from "@/components/friendly-date";
+import { replyEditedTime } from "@/lib/comment-edits";
+
+/** Shows "(edited <timestamp>)" after a message's posted time. Renders nothing
+ *  when the message was never edited. */
+function EditedMarker({ at }: { at: string | null }) {
+  if (!at) return null;
+  return (
+    <span className="text-xs text-zinc-400" title="This message was edited after it was posted">
+      (edited <FriendlyDate date={at} />)
+    </span>
+  );
+}
 
 /** Render comment/reply text with search highlighting, preferring htmlContent. */
 function CommentContent({ htmlContent, content, searchFilter, className }: {
@@ -934,6 +946,7 @@ export function CommentThreadPanel({
                     {thread.author}
                   </span>
                   <FriendlyDate date={thread.createdTime} className="text-xs text-zinc-400" />
+                  <EditedMarker at={thread.editedTime ?? null} />
                   {canModify(thread.fromMe, null) && (
                     <EntryMenu
                       label="comment"
@@ -976,6 +989,7 @@ export function CommentThreadPanel({
                           {reply.author}
                         </span>
                         <FriendlyDate date={reply.createdTime} className="text-xs text-zinc-400" />
+                        <EditedMarker at={replyEditedTime(reply)} />
                         {reply.action === "resolve" && (
                           <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-600">
                             Resolved

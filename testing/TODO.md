@@ -135,6 +135,11 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Deleting a reply removes just that reply, leaving the thread
 - [ ] Deleting my first comment removes the whole thread row from the list
 - [ ] Suggestions have no edit/delete menu
+- [ ] An edited reply shows "(edited <time>)" after its posted time; unedited messages don't
+- [ ] Editing a reply from Docreview makes its "(edited <time>)" marker appear after the save
+- [ ] An edited reply marks only itself, never the thread's first comment
+- [ ] Deleting a reply doesn't make the thread's first comment look edited
+- [ ] An edited reply-less comment shows "(edited <time>)" on the comment itself
 
 ### Suggestions Display
 - [ ] Suggestions appear in same table as comments

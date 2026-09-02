@@ -351,6 +351,11 @@ approximation — the suggestion may have been created before or after that time
 it equals `driveCreatedAt`. Gmail merge and extension sync update `driveModifiedAt` with
 actual reply timestamps when available.
 
+For the same reason, the thread panel's "(edited)" marker never appears on suggestions:
+it is driven by Drive's per-entry `modifiedTime` (see
+[comment-tracking.md](./comment-tracking.md#drive-api-notes)), which suggestion threads
+don't have.
+
 ### Limited isThreadAuthor / isReplyAuthor / mentionedMe
 
 Authorship, reply participation, and @mention flags for suggestions default to `false`
