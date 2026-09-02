@@ -114,6 +114,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   // controls work with the raw count instead.
   const isRead = isThreadRead(comment);
   const unreadCount = unreadMessageCount(comment);
+  const messageTotal = totalMessageCount(comment.replyCount);
+  // A lone message that's been read is worth no ink at all — "/ 1" would be
+  // noise on every one-line comment.
+  const showMessageTotal = messageTotal > 1 || unreadCount > 0;
 
   // The thread/suggestion API identifier — googleCommentId for comments, googleSuggestionId
   // for suggestions. Extension-sourced suggestions only have googleCommentId (disco ID).
@@ -721,11 +725,25 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       {cell(`${cellPy} pr-4 text-sm text-zinc-500 whitespace-nowrap`,
         sameAsCreated ? "—" : <FriendlyDate date={comment.driveModifiedAt} />
       )}
-      {cell(`${cellPy} pr-4 text-sm text-zinc-500 tabular-nums`,
-        comment.replyCount > 0 ? comment.replyCount : ""
-      )}
-      {cell(`${cellPy} pr-4 text-sm tabular-nums font-medium text-blue-600`,
-        unreadCount > 0 ? unreadCount : ""
+      {/* "unread / total", laid out as a fixed-width grid rather than three
+          table columns: the fixed tracks keep the count, slash and total lined
+          up down the table without the column widths having to cooperate, and
+          it stays one cell so the rest of the row spaces out normally.
+          The total counts the head comment, so it's one more than the replies.
+          A thread with nothing to say shows nothing: no count when everything
+          is read, and no "/ 1" on a lone message that's been read. */}
+      {cell(`${cellPy} pr-4 text-sm tabular-nums`,
+        showMessageTotal || unreadCount > 0 ? (
+          <span className="grid w-fit grid-cols-[minmax(2ch,auto)_1ch_minmax(2ch,auto)] gap-x-1">
+            <span className="text-right font-medium text-blue-600">
+              {unreadCount > 0 ? unreadCount : ""}
+            </span>
+            <span className="text-center text-zinc-300">{showMessageTotal ? "/" : ""}</span>
+            <span className="text-right text-zinc-500">
+              {showMessageTotal ? messageTotal : ""}
+            </span>
+          </span>
+        ) : ""
       )}
       {cell(`${cellPy} flex`,
         // stopPropagation + self-stretch: non-clickable buffer around star/badges
@@ -813,7 +831,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         onClick={handleRowClick}
         {...hoverHandlers}
       >
-        <td colSpan={6} className="max-w-0 overflow-hidden">
+        <td colSpan={5} className="max-w-0 overflow-hidden">
           <div className={cellWrap} style={cellWrapStyle}>
             <div className="overflow-hidden min-h-0 pt-0.5 pb-2 pl-4 pr-4">
           {isSuggestion ? (
@@ -837,7 +855,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             width (textarea, buttons) from leaking into the table's auto-layout
             column-width calculation. Without this, expanding a thread or
             typing in the reply box shifts the header row's columns. */}
-        <td colSpan={6} className="max-w-0 overflow-hidden p-0">
+        <td colSpan={5} className="max-w-0 overflow-hidden p-0">
           <div
             className="grid transition-[grid-template-rows] duration-200 ease-out"
             style={{ gridTemplateRows: expanded && !isExiting ? "1fr" : "0fr" }}

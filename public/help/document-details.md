@@ -40,8 +40,14 @@ Each row shows:
 - **Preview** -- First line of the comment with the author name.
 - **Created** -- When the thread was started.
 - **Modified** -- When the last reply was added ("--" if no replies).
-- **Responses** -- Number of replies in the thread.
-- **Unread** -- Number of messages in the thread you haven't read, counting the original comment (so an unread comment with no replies shows 1). Empty when the whole thread is read.
+- **Unread** -- How much of the thread you haven't read, written as "unread / total":
+    - **2 / 4** -- two of the thread's four messages are new to you.
+    - **1 / 1** -- a comment with no replies that you haven't read.
+    - **  / 4** -- you've read all four messages; the count is left blank.
+    - *(blank)* -- a single message you've already read, where " / 1" would just be noise.
+
+    The total counts the original comment as well as its replies.
+    This column doesn't sort -- use the Unread filter above the table instead.
 
 ### Row highlighting
 
@@ -97,4 +103,4 @@ The menu button at the end of the toolbar holds the less-used bulk actions:
 
 ## Sort behavior
 
-Comments are sorted by the column you select. When you interact with a single comment (reply, resolve, change status), the sort order is temporarily frozen to prevent the row from jumping to a new position. Click any column header to re-sort.
+Comments are sorted by the column you select. When you interact with a single comment (reply, resolve, change status), the sort order is temporarily frozen to prevent the row from jumping to a new position. Click the Created or Modified header to re-sort; the other columns don't sort.

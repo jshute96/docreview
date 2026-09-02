@@ -15,7 +15,7 @@ import { DeleteReAddDialog } from "@/components/delete-readd-dialog";
 import { ROLE_COLORS } from "@/lib/role-colors";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
-import { isThreadRead, totalMessageCount, unreadMessageCount } from "@/lib/read-state";
+import { isThreadRead, totalMessageCount } from "@/lib/read-state";
 import { CommentRow } from "@/components/comment-row";
 import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, setDocReadyHandler, getCommentsAndSuggestionsFromDoc, getSuggestionFromDoc, type ExtensionSuggestion, type ExtensionCommentInfo } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
@@ -635,7 +635,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
   const [unreadFilter, setUnreadFilter] = useState<TriState>("off");
   const [isStarredFilter, setIsStarredFilter] = useState<TriState>("off");
   const [searchFilter, setSearchFilter] = useState("");
-  type SortCol = "driveCreatedAt" | "driveModifiedAt" | "replyCount" | "unread" | "isReplyAuthor" | "resolved";
+  /** Only the two date columns sort. Status combines several flags into one
+   *  column with no meaningful order, and Unread is a pair of numbers. */
+  type SortCol = "driveCreatedAt" | "driveModifiedAt";
   type SortDir = "asc" | "desc";
   const [sortCol, setSortCol] = useState<SortCol>("driveModifiedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -687,9 +689,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortCol(col);
-      // Unread starts descending: the point of the column is to find the
-      // threads with the most unread messages, not the fully-read ones.
-      setSortDir(col === "unread" ? "desc" : "asc");
+      setSortDir("asc");
     }
   }
   const [refreshing, setRefreshing] = useState(false);
@@ -983,18 +983,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
         const bPos = frozenOrderRef.current.get(b.commentId) ?? Infinity;
         return aPos - bPos;
       }
-      let cmp = 0;
-      if (sortCol === "driveCreatedAt" || sortCol === "driveModifiedAt") {
-        const aTime = a[sortCol] ? new Date(a[sortCol]!).getTime() : 0;
-        const bTime = b[sortCol] ? new Date(b[sortCol]!).getTime() : 0;
-        cmp = aTime - bTime;
-      } else if (sortCol === "replyCount") {
-        cmp = a.replyCount - b.replyCount;
-      } else if (sortCol === "unread") {
-        cmp = unreadMessageCount(a) - unreadMessageCount(b);
-      } else {
-        cmp = (a[sortCol] ? 1 : 0) - (b[sortCol] ? 1 : 0);
-      }
+      const aTime = a[sortCol] ? new Date(a[sortCol]!).getTime() : 0;
+      const bTime = b[sortCol] ? new Date(b[sortCol]!).getTime() : 0;
+      const cmp = aTime - bTime;
       return sortDir === "asc" ? cmp : -cmp;
     });
 
@@ -1010,7 +1001,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
 
   function ThButton({ col, title, children }: { col: SortCol; title?: string; children: React.ReactNode }) {
     return (
-      <th className="py-2.5 pr-4 text-left">
+      <th className="min-w-40 py-2.5 pr-4 text-left">
         <button
           onClick={() => handleSort(col)}
           title={title}
@@ -1295,7 +1286,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
           <table className="w-full min-w-fit">
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50">
-                <th className="pl-4 py-2.5 pr-4 text-left">
+                <th className="min-w-40 pl-4 py-2.5 pr-4 text-left">
                   <button
                     onClick={() => handleSort("driveCreatedAt")}
                     title="Thread creation time"
@@ -1305,8 +1296,19 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                   </button>
                 </th>
                 <ThButton col="driveModifiedAt" title="Thread last-modified time">Modified</ThButton>
-                <ThButton col="replyCount" title="Number of replies">Responses</ThButton>
-                <ThButton col="unread" title="Number of unread messages in the thread, counting the original comment">Unread</ThButton>
+                {/* Left-aligned and the same width as the columns beside it,
+                    so the four headings space evenly. The "2 / 4" value is
+                    left-aligned to match, which lands the slash near the middle
+                    of the label. Unsortable, like Status: the filter bar's
+                    Unread toggle is the better way to get at these anyway. */}
+                <th className="min-w-40 py-2.5 pr-4 text-left">
+                  <span
+                    className="text-xs font-medium text-zinc-500 uppercase tracking-wide"
+                    title="Unread message count / Total message count"
+                  >
+                    Unread
+                  </span>
+                </th>
                 <th className="py-2.5 pr-4 text-left">
                   <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide" title="Comment status">Status</span>
                 </th>

@@ -278,8 +278,17 @@ would mean storing per-message IDs, which no sync path provides for replies.
 
 ### Display
 
-The comment table's **Unread** column shows `unreadMessageCount` (total minus read, clamped at
-0), which counts the head comment, so an untouched zero-reply thread shows 1. An expanded thread
+The comment table's **Unread** column reads "unread / total" — `unreadMessageCount` (total minus
+read, clamped at 0) over `totalMessageCount`, both counting the head comment, so the total is one
+more than the reply count and an untouched zero-reply thread reads "1 / 1". `CommentRow` draws it
+as a fixed-track grid inside one cell (count, slash, total), so the three parts line up down the
+table without depending on how the table apportions column widths — a `colSpan` heading over three
+real columns was tried first and left the slash drifting away from the number. The column is left-aligned and
+carries the same minimum width as the two date columns beside it, so the four headings space
+evenly across the row. The count is blank on a fully-read thread, and a read thread with a
+single message is left entirely blank rather than showing "/ 1". The column doesn't sort — the
+filter bar's Unread toggle covers the same ground, and there's no sensible single order for a
+pair of numbers. An expanded thread
 marks each unread message with a blue left rail and bold author name, and draws an "N unread"
 rule above the first unread message when there is a read part above it to separate from
 (`CommentThreadPanel`'s `readMessageCount` prop). The rail is a border and the green "by me"
@@ -499,7 +508,7 @@ Both regex and literal substring matching are always attempted:
 - **Green background** — comment is read (default read state). Only shown when neither red nor amber applies.
 - Red takes precedence over amber; both take precedence over green.
 
-The sortable data columns are Modified, Responses, and Status (which combines star, Mine/Replied/Assigned/@Mentioned badges, and Resolved/Open state into one column). The Assigned badge is shown in a darker style (amber-600) to stand out.
+The sortable data columns are Created and Modified — the only two with a meaningful single order. Status (which combines star, Mine/Replied/Assigned/@Mentioned badges, and Resolved/Open state into one column) and Unread don't sort. The Assigned badge is shown in a darker style (amber-600) to stand out.
 Modified shows "—" when it equals Created (i.e., no replies have been added).
 
 **Sort freezing on single-comment updates:** When you reply to, resolve, refresh, or
