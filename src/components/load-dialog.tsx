@@ -139,7 +139,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       abortRef.current?.abort();
     }
     setOpen(isOpen);
-  }, []);
+  }, [resetHighlights]);
 
   function handleCancel() {
     abortRef.current?.abort();

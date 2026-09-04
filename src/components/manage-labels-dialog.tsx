@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { GripVertical, Trash2 } from "lucide-react";
-import type { Label } from "@prisma/client";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +15,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,

@@ -382,7 +382,7 @@ export async function mergeExtensionSuggestions(
     logInfo(`[Suggestions:Ext] ${googleDocId}: processing ${s.id} ${actionType} old=${s.oldText.length}chars new=${s.newText.length}chars status=${s.status} hash=${contentHash.substring(0, 12)}…`);
 
     // 1. Check if this disco ID already exists — update metadata
-    let existingById = await prisma.comment.findFirst({
+    const existingById = await prisma.comment.findFirst({
       where: { docId, googleCommentId: s.id },
     });
     if (existingById && !existingById.googleSuggestionId) {

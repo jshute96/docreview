@@ -100,7 +100,7 @@ export function BulkEditDialog({
       resetHighlights();
     }
     setOpen(isOpen);
-  }, [initialDocs, allLabels]);
+  }, [initialDocs, allLabels, resetHighlights]);
 
   /**
    * Revert role/status/label states to 'as-is' if they've become redundant

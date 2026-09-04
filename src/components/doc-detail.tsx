@@ -17,7 +17,7 @@ import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { isThreadRead, totalMessageCount } from "@/lib/read-state";
 import { CommentRow } from "@/components/comment-row";
-import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, setDocReadyHandler, getCommentsAndSuggestionsFromDoc, getSuggestionFromDoc, type ExtensionSuggestion, type ExtensionCommentInfo } from "@/lib/bridge-to-extension";
+import { pingExtension, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, setDocReadyHandler, getCommentsAndSuggestionsFromDoc, getSuggestionFromDoc, type ExtensionSuggestion, type ExtensionCommentInfo } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -244,7 +244,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       }
       broadcastChange({ type: "comments", docId: doc.docId, commentType: CommentType.SUGGESTION, googleCommentId: discoId }, contextId);
     }).catch((err) => {
-      console.log("[doc-detail] suggestion refresh: server merge error", err);
+      console.log("[doc-detail] suggestion refresh: server merge error", err); // eslint-disable-line no-console
       if (!isAuthError(err)) toast.error("Couldn't save the refreshed suggestion");
     });
   }, [doc.docId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -456,10 +456,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
   // automatically instead of requiring a manual Refresh.
   useEffect(() => {
     setDocReadyHandler((docId) => {
-      console.log("[doc-detail] docReady received for", docId, "| this doc:", googleDocId, "| already loaded:", extensionSuggestionsLoaded.current);
+      console.log("[doc-detail] docReady received for", docId, "| this doc:", googleDocId, "| already loaded:", extensionSuggestionsLoaded.current); // eslint-disable-line no-console
       if (docId !== googleDocId) return;
       if (extensionSuggestionsLoaded.current) return;
-      console.log("[doc-detail] docReady: auto-fetching suggestions");
+      console.log("[doc-detail] docReady: auto-fetching suggestions"); // eslint-disable-line no-console
       void fetchExtensionCommentsAndSuggestions();
     });
     return () => setDocReadyHandler(null);

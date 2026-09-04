@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
 import { CommentStatus, CommentType, SuggestionType, type Comment } from "@prisma/client";
 import type { CommentThread, ThreadMap, SuggestionContent } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";

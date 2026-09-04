@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { toast } from "sonner";
-import { apiFetch, isAuthError, generateContextId } from "@/lib/api-fetch";
+import { useRef, useEffect } from "react";
 import type { DocWithLabels } from "@/types";
 import {
   Dialog,
@@ -11,7 +9,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useLabels } from "@/contexts/label-context";
 import { DocForm, type DocFormHandle } from "@/components/add-doc-form";
 
 interface DeleteReAddDialogProps {
@@ -31,7 +28,6 @@ export function DeleteReAddDialog({
   mimeType,
   onSuccess,
 }: DeleteReAddDialogProps) {
-  const { allLabels } = useLabels();
   const formRef = useRef<DocFormHandle>(null);
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { drive as createDrive } from "@googleapis/drive";
+import { drive as createDrive, type drive_v3 } from "@googleapis/drive";
 import { docs as createDocs, type docs_v1 } from "@googleapis/docs";
 import { OAuth2Client } from "google-auth-library";
 import { NextResponse } from "next/server";
@@ -89,7 +89,7 @@ export function parseGoogleDocId(url: string): string | null {
     if (idParam && BARE_DOC_ID_RE.test(idParam)) {
       return idParam;
     }
-  } catch (err) {
+  } catch {
     // Not a valid full URL, skip searchParam check
   }
 
@@ -1104,7 +1104,9 @@ export async function listChanges(
 
   do {
     const t0 = Date.now();
-    const res: any = await withProgressLogging(
+    // Annotated explicitly: TS can't infer `res` on its own here, because the
+    // call arguments read `currentToken`, which the loop assigns from `res`.
+    const res: { data: drive_v3.Schema$ChangeList } = await withProgressLogging(
       drive.changes.list({
         pageToken: currentToken,
         fields: "nextPageToken, newStartPageToken, changes(time, removed, fileId, file(id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed))",

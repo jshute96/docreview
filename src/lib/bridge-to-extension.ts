@@ -27,11 +27,11 @@ let cachedExtensionStatus: ExtensionStatus | null | undefined = null;
 export async function pingExtension(): Promise<ExtensionStatus | null> {
   try {
     const result = await sendExtensionMessage<ExtensionStatus>({ type: "ping" }, 2000);
-    console.log("[extension] Detected:", result);
+    console.log("[extension] Detected:", result); // eslint-disable-line no-console
     cachedExtensionStatus = result;
     return result;
   } catch {
-    console.log("[extension] Not detected");
+    console.log("[extension] Not detected"); // eslint-disable-line no-console
     cachedExtensionStatus = undefined;
     return null;
   }
@@ -221,7 +221,7 @@ export async function getSuggestionFromDoc(docId: string, discoId: string): Prom
   );
   if (result.success) {
     if (result.suggestion) {
-      console.log("[extension] getSuggestion:", discoId, "found");
+      console.log("[extension] getSuggestion:", discoId, "found"); // eslint-disable-line no-console
     }
     return result.suggestion ?? null;
   }
@@ -240,7 +240,7 @@ export async function getCommentFromDoc(docId: string, discoId: string): Promise
       error?: string;
     }>({ type: "getComment", docId, discoId }, 5000);
     if (result.success) {
-      console.log("[extension] getComment:", discoId, result.comment ? "found" : "not found");
+      console.log("[extension] getComment:", discoId, result.comment ? "found" : "not found"); // eslint-disable-line no-console
       return result.comment ?? null;
     }
     return null;
@@ -286,7 +286,7 @@ export async function getCommentsAndSuggestionsFromDoc(docId: string): Promise<{
     }>({ type: "getCommentsAndSuggestions", docId }, 8000);
     if (result.success) {
       const missingIdCount = result.missingIdCount ?? 0;
-      console.log("[extension] getCommentsAndSuggestions:", result.suggestions?.length ?? 0, "suggestions,", result.comments?.length ?? 0, "comments",
+      console.log("[extension] getCommentsAndSuggestions:", result.suggestions?.length ?? 0, "suggestions,", result.comments?.length ?? 0, "comments", // eslint-disable-line no-console
         missingIdCount ? `(${missingIdCount} dropped: no disco ID)` : "");
       return {
         suggestions: result.suggestions ?? [],
@@ -294,7 +294,7 @@ export async function getCommentsAndSuggestionsFromDoc(docId: string): Promise<{
         missingIdCount,
       };
     }
-    console.log("[extension] getCommentsAndSuggestions: not available —", result.error ?? "unknown");
+    console.log("[extension] getCommentsAndSuggestions: not available —", result.error ?? "unknown"); // eslint-disable-line no-console
     return null;
   } catch {
     return null;

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getValidSession } from "./auth-utils";
 import { auth } from "@/auth";
-import { OFFLINE_MODE, getExpectedOfflineId } from "./offline";
 
 vi.mock("@/auth", () => ({
   auth: vi.fn(),
@@ -17,7 +16,6 @@ vi.mock("./request-context", () => ({
 }));
 
 const mockAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
-const mockGetExpectedId = vi.mocked(getExpectedOfflineId);
 
 describe("auth-utils", () => {
   beforeEach(() => {
