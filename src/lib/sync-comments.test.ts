@@ -1292,8 +1292,8 @@ describe("syncComments read tracking", () => {
   });
 
   it("marks the last message unread when a thread changes without new replies", async () => {
-    // Someone edited a message or deleted a reply: activity we can't localize,
-    // so the thread resurfaces as unread.
+    // Someone edited a message: activity we can't localize, so the thread
+    // resurfaces as unread.
     mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 2, replySlotCount: 2, readSlotCount: 3 })]);
     mockFetchCommentData.mockResolvedValue({
       comments: [driveComment({
@@ -1311,8 +1311,7 @@ describe("syncComments read tracking", () => {
   it("holds the read boundary in place when a read reply is deleted", async () => {
     // The thread was fully read at 4 replies. Two are deleted, which leaves
     // their slots behind — so the boundary doesn't slide down over a message
-    // the user never read. Activity without new slots still resurfaces the last
-    // live message, which is all that should be unread afterwards.
+    // the user never read, and a deletion on its own doesn't resurface anything.
     mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 4, replySlotCount: 4, readSlotCount: 5 })]);
     mockFetchCommentData.mockResolvedValue({
       comments: [driveComment({
@@ -1326,11 +1325,31 @@ describe("syncComments read tracking", () => {
 
     await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
 
-    // Head + r0 stay read; r1 (the last live message) is the only thing unread.
-    // The old live-position boundary would have slid down to 3 of 3 messages
-    // here and reported the thread fully read.
-    expect(updatedReadCount()).toBe(2);
-    expect(updatedReadMessageCount()).toBe(2); // 2 of 3 live messages
+    // All 3 surviving messages stay read. The old live-position boundary would
+    // have slid down over slots it never covered.
+    expect(updatedReadCount()).toBe(5);
+    expect(updatedReadMessageCount()).toBe(3); // 3 of 3 live messages
+  });
+
+  it("clears the thread when the only unread reply is deleted", async () => {
+    // head read, one unread reply from someone else, then that reply is deleted.
+    // Nothing new is left to look at, so the thread goes to zero unread instead
+    // of bumping the head comment back to unread.
+    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 1, replySlotCount: 1, readSlotCount: 1 })]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 0,
+        replySlotCount: 1,
+        replyDeleted: [true],
+        replyAuthorMeFlags: [false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(updatedReadCount()).toBe(1);
+    expect(updatedReadMessageCount()).toBe(1); // 1 of 1 live message
   });
 
   it("doesn't treat a slot that arrived already deleted as someone else's reply", async () => {
@@ -1355,6 +1374,171 @@ describe("syncComments read tracking", () => {
     await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
 
     expect(mockComment.update.mock.calls[0][0].data.status).toBe("ARCHIVED");
+  });
+
+  it("doesn't move an archived comment to Inbox for a deletion alone", async () => {
+    // A deletion moves Drive's thread-level modifiedTime, which used to read as
+    // "activity" and pull the doc back on an AUTHOR doc. Nothing was added, so
+    // the doc would arrive in Inbox with nothing on it to explain the trip.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 2, replySlotCount: 2, readSlotCount: 3, status: "ARCHIVED" }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 1,
+        replySlotCount: 2,
+        replyDeleted: [false, true],
+        replyAuthorMeFlags: [false, false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const res = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("ARCHIVED");
+    expect(res.shouldUnarchive).toBe(false);
+  });
+
+  it("doesn't move an archived comment to Inbox for a slot that arrived already deleted", async () => {
+    // Same rule from the other direction: the slot count grew, but the only new
+    // slot is a tombstone, so there is nothing live to show for the trip.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 1, replySlotCount: 1, readSlotCount: 2, status: "ARCHIVED" }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 1,
+        replySlotCount: 2,
+        replyDeleted: [false, true],
+        replyAuthorMeFlags: [false, false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const res = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("ARCHIVED");
+    expect(res.shouldUnarchive).toBe(false);
+  });
+
+  it("still moves to Inbox when a deletion comes with a live new reply", async () => {
+    // The deletion suppression must not swallow real activity landing in the
+    // same window. Two replies deleted and one added, so the live count really
+    // does drop — otherwise `deletedThisSync` is false and this proves nothing.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 3, replySlotCount: 3, readSlotCount: 4, status: "ARCHIVED" }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 2,
+        replySlotCount: 4,
+        replyDeleted: [false, true, true, false],
+        replyAuthorMeFlags: [false, false, false, false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const res = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("INBOX");
+    expect(res.shouldUnarchive).toBe(true);
+  });
+
+  it("still acts on a resolve that lands in the same sync as a deletion", async () => {
+    // A resolve flip is a state change we'd never get a second look at — the new
+    // `resolved` is committed either way — so it escapes the deletion
+    // suppression, and it resurfaces the last live message as unread so the doc
+    // has something to show for the trip.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 2, replySlotCount: 2, readSlotCount: 3, status: "INBOX", resolved: false }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 1,
+        replySlotCount: 2,
+        replyDeleted: [false, true],
+        replyAuthorMeFlags: [false, false],
+        resolved: true,
+        iResolvedIt: false,
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const res = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.readSlotCount).toBe(1); // last live message unread
+    expect(res.shouldUnarchive).toBe(true);
+  });
+
+  it("still acts on a re-open that lands in the same sync as a deletion", async () => {
+    // The damaging direction: a thread someone re-opens must reach INBOX. If the
+    // deletion swallowed it the row would still be written `resolved: false`, so
+    // no later sync could ever see the transition again.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 2, replySlotCount: 2, readSlotCount: 3, status: "ARCHIVED", resolved: true }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 1,
+        replySlotCount: 2,
+        replyDeleted: [false, true],
+        replyAuthorMeFlags: [false, false],
+        resolved: false,
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const res = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("INBOX");
+    expect(mockComment.update.mock.calls[0][0].data.readSlotCount).toBe(1); // last live message unread
+    expect(res.shouldUnarchive).toBe(true);
+  });
+
+  it("treats a Gmail row's over-counted replies as activity, not a deletion", async () => {
+    // A Gmail-created row seeds replyCount/replySlotCount from the notification's
+    // reply list, which can overshoot what Drive reports. The lower Drive count
+    // is not a deletion — the slot count dropped too, and real deletions never
+    // lower that — so the first Drive sync of the thread still counts as activity.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 3, replySlotCount: 3, readSlotCount: 0, status: "ARCHIVED" }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 1,
+        replySlotCount: 1,
+        replyAuthorMeFlags: [false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const res = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("INBOX");
+    expect(res.shouldUnarchive).toBe(true);
+  });
+
+  it("still moves to Inbox when a message is edited", async () => {
+    // An edit has no new slots and no deletion, so it stays activity — and it
+    // resurfaces the last live message as unread, so the doc has something to
+    // show when it arrives.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 2, replySlotCount: 2, readSlotCount: 3, status: "ARCHIVED" }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 2,
+        replySlotCount: 2,
+        replyAuthorMeFlags: [false, false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const res = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("INBOX");
+    expect(mockComment.update.mock.calls[0][0].data.readSlotCount).toBe(2); // last live message unread
+    expect(res.shouldUnarchive).toBe(true);
   });
 
   it("sees a reply that arrives in the same window as a deletion", async () => {

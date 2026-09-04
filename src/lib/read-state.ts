@@ -128,10 +128,16 @@ export function isThreadRead(c: { readMessageCount: number; replyCount: number }
  * - Someone else's new replies → also carry it forward: leaving the boundary
  *   alone is what makes exactly the new replies unread, and what makes a manual
  *   "mark unread" survive later replies.
- * - Activity without new slots (an edit, a deletion, a resolve flip) → mark the
- *   last *live* message unread. Drive only reports a thread-level modifiedTime,
- *   so we can't tell which message changed; flagging the last one resurfaces the
- *   thread without guessing.
+ * - Activity without new slots (an edit, a resolve flip) → mark the last *live*
+ *   message unread. Drive only reports a thread-level modifiedTime, so we can't
+ *   tell which message changed; flagging the last one resurfaces the thread
+ *   without guessing.
+ *
+ * A deletion never reaches here as activity: `updateExistingComment` classifies a
+ * deletion with nothing live to replace it as not-activity before calling in (see
+ * `deletionOnly` there), so the boundary is carried forward by the no-activity
+ * rule. Deciding it there rather than here is deliberate — the same call has to
+ * settle whether the comment moves to Inbox, and the two answers must agree.
  *
  * The stored boundary is still clamped to the current slot total. Slot counts
  * are monotonic in every case Drive documents, but Google guarantees no

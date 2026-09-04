@@ -333,6 +333,10 @@ For the full picture on suggestions specifically, see [`suggestions.md`](./sugge
 After comment sync completes, each doc's sync result includes a `shouldUnarchive` flag
 indicating whether meaningful new activity was detected. ARCHIVED docs are moved back to
 INBOX only when this flag is true — not merely because they have unresolved comments.
+Deleting a comment or reply is deliberately *not* meaningful activity: nothing would show as
+unread, so the doc would arrive in Inbox with nothing on it that explains the trip. See
+`docs/inbox-states.md` (Smart Unarchive) and `docs/comment-tracking.md` ("Deletions aren't
+activity") for the full trigger list.
 
 ### Recency cutoff
 

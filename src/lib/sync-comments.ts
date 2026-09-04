@@ -578,11 +578,38 @@ async function updateExistingComment(
   // sync window leave the live count unchanged, which would hide the reply
   // completely. Slot counts only ever grow, so this can't false-negative.
   const hasNewReplies = c.replySlotCount > existing.replySlotCount;
+  // ...but only the *live* new slots are content the user can be shown. A reply
+  // posted and deleted between two syncs arrives as a brand-new tombstone slot,
+  // and moving the doc to Inbox for it strands the user on a doc with nothing
+  // in it that explains why it came back.
+  const newSlots = c.replyDeleted.slice(existing.replySlotCount);
+  const hasNewLiveReplies = newSlots.some((deleted) => !deleted);
+  // Whether something was deleted this sync: a slot arrived already dead, or the
+  // live count dropped while the slot count held. The slot-count condition is
+  // what keeps this from firing on a stored count that was too high to begin
+  // with rather than on a real deletion — a Gmail-created row seeds
+  // `replySlotCount` from the notification's reply list (see comment-merge.ts),
+  // which can overshoot what Drive later reports. A real deletion never lowers
+  // the slot count.
+  const deletedThisSync =
+    newSlots.some((deleted) => deleted) ||
+    (c.replySlotCount >= existing.replySlotCount && c.replyCount < existing.replyCount);
+  const resolveFlipped = existing.resolved !== c.resolved;
+  // A deletion with nothing live to replace it isn't activity worth surfacing:
+  // there is nothing new to read, so it must not mark the thread unread, move it
+  // to Inbox, or unarchive the doc — a doc that comes back to Inbox needs an
+  // unread comment on it to justify the trip. A resolve flip is exempt: it's a
+  // state change we'd never see again if this sync dropped it (the new `resolved`
+  // is committed below either way), and it resurfaces the thread's last live
+  // message as unread, so the doc still has something to show. An edit alongside
+  // a deletion *is* swallowed, which is the accepted cost of Drive reporting one
+  // thread-level modifiedTime and no per-message detail.
+  const deletionOnly = deletedThisSync && !hasNewLiveReplies && !resolveFlipped;
   const hasNewActivity =
-    hasNewReplies ||
-    (!existing.resolved && c.resolved) ||
-    (existing.resolved && !c.resolved) ||
-    (!selfEdited && !datesEqual(existing.driveModifiedAt, c.driveModifiedAt));
+    !deletionOnly &&
+    (hasNewLiveReplies ||
+      resolveFlipped ||
+      (!selfEdited && !datesEqual(existing.driveModifiedAt, c.driveModifiedAt)));
 
   // @-mention or assignment in new replies breaks out of MUTED
   // (see docs/inbox-states.md rule 2).
@@ -616,7 +643,7 @@ async function updateExistingComment(
     // 1. Comment transitions from non-INBOX to INBOX
     if (previousStatus !== CommentStatus.INBOX && status === CommentStatus.INBOX) unarchive = true;
     // 2. Existing INBOX comment gets new replies (unless I resolved it myself)
-    if (previousStatus === CommentStatus.INBOX && hasNewReplies && !(c.resolved && c.iResolvedIt)) unarchive = true;
+    if (previousStatus === CommentStatus.INBOX && hasNewLiveReplies && !(c.resolved && c.iResolvedIt)) unarchive = true;
     // 3. INBOX comment resolved by someone else. The *transition* is the
     // activity worth surfacing, so this tests the resolve arriving, not the
     // standing fact that the thread is resolved. Without `!existing.resolved`

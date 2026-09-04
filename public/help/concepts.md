@@ -29,6 +29,8 @@ When you archive a document or comment, Docreview watches for meaningful new act
 
 Each piece of activity brings the document back once, when Docreview first sees it -- archiving it again sticks until something new happens.
 
+Deleting a comment or reply doesn't bring a document back. There'd be nothing new to look at, so a deleted reply leaves the thread's read state alone -- and if the deleted reply was the only unread one, the thread simply reads as fully read. Edits and someone else resolving a thread still count.
+
 This means you can archive freely without worrying about missing important updates.
 
 ## Labels

@@ -392,7 +392,14 @@ in Google Docs (or from Docreview) and then a sync, so they belong to the live s
 - [ ] A reply deleted in Docs disappears from the thread on the next refresh, and stays gone across repeated refreshes
 - [ ] Deleting a reply *below* the read point doesn't change the unread count (the boundary holds its slot instead of sliding onto an unread message)
 - [ ] Deleting a reply *above* the read point leaves the already-read part read
-- [ ] Deleting a reply resurfaces the thread by marking its last live message unread (activity with no new slots)
+- [ ] Deleting the only unread reply leaves the thread fully read (0 unread), instead of bumping the message before it back to unread
+- [ ] Deleting an already-read reply doesn't resurface the thread — the surviving messages keep their read state
+- [ ] Deleting a reply on an archived doc doesn't move the comment to Inbox or unarchive the doc (even as doc author, where all activity is otherwise relevant)
+- [ ] A reply posted and deleted between two syncs (arrives as an already-dead slot) doesn't move the comment to Inbox or unarchive the doc
+- [ ] A deletion arriving in the same sync as a live new reply still moves the comment to Inbox and unarchives the doc
+- [ ] An edited reply still moves the comment to Inbox, unarchives the doc, and shows as unread
+- [ ] Someone else resolving a thread in the same window as a deleted reply still moves the doc to Inbox with the last live message unread
+- [ ] Re-opening a resolved thread in the same window as a deleted reply still moves the comment to Inbox
 - [ ] A reply deleted and another posted between two syncs: the new reply is still detected — thread to Inbox, one message unread, doc unarchived
 - [ ] An @mention in a reply posted after an earlier reply was deleted is still picked up (the "new replies" window isn't shifted by the deletion)
 - [ ] A reply that arrives already deleted (posted and deleted between syncs) does NOT move my own archived thread to Inbox as if a stranger replied

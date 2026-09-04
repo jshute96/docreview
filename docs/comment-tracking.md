@@ -112,10 +112,11 @@ timestamp test out of `hasNewActivity`:
 
 ```ts
 const hasNewActivity =
-  hasNewReplies ||
-  (!existing.resolved && c.resolved) ||
-  (existing.resolved && !c.resolved) ||
-  (!selfEdited && !datesEqual(existing.driveModifiedAt, c.driveModifiedAt));
+  !deletionOnly &&
+  (hasNewLiveReplies ||
+    (!existing.resolved && c.resolved) ||
+    (existing.resolved && !c.resolved) ||
+    (!selfEdited && !datesEqual(existing.driveModifiedAt, c.driveModifiedAt)));
 ```
 
 Every other trigger still counts. The status and `readSlotCount` that `computeCommentStatus`
@@ -129,8 +130,8 @@ Two cases follow from this:
   returns `previousStatus` and `readSlotCount` is carried over from the existing record. The
   new `driveModifiedAt` is still stored, so the next full sync compares equal and likewise finds
   no activity — the state holds without needing the flag again.
-- **Someone else replies while you're saving.** `hasNewReplies` is true, so `hasNewActivity` is
-  true regardless of the flag and the reply is handled exactly as on any other sync: `INBOX`,
+- **Someone else replies while you're saving.** `hasNewLiveReplies` is true, so `hasNewActivity`
+  is true regardless of the flag and the reply is handled exactly as on any other sync: `INBOX`,
   unread, @-mention rules and all. Their activity is never lost to your edit.
 
 The flag reaches `buildCommentUpdate` as well, because without it a self-edit would count as
@@ -206,8 +207,9 @@ this logic (first matching rule wins):
 2. If a **new reply @-mentions or assigns me** → `INBOX` (overrides all other rules,
    including MUTED).
 3. If `resolved = true` AND I was the one who resolved it → set status to `ARCHIVED`.
-4. Otherwise, if there is **new activity** (new replies, thread re-opened, or modification
-   detected via `driveModifiedAt`), apply relevance-based rules:
+4. Otherwise, if there is **new activity** (new *live* replies, thread re-opened, or
+   modification detected via `driveModifiedAt` — but see "Deletions aren't activity" below),
+   apply relevance-based rules:
    - **I was @-mentioned or assigned** anywhere in the thread → `INBOX` (even if I
      previously archived it; MUTED comments don't reach here)
    - **I'm the doc author** → `INBOX` (rule 4: all activity is relevant)
@@ -219,6 +221,47 @@ this logic (first matching rule wins):
 5. Otherwise (no new activity), preserve the existing `status`. This ensures that if
    you manually archive an unresolved thread, it stays archived until someone replies
    to it or re-opens it.
+
+#### Deletions aren't activity
+
+`updateExistingComment` computes `deletionOnly` — something was deleted this sync (the live
+reply count dropped while the slot count held, or a slot arrived already dead) and neither a
+live reply nor a resolve flip arrived with it — and suppresses `hasNewActivity` entirely when it
+holds. A pure deletion therefore doesn't mark the thread unread, doesn't move it to `INBOX`, and
+doesn't unarchive the doc.
+
+The slot-count condition on the live-count drop matters: a real deletion leaves a tombstone, so it
+never lowers the slot count. A *stored* count that was simply too high does — a Gmail-created row
+seeds both counts from the notification's reply list (`comment-merge.ts`), which can overshoot
+what Drive later reports — and that first Drive sync of the thread is real activity, not a
+deletion.
+
+The rule it's enforcing: **if nothing would show as unread, the comment shouldn't move to
+Inbox; if no comment moves to Inbox, the doc shouldn't either.** Drive's thread-level
+`modifiedTime` moves for a deletion just as it does for a reply, so without this a doc would
+land back in Inbox with nothing on it that explains the trip — and a reply posted and deleted
+between two syncs would do the same, arriving as a brand-new tombstone slot that looks like a
+new reply.
+
+Deciding this here, rather than in `nextReadSlotCount`, is what makes the invariant hold: one
+flag drives the read boundary, the comment's status, and the doc unarchive together, so they
+can't disagree. All three doc-unarchive rules are covered by it — rule 1 needs a status
+transition (which needs activity), rule 2 needs `hasNewLiveReplies`, and rule 3 needs a resolve,
+which is exempt from the suppression precisely so it keeps working.
+
+Still activity, deliberately:
+
+- **A resolve or unresolve flip.** Exempt even when a deletion lands in the same window. The new
+  `resolved` value is committed either way, so a sync that dropped the flip would be the last
+  chance to see it — re-opening an archived thread would leave it archived forever. It also
+  resurfaces the thread's last live message as unread, so the doc has something to show.
+- **An edit** on its own (it resurfaces the last live message as unread too).
+- **A deletion alongside a live new reply** — the reply is the activity.
+
+Swallowed, accepted: an edit landing in the same window as a deletion. Drive reports one
+thread-level `modifiedTime` and no per-message detail, so the two are indistinguishable, and
+silently marking a message unread is the worse failure. Unlike a resolve flip, an edit leaves no
+state we'd lose track of.
 
 The effect: threads you close yourself get archived quietly. Manual archiving is preserved.
 Activity only surfaces in Inbox when it's relevant to you — not all activity on every thread.
@@ -288,7 +331,8 @@ thread and by the Mark read/unread buttons.
 | New thread, first sync | Slots through my last contribution — see below |
 | I authored the latest message (the derived `isRead`, see below) | Fully read |
 | Someone else replied | **No write.** The preserved boundary already makes the new replies unread |
-| Activity with no new slots (edit, deletion, resolve flip) | Last *live* message marked unread |
+| A message was deleted, and nothing live arrived | Preserved — a deletion isn't activity at all (see ["Deletions aren't activity"](#deletions-arent-activity)), so this lands on the "no activity" rule |
+| Activity with no new slots (edit, resolve flip) | Last *live* message marked unread |
 | No activity | Preserved (clamped to the slot total) |
 | "Mark read" button | Fully read, using the `replySlotCount` the DB knew at click time |
 | "Mark unread" button | 0 (whole thread) |
@@ -302,6 +346,15 @@ tombstone contributes `false` to every flag array (Drive strips its author and m
 is also what you want: a message that no longer exists shouldn't ping anyone, and the
 "someone else replied" test explicitly skips tombstone slots so an arrived-already-deleted slot
 isn't mistaken for a stranger's reply.
+
+Deletion gets its own row because the generic "activity we can't localize" rule was wrong for
+it: deleting the one unread reply left the message *before* it unread, so a thread whose only
+unread content had just been removed still showed 1 unread and couldn't be cleared. A deletion
+is fully accounted for by itself, so the boundary is carried forward and the surviving messages
+keep exactly the read state they had. It's detected as the live reply count dropping while the
+slot count holds. The cost is that an edit landing in the same sync window as a deletion is
+missed — Drive reports one thread-level `modifiedTime` and no per-message detail, so the two
+are indistinguishable.
 
 `initialReadSlotCount` seeds a new thread with the slots up through my last contribution,
 on the reasoning that writing a message implies having read what came before it. A thread I
