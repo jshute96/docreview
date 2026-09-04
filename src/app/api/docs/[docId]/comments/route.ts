@@ -61,21 +61,23 @@ export async function PATCH(
     });
     count = result.count;
   } else if (isRead) {
-    // "Read" means every known message: reply_count + 1 (see
-    // src/lib/read-state.ts). That's a cross-column assignment, which Prisma's
-    // updateMany can't express, so it goes through raw SQL. commentIds is
-    // validated non-empty above, which Prisma.join requires. `updated_at` is
-    // set explicitly because Prisma maintains @updatedAt in the client, not the
-    // database — raw SQL would otherwise leave it stale here while every other
-    // comment write bumps it.
+    // "Read" means every known message, in both spaces: reply_slot_count + 1 for
+    // the boundary and reply_count + 1 for its render-space twin (see
+    // src/lib/read-state.ts). Both are cross-column assignments, which Prisma's
+    // updateMany can't express, so this branch goes through raw SQL — the
+    // unread direction is a plain zero in both spaces and doesn't need it.
+    // commentIds is validated non-empty above, which Prisma.join requires. `updated_at` is set explicitly because Prisma maintains
+    // @updatedAt in the client, not the database — raw SQL would otherwise
+    // leave it stale here while every other comment write bumps it.
     count = await prisma.$executeRaw`
-      UPDATE comments SET read_message_count = reply_count + 1, updated_at = NOW()
+      UPDATE comments
+      SET read_slot_count = reply_slot_count + 1, read_message_count = reply_count + 1, updated_at = NOW()
       WHERE doc_id = ${docId} AND comment_id IN (${Prisma.join(commentIds)})
     `;
   } else {
     const result = await prisma.comment.updateMany({
       where: { commentId: { in: commentIds }, docId },
-      data: { readMessageCount: 0 },
+      data: { readSlotCount: 0, readMessageCount: 0 },
     });
     count = result.count;
   }

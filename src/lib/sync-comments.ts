@@ -4,7 +4,7 @@ import { logError, logWarning, logInfo } from "@/lib/log";
 import { ExtCommentType } from "@/lib/extension-wire";
 import { GoogleMimeType } from "@/lib/mime-types";
 import { computeSuggestionHash } from "@/lib/suggestion-hash";
-import { initialReadMessageCount, nextReadMessageCount } from "@/lib/read-state";
+import { initialReadSlotCount, nextReadSlotCount, renderReadCount } from "@/lib/read-state";
 import { CommentStatus, CommentType, DocRole, DocStatus, type Doc, type Comment, type Prisma } from "@prisma/client";
 import type { DriveComment, DriveSuggestion, CommentThread, ThreadDetailResult } from "@/lib/google-drive";
 
@@ -531,6 +531,7 @@ function buildNewComment(
     isReplyAuthor: c.isReplyAuthor,
   });
 
+  const readSlotCount = initialReadSlotCount(c.isThreadAuthor, c.replyAuthorMeFlags);
   const record: Prisma.CommentCreateManyInput = {
     docId: doc.docId,
     googleCommentId: c.id,
@@ -538,7 +539,8 @@ function buildNewComment(
     resolved: c.resolved,
     isThreadAuthor: c.isThreadAuthor,
     isReplyAuthor: c.isReplyAuthor,
-    readMessageCount: initialReadMessageCount(c.isThreadAuthor, c.replyAuthorMeFlags),
+    readSlotCount,
+    readMessageCount: renderReadCount(c.replyDeleted, readSlotCount),
     assignedToMe: c.assignedToMe,
     mentionedMe: mentionedInThread,
     mentionedMeUnreplied: c.mentionedMeUnreplied,
@@ -546,6 +548,7 @@ function buildNewComment(
     driveCreatedAt: c.driveCreatedAt,
     driveModifiedAt: c.driveModifiedAt,
     replyCount: c.replyCount,
+    replySlotCount: c.replySlotCount,
   };
 
   // Doc-level unarchive: new INBOX comment triggers unarchive, but not if
@@ -571,7 +574,10 @@ async function updateExistingComment(
    *  exactly as they would be on any other sync. */
   selfEdited?: boolean,
 ): Promise<{ comment: Comment; updated: boolean; unarchive: boolean }> {
-  const hasNewReplies = c.replyCount > existing.replyCount;
+  // Slot space, not the live count: a delete and a reply landing in the same
+  // sync window leave the live count unchanged, which would hide the reply
+  // completely. Slot counts only ever grow, so this can't false-negative.
+  const hasNewReplies = c.replySlotCount > existing.replySlotCount;
   const hasNewActivity =
     hasNewReplies ||
     (!existing.resolved && c.resolved) ||
@@ -581,9 +587,9 @@ async function updateExistingComment(
   // @-mention or assignment in new replies breaks out of MUTED
   // (see docs/inbox-states.md rule 2).
   const newReplyMentionsMe = hasNewReplies &&
-    (c.replyMentionedMeFlags ?? []).slice(existing.replyCount).some(Boolean);
+    (c.replyMentionedMeFlags ?? []).slice(existing.replySlotCount).some(Boolean);
   const newReplyAssignsMe = hasNewReplies &&
-    (c.replyAssignedToMeFlags ?? []).slice(existing.replyCount).some(Boolean);
+    (c.replyAssignedToMeFlags ?? []).slice(existing.replySlotCount).some(Boolean);
 
   // MUTED fast-path: update metadata but preserve MUTED status unless @-mentioned or assigned
   if (existing.status === CommentStatus.MUTED && !newReplyMentionsMe && !newReplyAssignsMe) {
@@ -659,8 +665,12 @@ function computeCommentStatus(
     if (doc.role === DocRole.AUTHOR) return CommentStatus.INBOX;
     if (c.isThreadAuthor && hasNewReplies) {
       // Only INBOX if someone else replied (not just my own self-replies)
-      const newReplies = c.replyAuthorMeFlags.slice(existing.replyCount);
-      if (newReplies.some((me) => !me)) return CommentStatus.INBOX;
+      // Tombstones are excluded: a slot that arrived already deleted carries no
+      // author, so "not me" would be a false positive for "someone else replied".
+      const newReplies = c.replyAuthorMeFlags
+        .map((me, i) => ({ me, deleted: c.replyDeleted[i] === true }))
+        .slice(existing.replySlotCount);
+      if (newReplies.some((r) => !r.deleted && !r.me)) return CommentStatus.INBOX;
     } else if (c.isReplyAuthor && !c.isThreadAuthor) {
       // I participated on someone else's thread — any activity → INBOX
       return CommentStatus.INBOX;
@@ -683,24 +693,30 @@ function buildCommentUpdate(
 ): { changed: boolean; data: Prisma.CommentUncheckedUpdateInput } {
   const modifiedChanged = !datesEqual(existing.driveModifiedAt, c.driveModifiedAt);
   const activity = hasNewActivity ?? modifiedChanged;
-  // Read tracking: the rules live in nextReadMessageCount, shared with the
+  // Read tracking: the rules live in nextReadSlotCount, shared with the
   // extension suggestion merge. `c.isRead` is Drive's "I authored the last
   // message". A timestamp move that isn't real activity (a self-edit) doesn't
   // count, which is what keeps the user's own edit from marking their thread
   // unread.
-  const effectiveReadMessageCount = nextReadMessageCount({
-    storedCount: existing.readMessageCount,
-    oldReplyCount: existing.replyCount,
-    newReplyCount: c.replyCount,
+  const effectiveReadSlotCount = nextReadSlotCount({
+    storedCount: existing.readSlotCount,
+    oldReplySlotCount: existing.replySlotCount,
+    replyDeleted: c.replyDeleted,
     hasActivity: modifiedChanged && activity,
     iActedLast: c.isRead,
   });
+  // The same boundary in render space, cached so the docs table can count
+  // unread without the slot array. Only a boundary move or a deletion below it
+  // changes this — arriving replies leave it alone, which is what makes exactly
+  // those replies unread.
+  const effectiveReadMessageCount = renderReadCount(c.replyDeleted, effectiveReadSlotCount);
   const mentionedInThread = c.mentionedMe || (c.replyMentionedMeFlags ?? []).some(Boolean);
   const status = newStatus ?? existing.status;
 
   const changed =
     existing.resolved !== c.resolved ||
     existing.isReplyAuthor !== c.isReplyAuthor ||
+    existing.readSlotCount !== effectiveReadSlotCount ||
     existing.readMessageCount !== effectiveReadMessageCount ||
     existing.assignedToMe !== c.assignedToMe ||
     existing.mentionedMe !== mentionedInThread ||
@@ -708,11 +724,13 @@ function buildCommentUpdate(
     existing.status !== status ||
     !datesEqual(existing.driveCreatedAt, c.driveCreatedAt) ||
     modifiedChanged ||
-    existing.replyCount !== c.replyCount;
+    existing.replyCount !== c.replyCount ||
+    existing.replySlotCount !== c.replySlotCount;
 
   const data: Prisma.CommentUncheckedUpdateInput = {
     resolved: c.resolved,
     isReplyAuthor: c.isReplyAuthor,
+    readSlotCount: effectiveReadSlotCount,
     readMessageCount: effectiveReadMessageCount,
     assignedToMe: c.assignedToMe,
     mentionedMe: mentionedInThread,
@@ -721,6 +739,7 @@ function buildCommentUpdate(
     driveCreatedAt: c.driveCreatedAt,
     driveModifiedAt: c.driveModifiedAt,
     replyCount: c.replyCount,
+    replySlotCount: c.replySlotCount,
   };
 
   return { changed, data };

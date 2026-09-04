@@ -15,7 +15,14 @@ import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { navigateToComment, supportsCommentNavigation, getSuggestionFromDoc, getCommentFromDoc, getExtensionStatus, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
 import { docTarget } from "@/lib/tab-targets";
-import { isThreadRead, totalMessageCount, unreadMessageCount } from "@/lib/read-state";
+import {
+  isThreadRead,
+  liveThreadReplies,
+  replyDeletedFlags,
+  slotBoundaryFor,
+  totalMessageCount,
+  unreadMessageCount,
+} from "@/lib/read-state";
 
 interface CommentRowProps {
   comment: Comment;
@@ -64,7 +71,16 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   // messages away under the reader.
   const [expandId, setExpandId] = useState(0);
   const [hasBeenExpanded, setHasBeenExpanded] = useState(false);
-  const [threads, setThreads] = useState<CommentThread[]>(initialThread ? [initialThread] : []);
+  const [threads, setThreadsState] = useState<CommentThread[]>(initialThread ? [initialThread] : []);
+  // Mirrors `threads` so an async handler that refreshes mid-flight can read the
+  // replies it just fetched instead of the ones captured in its closure. Updated
+  // here rather than in an effect, so it's current the moment the setter returns
+  // rather than whenever React next re-renders.
+  const threadsRef = useRef<CommentThread[]>(threads);
+  function setThreads(next: CommentThread[] | ((prev: CommentThread[]) => CommentThread[])) {
+    threadsRef.current = typeof next === "function" ? next(threadsRef.current) : next;
+    setThreadsState(threadsRef.current);
+  }
   const [loadingThreads, setLoadingThreads] = useState(false);
   const [refreshingThread, setRefreshingThread] = useState(false);
   const [hasDirtyReply, setHasDirtyReply] = useState(false);
@@ -514,8 +530,11 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
 
   /** Shared PATCH for the read-state controls. The footer button sends the
    *  whole-thread boolean; the per-message controls in the expanded thread send
-   *  an absolute count, which the server clamps to the thread's known size. */
-  async function patchRead(body: { isRead: boolean } | { readMessageCount: number }): Promise<Comment | null> {
+   *  an absolute slot boundary plus its render-space twin, which the server
+   *  clamps to the thread's known size. */
+  async function patchRead(
+    body: { isRead: boolean } | { readSlotCount: number; readMessageCount: number },
+  ): Promise<Comment | null> {
     setLoading(true);
     const contextId = generateContextId();
     try {
@@ -563,10 +582,18 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       if (!isSuggestion) synced = await refreshThread();
       else if (!suggestionRefreshDisabled) await refreshSuggestion();
     }
-    const updated = await patchRead({ readMessageCount: count });
+    // The flags read back after any refresh above. A sync can only append slots,
+    // never renumber existing ones, so the click-time flags would map `count` to
+    // the same boundary — but marking the *last* message read has to reach the
+    // end of the thread the refresh just grew.
+    const latestReplies = threadsRef.current[0]?.replies;
+    const flags = latestReplies ? replyDeletedFlags(latestReplies) : slotFlags;
+    const boundary = slotBoundaryFor(flags, count);
+    // Both spaces, since the server can't convert between them without the flags.
+    const updated = await patchRead({ readSlotCount: boundary, readMessageCount: count });
     // Neutral wording: this fires in the mark-unread direction too, where a
     // clamp leaves *more* unread than the click asked for.
-    if (synced && updated && updated.readMessageCount !== count) {
+    if (synced && updated && updated.readSlotCount !== boundary) {
       toast.warning("Read point set as far as the synced messages — refresh the thread to include the rest");
     }
   }
@@ -716,6 +743,25 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       quotedFileContent,
     }];
   }, [isSuggestion, threads, hasTextContent, suggestionContent?.anchorText, suggestionContentText, defaultAuthor, comment.googleCommentId, comment.googleSuggestionId, comment.commentId, comment.isThreadAuthor, comment.driveCreatedAt, comment.resolved]);
+
+  // The panel draws live messages only and counts positions from what it draws;
+  // the stored boundary is counted in slot space, where deleted replies still
+  // hold their place. Convert on the way in and back on the way out — this is
+  // the only place in the client either conversion happens, which is what keeps
+  // the panel free of index arithmetic. Suggestions have no tombstones, so both
+  // conversions are the identity there.
+  const sourceThreads = isSuggestion ? suggestionThreads : threads;
+  const slotFlags = useMemo(
+    () => replyDeletedFlags(sourceThreads[0]?.replies ?? []),
+    [sourceThreads],
+  );
+  const panelThreads = useMemo(
+    () => sourceThreads.map((t) => ({ ...t, replies: liveThreadReplies(t.replies) })),
+    [sourceThreads],
+  );
+  // The stored render-space count is already what the panel needs, so nothing
+  // converts on the way in — only the write path below converts, back to slots.
+  const panelReadCount = comment.readMessageCount;
 
   // Suggestion refresh is only possible when we have a disco ID and the extension
   // is available with Docs integration enabled. Compute disabled state and tooltip.
@@ -882,7 +928,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
           >
             <div className={`min-h-0${expanded && !isExiting ? "" : " overflow-hidden"}`}>
               <CommentThreadPanel
-                  threads={isSuggestion ? suggestionThreads : threads}
+                  threads={panelThreads}
                   loading={loadingThreads}
                   resolved={comment.resolved}
                   emptyMessage={emptyMessage}
@@ -905,7 +951,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   isArchived={isArchived}
                   onToggleRead={toggleRead}
                   isRead={isRead}
-                  readMessageCount={comment.readMessageCount}
+                  readMessageCount={panelReadCount}
                   onSetReadCount={setReadCount}
                   // The pre-sync is the slow part, and it sets refreshingThread
                   // rather than loading — without it a second click during the

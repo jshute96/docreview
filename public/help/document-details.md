@@ -46,7 +46,9 @@ Each row shows:
     - **  / 4** -- you've read all four messages; the count is left blank.
     - *(blank)* -- a single message you've already read, where " / 1" would just be noise.
 
-    The total counts the original comment as well as its replies.
+    The total counts the original comment as well as its replies. Replies that have
+    been deleted don't appear in the thread and aren't counted here either, and
+    deleting one never changes how much of the rest of the thread you've read.
     This column doesn't sort -- use the Unread filter above the table instead.
 
 ### Row highlighting

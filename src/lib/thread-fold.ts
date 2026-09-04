@@ -33,9 +33,11 @@ export function estimateLines(text: string, width: number): number {
  *  replying to, and so does the last read message (index `readCount - 1`), so
  *  the first unread reply has its antecedent on screen.
  *
- *  `readCount` is the stored read-message count and `total` the live message
- *  count (head comment included); the stored count can exceed the live one when
- *  a reply has been deleted, so it's clamped. */
+ *  Both counts are in render space: `readCount` is how many of the drawn
+ *  messages have been read (converted from the stored slot boundary by
+ *  `CommentRow`) and `total` the drawn message count, head comment included.
+ *  The clamp is defensive — a suggestion's high-water-mark reply count can
+ *  exceed the messages the panel actually renders. */
 export function foldEnd(
   readCount: number,
   total: number,

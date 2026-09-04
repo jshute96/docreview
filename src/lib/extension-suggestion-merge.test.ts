@@ -161,8 +161,8 @@ describe("mergeExtensionSuggestions", () => {
       // reorders it after the disco-ID lookup, and quietly reopens this hole.
       mockComment.findFirst.mockResolvedValue({
         commentId: "discoRow", docId: "d1", googleCommentId: "(no ID)",
-        googleSuggestionId: null, status: CommentStatus.INBOX, replyCount: 0,
-        resolved: false, readMessageCount: 0,
+        googleSuggestionId: null, status: CommentStatus.INBOX, replyCount: 0, replySlotCount: 0,
+        resolved: false, readSlotCount: 0,
       });
       mockComment.findMany.mockResolvedValue([
         { commentId: "realRow", googleCommentId: null, googleSuggestionId: "suggest.xyz" },
@@ -223,12 +223,13 @@ describe("mergeExtensionSuggestions", () => {
       googleSuggestionId: "suggest.xyz",
       status: CommentStatus.ARCHIVED,
       suggestionContentHash: hash,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: false,
       isThreadAuthor: false,
       isReplyAuthor: false,
       mentionedMe: false,
       mentionedMeUnreplied: false,
+      readSlotCount: 0,
       readMessageCount: 0,
       driveCreatedAt: new Date("2026-03-20T15:00:00.000Z"),
       driveModifiedAt: new Date("2026-03-20T15:00:00.000Z"),
@@ -245,7 +246,7 @@ describe("mergeExtensionSuggestions", () => {
     mockComment.findFirst.mockResolvedValue({
       commentId: "cr1",
       status: CommentStatus.INBOX,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: false,
     });
 
@@ -273,7 +274,7 @@ describe("mergeExtensionSuggestions", () => {
       googleSuggestionId: null,
       suggestionContentHash: hash,
       status: CommentStatus.INBOX,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: false,
     });
     // One suggestion-only partner with same hash
@@ -283,7 +284,7 @@ describe("mergeExtensionSuggestions", () => {
       googleSuggestionId: "suggest.xyz",
       suggestionContentHash: hash,
       status: CommentStatus.ARCHIVED,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: false,
     }]);
 
@@ -306,7 +307,7 @@ describe("mergeExtensionSuggestions", () => {
       googleSuggestionId: null,
       suggestionContentHash: hash,
       status: CommentStatus.INBOX,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: false,
     });
     // Candidate has no googleSuggestionId to salvage — defensive filter rejects
@@ -316,7 +317,7 @@ describe("mergeExtensionSuggestions", () => {
       googleSuggestionId: null,
       suggestionContentHash: hash,
       status: CommentStatus.ARCHIVED,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: false,
     }]);
 
@@ -336,14 +337,14 @@ describe("mergeExtensionSuggestions", () => {
       googleSuggestionId: null,
       suggestionContentHash: hash,
       status: CommentStatus.INBOX,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: false,
     });
     mockComment.findMany.mockResolvedValue([
       { commentId: "a", googleCommentId: null, googleSuggestionId: "suggest.a",
-        suggestionContentHash: hash, status: CommentStatus.ARCHIVED, replyCount: 0, resolved: false },
+        suggestionContentHash: hash, status: CommentStatus.ARCHIVED, replyCount: 0, replySlotCount: 0, resolved: false },
       { commentId: "b", googleCommentId: null, googleSuggestionId: "suggest.b",
-        suggestionContentHash: hash, status: CommentStatus.ARCHIVED, replyCount: 0, resolved: false },
+        suggestionContentHash: hash, status: CommentStatus.ARCHIVED, replyCount: 0, replySlotCount: 0, resolved: false },
     ]);
 
     await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion()], userEmail, makeDoc());
@@ -361,7 +362,7 @@ describe("mergeExtensionSuggestions", () => {
       googleCommentId: null,
       suggestionContentHash: hash,
       status: CommentStatus.ARCHIVED,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: false,
     }]);
 
@@ -381,8 +382,8 @@ describe("mergeExtensionSuggestions", () => {
   it("inserts a new row when multiple candidates match by hash (ambiguous)", async () => {
     mockComment.findFirst.mockResolvedValue(null);
     mockComment.findMany.mockResolvedValue([
-      { commentId: "cr1", googleCommentId: null, replyCount: 0, resolved: false, status: CommentStatus.ARCHIVED },
-      { commentId: "cr2", googleCommentId: null, replyCount: 0, resolved: false, status: CommentStatus.ARCHIVED },
+      { commentId: "cr1", googleCommentId: null, replyCount: 0, replySlotCount: 0, resolved: false, status: CommentStatus.ARCHIVED },
+      { commentId: "cr2", googleCommentId: null, replyCount: 0, replySlotCount: 0, resolved: false, status: CommentStatus.ARCHIVED },
     ]);
 
     const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion()], userEmail, makeDoc());
@@ -395,7 +396,7 @@ describe("mergeExtensionSuggestions", () => {
     mockComment.findFirst.mockResolvedValue({
       commentId: "cr1",
       status: CommentStatus.MUTED,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: false,
     });
 
@@ -413,7 +414,7 @@ describe("mergeExtensionSuggestions", () => {
     mockComment.findFirst.mockResolvedValue({
       commentId: "cr1",
       status: CommentStatus.MUTED,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: false,
     });
 
@@ -432,7 +433,7 @@ describe("mergeExtensionSuggestions", () => {
     mockComment.findFirst.mockResolvedValue({
       commentId: "cr1",
       status: CommentStatus.INBOX,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: false,
     });
 
@@ -450,7 +451,7 @@ describe("mergeExtensionSuggestions", () => {
     mockComment.findFirst.mockResolvedValue({
       commentId: "cr1",
       status: CommentStatus.INBOX,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: false,
     });
 
@@ -468,7 +469,7 @@ describe("mergeExtensionSuggestions", () => {
     mockComment.findFirst.mockResolvedValue({
       commentId: "cr1",
       status: CommentStatus.ARCHIVED,
-      replyCount: 1,
+      replyCount: 1, replySlotCount: 1,
       resolved: false,
     });
 
@@ -489,7 +490,7 @@ describe("mergeExtensionSuggestions", () => {
     mockComment.findFirst.mockResolvedValue({
       commentId: "cr1",
       status: CommentStatus.INBOX,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: false,
     });
 
@@ -504,7 +505,7 @@ describe("mergeExtensionSuggestions", () => {
     mockComment.findFirst.mockResolvedValue({
       commentId: "cr1",
       status: CommentStatus.ARCHIVED,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: true,
     });
 
@@ -578,7 +579,7 @@ describe("mergeExtensionSuggestions", () => {
     mockComment.findFirst.mockResolvedValue({
       commentId: "cr1",
       status: CommentStatus.MUTED,
-      replyCount: 0,
+      replyCount: 0, replySlotCount: 0,
       resolved: false,
     });
 
@@ -603,7 +604,7 @@ describe("mergeExtensionSuggestions", () => {
     mockComment.findFirst.mockResolvedValue(null);
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", googleCommentId: null,
-      status: CommentStatus.ARCHIVED, replyCount: 0, resolved: false,
+      status: CommentStatus.ARCHIVED, replyCount: 0, replySlotCount: 0, resolved: false,
     }]);
     await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion()], userEmail, makeDoc());
     expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
@@ -611,13 +612,13 @@ describe("mergeExtensionSuggestions", () => {
 
   it("bumps lastCommentActivity when updating an existing disco ID", async () => {
     mockComment.findFirst.mockResolvedValue({
-      commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false,
+      commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, replySlotCount: 0, resolved: false,
     });
     await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion()], userEmail, makeDoc());
     expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
   });
 
-  // ---------- read state (readMessageCount) ----------
+  // ---------- read state (readSlotCount) ----------
 
   describe("read state", () => {
     it("marks new suggestion as read when it's my own with no replies", async () => {
@@ -663,7 +664,7 @@ describe("mergeExtensionSuggestions", () => {
 
     it("marks existing suggestion read when a new reply from me arrives", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 0,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, replySlotCount: 0, resolved: false, readSlotCount: 0,
       });
       await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         replies: [{ author: "Me", isMine: true, timestamp: "4:00 PM Mar 20", text: "reply" }],
@@ -673,7 +674,7 @@ describe("mergeExtensionSuggestions", () => {
 
     it("marks existing suggestion unread when a new reply from someone else arrives", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 1,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, replySlotCount: 0, resolved: false, readSlotCount: 1,
       });
       await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         replies: [{ author: "Alice", isMine: false, timestamp: "4:00 PM Mar 20", text: "reply" }],
@@ -684,7 +685,7 @@ describe("mergeExtensionSuggestions", () => {
     it("preserves a manually-toggled read count when no new activity", async () => {
       // User manually marked as read, no new replies or state change → stays read
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 1,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, replySlotCount: 0, resolved: false, readSlotCount: 1,
       });
       await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({ isMine: false })], userEmail, makeDoc());
       expect(isThreadRead(mockComment.update.mock.calls[0][0].data)).toBe(true);
@@ -692,7 +693,7 @@ describe("mergeExtensionSuggestions", () => {
 
     it("marks unread when resolve state changes (my suggestion accepted by someone else)", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 1,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, replySlotCount: 0, resolved: false, readSlotCount: 1,
       });
       // Reply arrives: my suggestion, they accepted it (the accept reply is theirs)
       await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
@@ -706,7 +707,7 @@ describe("mergeExtensionSuggestions", () => {
       mockComment.findFirst.mockResolvedValue(null);
       mockComment.findMany.mockResolvedValueOnce([{
         commentId: "cr1", googleCommentId: null, suggestionContentHash: computeSuggestionHash(SuggestionType.INSERT, "", "new text"),
-        status: CommentStatus.ARCHIVED, replyCount: 0, resolved: false, readMessageCount: 0,
+        status: CommentStatus.ARCHIVED, replyCount: 0, replySlotCount: 0, resolved: false, readSlotCount: 0,
       }]);
       await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         isMine: true,
@@ -729,13 +730,13 @@ describe("mergeExtensionSuggestions", () => {
 
       const data = mockComment.create.mock.calls[0][0].data;
       // Their suggestion + my reply read; the two replies after mine are not.
-      expect(data.readMessageCount).toBe(2);
+      expect(data.readSlotCount).toBe(2);
       expect(data.replyCount).toBe(3);
     });
 
     it("carries the count forward unchanged when someone else replies", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 1, resolved: false, readMessageCount: 2,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 1, replySlotCount: 1, resolved: false, readSlotCount: 2,
       });
 
       await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
@@ -746,12 +747,12 @@ describe("mergeExtensionSuggestions", () => {
       })], userEmail, makeDoc());
 
       // Was 2 of 2; now 2 of 3 — exactly their new reply is unread.
-      expect(mockComment.update.mock.calls[0][0].data.readMessageCount).toBe(2);
+      expect(mockComment.update.mock.calls[0][0].data.readSlotCount).toBe(2);
     });
 
     it("marks the last message unread on a resolve flip with no new replies", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 1,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, replySlotCount: 0, resolved: false, readSlotCount: 1,
       });
 
       // Someone else's suggestion, accepted without any discussion reply. The
@@ -761,12 +762,30 @@ describe("mergeExtensionSuggestions", () => {
         isMine: false, status: "accepted", replies: [],
       })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
 
-      expect(mockComment.update.mock.calls[0][0].data.readMessageCount).toBe(0);
+      expect(mockComment.update.mock.calls[0][0].data.readSlotCount).toBe(0);
+    });
+
+    it("never lowers the slot count, which a Gmail notification may have raised", async () => {
+      // Gmail saw 3 replies and raised the slot count; the extension scrape only
+      // sees 1, because the other two are deleted and the rendered thread hides
+      // them. Its count is a lower bound on slots, so it must not write back down.
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 3, replySlotCount: 3, resolved: false, readSlotCount: 4,
+      });
+
+      await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        replies: [{ author: "Alice", isMine: false, timestamp: "4:00 PM Mar 20", text: "hi" }],
+      })], userEmail, makeDoc());
+
+      const data = mockComment.update.mock.calls[0][0].data;
+      expect(data.replySlotCount).toBe(3);
+      // The live count is a plain overwrite: it is what the thread draws now.
+      expect(data.replyCount).toBe(1);
     });
 
     it("clamps a stored count that exceeds the thread after replies disappear", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 4, resolved: false, readMessageCount: 5,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 4, replySlotCount: 4, resolved: false, readSlotCount: 5,
       });
 
       await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
@@ -775,7 +794,7 @@ describe("mergeExtensionSuggestions", () => {
       })], userEmail, makeDoc());
 
       // Clamped to 2, then the no-new-replies rule leaves the last message unread.
-      expect(mockComment.update.mock.calls[0][0].data.readMessageCount).toBe(1);
+      expect(mockComment.update.mock.calls[0][0].data.readSlotCount).toBe(1);
     });
   });
 
@@ -792,7 +811,7 @@ describe("mergeExtensionSuggestions", () => {
       mockComment.findFirst.mockResolvedValue(null);
       mockComment.findMany.mockResolvedValueOnce([{
         commentId: "cr1", googleCommentId: null, suggestionContentHash: computeSuggestionHash(SuggestionType.INSERT, "", "new text"),
-        status: CommentStatus.ARCHIVED, replyCount: 0, resolved: false, readMessageCount: 0,
+        status: CommentStatus.ARCHIVED, replyCount: 0, replySlotCount: 0, resolved: false, readSlotCount: 0,
       }]);
       const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({ isMine: true })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
       expect(res.shouldUnarchive).toBe(false);
@@ -800,7 +819,7 @@ describe("mergeExtensionSuggestions", () => {
 
     it("unarchives when existing INBOX suggestion gets new reply from someone else (rule 2)", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 1, resolved: false, readMessageCount: 2,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 1, replySlotCount: 1, resolved: false, readSlotCount: 2,
       });
       const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         isMine: true,
@@ -814,7 +833,7 @@ describe("mergeExtensionSuggestions", () => {
 
     it("does NOT unarchive when existing INBOX suggestion gets new reply but I was the one who accepted (rule 2 exception)", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 0,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, replySlotCount: 0, resolved: false, readSlotCount: 0,
       });
       const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         isMine: false, status: "accepted",
@@ -826,7 +845,7 @@ describe("mergeExtensionSuggestions", () => {
 
     it("unarchives when my INBOX suggestion is accepted by someone else (rule 3)", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 1,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, replySlotCount: 0, resolved: false, readSlotCount: 1,
       });
       const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         isMine: true, status: "accepted",
@@ -841,7 +860,7 @@ describe("mergeExtensionSuggestions", () => {
 
     it("does NOT unarchive when my INBOX suggestion is silently accepted by someone else (archive transition)", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, resolved: false, readMessageCount: 1,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, replySlotCount: 0, resolved: false, readSlotCount: 1,
       });
       const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         isMine: true, status: "accepted",
@@ -853,7 +872,7 @@ describe("mergeExtensionSuggestions", () => {
 
     it("does NOT unarchive when existing INBOX suggestion has no new activity and the read count is preserved", async () => {
       mockComment.findFirst.mockResolvedValue({
-        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 2, resolved: false, readMessageCount: 3,
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 2, replySlotCount: 2, resolved: false, readSlotCount: 3,
       });
       const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
         replies: [

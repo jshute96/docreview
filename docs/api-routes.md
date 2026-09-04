@@ -111,20 +111,25 @@ PATCH only. Bulk-updates comment `status` or `isRead` for multiple comments.
 
 Body: `{ commentIds: string[], status?: CommentStatus, isRead?: boolean }`
 
-The `isRead` boolean is stored as a message count (`readMessageCount`) — true means every
+The `isRead` boolean is stored as a slot boundary (`readSlotCount`) — true means every
 known message in the thread, false means none. See docs/comment-tracking.md#read-tracking.
 
 No Google API (Prisma only).
 
 ### `/api/docs/[docId]/comments/[commentId]` — Single comment update
 
-PATCH. Updates a single comment's `status`, `isRead`, `readMessageCount`, or `isStarred` in
-the database (`isRead` is stored as a message count — see the bulk route above).
-`readMessageCount` sets the read point directly, for the expanded thread's per-message
-controls; it must be a non-negative integer, is clamped to the thread's stored size, and is
-rejected alongside `isRead` since both write the same field. The client syncs the thread before
-sending a count past that size, so the clamp caps against a current count — see
-`docs/comment-tracking.md`.
+PATCH. Updates a single comment's `status`, `isRead`, `readSlotCount`, or `isStarred` in
+the database (`isRead` is stored as a slot boundary — see the bulk route above).
+`readSlotCount` sets the read point directly, for the expanded thread's per-message controls.
+
+It **must be sent together with `readMessageCount`**, and either without the other is a 400.
+The two are the same boundary in the two numbering spaces, and the route can't convert between
+them — that needs the thread's tombstones, which only the client has. Both must be
+non-negative integers; the boundary is clamped to the thread's stored slot size, and since that
+clamp only fires at the total, a clamped write stores the full live total as its twin.
+`readSlotCount` is rejected alongside `isRead`, since both write the same field. The client
+syncs the thread before sending a boundary past the stored size, so the clamp normally caps
+against a current count — see `docs/comment-tracking.md`.
 Auto-unarchives the parent doc if a comment moves to INBOX.
 
 No Google API (Prisma only).

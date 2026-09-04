@@ -55,7 +55,7 @@ The PostgreSQL database has eight tables managed by Prisma. See
   (OK/Trashed/Not Found/Denied), comment sync timestamp, notes, starred flag.
 - **Comment** — a comment thread or suggestion synced from Google. Tracks
   `type` (Comment/Suggestion), `resolved` status, author flags (`isThreadAuthor`,
-  `isReplyAuthor`), user state (`readMessageCount`, `isStarred`, `status`), and suggestion
+  `isReplyAuthor`), user state (`readSlotCount`, `readMessageCount`, `isStarred`, `status`), and suggestion
   metadata (`suggestionType`: Insert/Delete/Edit).
 - **Label** — user-defined color-coded labels with drag-reorderable positions.
 - **DocLabel** — many-to-many join between Docs and Labels.

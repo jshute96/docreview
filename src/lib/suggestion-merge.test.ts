@@ -96,15 +96,84 @@ describe("mergeSuggestionsFromGmail", () => {
     mockComment.findFirst.mockResolvedValue(null);
     // One match by content hash (Drive-created row without googleCommentId)
     mockComment.findMany.mockResolvedValue([{
-      commentId: "cr1", googleCommentId: null, replyCount: 0,
+      commentId: "cr1", googleCommentId: null, replyCount: 0, replySlotCount: 0, readSlotCount: 0,
     }]);
 
     const result = await mergeSuggestionsFromGmail("d1", "gdoc1", email);
     expect(result).toEqual({ merged: 1, inserted: 0, shouldUnarchive: false });
+    // Read state is untouched entirely: the stored count is a *read* count, so
+    // raising the total is by itself what makes new replies show as unread.
     expect(mockComment.update).toHaveBeenCalledWith({
       where: { commentId: "cr1" },
-      data: { googleCommentId: "AAAB0abc", replyCount: 0, driveCreatedAt: new Date("2026-03-20T15:00:00Z") },
+      data: {
+        googleCommentId: "AAAB0abc",
+        replyCount: 0,
+        replySlotCount: 0,
+        driveCreatedAt: new Date("2026-03-20T15:00:00Z"),
+      },
     });
+  });
+
+  it("never lowers replySlotCount on a thread with a tombstone", async () => {
+    // The row has 3 slots, one of them a tombstone, so 2 live replies. Gmail
+    // reports the 2 live ones, which proves only that there are *at least* 2
+    // slots — so the slot column takes a max against itself and stays at 3.
+    // Maxing against the live count instead would drop it 3 → 2, and the next
+    // Drive sync would see 3 > 2 and read a long-deleted reply as brand-new
+    // activity, marking the thread unread all over again.
+    mockParse.mockReturnValue({
+      type: "comment",
+      subject: "", from: "", to: "", date_str: "",
+      documentId: "gdoc1", documentTitle: "Test", documentUrl: "https://docs.google.com/document/d/gdoc1/edit",
+      comments: [],
+      suggestions: [makeSuggestion({ replies: [
+        { author: "Alice", time: "2026-03-20T15:00:00Z", text: "one" },
+        { author: "Bob", time: "2026-03-20T15:01:00Z", text: "two" },
+      ] })],
+    });
+    mockComment.findFirst.mockResolvedValue(null);
+    mockComment.findMany.mockResolvedValue([{
+      commentId: "cr1", googleCommentId: null,
+      replyCount: 2, replySlotCount: 3, readSlotCount: 0, readMessageCount: 0,
+    }]);
+
+    await mergeSuggestionsFromGmail("d1", "gdoc1", email);
+
+    const data = mockComment.update.mock.calls[0][0].data;
+    expect(data.replySlotCount).toBe(3);
+    expect(data.replyCount).toBe(2);
+  });
+
+  it("raises replySlotCount to the replies Gmail can see", async () => {
+    // Two new replies arrive on a thread the DB knows as having none. Gmail's
+    // count is a lower bound on slots, and raising the column to it is what
+    // stops the next Drive sync counting those same replies as new a second
+    // time — after the user has already read them off the Gmail bump.
+    mockParse.mockReturnValue({
+      type: "comment",
+      subject: "", from: "", to: "", date_str: "",
+      documentId: "gdoc1", documentTitle: "Test", documentUrl: "https://docs.google.com/document/d/gdoc1/edit",
+      comments: [],
+      suggestions: [makeSuggestion({ replies: [
+        { author: "Alice", time: "2026-03-20T15:00:00Z", text: "one" },
+        { author: "Bob", time: "2026-03-20T15:01:00Z", text: "two" },
+      ] })],
+    });
+    mockComment.findFirst.mockResolvedValue(null);
+    mockComment.findMany.mockResolvedValue([{
+      commentId: "cr1", googleCommentId: null,
+      replyCount: 0, replySlotCount: 0, readSlotCount: 0, readMessageCount: 0,
+    }]);
+
+    await mergeSuggestionsFromGmail("d1", "gdoc1", email);
+
+    const data = mockComment.update.mock.calls[0][0].data;
+    expect(data.replyCount).toBe(2);
+    expect(data.replySlotCount).toBe(2);
+    // Read state untouched: the boundary is a read count, so raising the total
+    // is by itself what makes the two new replies unread.
+    expect(data).not.toHaveProperty("readSlotCount");
+    expect(data).not.toHaveProperty("readMessageCount");
   });
 
   it("inserts new row when no hash match (Gmail arrives first)", async () => {

@@ -461,7 +461,13 @@ export function CommentThreadPanel({
    *
    *  The count here comes from the live thread, while the table's Unread column
    *  comes from the stored `replyCount`. The two can differ briefly when the
-   *  thread has been refreshed from Drive but the row hasn't been re-synced. */
+   *  thread has been refreshed from Drive but the row hasn't been re-synced.
+   *
+   *  In that window the *boundary* can be off too, not just the total: a reply
+   *  deleted since the last sync shortens the drawn thread, but `readMessageCount`
+   *  still counts the messages that were live when it was written, so the divider
+   *  sits one message low per deletion above it. Fetching the thread doesn't write
+   *  to the DB, so it settles on the next sync of the row rather than here. */
   const unreadDivider = (threadIndex: number, messageIndex: number, thread: CommentThread) => {
     if (threadIndex !== 0 || messageIndex === 0) return null;
     if (messageIndex !== readMessageCount) return null;

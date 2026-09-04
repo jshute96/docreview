@@ -15,7 +15,7 @@ import { DeleteReAddDialog } from "@/components/delete-readd-dialog";
 import { ROLE_COLORS } from "@/lib/role-colors";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
-import { isThreadRead, totalMessageCount } from "@/lib/read-state";
+import { isThreadRead, liveThreadReplies, totalMessageCount, totalSlotCount } from "@/lib/read-state";
 import { CommentRow } from "@/components/comment-row";
 import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, setDocReadyHandler, getCommentsAndSuggestionsFromDoc, getSuggestionFromDoc, type ExtensionSuggestion, type ExtensionCommentInfo } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
@@ -165,12 +165,15 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
     }
   }
 
-  // Derive searchable text from threadMap (author names + all reply content)
+  // Derive searchable text from threadMap (author names + all reply content).
+  // Tombstones are skipped: Drive strips a deleted reply's author and content, so
+  // the placeholder's stand-in author would otherwise make every thread with a
+  // deletion match a search for that word, with nothing in the panel to show for it.
   const threadText = useMemo(() => {
     const result: Record<string, string> = {};
     for (const [id, thread] of Object.entries(threadMap)) {
       const parts: string[] = [thread.author, thread.content];
-      for (const r of thread.replies) {
+      for (const r of liveThreadReplies(thread.replies)) {
         if (r.author) parts.push(r.author);
         if (r.content) parts.push(r.content);
       }
@@ -880,8 +883,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
 
   async function handleBulkReadChange(targetIsRead: boolean) {
     const targets = filteredComments.filter((c) => isThreadRead(c) !== targetIsRead);
-    // Mirrors how the server turns the isRead request field into a count.
-    const readCountFor = (c: Comment) => (targetIsRead ? totalMessageCount(c.replyCount) : 0);
+    // Mirrors how the server turns the isRead request field into stored state.
+    const readStateFor = (c: Comment) => targetIsRead
+      ? { readSlotCount: totalSlotCount(c.replySlotCount), readMessageCount: totalMessageCount(c.replyCount) }
+      : { readSlotCount: 0, readMessageCount: 0 };
     if (targets.length === 0) return;
 
     const setBusy = targetIsRead ? setBulkMarkingRead : setBulkMarkingUnread;
@@ -901,13 +906,13 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       const { count } = await res.json();
       setComments((prev) =>
         prev.map((c) =>
-          commentIds.includes(c.commentId) ? { ...c, readMessageCount: readCountFor(c) } : c
+          commentIds.includes(c.commentId) ? { ...c, ...readStateFor(c) } : c
         )
       );
 
       // Trigger exit animations for comments that would be filtered out
       targets.forEach((c) => {
-        const updated = { ...c, readMessageCount: readCountFor(c) };
+        const updated = { ...c, ...readStateFor(c) };
         if (wouldBeFilteredOut(updated)) {
           setExitingIds((prev) => new Set(prev).add(updated.commentId));
         }

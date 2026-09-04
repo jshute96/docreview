@@ -25,8 +25,10 @@ filter and sort controls.
 | `iResolvedIt` | Drive | I was the one who resolved it |
 | `driveCreatedAt` | Drive | When the comment was originally created |
 | `driveModifiedAt` | Drive | When the comment (or any reply) was last modified |
-| `replyCount` | Drive | Number of replies to the comment (not counting the original) |
-| `readMessageCount` | Docreview | How many of the thread's messages I've read (see [Read Tracking](#read-tracking)) |
+| `replyCount` | Drive | Number of *live* replies to the comment (not counting the original, and not counting deleted ones) |
+| `replySlotCount` | Drive | Number of reply *slots*, deleted replies included. Monotonic (see [Read Tracking](#read-tracking)) |
+| `readSlotCount` | Docreview | The read boundary, counted in slots (see [Read Tracking](#read-tracking)) |
+| `readMessageCount` | Docreview | The same boundary in live messages — a cache the table and filters read (unread is `replyCount + 1` minus this) |
 | `assignedToMe` | Drive | The comment was assigned to me (derived from comment + reply `assigneeEmailAddress`; see limitation below) |
 | `mentionedMe` | Drive | I was @mentioned anywhere in the thread (comment or any reply). Cleared when `assignedToMe` is true (assignment takes precedence) |
 | `mentionedMeUnreplied` | Drive | `mentionedMe` is true and there's no reply/resolve by me after the last mention. Cleared when `assignedToMe` is true |
@@ -64,7 +66,10 @@ override all other rules — if someone mentions or assigns me, I see it regardl
 
 ## Deleted Comments
 
-When a comment is deleted in Google Docs, the Drive API simply stops returning it. Since we
+When a whole comment *thread* is deleted in Google Docs, Drive keeps a tombstone for it, but
+it's an empty one: the head comment's content and author are stripped, and deleting a head
+takes every reply with it (verified against real docs — no deleted thread had a surviving live
+reply). Sync therefore skips any comment with `deleted: true` and treats it as absent. Since we
 don't store comment text in the database (it's fetched from Drive on page load), there's
 nothing useful left to show — the "Open" link would point at nothing, expanding would 404,
 and only bare metadata (dates, reply count) would remain. So during sync, any COMMENT records
@@ -87,11 +92,13 @@ Deleting the first comment of a thread deletes the whole thread; the `Comment` r
 removed immediately, matching what a later full sync would do. Deleting a reply re-syncs the
 thread so `replyCount` and the derived flags follow.
 
-A deleted comment or reply is not removed from Drive outright — it comes back from
-`comments.get` with `deleted: true` and its content stripped. `comments.list` omits them
-(unless `includeDeleted` is set, which we don't), and Google Docs itself hides them, so the
-parsing helpers in `google-drive.ts` treat a `deleted` comment as absent and filter `deleted`
-replies out before anything counts or renders them.
+A deleted comment or reply is not removed from Drive outright — it leaves a tombstone. Both
+`comments.list` and `comments.get` omit tombstones **unless `includeDeleted: true` is set**, and
+Docreview now sets it on both. A tombstone keeps only `id`, `createdTime`, `modifiedTime` and
+`deleted: true` — the content **and the author** are gone, so there is nothing to draw and no
+way to attribute it. Google Docs hides them and so does Docreview: deleted threads are skipped
+outright, and deleted replies are kept only as positions, filtered out before anything is
+rendered (`liveThreadReplies`). What those positions are for is [Read Tracking](#read-tracking).
 
 #### Keeping a self-edit out of the Inbox
 
@@ -111,7 +118,7 @@ const hasNewActivity =
   (!selfEdited && !datesEqual(existing.driveModifiedAt, c.driveModifiedAt));
 ```
 
-Every other trigger still counts. The status and `readMessageCount` that `computeCommentStatus`
+Every other trigger still counts. The status and `readSlotCount` that `computeCommentStatus`
 and `buildCommentUpdate` produce are therefore already correct, and the sync's single
 `comment.update` writes them — there is no second write walking a status change back, and no
 window in which the comment sits in the wrong state.
@@ -119,7 +126,7 @@ window in which the comment sits in the wrong state.
 Two cases follow from this:
 
 - **You edit, nothing else happened.** `hasNewActivity` is false, so `computeCommentStatus`
-  returns `previousStatus` and `readMessageCount` is carried over from the existing record. The
+  returns `previousStatus` and `readSlotCount` is carried over from the existing record. The
   new `driveModifiedAt` is still stored, so the next full sync compares equal and likewise finds
   no activity — the state holds without needing the flag again.
 - **Someone else replies while you're saving.** `hasNewReplies` is true, so `hasNewActivity` is
@@ -158,6 +165,10 @@ thread behind it (see `docs/api-routes.md`).
 Each comment is keyed by `discussionId` (the `disco=` URL parameter). Duplicate
 detection uses `findFirst` by docId + googleCommentId. Fields are populated from
 the email: author, timestamp, content (text or suggestion placeholder), reply count.
+Gmail never reports deleted replies, so slot space and render space coincide and both
+count columns get the same value; both read counts stay at their default of 0, leaving
+the thread unread. Rows are insert-only — an existing `discussionId` is skipped, so this
+path never revises a count or a read boundary.
 The `source` field is set to `"gmail"` to distinguish from Drive-sourced comments.
 
 ---
@@ -190,7 +201,7 @@ this logic (first matching rule wins):
 
 1. Compare `resolved`, `isReplyAuthor`, `assignedToMe`, `mentionedMe`,
    `mentionedMeUnreplied`, `status`, `driveCreatedAt`, `driveModifiedAt`, and `replyCount`
-   against the existing record, along with the `readMessageCount` the read rules produce
+   against the existing record, along with the `readSlotCount` the read rules produce
    (see [Read Tracking](#read-tracking)). Skip the update if all match.
 2. If a **new reply @-mentions or assigns me** → `INBOX` (overrides all other rules,
    including MUTED).
@@ -216,17 +227,54 @@ Activity only surfaces in Inbox when it's relevant to you — not all activity o
 
 ## Read Tracking
 
-Read state is stored per thread as **`readMessageCount`**: how many of the thread's messages
-have been read, counting from the start. A thread's messages are the head comment plus its
-replies, so a thread with `replyCount` replies has `replyCount + 1` messages, and:
+Read state is a **boundary**, not a set of message identities, and it is counted in *slot
+space*. Two numberings matter:
 
-- `readMessageCount = 0` — nothing read.
-- `readMessageCount >= replyCount + 1` — fully read.
-- Anything between — the messages after `readMessageCount` are unread.
+- **Slot space** — the head comment plus every reply slot Drive has ever returned, tombstones
+  included. Slot positions never move and the slot count only ever grows, because a deleted
+  reply keeps its place in Drive's response (`deleted: true`, content and author stripped).
+  `readSlotCount` lives here: 0 = nothing read, `replySlotCount + 1` = fully read.
+- **Render space** — the head comment plus the *live* replies. This is what the thread panel
+  draws and what the docs table counts.
 
-The helpers live in `src/lib/read-state.ts` (`isThreadRead`, `totalMessageCount`,
-`initialReadMessageCount`) and are shared by server and client. Always compare with `>=`:
-deleting a reply shrinks `replyCount`, so a stored count can exceed the current total.
+Counting the boundary in slot space is what keeps it still. When the boundary was a live-message
+position, deleting a reply below it shifted every later message down one and silently credited
+an unread message as read — a thread with 5 replies read up to 2 had 4 unread, and deleting
+reply 0 left it with 3. Tombstones hold those positions open, so that no longer happens.
+
+Because tombstones keep their order, the read messages are still a **prefix** of the rendered
+ones, so one number converts between the spaces. The helpers live in `src/lib/read-state.ts`
+(`renderReadCount`, `slotBoundaryFor`, `unreadMessageCount`, `isThreadRead`, `totalMessageCount`,
+`initialReadSlotCount`) and are shared by server and client. `CommentRow` is the only place in
+the client that converts — in on the way to the panel, back out when a read-point control
+writes — so `CommentThreadPanel` and `thread-fold.ts` do their index arithmetic entirely in
+render space and never learn that slots exist.
+
+Sources with no tombstone concept — extension-scraped suggestions, threads synthesized from
+Gmail notifications — have no deleted slots, so the two spaces coincide and every conversion is
+the identity (`noTombstones`).
+
+The boundary is still clamped to the current slot total. Slot counts are monotonic in every
+case Drive documents, but Google guarantees no retention period for tombstones; if they were
+ever purged, the clamp is what stops leftover read credit swallowing the next real reply.
+
+**`readMessageCount` caches the boundary in render space.** The docs table and the Unread
+filter need it without fetching the thread, and it can't be derived from the stored counts
+alone — it depends on which slots *below* the boundary are deleted. So whichever writer moves
+the boundary writes both numbers: sync computes it from the real slot array, and the PATCH
+route takes it from the client, which converted the position it drew.
+
+Caching the **read** count rather than an unread one matters for two reasons. Its zero value
+means "nothing read", so a row created without thinking about read state is correctly fully
+unread — the opposite convention would make every new row silently look read. And it doesn't
+move when replies arrive: `renderReadCount` depends only on slots *below* the boundary, so
+appending replies raises the derived unread with no write anywhere. Only a boundary move or a
+deletion below the boundary changes it.
+
+Deleting a read reply is the case worth tracing: `readMessageCount` drops by one because that
+message no longer renders, and `replyCount` drops by one alongside it, so
+`replyCount + 1 - readMessageCount` is unchanged. The unread count doesn't move, which is the
+whole point.
 
 **Google provides no read signal.** Neither Drive nor the Docs API reports whether a comment
 has been seen, and Docreview doesn't try to infer one from the Google Docs UI. This is purely
@@ -237,15 +285,25 @@ thread and by the Mark read/unread buttons.
 
 | Situation | Result |
 |---|---|
-| New thread, first sync | Messages through my last contribution — see below |
+| New thread, first sync | Slots through my last contribution — see below |
 | I authored the latest message (the derived `isRead`, see below) | Fully read |
-| Someone else replied | **No write.** The preserved count already makes the new replies unread |
-| Activity with no new replies (edit, deleted reply, resolve flip) | Last message marked unread |
-| No activity | Preserved (clamped down if `replyCount` shrank) |
-| "Mark read" button | Fully read, using the `replyCount` the DB knew at click time |
+| Someone else replied | **No write.** The preserved boundary already makes the new replies unread |
+| Activity with no new slots (edit, deletion, resolve flip) | Last *live* message marked unread |
+| No activity | Preserved (clamped to the slot total) |
+| "Mark read" button | Fully read, using the `replySlotCount` the DB knew at click time |
 | "Mark unread" button | 0 (whole thread) |
 
-`initialReadMessageCount` seeds a new thread with the messages up through my last contribution,
+New replies are detected as `replySlotCount > existing.replySlotCount`, and the "which replies
+are new" slice is `.slice(existing.replySlotCount)` over slot-indexed flag arrays. Both were
+previously counted in live replies, which had a false negative: a delete and a reply landing in
+the same sync window left the live count unchanged, so the new reply was never seen at all — no
+Inbox move, no unread, no @-mention pickup. Slot counts only grow, so that can't happen. A
+tombstone contributes `false` to every flag array (Drive strips its author and mentions), which
+is also what you want: a message that no longer exists shouldn't ping anyone, and the
+"someone else replied" test explicitly skips tombstone slots so an arrived-already-deleted slot
+isn't mistaken for a stranger's reply.
+
+`initialReadSlotCount` seeds a new thread with the slots up through my last contribution,
 on the reasoning that writing a message implies having read what came before it. A thread I
 acted last on is therefore fully read, one I never posted in is fully unread, and one where
 others replied after me lands partially read — my reply followed by two replies I've never
@@ -257,36 +315,57 @@ thread you'd read shows only the new replies as unread.
 
 ### Suggestions
 
-`readMessageCount` on a suggestion only gets meaningful values from the Chrome extension, the
+`readSlotCount` on a suggestion only gets meaningful values from the Chrome extension, the
 only source with per-reply authorship (accept/reject actions count as replies, so the units
-match comments). The Docs API never writes `replyCount` or `readMessageCount`; Gmail merges
-write `replyCount` only. A suggestion Docreview has only ever seen via the Docs API therefore
+match comments). The Docs API never writes `replyCount` or `readSlotCount`; Gmail merges
+write the reply counts and the unread cache only. A suggestion Docreview has only ever seen via the Docs API therefore
 sits at `0/1` and reads as unread.
 
-### Gmail raises the total without touching the count
+### Gmail raises the total without moving the boundary
 
 `mergeSuggestionsFromGmail` updates an existing row's `replyCount` (to
-`max(notification replies, stored)`) and never writes read state. Because the total is
-`replyCount + 1`, a notification about new replies makes a read suggestion show exactly those
-new replies as unread, with no read-state write anywhere — the two fields stay consistent by
-construction, so this path never has to reason about read state at all.
+`max(notification replies, stored)`) and never moves `readSlotCount`. Leaving the boundary
+alone is exactly what makes a notification about new replies show those replies as unread on
+an otherwise-read suggestion.
+
+It writes no read state at all. Because the stored count is a *read* count, raising the total
+is by itself exactly what makes the new replies unread — the two fields stay consistent by
+construction, so this path never has to reason about read state.
+
+`replySlotCount` takes a high-water mark too, **against itself** rather than against
+`replyCount`. A notification lists the messages Gmail shows, and Gmail never shows deleted
+ones, so its count is a live count — but against the slot column it's still a valid *lower
+bound*: seeing N live replies proves the thread has at least N slots.
+
+Both parts of that matter. Maxing against `replyCount` instead would write a live count into
+the slot column and *lower* it on any thread with a tombstone, and the next Drive sync would
+then see the true slot count exceed the stored one and read a long-deleted reply as brand-new
+activity. Not writing it at all is also wrong, in a subtler way: the column would lag behind
+replies Gmail already told us about, and the next Drive sync would count those same replies as
+new a second time — marking them unread again after the user had already read them off the
+Gmail bump.
+
+The bound is loose on a thread with tombstones, since Gmail can't see them, so the column can
+still lag there. That only errs low, which over-reports new replies later and never hides one —
+the same safe direction the migration relies on. The two maxes also preserve the
+live-≤-slots ordering: both take the max against the same N, and `replySlotCount` starts at or
+above `replyCount`.
+
+The extension merge (`buildExtensionSuggestionUpdate`) takes the same max for the same
+reason: it scrapes the rendered thread, which hides deleted replies, so its count is a live
+one too. Only `replySlotCount` is guarded that way -- `replyCount` is a plain overwrite,
+since it is meant to track what the thread currently draws.
 
 `mergeCommentsFromGmail` has no such interaction: it only inserts threads Drive couldn't
 supply (docs where `comments.list` returns 403) and is a no-op when the row already exists,
-so Gmail never revises an existing comment's reply count.
-
-### Not tracked
-
-The count is a position, not a set of message identities, so **deleting a reply below the read
-boundary shifts the boundary down with it** and credits one previously-unread message as read.
-A thread with 5 replies read up to 2 has 4 unread; delete reply 0 and it has 3. Fixing this
-would mean storing per-message IDs, which no sync path provides for replies.
+so Gmail never revises an existing comment's reply count. Inserted rows start fully unread.
 
 ### Display
 
-The comment table's **Unread** column reads "unread / total" — `unreadMessageCount` (total minus
-read, clamped at 0) over `totalMessageCount`, both counting the head comment, so the total is one
-more than the reply count and an untouched zero-reply thread reads "1 / 1". `CommentRow` draws it
+The comment table's **Unread** column reads "unread / total" — `unreadMessageCount`
+(`totalMessageCount` minus the stored `readMessageCount`, clamped at 0) over
+`totalMessageCount`, both counting the head comment and both counting live messages only,
+so the total is one more than the live reply count and an untouched zero-reply thread reads "1 / 1". `CommentRow` draws it
 as a fixed-track grid inside one cell (count, slash, total), so the three parts line up down the
 table without depending on how the table apportions column widths — a `colSpan` heading over three
 real columns was tried first and left the slash drifting away from the number. The column is left-aligned and
@@ -297,15 +376,17 @@ filter bar's Unread toggle covers the same ground, and there's no sensible singl
 pair of numbers. An expanded thread
 marks each unread message with a blue left rail and bold author name, and draws an "N unread"
 rule above the first unread message when there is a read part above it to separate from
-(`CommentThreadPanel`'s `readMessageCount` prop). The rail is a border and the green "by me"
+(`CommentThreadPanel`'s `readMessageCount` prop — the stored cache is already render-space, so
+it passes straight through; only the write path converts, back into slots). The rail is a border and the green "by me"
 tint is a background, so a message of yours that was manually marked unread shows both.
 
 Every message in an expanded thread carries a read-point control, revealed on hover at the end
 of its author row: a small blue button reading **Mark read** on an unread message and **Mark
 unread** on a read one — the same wording as the whole-thread button in the panel footer, since
 it does the same thing over a narrower range. Clicking it on an unread message marks that message
-and everything above it read (`readMessageCount = index + 1`); clicking it on a read message
-makes that message the first unread one (`readMessageCount = index`). The controls appear on the
+and everything above it read (render count = `index + 1`); clicking it on a read message
+makes that message the first unread one (render count = `index`). `CommentRow` converts that
+render position to a slot boundary before sending it. The controls appear on the
 head comment and the last reply too, so the boundary reaches either end: using it on an
 already-read head comment marks the whole thread unread, and on a still-unread last message
 marks the whole thread read.
@@ -320,10 +401,14 @@ suggestion's `replyCount` is a high-water mark (`suggestion-merge.ts` stores
 per-message control then can't reach "fully read" from the last visible message, and the
 footer's whole-thread button is the way to get there.
 
-The control sends an absolute `readMessageCount` to `PATCH /api/docs/[docId]/comments/[commentId]`,
-counted from the thread the panel fetched. The route clamps it to the thread's stored size, so a
-stored read count never exceeds the thread it belongs to. Sending it together with `isRead` is
-rejected, since both write the same field.
+The control sends an absolute `readSlotCount` — converted from the position the panel drew,
+using the tombstones in the thread it fetched — to `PATCH /api/docs/[docId]/comments/[commentId]`,
+paired with that position itself as `readMessageCount`. The two must travel together: they are
+the same boundary in the two spaces, and the route can't convert between them without the
+thread's tombstones. The route clamps the boundary to the thread's stored slot size, so a
+stored boundary never exceeds the thread it belongs to; the clamp only fires at that total, so
+when it does the render-space twin becomes the full live total. Sending a boundary together
+with `isRead` is rejected, since both write the same field.
 
 That clamp needs the stored size to be current, and it isn't always: expanding a thread fetches it
 live from Drive (`GET .../threads?commentId=`) without writing anything back, so a reply posted
@@ -354,7 +439,7 @@ any other refresh would produce on finding those replies.
 A thread expanded with unread messages hides the middle of its read run, so the new activity is
 what you land on. The messages that always stay are the head comment — what everyone is replying
 to — and the last read message, so the first unread reply has its antecedent on screen. Anything
-between them (indices 1 through `readMessageCount - 2`) is replaced by a grey "N hidden" rule
+between them (render indices 1 through `readMessageCount - 2`) is replaced by a grey "N hidden" rule
 with a button that reveals them.
 
 Two or more messages in the run always fold — the "N hidden" line costs less space than they do.
@@ -374,7 +459,7 @@ back out.
 Suggestions fold too — it's the same panel — but rarely do: only extension-synced suggestions have
 real replies, and a synthesized single-message suggestion fails both conditions. The suggestion
 summary in `headerContent` is never folded, since it isn't a message. The fold measures the live
-thread and clamps `readMessageCount` to it, so a suggestion's high-water-mark `replyCount` can't
+thread and clamps the render-space read count to it, so a suggestion's high-water-mark `replyCount` can't
 distort it.
 
 **What folds is decided once per open, and after that the fold can only go away.** `CommentRow`
@@ -456,7 +541,7 @@ in inbox when first synced. See [Phase 3.5 — Smart Unarchive](./refresh.md#pha
 - **Extension path**: applies comment-like rules — `@-mention → INBOX`, `resolved → ARCHIVED`,
   `doc author or participant → INBOX`, otherwise `ARCHIVED`.
 - **Extension enrichment**: when the extension first enriches a Docs API-created suggestion
-  (adding the disco ID), both the initial status and `readMessageCount` are re-evaluated with
+  (adding the disco ID), both the initial status and `readSlotCount` are re-evaluated with
   the now-available participation data. This corrects cases like "my suggestion on a REVIEWER
   doc" from ARCHIVED to INBOX, and seeds the read count from the per-reply authorship flags.
 - **Gmail-first inserts**: always `"INBOX"` (notification = interesting activity).
@@ -586,7 +671,7 @@ table but syncs from different APIs:
 | **DB type** | `COMMENT` | `SUGGESTION` |
 | **ID format** | `googleCommentId` — Drive comment ID (`AAAB...`) | `googleSuggestionId` — Docs API ID (`suggest.xxx`) |
 | **Replies** | Full thread with reply count, author tracking, @mentions | Not tracked by Docs API; available when Chrome extension provides DOM data |
-| **Status fields** | `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, `readMessageCount`, etc. from Drive | Default to `false`/`0` from Docs API; `isThreadAuthor`/`isReplyAuthor`/`mentionedMe`/`readMessageCount` populated by extension merge when available |
+| **Status fields** | `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, `readSlotCount`, etc. from Drive | Default to `false`/`0` from Docs API; `isThreadAuthor`/`isReplyAuthor`/`mentionedMe`/`readSlotCount` populated by extension merge when available |
 | **Resolution** | Resolved/reopened via Drive API | Accepted/rejected — disappears from doc body |
 | **Navigation** | `?disco=` with `googleCommentId` | `?disco=` with `googleCommentId` when available (see below) |
 
@@ -684,7 +769,8 @@ For full suggestion sync details, see [`suggestions.md`](./suggestions.md).
 
 - **Endpoint**: `GET /drive/v3/files/{fileId}/comments`
 - **`fields` is mandatory** — Drive returns nothing without it.
-- **Fields used for sync**: `id, resolved, deleted, createdTime, modifiedTime, author(me), assigneeEmailAddress, mentionedEmailAddresses, replies(id, deleted, action, author(me), assigneeEmailAddress, mentionedEmailAddresses)`. `deleted` on both levels is what lets the parsing helpers drop deleted entries (see above); reply `id` is needed to edit or delete a specific reply.
+- **Fields used for sync**: `id, resolved, deleted, createdTime, modifiedTime, author(me), assigneeEmailAddress, mentionedEmailAddresses, replies(id, deleted, action, author(me), assigneeEmailAddress, mentionedEmailAddresses)`. `deleted` on both levels is what separates tombstones from live entries (see above); reply `id` is needed to edit or delete a specific reply.
+- **`includeDeleted`**: set to `true` on both `comments.list` and `comments.get`. One flag covers both levels — without it Drive returns neither deleted threads nor deleted replies, and with it both come back. Deleted threads are skipped by sync; deleted replies are kept as positions for read tracking. Tombstones retain only `id`, `createdTime`, `modifiedTime` and `deleted`; content, author, `resolved` and `quotedFileContent` are all stripped. They persist indefinitely in practice (entries six months old still come back), though Google documents no retention guarantee.
 - **Fields used for thread display**: adds `content, htmlContent, quotedFileContent(mimeType, value), author(displayName), replies(content, htmlContent, createdTime, author(displayName))`
 - **`htmlContent`**: Read-only field with HTML formatting of comment/reply text (bold, italics, @mention links). The API recommends displaying `htmlContent` over plain `content`. The thread panel renders it via `dangerouslySetInnerHTML`, passing it through `sanitizeHtml()` (`src/lib/sanitize-html.ts`, a DOMPurify wrapper) first — Drive already escapes user text, so this is defense in depth. `quotedFileContent.value` is sanitized the same way.
 - **`quotedFileContent`**: The document text the comment was anchored to at creation time. MIME type is typically `text/html` but in practice the value appears to contain no formatting markup. This is a snapshot — the text may have been edited or deleted since. The Drive API may also truncate long quoted text (the truncation format is undocumented). The thread panel shows one of three warnings when the quoted text doesn't match the current document, based on `originalContentDeleted` (a tri-state from the Chrome extension: `true` = deleted, `false` = checked & not deleted, `undefined` = not checked):
@@ -716,11 +802,15 @@ once and used for three derived fields:
   `author.me === true`.
 - **`isRead`** — transient, computed per sync, never stored: if `replies.length > 0`,
   `replies[last].author.me === true`; otherwise `comment.author.me === true`. It answers
-  "was I the last to act", which sync uses to advance `readMessageCount` and to gate the
-  doc-level unarchive rules. Stored read state lives in `readMessageCount` — see
+  "was I the last to act", which sync uses to advance `readSlotCount` and to gate the
+  doc-level unarchive rules. Stored read state lives in `readSlotCount` — see
   [Read Tracking](#read-tracking).
-- **`replyCount`** — `replies.length`: total number of replies to the original comment,
-  including resolve actions. No extra API call; derived from the already-fetched replies.
+- **`replyCount`** — the number of *live* replies to the original comment, including resolve
+  actions. No extra API call; derived from the already-fetched replies.
+- **`replySlotCount`** — `replies.length`, tombstones included, and `replyDeleted` the per-slot
+  flags. Drive has no reply-count field of its own, so both come free from the array we already
+  fetch. Authorship-derived flags (`isThreadAuthor`, `isReplyAuthor`, `iResolvedIt`, `isRead`)
+  are computed over the *live* replies, since a tombstone carries no author.
 - **`assignedToMe`** — whether the comment is assigned to the current user. Derived from
   the last reply's `assigneeEmailAddress` if any reply has it, otherwise the top-level
   `comment.assigneeEmailAddress` (case-insensitive). Note: the Drive API only populates

@@ -125,6 +125,9 @@ describe("PATCH /api/docs/[docId]/comments/[commentId]", () => {
         commentId: "c1",
         docId: "d1",
         replyCount,
+        // No deleted replies in these fixtures, so slot space and render space
+        // coincide — the shape of a thread nobody has deleted anything in.
+        replySlotCount: replyCount,
         doc: { userId: "u1", status: "INBOX" },
       });
       mockComment.update.mockResolvedValue({ commentId: "c1" });
@@ -135,7 +138,7 @@ describe("PATCH /api/docs/[docId]/comments/[commentId]", () => {
 
       await PATCH(patchRequest("d1", "c1", { isRead: true }), { params: params("d1", "c1") });
 
-      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readMessageCount: 5 });
+      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readSlotCount: 5, readMessageCount: 5 });
     });
 
     it("marks a reply-less thread read with just the head comment", async () => {
@@ -143,7 +146,7 @@ describe("PATCH /api/docs/[docId]/comments/[commentId]", () => {
 
       await PATCH(patchRequest("d1", "c1", { isRead: true }), { params: params("d1", "c1") });
 
-      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readMessageCount: 1 });
+      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readSlotCount: 1, readMessageCount: 1 });
     });
 
     it("marks unread by zeroing the count", async () => {
@@ -151,7 +154,7 @@ describe("PATCH /api/docs/[docId]/comments/[commentId]", () => {
 
       await PATCH(patchRequest("d1", "c1", { isRead: false }), { params: params("d1", "c1") });
 
-      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readMessageCount: 0 });
+      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readSlotCount: 0, readMessageCount: 0 });
     });
 
     it("leaves the read count alone when only status changes", async () => {
@@ -159,18 +162,26 @@ describe("PATCH /api/docs/[docId]/comments/[commentId]", () => {
 
       await PATCH(patchRequest("d1", "c1", { status: "ARCHIVED" }), { params: params("d1", "c1") });
 
-      expect(mockComment.update.mock.calls[0][0].data).not.toHaveProperty("readMessageCount");
+      expect(mockComment.update.mock.calls[0][0].data).not.toHaveProperty("readSlotCount");
     });
   });
 
-  // The per-message read-point controls send an absolute count instead.
-  describe("readMessageCount", () => {
-    function existingComment(replyCount: number) {
+  // The per-message read-point controls send an absolute slot boundary instead,
+  // converted by the client from the position it drew, paired with that
+  // position itself as the render-space twin.
+  describe("readSlotCount", () => {
+    /** `replySlotCount` defaults to `replyCount`: no deleted replies, so slot
+     *  space and render space coincide. Pass it explicitly to model a thread
+     *  that has had a reply deleted. */
+    function existingComment(replyCount: number, replySlotCount = replyCount) {
       mockAuth.mockResolvedValue({ user: { id: "u1" } });
       mockComment.findUnique.mockResolvedValue({
         commentId: "c1",
         docId: "d1",
         replyCount,
+        // No deleted replies in these fixtures, so slot space and render space
+        // coincide — the shape of a thread nobody has deleted anything in.
+        replySlotCount,
         doc: { userId: "u1", status: "INBOX" },
       });
       mockComment.update.mockResolvedValue({ commentId: "c1" });
@@ -179,17 +190,17 @@ describe("PATCH /api/docs/[docId]/comments/[commentId]", () => {
     it("stores a partial count", async () => {
       existingComment(4);
 
-      await PATCH(patchRequest("d1", "c1", { readMessageCount: 2 }), { params: params("d1", "c1") });
+      await PATCH(patchRequest("d1", "c1", { readSlotCount: 2, readMessageCount: 2 }), { params: params("d1", "c1") });
 
-      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readMessageCount: 2 });
+      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readSlotCount: 2, readMessageCount: 2 });
     });
 
     it("stores zero as fully unread", async () => {
       existingComment(4);
 
-      await PATCH(patchRequest("d1", "c1", { readMessageCount: 0 }), { params: params("d1", "c1") });
+      await PATCH(patchRequest("d1", "c1", { readSlotCount: 0, readMessageCount: 0 }), { params: params("d1", "c1") });
 
-      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readMessageCount: 0 });
+      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readSlotCount: 0, readMessageCount: 0 });
     });
 
     // The client syncs the thread before sending a count past the stored size,
@@ -198,16 +209,61 @@ describe("PATCH /api/docs/[docId]/comments/[commentId]", () => {
     it("clamps a count past the thread's known size instead of rejecting", async () => {
       existingComment(2);
 
-      const res = await PATCH(patchRequest("d1", "c1", { readMessageCount: 9 }), { params: params("d1", "c1") });
+      const res = await PATCH(patchRequest("d1", "c1", { readSlotCount: 9, readMessageCount: 9 }), { params: params("d1", "c1") });
 
       expect(res.status).toBe(200);
-      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readMessageCount: 3 });
+      // Clamped at the stored slot total, which means "read to the end" — so the
+      // render-space twin becomes the live total rather than what was asked for.
+      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readSlotCount: 3, readMessageCount: 3 });
+    });
+
+    // Two of the four replies were deleted, so the two counts genuinely differ:
+    // 5 slots (head + 4) against 3 drawn messages (head + 2 live).
+    it("stores each count in its own space on a thread with tombstones", async () => {
+      existingComment(2, 4);
+
+      await PATCH(patchRequest("d1", "c1", { readSlotCount: 5, readMessageCount: 3 }), { params: params("d1", "c1") });
+
+      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readSlotCount: 5, readMessageCount: 3 });
+    });
+
+    it("clamps each count to its own total on a thread with tombstones", async () => {
+      existingComment(2, 4);
+
+      const res = await PATCH(patchRequest("d1", "c1", { readSlotCount: 9, readMessageCount: 9 }), { params: params("d1", "c1") });
+
+      expect(res.status).toBe(200);
+      // Pulled back to the slot total, which means "read to the end", so the
+      // twin becomes the live total (3) rather than the 9 that was asked for.
+      expect(mockComment.update.mock.calls[0][0].data).toEqual({ readSlotCount: 5, readMessageCount: 3 });
+    });
+
+    // The live messages below a boundary are a subset of the slots below it, so
+    // this pair can't describe any real thread: it means a client bug.
+    it("rejects a render count above the slot count", async () => {
+      existingComment(2, 4);
+
+      const res = await PATCH(patchRequest("d1", "c1", { readSlotCount: 2, readMessageCount: 3 }), { params: params("d1", "c1") });
+
+      expect(res.status).toBe(400);
+      expect(mockComment.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects either count sent without the other", async () => {
+      existingComment(4);
+
+      const slotOnly = await PATCH(patchRequest("d1", "c1", { readSlotCount: 2 }), { params: params("d1", "c1") });
+      const renderOnly = await PATCH(patchRequest("d1", "c1", { readMessageCount: 2 }), { params: params("d1", "c1") });
+
+      expect(slotOnly.status).toBe(400);
+      expect(renderOnly.status).toBe(400);
+      expect(mockComment.update).not.toHaveBeenCalled();
     });
 
     it("rejects a negative count", async () => {
       existingComment(4);
 
-      const res = await PATCH(patchRequest("d1", "c1", { readMessageCount: -1 }), { params: params("d1", "c1") });
+      const res = await PATCH(patchRequest("d1", "c1", { readSlotCount: -1, readMessageCount: 0 }), { params: params("d1", "c1") });
 
       expect(res.status).toBe(400);
       expect(mockComment.update).not.toHaveBeenCalled();
@@ -216,16 +272,16 @@ describe("PATCH /api/docs/[docId]/comments/[commentId]", () => {
     it("rejects a non-integer count", async () => {
       existingComment(4);
 
-      const res = await PATCH(patchRequest("d1", "c1", { readMessageCount: 1.5 }), { params: params("d1", "c1") });
+      const res = await PATCH(patchRequest("d1", "c1", { readSlotCount: 1.5, readMessageCount: 0 }), { params: params("d1", "c1") });
 
       expect(res.status).toBe(400);
       expect(mockComment.update).not.toHaveBeenCalled();
     });
 
-    it("rejects isRead and readMessageCount together", async () => {
+    it("rejects isRead and readSlotCount together", async () => {
       existingComment(4);
 
-      const res = await PATCH(patchRequest("d1", "c1", { isRead: true, readMessageCount: 2 }), {
+      const res = await PATCH(patchRequest("d1", "c1", { isRead: true, readSlotCount: 2 }), {
         params: params("d1", "c1"),
       });
 

@@ -109,10 +109,11 @@ describe("PATCH /api/docs/[docId]/comments", () => {
     expect((await res.json()).count).toBe(2);
     expect(mockComment.updateMany).not.toHaveBeenCalled();
     const sql = mockExecuteRaw.mock.calls[0][0].join("?");
+    expect(sql).toContain("read_slot_count = reply_slot_count + 1");
     expect(sql).toContain("read_message_count = reply_count + 1");
   });
 
-  it("marks unread by zeroing the read count", async () => {
+  it("marks unread by zeroing both read counts", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue({ docId: "d1", userId: "u1" });
     mockComment.updateMany.mockResolvedValue({ count: 2 });
@@ -121,10 +122,12 @@ describe("PATCH /api/docs/[docId]/comments", () => {
     const res = await PATCH(req, params);
 
     expect(res.status).toBe(200);
+    // Zero in both spaces, so there's no cross-column assignment and no need
+    // to drop to raw SQL the way the read direction does.
     expect(mockExecuteRaw).not.toHaveBeenCalled();
     expect(mockComment.updateMany).toHaveBeenCalledWith({
       where: { commentId: { in: ["c1", "c2"] }, docId: "d1" },
-      data: { readMessageCount: 0 },
+      data: { readSlotCount: 0, readMessageCount: 0 },
     });
   });
 });
