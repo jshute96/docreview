@@ -684,8 +684,9 @@ in Google Docs (or from Docreview) and then a sync, so they belong to the live s
 - [ ] Offline mode: all Drive/Docs/Gmail API calls gracefully skipped with logged warnings
 - [ ] View-only doc: comments page shows comments from Drive API (no extension data)
 - [ ] View-only doc: extension fetches (getComment, getSuggestion) return gracefully (no 5s hang)
-- [ ] Doc with no comments: comments page shows empty state
-- [ ] No-comment-permission doc: comments page shows "Comments not visible on this document." (not "No comments")
+- [ ] Doc with no comments *that the user can comment on*: comments page shows the ordinary empty state ("No comments yet")
+- [ ] View-only doc with genuinely no comments: shows "Comments not visible on this document.", not the ordinary empty state — the two are indistinguishable from Drive and this is the deliberate choice
+- [ ] No-comment-permission doc: comments page shows "Comments not visible on this document." (not "No comments") — covers both Drive shapes: `comments.list` refused with a 403, and it succeeding with an empty list while `capabilities.canComment` is false
 - [ ] Deleted/inaccessible doc (Drive 404): comments page shows "Comments not visible on this document." (not a load error)
 - [ ] Reply on a doc where comment access was revoked: shows the permission message, not a generic failure
 - [ ] Extension suggestion sync: the cross-tab event is recognized as a suggestion (re-scrapes the extension, no Drive thread fetch for a disco ID Drive doesn't know)

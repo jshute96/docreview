@@ -36,6 +36,8 @@ vi.mock("@/lib/google-drive", async () => {
     // Pure helpers — use real implementations so error-code checks work
     isDriveErrorCode: actual.isDriveErrorCode,
     getDriveErrorCode: actual.getDriveErrorCode,
+    commentsAreHidden: actual.commentsAreHidden,
+    COMMENT_VISIBILITY_FIELDS: actual.COMMENT_VISIBILITY_FIELDS,
     _commentsGet: commentsGet,
     _filesGet: filesGet,
   };
@@ -193,6 +195,49 @@ describe("GET /api/docs/[docId]/threads", () => {
     const data = await res.json();
     expect(data.threads).toEqual({});
     expect(data.forbidden).toBe(true);
+  });
+
+  it("returns forbidden when comments are hidden rather than refused", async () => {
+    // View-only access returns an empty list rather than a 403.
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue(docRecord);
+    mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
+    mockFetchCommentData.mockResolvedValue({ threads: [] });
+    mockFilesGet.mockResolvedValue({ data: { viewedByMeTime: null, capabilities: { canComment: false } } });
+
+    const req = new NextRequest("http://localhost/api/docs/d1/threads");
+    const res = await GET(req, makeParams("d1"));
+    const data = await res.json();
+    expect(data.forbidden).toBe(true);
+  });
+
+  it("does not report forbidden when a no-comment doc's threads are visible", async () => {
+    // Threads came back, so comments are readable whatever the capability says.
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue(docRecord);
+    mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
+    mockFetchCommentData.mockResolvedValue({ threads: [
+      { id: "c1", author: "A", fromMe: false, content: "x", createdTime: "", resolved: false, replies: [] },
+    ] });
+    mockFilesGet.mockResolvedValue({ data: { viewedByMeTime: null, capabilities: { canComment: false } } });
+
+    const req = new NextRequest("http://localhost/api/docs/d1/threads");
+    const res = await GET(req, makeParams("d1"));
+    const data = await res.json();
+    expect(data.forbidden).toBeUndefined();
+  });
+
+  it("asks Drive for the capability the hidden-comments check depends on", async () => {
+    // Dropping the field would silently disable the check, not fail loudly.
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue(docRecord);
+    mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
+    mockFetchCommentData.mockResolvedValue({ threads: [] });
+    mockFilesGet.mockResolvedValue({ data: { viewedByMeTime: null } });
+
+    const req = new NextRequest("http://localhost/api/docs/d1/threads");
+    await GET(req, makeParams("d1"));
+    expect(mockFilesGet.mock.calls[0][0].fields).toContain("capabilities(canComment)");
   });
 
   it("returns forbidden when the file is not found in Drive (404)", async () => {

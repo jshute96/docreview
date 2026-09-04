@@ -371,8 +371,10 @@ in `DocTable` has the full set. Source-specific refreshes from the hamburger men
 the same pattern via `handleSourceRefresh`.
 
 **Per-doc refresh:** The `POST /api/docs/[docId]/refresh` response includes the full updated doc
-with its comments array, plus thread details, suggestion content, document text, and
-`viewedByMeTime`. `DocDetail` destructures all of this from the response and updates state
+with its comments array, plus thread details, suggestion content, document text,
+`viewedByMeTime`, and `forbidden` (whether Drive is withholding this doc's comments — see
+`docs/api-routes.md`), which lets a refresh both raise and clear the "Comments not visible"
+empty state. `DocDetail` destructures all of this from the response and updates state
 directly — no follow-up `/comments` or `/content` fetches needed. After applying the server
 response, the client also runs `fetchExtensionCommentsAndSuggestions()` to fetch both suggestion data and
 comment info from the Chrome extension (if available). Suggestion data overwrites the

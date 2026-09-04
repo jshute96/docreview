@@ -15,6 +15,7 @@ import {
   isDriveErrorCode,
   getDriveErrorCode,
   isInvalidGrantError,
+  commentsAreHidden,
 } from "./google-drive";
 
 describe("parseGoogleDocId", () => {
@@ -398,5 +399,32 @@ describe("fetchCommentData permission handling", () => {
     commentsList.mockResolvedValue({ data: { comments: [], nextPageToken: null } });
     const result = await fetchCommentData(auth, "gdoc1", { threads: true });
     expect(result.permissionDenied).toBeUndefined();
+  });
+});
+
+describe("commentsAreHidden", () => {
+  it("reports a refused comments.list", () => {
+    expect(commentsAreHidden({ permissionDenied: true, threadCount: 0 })).toBe(true);
+  });
+
+  it("reports an empty list from a doc the user can't comment on", () => {
+    // View-only access silently returns no comments instead of a 403.
+    expect(commentsAreHidden({ canComment: false, threadCount: 0 })).toBe(true);
+  });
+
+  it("stays off when threads came back, whatever the capability says", () => {
+    expect(commentsAreHidden({ canComment: false, threadCount: 2 })).toBe(false);
+  });
+
+  it("stays off for a genuinely empty doc the user can comment on", () => {
+    expect(commentsAreHidden({ canComment: true, threadCount: 0 })).toBe(false);
+  });
+
+  it("stays off when the capability wasn't fetched", () => {
+    expect(commentsAreHidden({ threadCount: 0 })).toBe(false);
+  });
+
+  it("stays off when threads weren't requested at all", () => {
+    expect(commentsAreHidden({ canComment: false, threadCount: undefined })).toBe(false);
   });
 });

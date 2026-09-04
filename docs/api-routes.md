@@ -148,17 +148,37 @@ GET modes:
 
 All responses return threads as `Record<id, CommentThread>`.
 
-If Drive returns 403 or 404 for the file (no comment access, deleted, or access
-revoked — Drive returns 404 for the last two indistinguishably), GET responds
-`{ threads: {}, forbidden: true }` with a warning log rather than a 502, and the
-UI shows "Comments not visible on this document." The same flag is returned when
-the file itself is readable but `comments.list` is refused — `fetchCommentData`
-swallows that 403 on the threads-only path and reports it as `permissionDenied`
-(the name its own sync result already uses). `POST /refresh` reports the same
-condition the same way, and sets `forbidden: false` once comments come back, so a
-refresh can clear the message as well as raise it. This route deliberately does
-not update the doc's `accessState` — the refresh route owns that state machine
-(see `docs/access-states.md`).
+**The `forbidden` flag.** `forbidden: true` means Drive won't show this user the
+doc's comments, so the page says "Comments not visible on this document." instead
+of "No comments yet. Click Refresh to sync." GET sets it in three cases:
+
+1. `files.get` fails with 403 or 404 — no access, deleted, or access revoked
+   (Drive returns 404 for the last two indistinguishably). GET responds
+   `{ threads: {}, forbidden: true }` and logs a warning rather than a 502.
+2. `files.get` succeeds but `comments.list` returns 403 — the file is readable,
+   its comments aren't. `fetchCommentData` swallows that 403 on the threads-only
+   path and returns `permissionDenied` instead of throwing.
+3. `comments.list` returns no comments and `files.get` reports
+   `capabilities.canComment: false`. View-only access usually hides comments
+   rather than refusing them, so an empty list proves nothing by itself.
+
+Cases 2 and 3 are decided by `commentsAreHidden()` in `google-drive.ts`. Both
+this route and `POST /api/docs/[docId]/refresh` call it, and both ask `files.get`
+for `COMMENT_VISIBILITY_FIELDS` so the capability is there to check. A non-empty
+thread list is never reported as forbidden, whatever the capability says.
+
+Case 3 is deliberately conservative: it also catches a view-only doc that
+genuinely has no comments. Drive gives us no way to tell those apart, and telling
+someone who can't see comments to click Refresh is the worse of the two answers.
+
+`POST /api/docs/[docId]/refresh` reports cases 2 and 3 the same way, and returns
+`forbidden: false` when it does see comments, so a refresh clears a stale message
+as well as raising one. Case 1 is different there: a failed `files.get` updates
+`accessState` and the response omits `forbidden` entirely, leaving the client's
+existing state alone rather than overwriting it with a guess.
+
+GET deliberately does not update the doc's `accessState` — the refresh route owns
+that state machine (see `docs/access-states.md`).
 
 POST with `?commentId=X` forces a fresh fetch and syncs the DB comment record.
 It runs the same per-comment sync a full refresh does, so it also auto-unarchives

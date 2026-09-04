@@ -30,6 +30,8 @@ vi.mock("@/lib/google-drive", async () => {
     driveUrlFor: actual.driveUrlFor,
     isDriveErrorCode: actual.isDriveErrorCode,
     getDriveErrorCode: actual.getDriveErrorCode,
+    commentsAreHidden: actual.commentsAreHidden,
+    COMMENT_VISIBILITY_FIELDS: actual.COMMENT_VISIBILITY_FIELDS,
   };
 });
 vi.mock("@/lib/refresh");
@@ -110,6 +112,40 @@ describe("Single-doc Refresh API", () => {
       files: { get: vi.fn().mockResolvedValue({ data: { id: googleDocId, name: "Title", owners: [{ me: true }] } }) },
     } as any);
     vi.mocked(upsertDocsAndSyncComments).mockResolvedValue({} as any);
+
+    const req = new NextRequest(`http://localhost/api/docs/${docId}/refresh`, { method: "POST" });
+    const res = await POST(req, makeParams());
+    expect((await res.json()).forbidden).toBe(false);
+  });
+
+  it("reports comment access denial when Drive hides comments without a 403", async () => {
+    // View-only access returns an empty comment list rather than a 403.
+    const dbDoc = { docId, userId, googleDocId };
+    vi.mocked(prisma.doc.findUnique).mockResolvedValue(dbDoc as any);
+    vi.mocked(getDriveClient).mockResolvedValue({} as any);
+    vi.mocked(createDriveService).mockReturnValue({
+      files: { get: vi.fn().mockResolvedValue({ data: { id: googleDocId, name: "Title", owners: [{ me: false }], capabilities: { canComment: false } } }) },
+    } as any);
+    vi.mocked(upsertDocsAndSyncComments).mockResolvedValue({} as any);
+    vi.mocked(fetchCommentData).mockResolvedValue({ comments: [], threads: [] });
+
+    const req = new NextRequest(`http://localhost/api/docs/${docId}/refresh`, { method: "POST" });
+    const res = await POST(req, makeParams());
+    expect((await res.json()).forbidden).toBe(true);
+  });
+
+  it("does not report denial when a no-comment-capability doc's threads are visible", async () => {
+    const dbDoc = { docId, userId, googleDocId };
+    vi.mocked(prisma.doc.findUnique).mockResolvedValue(dbDoc as any);
+    vi.mocked(getDriveClient).mockResolvedValue({} as any);
+    vi.mocked(createDriveService).mockReturnValue({
+      files: { get: vi.fn().mockResolvedValue({ data: { id: googleDocId, name: "Title", owners: [{ me: false }], capabilities: { canComment: false } } }) },
+    } as any);
+    vi.mocked(upsertDocsAndSyncComments).mockResolvedValue({} as any);
+    vi.mocked(fetchCommentData).mockResolvedValue({
+      comments: [],
+      threads: [{ id: "c1", author: "A", fromMe: false, content: "x", createdTime: "", resolved: false, replies: [] }],
+    } as any);
 
     const req = new NextRequest(`http://localhost/api/docs/${docId}/refresh`, { method: "POST" });
     const res = await POST(req, makeParams());

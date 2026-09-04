@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, createDriveService, invalidGrantResponse, fetchCommentData, fetchDocData, fetchFileTextViaExport, driveUrlFor, isDriveErrorCode } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, invalidGrantResponse, fetchCommentData, fetchDocData, fetchFileTextViaExport, driveUrlFor, isDriveErrorCode, commentsAreHidden, COMMENT_VISIBILITY_FIELDS } from "@/lib/google-drive";
 import type { ThreadMap, SuggestionContent, DriveSuggestion, DriveDoc } from "@/lib/google-drive";
 import { upsertDocsAndSyncComments } from "@/lib/refresh";
 import { docWithCommentsInclude, stripServerOnly } from "@/lib/doc-queries";
@@ -43,15 +43,18 @@ export async function POST(
   // upsertDocsAndSyncComments only reads the DriveDoc fields.
   let driveDoc: (DriveDoc & { trashed: boolean }) | undefined;
   let viewedByMeTime: string | null = null;
+  // Undefined when the response carried no `capabilities` object.
+  let canComment: boolean | null | undefined;
   try {
     const drive = createDriveService(driveAuth);
     const fileRes = await drive.files.get({
       fileId: doc.googleDocId,
-      fields: "id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed, viewedByMeTime",
+      fields: `id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName), trashed, viewedByMeTime, ${COMMENT_VISIBILITY_FIELDS}`,
       supportsAllDrives: true,
     });
     const f = fileRes.data;
     viewedByMeTime = f.viewedByMeTime ?? null;
+    canComment = f.capabilities?.canComment;
     const isOwner = f.owners?.some((o) => o.me === true) ?? false;
     driveDoc = {
       googleDocId: f.id!,
@@ -130,8 +133,16 @@ export async function POST(
         },
       });
 
+      // `permissionDenied` is always undefined here (a sync lets the 403 reach
+      // the catch above) — passed so the rule stays in one place.
+      if (commentResult) {
+        commentsForbidden = commentsAreHidden({
+          permissionDenied: commentResult.permissionDenied,
+          canComment,
+          threadCount: commentResult.threads?.length,
+        });
+      }
       // Build thread map keyed by thread ID for the client response.
-      if (commentResult && !commentResult.permissionDenied) commentsForbidden = false;
       if (commentResult?.threads) {
         threadMap = {};
         for (const t of commentResult.threads) threadMap[t.id] = t;

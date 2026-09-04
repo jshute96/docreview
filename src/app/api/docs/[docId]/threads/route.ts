@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, createDriveService, fetchThreadDetail, fetchDocData, fetchCommentData, invalidGrantResponse, isDriveErrorCode, getDriveErrorCode } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, fetchThreadDetail, fetchDocData, fetchCommentData, invalidGrantResponse, isDriveErrorCode, getDriveErrorCode, commentsAreHidden, COMMENT_VISIBILITY_FIELDS } from "@/lib/google-drive";
 import { OfflineModeError } from "@/lib/offline";
 import type { ThreadMap } from "@/lib/google-drive";
 import { bumpLastCommentActivity, syncSingleComment, unarchiveDocIfNeeded } from "@/lib/sync-comments";
@@ -78,7 +78,7 @@ export async function GET(
       fetchCommentData(driveAuth, doc.googleDocId, { threads: true }),
       drive.files.get({
         fileId: doc.googleDocId,
-        fields: "viewedByMeTime",
+        fields: `viewedByMeTime, ${COMMENT_VISIBILITY_FIELDS}`,
         supportsAllDrives: true,
       }),
     ]);
@@ -88,13 +88,19 @@ export async function GET(
       threads[t.id] = t;
     }
 
+    // comments.list can be refused — or quietly emptied — while files.get
+    // succeeds: the doc is readable, its comments aren't. Without this the UI
+    // would show the ordinary "no comments" empty state.
+    const forbidden = commentsAreHidden({
+      permissionDenied: threadResult.permissionDenied,
+      canComment: fileRes.data.capabilities?.canComment,
+      threadCount: Object.keys(threads).length,
+    });
+
     return NextResponse.json({
       threads,
       viewedByMeTime: fileRes.data.viewedByMeTime ?? null,
-      // comments.list can be refused while files.get succeeds — the doc is
-      // readable, its comments aren't. Without this the UI would show the
-      // ordinary "no comments" empty state.
-      ...(threadResult.permissionDenied ? { forbidden: true } : {}),
+      ...(forbidden ? { forbidden: true } : {}),
     });
   } catch (err) {
     if (err instanceof OfflineModeError) {

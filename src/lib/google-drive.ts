@@ -441,6 +441,33 @@ export interface CommentDataResult {
   permissionDenied?: boolean;
 }
 
+/** `files.get` fields needed by {@link commentsAreHidden}. */
+export const COMMENT_VISIBILITY_FIELDS = "capabilities(canComment)";
+
+/**
+ * Whether Drive is withholding this doc's comments from the user, as opposed to
+ * the doc genuinely having none. Two shapes of the same condition:
+ *  - `comments.list` returns 403 (reported as `permissionDenied`), or
+ *  - the call succeeds but returns nothing while `capabilities.canComment` is
+ *    false. View-only access hides comments instead of refusing the call, so an
+ *    empty list on its own can't be told apart from a doc with no comments.
+ *
+ * The second rule is deliberately conservative: it also catches a view-only doc
+ * that simply has no comments, and anything else that clears the capability. For
+ * a user who can't comment, "click Refresh to sync" is wrong advice either way.
+ *
+ * A non-empty result means we can see comments, whatever the capability says.
+ * Undefined `threadCount` means threads weren't requested — nothing to judge.
+ */
+export function commentsAreHidden(opts: {
+  permissionDenied?: boolean;
+  canComment?: boolean | null;
+  threadCount: number | undefined;
+}): boolean {
+  if (opts.permissionDenied) return true;
+  return opts.canComment === false && opts.threadCount === 0;
+}
+
 // Builds the per-comment Drive API fields string based on which outputs are
 // needed. Used by both comments.list (via buildCommentListFields) and comments.get.
 // sync-only: lean metadata fields. threads-only: content/display fields.
