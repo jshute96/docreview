@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npx tsx
 import { readFileSync, writeFileSync, readdirSync } from "fs";
-import { join, dirname, basename } from "path";
+import { join, basename } from "path";
 import { parseGmailNotification } from "../src/lib/parse-gmail-notification";
 
 const USAGE =

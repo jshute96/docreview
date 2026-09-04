@@ -18,7 +18,7 @@ import { DocTypeIcon } from "@/components/doc-type-icon";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { BulkEditState, cycleBulkEditState } from "@/lib/bulk-edit";
 import { Star } from "lucide-react";
-import { contrastText } from "@/lib/utils";
+import { contrastText, pluralize } from "@/lib/utils";
 import { ManageLabelsDialog } from "@/components/manage-labels-dialog";
 import { Button } from "@/components/ui/button";
 import { broadcastChange } from "@/lib/cross-tab";
@@ -100,7 +100,7 @@ export function BulkEditDialog({
       resetHighlights();
     }
     setOpen(isOpen);
-  }, [initialDocs, allLabels]);
+  }, [initialDocs, allLabels, resetHighlights]);
 
   /**
    * Revert role/status/label states to 'as-is' if they've become redundant
@@ -235,7 +235,7 @@ export function BulkEditDialog({
       onSave(updatedDocs);
       setOpen(false);
       broadcastChange({ type: "docs" }, contextId);
-      toast.success(`Updated ${updatedDocs.length} documents`);
+      toast.success(`Updated ${pluralize(updatedDocs.length, "document")}`);
       if (skipped > 0) {
         toast.warning(`${skipped} document${skipped === 1 ? " was" : "s were"} not found`);
       }

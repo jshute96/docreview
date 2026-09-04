@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { withProgressLogging } from "./promise-utils";
 import { logInfo } from "./log";
-import { getRequestId } from "./request-context";
 
 vi.mock("./log", () => ({
   logInfo: vi.fn(),

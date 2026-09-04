@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 import { getDriveClient } from "./google-drive";
 import { syncComments } from "./sync-comments";
 import { scanGmailForDocIds } from "./gmail";
-import { getStatus, updateGmailTimestamp, updateDriveChangesToken } from "./status";
+import { getStatus, updateGmailTimestamp } from "./status";
 
 vi.mock("./prisma");
 vi.mock("./google-drive");

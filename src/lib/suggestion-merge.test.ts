@@ -84,7 +84,6 @@ describe("mergeSuggestionsFromGmail", () => {
   });
 
   it("merges into existing Drive-created row by content hash", async () => {
-    const hash = computeSuggestionHash("INSERT", "", "new text");
     mockParse.mockReturnValue({
       type: "comment",
       subject: "", from: "", to: "", date_str: "",

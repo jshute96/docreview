@@ -39,6 +39,7 @@ import { broadcastChange } from "@/lib/cross-tab";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { StarButton } from "@/components/star-button";
 import { docTarget } from "@/lib/tab-targets";
+import { pluralize } from "@/lib/utils";
 
 type TimeUnit = "days" | "months" | "years" | "all";
 
@@ -139,7 +140,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       abortRef.current?.abort();
     }
     setOpen(isOpen);
-  }, []);
+  }, [resetHighlights]);
 
   function handleCancel() {
     abortRef.current?.abort();
@@ -181,7 +182,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       if (result.noGmailAccount) {
         toast.warning("No Gmail account", { duration: 4000 });
       } else {
-        toast.success(`Found ${result.total} documents in ${sourceLabel} (${newCount} new)`, { duration: 4000 });
+        toast.success(`Found ${pluralize(result.total, "document")} in ${sourceLabel} (${newCount} new)`, { duration: 4000 });
       }
     } catch (err) {
       dismissProgressToasts();

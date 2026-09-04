@@ -253,7 +253,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
         try {
           setValidationState("validating");
           resolveInFlight.current = true;
-          console.log("[extension] Resolving:", urlToValidate);
+          console.log("[extension] Resolving:", urlToValidate); // eslint-disable-line no-console
           const result = await resolveUrl(urlToValidate);
           // Only the current run may clear the flag: a superseded run's promise
           // can land mid-way through a newer resolve, and clearing it there
@@ -261,9 +261,9 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
           // background tab.
           if (!controller.signal.aborted) resolveInFlight.current = false;
           if (result.resolved) {
-            console.log("[extension] Resolved to:", result.url);
+            console.log("[extension] Resolved to:", result.url); // eslint-disable-line no-console
           } else {
-            console.log("[extension] Resolution failed:", result.error ?? "not a Google Doc");
+            console.log("[extension] Resolution failed:", result.error ?? "not a Google Doc"); // eslint-disable-line no-console
           }
           if (controller.signal.aborted) return;
           if (result.resolved && result.url) {
@@ -283,7 +283,7 @@ export const DocForm = forwardRef<DocFormHandle, DocFormProps>(
             setValidationState("invalid");
             setValidationError(errorMessageForCode(DocErrorCode.InvalidUrl));
           }
-        } catch (err) {
+        } catch {
           resolveInFlight.current = false;
           // Restore the server's invalid result
           setValidationState("invalid");

@@ -35,10 +35,14 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
       .catch(() => {});
   }, []);
 
-  // Reset to first page when reopened
-  useEffect(() => {
+  // Reset to first page when reopened. Done during render rather than in an
+  // effect so the first render after opening already shows page 0 (and to avoid
+  // the cascading re-render an effect-based reset would cause).
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) setCurrentIndex(0);
-  }, [open]);
+  }
 
   const handleClose = useCallback(() => {
     onOpenChange(false);

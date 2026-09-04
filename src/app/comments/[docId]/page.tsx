@@ -1,4 +1,4 @@
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { DocDetail } from "@/components/doc-detail";
 import { requireAuth } from "@/lib/auth-utils";

@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { GripVertical, Trash2 } from "lucide-react";
-import type { Label } from "@prisma/client";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +27,7 @@ import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { useLabels } from "@/contexts/label-context";
 import type { LabelWithCount } from "@/types";
+import { pluralize } from "@/lib/utils";
 
 function randomPrimaryColor(): string {
   return PRIMARY_COLORS[Math.floor(Math.random() * PRIMARY_COLORS.length)];
@@ -278,6 +278,13 @@ export function ManageLabelsDialog({
     }
   }
 
+  // The confirm dialog animates out over 200ms, during which `labelToDelete` is
+  // already null. Render from a latched copy so the text doesn't flash to
+  // "Delete label ?" / "isn't attached to any documents" on the way out.
+  const [confirmLabel, setConfirmLabel] = useState<LabelWithCount | null>(null);
+  if (labelToDelete && labelToDelete !== confirmLabel) setConfirmLabel(labelToDelete);
+  const confirmLabelDocCount = confirmLabel?._count?.docs ?? 0;
+
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
@@ -321,7 +328,7 @@ export function ManageLabelsDialog({
               <div
                 key={label.labelId}
                 data-label-row
-                title={`Label ${label.name} is attached to ${label._count?.docs ?? 0} documents`}
+                title={`Label ${label.name} is attached to ${pluralize(label._count?.docs ?? 0, "document")}`}
                 className={`flex items-center justify-between rounded-md px-2 py-1.5 select-none touch-none ${
                   dragActiveIndex === index
                     ? "bg-zinc-100 ring-1 ring-zinc-300 cursor-grabbing"
@@ -370,11 +377,17 @@ export function ManageLabelsDialog({
       </DialogContent>
 
       <AlertDialog open={!!labelToDelete} onOpenChange={(o) => !o && setLabelToDelete(null)}>
-        <AlertDialogContent aria-describedby={undefined}>
+        <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Label {labelToDelete?.name} is attached to {labelToDelete?._count?.docs ?? 0} documents. Delete it?
+              Label {confirmLabel?.name} is attached to {pluralize(confirmLabelDocCount, "document")}. Delete it?
             </AlertDialogTitle>
+            {/* The title already states the consequence for sighted users, so the
+                description Radix requires would just repeat it on screen. Kept
+                for screen readers only. */}
+            <AlertDialogDescription className="sr-only">
+              Deleting a label removes it from any documents that use it. This can&apos;t be undone.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>

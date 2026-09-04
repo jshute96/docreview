@@ -96,7 +96,10 @@ export function DeleteAllDialog({ open, onOpenChange }: DeleteAllDialogProps) {
         ) : (
           <>
             <AlertDialogHeader>
-              <AlertDialogTitle>Should we also delete user credentials?</AlertDialogTitle>
+              <AlertDialogTitle>Do you want to log out?</AlertDialogTitle>
+              <AlertDialogDescription>
+                All data in Docreview will be deleted.
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={reset} disabled={deleting}>

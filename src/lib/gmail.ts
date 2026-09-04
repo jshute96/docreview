@@ -281,7 +281,6 @@ export async function scanGmailForDocIds(
         }
 
         const headers = res.data.payload?.headers ?? [];
-        const subject = headers.find((h) => h.name?.toLowerCase() === "subject")?.value ?? "(no subject)";
         const fromHeader = headers.find((h) => h.name?.toLowerCase() === "from")?.value ?? "";
 
         // Skip sharing notifications that are confirmations of our own shares

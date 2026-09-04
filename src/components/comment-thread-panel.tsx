@@ -389,6 +389,9 @@ export function CommentThreadPanel({
   // -1 is "not decided yet": it can't collide with a real `expandId`, and it
   // keeps the check honest when the prop is omitted.
   const decidedFor = useRef<number | undefined>(-1);
+  // Intentionally runs on every render; `decidedFor` makes it a no-op once the
+  // fold has been decided.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     if (decidedFor.current === expandId) return;
     const thread = threads[0];
@@ -544,7 +547,7 @@ export function CommentThreadPanel({
 
   useEffect(() => {
     resizeTextarea();
-  }, [replyText, resizeTextarea]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [replyText, resizeTextarea]);
 
   // Recalculate on container resize (window resize, layout changes)
   useEffect(() => {
@@ -886,7 +889,7 @@ export function CommentThreadPanel({
   return (
     <div ref={panelRef} className={`mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4${isSelected ? " ring-2 ring-blue-400" : ""}`}>
       {headerContent}
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- click to select comment in Google Doc */}
+      {/* Click anywhere in the thread body to select the comment in the Google Doc. */}
       <div className={`divide-y divide-zinc-200${onSelectInDoc ? " cursor-pointer" : ""}`} onClick={onSelectInDoc}>
         {threads.map((thread, threadIndex) => (
           <div

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
-import { DocRole, DocStatus } from "@prisma/client";
 
 vi.mock("@/auth", () => ({
   auth: vi.fn(),

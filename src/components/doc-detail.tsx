@@ -17,7 +17,7 @@ import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
 import { isThreadRead, liveThreadReplies, totalMessageCount, totalSlotCount } from "@/lib/read-state";
 import { CommentRow } from "@/components/comment-row";
-import { pingExtension, navigateToComment, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, setDocReadyHandler, getCommentsAndSuggestionsFromDoc, getSuggestionFromDoc, type ExtensionSuggestion, type ExtensionCommentInfo } from "@/lib/bridge-to-extension";
+import { pingExtension, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, setDocReadyHandler, getCommentsAndSuggestionsFromDoc, getSuggestionFromDoc, type ExtensionSuggestion, type ExtensionCommentInfo } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -45,7 +45,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DialogButtons } from "@/components/dialog-buttons";
-import { formatDate } from "@/lib/utils";
+import { formatDate, pluralize } from "@/lib/utils";
 import { createMatcher } from "@/lib/highlight";
 import { broadcastChange, useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
@@ -247,7 +247,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       }
       broadcastChange({ type: "comments", docId: doc.docId, commentType: CommentType.SUGGESTION, googleCommentId: discoId }, contextId);
     }).catch((err) => {
-      console.log("[doc-detail] suggestion refresh: server merge error", err);
+      console.log("[doc-detail] suggestion refresh: server merge error", err); // eslint-disable-line no-console
       if (!isAuthError(err)) toast.error("Couldn't save the refreshed suggestion");
     });
   }, [doc.docId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -459,10 +459,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
   // automatically instead of requiring a manual Refresh.
   useEffect(() => {
     setDocReadyHandler((docId) => {
-      console.log("[doc-detail] docReady received for", docId, "| this doc:", googleDocId, "| already loaded:", extensionSuggestionsLoaded.current);
+      console.log("[doc-detail] docReady received for", docId, "| this doc:", googleDocId, "| already loaded:", extensionSuggestionsLoaded.current); // eslint-disable-line no-console
       if (docId !== googleDocId) return;
       if (extensionSuggestionsLoaded.current) return;
-      console.log("[doc-detail] docReady: auto-fetching suggestions");
+      console.log("[doc-detail] docReady: auto-fetching suggestions"); // eslint-disable-line no-console
       void fetchExtensionCommentsAndSuggestions();
     });
     return () => setDocReadyHandler(null);
@@ -824,7 +824,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       }, 200);
 
       broadcastChange({ type: "comments", docId: doc.docId }, contextId);
-      toast.success(`${pastVerb} ${count} comments`);
+      toast.success(`${pastVerb} ${pluralize(count, "comment")}`);
     } catch (err) {
       if (!isAuthError(err)) toast.error(`Failed to ${verb} comments`);
     } finally {
@@ -927,7 +927,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       }, 200);
 
       broadcastChange({ type: "comments", docId: doc.docId }, contextId);
-      toast.success(`Marked ${count} comments ${pastVerb}`);
+      toast.success(`Marked ${pluralize(count, "comment")} ${pastVerb}`);
     } catch (err) {
       if (!isAuthError(err)) toast.error(`Failed to mark comments ${pastVerb}`);
     } finally {
