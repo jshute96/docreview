@@ -20,6 +20,7 @@ vi.mock("@/lib/prisma", () => {
 vi.mock("@/lib/sync-comments", () => ({
   bumpLastCommentActivity: vi.fn(),
   syncSingleComment: vi.fn(),
+  unarchiveDocIfNeeded: vi.fn(),
 }));
 vi.mock("@/lib/google-drive", async () => {
   const actual = await vi.importActual<typeof import("@/lib/google-drive")>("@/lib/google-drive");
@@ -49,7 +50,7 @@ import {
   fetchDocData,
   fetchCommentData,
 } from "@/lib/google-drive";
-import { syncSingleComment } from "@/lib/sync-comments";
+import { syncSingleComment, unarchiveDocIfNeeded } from "@/lib/sync-comments";
 import * as googleDriveMod from "@/lib/google-drive";
 
 const mockAuth = vi.mocked(auth) as unknown as ReturnType<typeof vi.fn>;
@@ -63,6 +64,7 @@ const mockFetchThreadDetail = vi.mocked(fetchThreadDetail);
 const mockFetchDocData = vi.mocked(fetchDocData);
 const mockFetchCommentData = vi.mocked(fetchCommentData);
 const mockSyncSingleComment = vi.mocked(syncSingleComment);
+const mockUnarchiveDocIfNeeded = vi.mocked(unarchiveDocIfNeeded);
 // Access the mock comments.get via the helper we attached to the mock module
 const mockCommentsGet = (googleDriveMod as unknown as { _commentsGet: ReturnType<typeof vi.fn> })
   ._commentsGet;
@@ -131,7 +133,7 @@ describe("GET /api/docs/[docId]/threads", () => {
     mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
     const thread = { id: "c1", author: "Alice", fromMe: false, content: "Hi", createdTime: "", resolved: false, replies: [] };
     mockFetchThreadDetail.mockResolvedValue({
-      comment: { id: "c1", resolved: false, isThreadAuthor: true, isReplyAuthor: false, iResolvedIt: false, isRead: false, assignedToMe: false, mentionedMe: false, mentionedMeUnreplied: false, driveCreatedAt: null, driveModifiedAt: null, replyCount: 0, replyAuthorMeFlags: [], replyMentionedMeFlags: [], replyAssignedToMeFlags: [] },
+      comment: { id: "c1", resolved: false, isThreadAuthor: true, isReplyAuthor: false, iResolvedIt: false, isRead: false, assignedToMe: false, mentionedMe: false, mentionedMeUnreplied: false, driveCreatedAt: null, driveModifiedAt: null, replyCount: 0, replySlotCount: 0, replyDeleted: [], replyAuthorMeFlags: [], replyMentionedMeFlags: [], replyAssignedToMeFlags: [] },
       thread,
     });
 
@@ -302,6 +304,36 @@ describe("POST /api/docs/[docId]/threads", () => {
     const data = await res.json();
     expect(data.comment.isThreadAuthor).toBe(true);
     expect(Object.keys(data.threads)).toHaveLength(1);
+  });
+
+  // This route commits the same row changes a full refresh would, so it owns the
+  // unarchive signal too. Every trigger is a transition, and the write consumes
+  // it — dropping it here would strand the doc in ARCHIVED for good.
+  it("acts on the unarchive signal from the single-comment sync", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1", email: "u1@test.com" } });
+    mockDoc.findUnique.mockResolvedValue({ ...docRecord, status: "ARCHIVED" });
+    const commentRecord = {
+      commentId: "cr1", docId: "d1", googleCommentId: "c1",
+      type: "COMMENT", status: "INBOX", resolved: false,
+    };
+    mockComment.findFirst.mockResolvedValue(commentRecord);
+    mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
+
+    const thread = { id: "c1", author: "Alice", fromMe: false, content: "Hi", createdTime: "", resolved: true, replies: [] };
+    mockSyncSingleComment.mockResolvedValue({
+      comment: { ...commentRecord, resolved: true } as any,
+      thread,
+      created: false, updated: true, deleted: false, shouldUnarchive: true,
+    });
+
+    const req = new NextRequest(
+      "http://localhost/api/docs/d1/threads?commentId=c1",
+      { method: "POST" }
+    );
+    const res = await POST(req, makeParams("d1"));
+
+    expect(res.status).toBe(200);
+    expect(mockUnarchiveDocIfNeeded).toHaveBeenCalledWith("d1", "ARCHIVED", true);
   });
 
   it("auto-archives resolved comment when I resolved it", async () => {

@@ -270,8 +270,10 @@ describe("liveReplies", () => {
     expect(liveReplies({ replies })).toHaveLength(2);
   });
 
-  // comments.get returns deleted replies with deleted: true and their content
-  // stripped; Google Docs hides them, so they must not render or be counted.
+  // With includeDeleted, both comments.list and comments.get return deleted
+  // replies as tombstones (deleted: true, content and author stripped). They
+  // hold their slot for read tracking, but Google Docs hides them, so they must
+  // not render or count toward replyCount.
   it("drops replies marked deleted", () => {
     const replies = [
       { id: "r1", content: "kept" },
@@ -284,6 +286,80 @@ describe("liveReplies", () => {
   it("returns an empty array when there are no replies", () => {
     expect(liveReplies({})).toEqual([]);
     expect(liveReplies({ replies: null })).toEqual([]);
+  });
+});
+
+/** The whole slot model rests on Drive actually returning tombstones and on
+ *  deleted threads being dropped again afterwards. Neither is visible in the
+ *  parsed output, so both are pinned here — if the flag is ever dropped,
+ *  replySlotCount silently collapses to the live count and every stored read
+ *  boundary shifts. */
+describe("fetchCommentData tombstone handling", () => {
+  const auth = {} as Parameters<typeof fetchCommentData>[0];
+
+  function respondWith(comments: unknown[]) {
+    commentsList.mockReset();
+    commentsList.mockResolvedValue({ data: { comments, nextPageToken: null } });
+  }
+
+  it("asks Drive for deleted comments and replies", async () => {
+    respondWith([]);
+    await fetchCommentData(auth, "gdoc1", { sync: true, userEmail: "me@example.com" });
+    expect(commentsList.mock.calls[0][0]).toMatchObject({ includeDeleted: true });
+  });
+
+  it("counts tombstone slots separately from live replies", async () => {
+    respondWith([{
+      id: "c1",
+      content: "head",
+      createdTime: "2024-06-01T00:00:00Z",
+      author: { me: false },
+      replies: [
+        { id: "r0", author: { me: false }, content: "kept" },
+        { id: "r1", deleted: true, content: "" },
+        { id: "r2", author: { me: false }, content: "also kept" },
+      ],
+    }]);
+
+    const { comments } = await fetchCommentData(auth, "gdoc1", { sync: true, userEmail: "me@example.com" });
+    expect(comments![0].replyCount).toBe(2);
+    expect(comments![0].replySlotCount).toBe(3);
+    expect(comments![0].replyDeleted).toEqual([false, true, false]);
+    // Slot-indexed, so the flags line up with replyDeleted for slicing.
+    expect(comments![0].replyAuthorMeFlags).toHaveLength(3);
+  });
+
+  it("keeps tombstones in the thread for display, flagged rather than dropped", async () => {
+    respondWith([{
+      id: "c1",
+      content: "head",
+      createdTime: "2024-06-01T00:00:00Z",
+      author: { displayName: "Alice", me: false },
+      replies: [
+        { id: "r0", author: { displayName: "Bob" }, content: "kept", createdTime: "2024-06-02T00:00:00Z" },
+        { id: "r1", deleted: true, content: "", createdTime: "2024-06-03T00:00:00Z" },
+      ],
+    }]);
+
+    const { threads } = await fetchCommentData(auth, "gdoc1", { threads: true });
+    expect(threads![0].replies.map((r) => r.deleted)).toEqual([undefined, true]);
+  });
+
+  it("skips a deleted thread, so includeDeleted can't resurrect a deleted row", async () => {
+    // Sync deletes DB rows for comments Drive didn't return. A deleted thread
+    // now *is* returned, so it has to be dropped here or it would never be
+    // cleaned up. Drive strips its content and author, and deleting a head
+    // takes every reply with it.
+    respondWith([
+      { id: "gone", deleted: true, createdTime: "2024-06-01T00:00:00Z", replies: [{ id: "r0", deleted: true }] },
+      { id: "c1", content: "still here", createdTime: "2024-06-01T00:00:00Z", author: { me: false }, replies: [] },
+    ]);
+
+    const { comments, threads } = await fetchCommentData(
+      auth, "gdoc1", { sync: true, threads: true, userEmail: "me@example.com" },
+    );
+    expect(comments!.map((c) => c.id)).toEqual(["c1"]);
+    expect(threads!.map((t) => t.id)).toEqual(["c1"]);
   });
 });
 

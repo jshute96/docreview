@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { suppressingErrors } from "@/test-utils";
+import { isThreadRead, noTombstones } from "@/lib/read-state";
 
 vi.mock("@/lib/prisma", () => {
   const comment = {
@@ -92,19 +93,25 @@ beforeEach(() => {
 // Helper: a DB comment record (from Prisma findMany) with sensible defaults
 function dbComment(overrides: Record<string, unknown> = {}) {
   // Tests express stored read state with the `isRead` boolean the UI still
-  // uses; it's translated to the stored message count here (see
-  // src/lib/read-state.ts). Override `readMessageCount` directly to model a
+  // uses; it's translated to the stored slot boundary here (see
+  // src/lib/read-state.ts). Override `readSlotCount` directly to model a
   // partially-read thread.
+  //
+  // `replySlotCount` defaults to `replyCount`, which is the truth for any
+  // thread that has never had a reply deleted — override it (with a matching
+  // `replyDeleted` on the Drive side) to model one that has.
   const { isRead, ...rest } = overrides;
   const replyCount = (rest.replyCount as number | undefined) ?? 0;
+  const replySlotCount = (rest.replySlotCount as number | undefined) ?? replyCount;
   return {
     commentId: "cr1", docId: "d1", googleCommentId: "c1",
     type: "COMMENT", suggestionType: null,
     resolved: false, isThreadAuthor: false, isReplyAuthor: false,
-    readMessageCount: isRead ? replyCount + 1 : 0, isStarred: false,
+    readSlotCount: isRead ? replySlotCount + 1 : 0, isStarred: false,
+    readMessageCount: isRead ? replyCount + 1 : 0,
     assignedToMe: false, mentionedMe: false, mentionedMeUnreplied: false,
     status: "INBOX", driveCreatedAt: new Date("2024-06-01"),
-    driveModifiedAt: new Date("2024-06-10"), replyCount,
+    driveModifiedAt: new Date("2024-06-10"), replyCount, replySlotCount,
     createdAt: new Date(), updatedAt: new Date(),
     ...rest,
   };
@@ -112,6 +119,7 @@ function dbComment(overrides: Record<string, unknown> = {}) {
 
 // Helper: a single Drive comment with sensible defaults
 function driveComment(overrides: Record<string, unknown> = {}) {
+  const replyCount = (overrides.replyCount as number | undefined) ?? 0;
   return {
     id: "c1",
     resolved: false,
@@ -125,6 +133,11 @@ function driveComment(overrides: Record<string, unknown> = {}) {
     driveCreatedAt: new Date("2024-06-01"),
     driveModifiedAt: new Date("2024-06-10"),
     replyCount: 0,
+    // No deleted replies unless a test says otherwise, so slot space and
+    // render space coincide — the shape of every thread before someone
+    // deletes something in it.
+    replySlotCount: replyCount,
+    replyDeleted: noTombstones(replyCount),
     replyAuthorMeFlags: [] as boolean[],
     replyMentionedMeFlags: [] as boolean[],
     replyAssignedToMeFlags: [] as boolean[],
@@ -236,7 +249,7 @@ describe("syncComments isInteresting logic", () => {
   it("unarchives when existing INBOX comment on AUTHOR doc has new replies", async () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockComment.findMany.mockResolvedValueOnce([{
-      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 1,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 1, replySlotCount: 1,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({ replyCount: 3, replyAuthorMeFlags: [false, false, false] }),
@@ -250,7 +263,7 @@ describe("syncComments isInteresting logic", () => {
   it("does NOT unarchive when existing comment has new replies but not relevant (REVIEWER, no participation)", async () => {
     const doc = makeDoc({ role: "REVIEWER" });
     mockComment.findMany.mockResolvedValueOnce([{
-      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", replyCount: 1,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", replyCount: 1, replySlotCount: 1,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({ replyCount: 3, isReplyAuthor: false, replyAuthorMeFlags: [false, false, false] }),
@@ -263,7 +276,7 @@ describe("syncComments isInteresting logic", () => {
   it("does NOT unarchive when existing INBOX comment has new replies but isRead (my own reply)", async () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockComment.findMany.mockResolvedValueOnce([{
-      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 1,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 1, replySlotCount: 1,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({ replyCount: 3, isRead: true, replyAuthorMeFlags: [false, true, true] }),
@@ -276,7 +289,7 @@ describe("syncComments isInteresting logic", () => {
   it("does NOT unarchive when replyCount has not increased", async () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockComment.findMany.mockResolvedValueOnce([{
-      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 3,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 3, replySlotCount: 3,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({ replyCount: 3 }),
@@ -291,7 +304,7 @@ describe("syncComments isInteresting logic", () => {
   it("does NOT unarchive for MUTED existing comment even with new replies", async () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockComment.findMany.mockResolvedValueOnce([{
-      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED", replyCount: 1,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED", replyCount: 1, replySlotCount: 1,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({ replyCount: 5 }),
@@ -313,6 +326,24 @@ describe("syncComments isInteresting logic", () => {
     const { shouldUnarchive, suggestionsCreated } = await syncComments(doc, driveAuth);
     expect(suggestionsCreated).toBe(1);
     expect(shouldUnarchive).toBe(true);
+  });
+
+  it("creates a Docs-API suggestion as unread", async () => {
+    // The Docs API supplies no reply or authorship data, so the row is one
+    // unread message. Both read counts default to 0, which is exactly that —
+    // the reason the cache stores a *read* count rather than an unread one.
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockFetchCommentData.mockResolvedValue({ comments: [] });
+    mockFetchDocData.mockResolvedValue({ suggestions: [
+      { id: "suggest.abc", suggestionType: "INSERT", insertedText: "added", deletedText: "" },
+    ], suggestionContent: {}, documentText: null });
+
+    await syncComments(doc, driveAuth);
+
+    const created = mockComment.createMany.mock.calls
+      .flatMap((call) => call[0].data)
+      .find((r: { googleSuggestionId?: string }) => r.googleSuggestionId === "suggest.abc");
+    expect(isThreadRead({ readMessageCount: created.readMessageCount ?? 0, replyCount: 0 })).toBe(false);
   });
 
   it("does NOT unarchive for new suggestion on REVIEWER doc", async () => {
@@ -383,7 +414,7 @@ describe("syncComments comment status", () => {
 
   it("archives existing comment when I resolved it", async () => {
     mockComment.findMany.mockResolvedValueOnce([{
-      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 0,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX", replyCount: 0, replySlotCount: 0,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({ resolved: true, iResolvedIt: true }),
@@ -397,7 +428,7 @@ describe("syncComments comment status", () => {
 
   it("sets existing comment to INBOX when resolved by someone else on AUTHOR doc", async () => {
     mockComment.findMany.mockResolvedValueOnce([{
-      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", replyCount: 0,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", replyCount: 0, replySlotCount: 0,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({ resolved: true, iResolvedIt: false }),
@@ -411,7 +442,7 @@ describe("syncComments comment status", () => {
 
   it("preserves status when resolved by someone else on REVIEWER doc without participation", async () => {
     mockComment.findMany.mockResolvedValueOnce([{
-      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", replyCount: 0,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED", replyCount: 0, replySlotCount: 0,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({ resolved: true, iResolvedIt: false }),
@@ -425,7 +456,7 @@ describe("syncComments comment status", () => {
 
   it("preserves MUTED status — does not change it to INBOX or ARCHIVED", async () => {
     mockComment.findMany.mockResolvedValueOnce([{
-      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED", replyCount: 0,
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED", replyCount: 0, replySlotCount: 0,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({ resolved: true, iResolvedIt: true }),
@@ -442,7 +473,7 @@ describe("syncComments comment status", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
-      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+      resolved: false, replyCount: 0, replySlotCount: 0, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({ resolved: false, replyCount: 0, driveModifiedAt: modDate }),
@@ -461,7 +492,7 @@ describe("syncComments comment status", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
-      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+      resolved: false, replyCount: 0, replySlotCount: 0, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -482,7 +513,7 @@ describe("syncComments comment status", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
-      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+      resolved: false, replyCount: 0, replySlotCount: 0, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -507,7 +538,7 @@ describe("syncComments self-reply detection", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
-      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+      resolved: false, replyCount: 0, replySlotCount: 0, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -527,7 +558,7 @@ describe("syncComments self-reply detection", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
-      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+      resolved: false, replyCount: 0, replySlotCount: 0, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -547,7 +578,7 @@ describe("syncComments self-reply detection", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
-      resolved: false, replyCount: 1, driveModifiedAt: modDate,
+      resolved: false, replyCount: 1, replySlotCount: 1, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -604,7 +635,7 @@ describe("syncComments @-mention detection", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED",
-      resolved: false, replyCount: 1, driveModifiedAt: modDate,
+      resolved: false, replyCount: 1, replySlotCount: 1, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -625,7 +656,7 @@ describe("syncComments @-mention detection", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED",
-      resolved: false, replyCount: 1, driveModifiedAt: modDate,
+      resolved: false, replyCount: 1, replySlotCount: 1, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -648,7 +679,7 @@ describe("syncComments @-mention detection", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
-      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+      resolved: false, replyCount: 0, replySlotCount: 0, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -678,7 +709,7 @@ describe("syncComments @-mention detection", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED",
-      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+      resolved: false, replyCount: 0, replySlotCount: 0, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -723,7 +754,7 @@ describe("syncComments assigned-to-me detection", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED",
-      resolved: false, replyCount: 1, driveModifiedAt: modDate,
+      resolved: false, replyCount: 1, replySlotCount: 1, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -745,7 +776,7 @@ describe("syncComments assigned-to-me detection", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED",
-      resolved: false, replyCount: 1, driveModifiedAt: modDate,
+      resolved: false, replyCount: 1, replySlotCount: 1, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -768,7 +799,7 @@ describe("syncComments assigned-to-me detection", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "MUTED",
-      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+      resolved: false, replyCount: 0, replySlotCount: 0, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -788,7 +819,7 @@ describe("syncComments assigned-to-me detection", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
-      resolved: false, replyCount: 1, driveModifiedAt: modDate,
+      resolved: false, replyCount: 1, replySlotCount: 1, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -815,7 +846,7 @@ describe("syncComments shouldUnarchive doc-level rules", () => {
     const modDate = new Date("2024-06-10T10:00:00Z");
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "ARCHIVED",
-      resolved: false, replyCount: 0, driveModifiedAt: modDate,
+      resolved: false, replyCount: 0, replySlotCount: 0, driveModifiedAt: modDate,
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -832,7 +863,7 @@ describe("syncComments shouldUnarchive doc-level rules", () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX",
-      resolved: false, replyCount: 0, driveModifiedAt: new Date("2024-06-10"),
+      resolved: false, replyCount: 0, replySlotCount: 0, driveModifiedAt: new Date("2024-06-10"),
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -846,11 +877,56 @@ describe("syncComments shouldUnarchive doc-level rules", () => {
     expect(shouldUnarchive).toBe(true);
   });
 
+  // The resolve is activity worth surfacing exactly once. Testing the standing
+  // resolved state instead would re-unarchive on every sync, so a doc with a
+  // thread someone else resolved could never be archived.
+  it("does NOT unarchive again on a later sync of an already-resolved INBOX comment", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    const modDate = new Date("2024-06-11");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX",
+      resolved: true, replyCount: 1, replySlotCount: 1, readSlotCount: 0, readMessageCount: 0,
+      driveModifiedAt: modDate,
+    }]);
+    mockFetchCommentData.mockResolvedValue({ comments: [
+      driveComment({
+        resolved: true, iResolvedIt: false,
+        replyCount: 1, replyAuthorMeFlags: [false],
+        driveModifiedAt: modDate,
+      }),
+    ] });
+
+    const { shouldUnarchive } = await syncComments(doc, driveAuth);
+    expect(shouldUnarchive).toBe(false);
+  });
+
+  // The rule-3 test above also adds a reply, so rule 2 alone would carry it. This
+  // one isolates rule 3: the reply count is unchanged and the only thing that
+  // moved is `resolved`.
+  it("unarchives on a bare resolve by someone else, with no new replies (rule 3 alone)", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX",
+      resolved: false, replyCount: 1, replySlotCount: 1, readSlotCount: 0, readMessageCount: 0,
+      driveModifiedAt: new Date("2024-06-10"),
+    }]);
+    mockFetchCommentData.mockResolvedValue({ comments: [
+      driveComment({
+        resolved: true, iResolvedIt: false,
+        replyCount: 1, replyAuthorMeFlags: [false],
+        driveModifiedAt: new Date("2024-06-11"), // the resolve bumps modifiedTime
+      }),
+    ] });
+
+    const { shouldUnarchive } = await syncComments(doc, driveAuth);
+    expect(shouldUnarchive).toBe(true);
+  });
+
   it("does NOT unarchive when INBOX comment resolved by me", async () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockComment.findMany.mockResolvedValueOnce([{
       commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX",
-      resolved: false, replyCount: 0, driveModifiedAt: new Date("2024-06-10"),
+      resolved: false, replyCount: 0, replySlotCount: 0, driveModifiedAt: new Date("2024-06-10"),
     }]);
     mockFetchCommentData.mockResolvedValue({ comments: [
       driveComment({
@@ -1099,11 +1175,15 @@ describe("syncComments deleted comment cleanup", () => {
   });
 });
 
-// --------------- read tracking (readMessageCount) ---------------
+// --------------- read tracking (readSlotCount) ---------------
 
 describe("syncComments read tracking", () => {
-  /** The readMessageCount written by the single update call. */
+  /** The readSlotCount written by the single update call. */
   function updatedReadCount() {
+    return mockComment.update.mock.calls[0][0].data.readSlotCount;
+  }
+  /** Its render-space twin, written alongside it. */
+  function updatedReadMessageCount() {
     return mockComment.update.mock.calls[0][0].data.readMessageCount;
   }
 
@@ -1115,7 +1195,7 @@ describe("syncComments read tracking", () => {
     await syncComments(makeDoc(), driveAuth);
 
     // My comment, their reply, my reply — all 3 messages read.
-    expect(mockComment.createMany.mock.calls[0][0].data[0].readMessageCount).toBe(3);
+    expect(mockComment.createMany.mock.calls[0][0].data[0].readSlotCount).toBe(3);
   });
 
   it("seeds a new comment as fully unread when I never posted", async () => {
@@ -1125,7 +1205,7 @@ describe("syncComments read tracking", () => {
 
     await syncComments(makeDoc(), driveAuth);
 
-    expect(mockComment.createMany.mock.calls[0][0].data[0].readMessageCount).toBe(0);
+    expect(mockComment.createMany.mock.calls[0][0].data[0].readSlotCount).toBe(0);
   });
 
   it("seeds partial read state through my last reply", async () => {
@@ -1136,11 +1216,36 @@ describe("syncComments read tracking", () => {
     await syncComments(makeDoc(), driveAuth);
 
     // Their comment + my reply read; the two replies after mine are not.
-    expect(mockComment.createMany.mock.calls[0][0].data[0].readMessageCount).toBe(2);
+    expect(mockComment.createMany.mock.calls[0][0].data[0].readSlotCount).toBe(2);
+  });
+
+  it("seeds a thread that already has a tombstone with both counts, in their own spaces", async () => {
+    // First sync of a thread whose middle reply was deleted before we ever saw
+    // it. Slots: head, r0, [deleted], r2 — my reply is the last one.
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 2, // live replies only
+        replySlotCount: 3,
+        replyDeleted: [false, true, false],
+        replyAuthorMeFlags: [false, false, true],
+      })],
+    });
+
+    await syncComments(makeDoc(), driveAuth);
+
+    const created = mockComment.createMany.mock.calls[0][0].data[0];
+    // The boundary counts all four slots; the cache counts the three messages
+    // the panel will actually draw. This is the one create path where the two
+    // genuinely differ.
+    expect(created.readSlotCount).toBe(4);
+    expect(created.readMessageCount).toBe(3);
+    // Fully read: 3 of 3 drawn messages.
+    expect(created.replyCount).toBe(2);
+    expect(created.replySlotCount).toBe(3);
   });
 
   it("leaves the read count alone when someone else replies, so only new replies are unread", async () => {
-    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 2, readMessageCount: 3 })]);
+    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 2, replySlotCount: 2, readSlotCount: 3 })]);
     mockFetchCommentData.mockResolvedValue({
       comments: [driveComment({
         replyCount: 4,
@@ -1156,7 +1261,7 @@ describe("syncComments read tracking", () => {
   });
 
   it("keeps a manual mark-unread across a later reply", async () => {
-    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 1, readMessageCount: 0 })]);
+    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 1, replySlotCount: 1, readSlotCount: 0 })]);
     mockFetchCommentData.mockResolvedValue({
       comments: [driveComment({
         replyCount: 2,
@@ -1171,7 +1276,7 @@ describe("syncComments read tracking", () => {
   });
 
   it("marks the thread fully read when my own reply is the latest activity", async () => {
-    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 1, readMessageCount: 0 })]);
+    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 1, replySlotCount: 1, readSlotCount: 0 })]);
     mockFetchCommentData.mockResolvedValue({
       comments: [driveComment({
         replyCount: 2,
@@ -1187,9 +1292,9 @@ describe("syncComments read tracking", () => {
   });
 
   it("marks the last message unread when a thread changes without new replies", async () => {
-    // Someone edited a message or deleted a reply: activity we can't localize,
-    // so the thread resurfaces as unread.
-    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 2, readMessageCount: 3 })]);
+    // Someone edited a message: activity we can't localize, so the thread
+    // resurfaces as unread.
+    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 2, replySlotCount: 2, readSlotCount: 3 })]);
     mockFetchCommentData.mockResolvedValue({
       comments: [driveComment({
         replyCount: 2,
@@ -1203,20 +1308,263 @@ describe("syncComments read tracking", () => {
     expect(updatedReadCount()).toBe(2);
   });
 
-  it("clamps a stored count that exceeds the thread after replies are deleted", async () => {
-    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 4, readMessageCount: 5 })]);
+  it("holds the read boundary in place when a read reply is deleted", async () => {
+    // The thread was fully read at 4 replies. Two are deleted, which leaves
+    // their slots behind — so the boundary doesn't slide down over a message
+    // the user never read, and a deletion on its own doesn't resurface anything.
+    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 4, replySlotCount: 4, readSlotCount: 5 })]);
     mockFetchCommentData.mockResolvedValue({
       comments: [driveComment({
         replyCount: 2,
-        replyAuthorMeFlags: [false, false],
+        replySlotCount: 4,
+        replyDeleted: [false, false, true, true],
+        replyAuthorMeFlags: [false, false, false, false],
         driveModifiedAt: new Date("2024-06-20"),
       })],
     });
 
     await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
 
-    // Clamped to 3, then the no-new-replies rule leaves the last message unread.
-    expect(updatedReadCount()).toBe(2);
+    // All 3 surviving messages stay read. The old live-position boundary would
+    // have slid down over slots it never covered.
+    expect(updatedReadCount()).toBe(5);
+    expect(updatedReadMessageCount()).toBe(3); // 3 of 3 live messages
+  });
+
+  it("clears the thread when the only unread reply is deleted", async () => {
+    // head read, one unread reply from someone else, then that reply is deleted.
+    // Nothing new is left to look at, so the thread goes to zero unread instead
+    // of bumping the head comment back to unread.
+    mockComment.findMany.mockResolvedValue([dbComment({ replyCount: 1, replySlotCount: 1, readSlotCount: 1 })]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 0,
+        replySlotCount: 1,
+        replyDeleted: [true],
+        replyAuthorMeFlags: [false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(updatedReadCount()).toBe(1);
+    expect(updatedReadMessageCount()).toBe(1); // 1 of 1 live message
+  });
+
+  it("doesn't treat a slot that arrived already deleted as someone else's reply", async () => {
+    // A reply posted and deleted between two syncs shows up as a brand-new
+    // tombstone slot. Drive strips its author, so "not me" would otherwise read
+    // as "a stranger replied" and pull my own archived thread back to Inbox for
+    // a message that no longer exists.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 1, replySlotCount: 1, readSlotCount: 2, status: "ARCHIVED" }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        isThreadAuthor: true,
+        replyCount: 1,
+        replySlotCount: 2,
+        replyDeleted: [false, true],
+        replyAuthorMeFlags: [false, false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    await syncComments(makeDoc({ role: "REVIEWER" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("ARCHIVED");
+  });
+
+  it("doesn't move an archived comment to Inbox for a deletion alone", async () => {
+    // A deletion moves Drive's thread-level modifiedTime, which used to read as
+    // "activity" and pull the doc back on an AUTHOR doc. Nothing was added, so
+    // the doc would arrive in Inbox with nothing on it to explain the trip.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 2, replySlotCount: 2, readSlotCount: 3, status: "ARCHIVED" }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 1,
+        replySlotCount: 2,
+        replyDeleted: [false, true],
+        replyAuthorMeFlags: [false, false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const res = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("ARCHIVED");
+    expect(res.shouldUnarchive).toBe(false);
+  });
+
+  it("doesn't move an archived comment to Inbox for a slot that arrived already deleted", async () => {
+    // Same rule from the other direction: the slot count grew, but the only new
+    // slot is a tombstone, so there is nothing live to show for the trip.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 1, replySlotCount: 1, readSlotCount: 2, status: "ARCHIVED" }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 1,
+        replySlotCount: 2,
+        replyDeleted: [false, true],
+        replyAuthorMeFlags: [false, false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const res = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("ARCHIVED");
+    expect(res.shouldUnarchive).toBe(false);
+  });
+
+  it("still moves to Inbox when a deletion comes with a live new reply", async () => {
+    // The deletion suppression must not swallow real activity landing in the
+    // same window. Two replies deleted and one added, so the live count really
+    // does drop — otherwise `deletedThisSync` is false and this proves nothing.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 3, replySlotCount: 3, readSlotCount: 4, status: "ARCHIVED" }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 2,
+        replySlotCount: 4,
+        replyDeleted: [false, true, true, false],
+        replyAuthorMeFlags: [false, false, false, false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const res = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("INBOX");
+    expect(res.shouldUnarchive).toBe(true);
+  });
+
+  it("still acts on a resolve that lands in the same sync as a deletion", async () => {
+    // A resolve flip is a state change we'd never get a second look at — the new
+    // `resolved` is committed either way — so it escapes the deletion
+    // suppression, and it resurfaces the last live message as unread so the doc
+    // has something to show for the trip.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 2, replySlotCount: 2, readSlotCount: 3, status: "INBOX", resolved: false }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 1,
+        replySlotCount: 2,
+        replyDeleted: [false, true],
+        replyAuthorMeFlags: [false, false],
+        resolved: true,
+        iResolvedIt: false,
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const res = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.readSlotCount).toBe(1); // last live message unread
+    expect(res.shouldUnarchive).toBe(true);
+  });
+
+  it("still acts on a re-open that lands in the same sync as a deletion", async () => {
+    // The damaging direction: a thread someone re-opens must reach INBOX. If the
+    // deletion swallowed it the row would still be written `resolved: false`, so
+    // no later sync could ever see the transition again.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 2, replySlotCount: 2, readSlotCount: 3, status: "ARCHIVED", resolved: true }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 1,
+        replySlotCount: 2,
+        replyDeleted: [false, true],
+        replyAuthorMeFlags: [false, false],
+        resolved: false,
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const res = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("INBOX");
+    expect(mockComment.update.mock.calls[0][0].data.readSlotCount).toBe(1); // last live message unread
+    expect(res.shouldUnarchive).toBe(true);
+  });
+
+  it("treats a Gmail row's over-counted replies as activity, not a deletion", async () => {
+    // A Gmail-created row seeds replyCount/replySlotCount from the notification's
+    // reply list, which can overshoot what Drive reports. The lower Drive count
+    // is not a deletion — the slot count dropped too, and real deletions never
+    // lower that — so the first Drive sync of the thread still counts as activity.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 3, replySlotCount: 3, readSlotCount: 0, status: "ARCHIVED" }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 1,
+        replySlotCount: 1,
+        replyAuthorMeFlags: [false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const res = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("INBOX");
+    expect(res.shouldUnarchive).toBe(true);
+  });
+
+  it("still moves to Inbox when a message is edited", async () => {
+    // An edit has no new slots and no deletion, so it stays activity — and it
+    // resurfaces the last live message as unread, so the doc has something to
+    // show when it arrives.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 2, replySlotCount: 2, readSlotCount: 3, status: "ARCHIVED" }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 2,
+        replySlotCount: 2,
+        replyAuthorMeFlags: [false, false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const res = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("INBOX");
+    expect(mockComment.update.mock.calls[0][0].data.readSlotCount).toBe(2); // last live message unread
+    expect(res.shouldUnarchive).toBe(true);
+  });
+
+  it("sees a reply that arrives in the same window as a deletion", async () => {
+    // The live reply count is unchanged — one deleted, one added — so the old
+    // `replyCount` comparison found no new replies and the thread never
+    // resurfaced. Slot counts only grow, so this can't hide.
+    mockComment.findMany.mockResolvedValue([
+      dbComment({ replyCount: 2, replySlotCount: 2, readSlotCount: 3, status: "ARCHIVED" }),
+    ]);
+    mockFetchCommentData.mockResolvedValue({
+      comments: [driveComment({
+        replyCount: 2,
+        replySlotCount: 3,
+        replyDeleted: [true, false, false],
+        replyAuthorMeFlags: [false, false, false],
+        driveModifiedAt: new Date("2024-06-20"),
+      })],
+    });
+
+    const { shouldUnarchive } = await syncComments(makeDoc({ role: "AUTHOR" }), driveAuth);
+
+    expect(mockComment.update.mock.calls[0][0].data.status).toBe("INBOX");
+    expect(shouldUnarchive).toBe(true);
+    // The boundary is carried forward, so exactly the new reply reads as unread.
+    expect(updatedReadCount()).toBe(3);
+    expect(updatedReadMessageCount()).toBe(2); // 2 of 3 live messages
   });
 });
 
@@ -1294,7 +1642,7 @@ describe("syncSingleComment selfEdited", () => {
 
     const data = mockComment.update.mock.calls[0][0].data;
     expect(data.status).toBe("ARCHIVED");
-    expect(data.readMessageCount).toBe(1); // still fully read (1 of 1 messages)
+    expect(data.readSlotCount).toBe(1); // still fully read (1 of 1 messages)
     // The new timestamp is still recorded, so the next full sync sees no activity.
     expect(data.driveModifiedAt).toEqual(new Date("2024-06-20"));
   });
@@ -1329,7 +1677,7 @@ describe("syncSingleComment selfEdited", () => {
     const data = mockComment.update.mock.calls[0][0].data;
     expect(data.status).toBe("INBOX");
     // The head comment stays read and their reply is the one unread message.
-    expect(data.readMessageCount).toBe(1);
+    expect(data.readSlotCount).toBe(1);
     expect(data.replyCount).toBe(1);
   });
 });

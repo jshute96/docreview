@@ -101,6 +101,15 @@ export async function mergeSuggestionsFromGmail(
       // Gmail notification = interesting activity → promote ARCHIVED to INBOX
       // but respect MUTED (user explicitly silenced this thread).
       const promoteStatus = candidates[0].status === CommentStatus.ARCHIVED ? CommentStatus.INBOX : undefined;
+      // Both counts take a high-water mark, each against its own field. A
+      // notification lists the messages Gmail shows, which never include deleted
+      // ones — so its count is a live count, and against the slot column it acts
+      // as a *lower bound*: seeing N live replies proves there are at least N
+      // slots. Taking the max keeps that column monotonic, which is the whole
+      // point of it; taking it against replyCount instead (as an earlier version
+      // did) could lower it on a thread with a tombstone.
+      const mergedReplyCount = Math.max(suggestion.replies.length, candidates[0].replyCount);
+      const mergedSlotCount = Math.max(suggestion.replies.length, candidates[0].replySlotCount);
       // Use the last reply's timestamp as driveModifiedAt if available,
       // keeping the later of the existing value and the new one.
       const lastReply = suggestion.replies[suggestion.replies.length - 1];
@@ -112,7 +121,19 @@ export async function mergeSuggestionsFromGmail(
           where: { commentId: candidates[0].commentId },
           data: {
             googleCommentId: discoId,
-            replyCount: Math.max(suggestion.replies.length, candidates[0].replyCount),
+            // Read state is deliberately untouched — the stored boundary is a
+            // *read* count, so raising the total is by itself exactly what makes
+            // the new replies unread.
+            //
+            // Raising the slot count matters for what happens next: if it lagged,
+            // the following Drive sync would see the true count exceed it, read
+            // that as new replies, and mark the thread unread a second time —
+            // including replies the user has since read through Gmail's bump.
+            // On a thread with tombstones the bound is loose (Gmail can't see
+            // them), so it can still lag; it just errs low, which only ever
+            // over-reports later and never hides a reply.
+            replyCount: mergedReplyCount,
+            replySlotCount: mergedSlotCount,
             ...(gmailTime ? { driveCreatedAt: gmailTime } : {}),
             ...(newModified ? { driveModifiedAt: newModified } : {}),
             ...(promoteStatus ? { status: promoteStatus } : {}),
@@ -139,6 +160,7 @@ export async function mergeSuggestionsFromGmail(
             driveCreatedAt: sugCreatedAt,
             driveModifiedAt: sugCreatedAt,
             replyCount: suggestion.replies.length,
+            replySlotCount: suggestion.replies.length,
           },
         });
         await bumpLastCommentActivity(docId, [sugCreatedAt], tx);

@@ -134,6 +134,8 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] A failed edit keeps the editor open with the typed text and shows the error
 - [ ] Deleting a reply removes just that reply, leaving the thread
 - [ ] Deleting my first comment removes the whole thread row from the list
+- [ ] Deleted replies are never drawn in the thread panel, and the "unread / total" column counts live messages only
+      (sync behaviour around deletions is covered under Comment Status & Sync Logic → Deleted Replies)
 - [ ] Suggestions have no edit/delete menu
 
 ### Suggestions Display
@@ -342,6 +344,8 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Extension suggestion merge unarchives doc when suggestion moves to Inbox
 - [ ] Gmail suggestion merge unarchives doc when suggestion is promoted/inserted as Inbox
 - [ ] Does NOT unarchive on: muted comments (unless @mentioned), my own activity (thread already read)
+- [ ] Archiving a doc that has an Inbox thread someone else resolved sticks: repeated refreshes leave it archived, because the resolve unarchives only on the sync that first sees it (same for a suggestion someone else accepted)
+- [ ] Opening a thread on an archived doc at the moment someone else's resolve lands unarchives the doc: the single-thread refresh acts on the signal rather than consuming it silently
 - [ ] Does NOT unarchive on suggestions where I was the last actor (e.g., I typed my own suggestion, I accepted/rejected it myself)
 - [ ] Unarchives when existing INBOX suggestion gets a new non-self reply (suggestion rule 2)
 - [ ] Unarchives when my INBOX suggestion is accepted/rejected by someone else (suggestion rule 3)
@@ -378,6 +382,35 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Marking a message unread inside a folded run shows the whole run again, not part of it
 - [ ] "Expand all" unfolds a thread that was already open and folded
 - [ ] "Expand all" opens threads with no fold; "Expand unread" and a row click fold; collapsing and re-opening folds again; an active search shows everything
+
+### Deleted Replies (slot-based read tracking)
+
+Drive keeps a tombstone for a deleted reply — same position, content and author stripped —
+and Docreview counts read state against those stable slots. All of these need a reply deleted
+in Google Docs (or from Docreview) and then a sync, so they belong to the live suites.
+
+- [ ] A reply deleted in Docs disappears from the thread on the next refresh, and stays gone across repeated refreshes
+- [ ] Deleting a reply *below* the read point doesn't change the unread count (the boundary holds its slot instead of sliding onto an unread message)
+- [ ] Deleting a reply *above* the read point leaves the already-read part read
+- [ ] Deleting the only unread reply leaves the thread fully read (0 unread), instead of bumping the message before it back to unread
+- [ ] Deleting an already-read reply doesn't resurface the thread — the surviving messages keep their read state
+- [ ] Deleting a reply on an archived doc doesn't move the comment to Inbox or unarchive the doc (even as doc author, where all activity is otherwise relevant)
+- [ ] A reply posted and deleted between two syncs (arrives as an already-dead slot) doesn't move the comment to Inbox or unarchive the doc
+- [ ] A deletion arriving in the same sync as a live new reply still moves the comment to Inbox and unarchives the doc
+- [ ] An edited reply still moves the comment to Inbox, unarchives the doc, and shows as unread
+- [ ] Someone else resolving a thread in the same window as a deleted reply still moves the doc to Inbox with the last live message unread
+- [ ] Re-opening a resolved thread in the same window as a deleted reply still moves the comment to Inbox
+- [ ] A reply deleted and another posted between two syncs: the new reply is still detected — thread to Inbox, one message unread, doc unarchived
+- [ ] An @mention in a reply posted after an earlier reply was deleted is still picked up (the "new replies" window isn't shifted by the deletion)
+- [ ] A reply that arrives already deleted (posted and deleted between syncs) does NOT move my own archived thread to Inbox as if a stranger replied
+- [ ] A muted thread with a deleted reply stays muted through a refresh
+- [ ] Deleting the whole thread (first comment) removes the row, and refresh doesn't resurrect it — deleted threads come back from Drive now that deleted entries are requested
+- [ ] Per-message read-point controls land on the right message in a thread containing a deleted reply (the position drawn maps back to the right slot)
+- [ ] "Mark all read" then a refresh leaves a tombstoned thread fully read, with nothing re-marked unread
+- [ ] Folding counts only the messages actually drawn: a read run containing a tombstone doesn't hide the wrong messages
+- [ ] Comment search doesn't match a thread on a deleted reply: Drive strips the placeholder's author and content, and neither reaches the search text
+- [ ] Gmail notification on a suggestion with a deleted reply: the reply total rises and the new replies show unread, and a following sync doesn't mark them unread a second time
+- [ ] Extension scrape of a suggestion whose reply total Gmail already raised doesn't pull it back down, and doesn't re-mark read replies unread on the next sync
 
 ### Suggestion Updates (Chrome extension sync only — only source with reply-authorship data)
 - [ ] Suggestion read count set from my last action: my reply/accept/reject → read; theirs → unread

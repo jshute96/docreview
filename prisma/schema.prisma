@@ -190,10 +190,6 @@ model Comment {
   resolved           Boolean        @default(false)
   isThreadAuthor     Boolean        @default(false) @map("is_thread_author")
   isReplyAuthor      Boolean        @default(false) @map("is_reply_author")
-  // Number of messages in the thread the user has read, counting the head
-  // comment plus replies (fully read = replyCount + 1; 0 = nothing read).
-  // Compare with >= since replyCount can shrink when replies are deleted.
-  readMessageCount   Int            @default(0) @map("read_message_count")
   isStarred          Boolean        @default(false) @map("is_starred")
   assignedToMe       Boolean        @default(false) @map("assigned_to_me")
   mentionedMe        Boolean        @default(false) @map("mentioned_me")
@@ -201,7 +197,41 @@ model Comment {
   status             CommentStatus  @default(INBOX)
   driveCreatedAt     DateTime?      @map("drive_created_at")
   driveModifiedAt    DateTime?      @map("drive_modified_at")
+  // The four counts below are the same two quantities — the thread's size and
+  // how much of it has been read — in two numberings. See src/lib/read-state.ts.
+  //
+  // SLOT SPACE keeps a slot for every reply Drive has ever returned, deleted
+  // ones included. Positions here never move and the count only grows, which is
+  // what keeps the read boundary from sliding when a reply is deleted.
+  //
+  // The thread's size in slots. Monotonic, so `>` against the stored value
+  // detects new replies without the false negative a live count gives when a
+  // delete and a reply land together.
+  replySlotCount     Int            @default(0) @map("reply_slot_count")
+  // The read boundary: how many slots the user has read, head comment plus every
+  // reply slot including deleted ones. The only authoritative read state here —
+  // the pair below is derived from it.
+  readSlotCount      Int            @default(0) @map("read_slot_count")
+  //
+  // RENDER SPACE counts only the messages the thread actually draws. Both fields
+  // are caches: each is its slot-space counterpart projected through the
+  // tombstone flags, and those flags aren't stored, so neither can be recomputed
+  // from the other columns — only by re-fetching the thread from Drive.
+  //
+  // Live replies, deleted ones excluded: replySlotCount minus the tombstones.
+  // The display total is replyCount + 1. (Not always a faithful projection —
+  // Gmail and extension merges keep it as a high-water mark.)
   replyCount         Int            @default(0) @map("reply_count")
+  // The read boundary in live messages. Unread is `replyCount + 1` minus this,
+  // clamped at 0; the docs table and the Unread filter read it without having to
+  // fetch the thread.
+  //
+  // Only a boundary move or a deletion *below* the boundary changes this, so
+  // arriving replies need no write here — which is what keeps a manual "mark
+  // unread" sticky, and what lets Gmail raise a thread's total without touching
+  // read state at all. Storing a read count rather than an unread one also makes
+  // the default of 0 mean "nothing read", so a new row is correctly unread.
+  readMessageCount   Int            @default(0) @map("read_message_count")
   createdAt          DateTime       @default(now()) @map("created_at")
   updatedAt          DateTime       @updatedAt @map("updated_at")
   doc                Doc            @relation(fields: [docId], references: [docId], onDelete: Cascade)

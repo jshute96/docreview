@@ -21,7 +21,7 @@ import { computeMentionedMeUnreplied } from "@/lib/google-drive";
 import { bumpLastCommentActivity, computeInitialInboxStatus, datesEqual, findUnlinkedSuggestionsByHash } from "@/lib/sync-comments";
 import { parseExtensionTimestamp } from "@/lib/extension-suggestions";
 import { isDiscoId } from "@/lib/disco-id";
-import { initialReadMessageCount, isThreadRead, nextReadMessageCount } from "@/lib/read-state";
+import { initialReadSlotCount, isThreadRead, nextReadSlotCount, noTombstones } from "@/lib/read-state";
 import { CommentStatus, CommentType, DocRole, Prisma, type Comment, type Doc } from "@prisma/client";
 import { ExtSuggestionStatus, parseExtSuggestionStatus } from "@/lib/extension-wire";
 
@@ -102,7 +102,7 @@ function computeMentionFlags(
 
 /**
  * For rows the extension has already enriched (disco ID already set), carry the
- * stored `readMessageCount` forward — parallels comment sync's read handling in
+ * stored `readSlotCount` forward — parallels comment sync's read handling in
  * `buildCommentUpdate` (see `src/lib/read-state.ts` for the counting
  * convention). New replies from other people need no write: the preserved count
  * already compares them as unread, which is what keeps manual Mark
@@ -111,7 +111,7 @@ function computeMentionFlags(
  * DOM-parsed and imprecise.
  *
  * This is NOT used for the Drive-first / Gmail-first enrichment path. Those
- * rows land here with the schema-default `readMessageCount: 0`, which isn't a
+ * rows land here with the schema-default `readSlotCount: 0`, which isn't a
  * real manual toggle worth preserving. The hash-match branch uses the freshly
  * computed count directly, so read-state and unarchive signals still land
  * correctly on the first enrichment — e.g., if Drive sync seeded a suggestion
@@ -119,16 +119,21 @@ function computeMentionFlags(
  * unarchives the doc; if I seeded it and nothing has happened, it's marked
  * read and the doc stays archived.
  */
-function effectiveReadMessageCountForUpdate(
-  existing: Pick<Comment, "readMessageCount" | "replyCount" | "resolved">,
+function effectiveReadSlotCountForUpdate(
+  existing: Pick<Comment, "readSlotCount" | "replySlotCount" | "replyCount" | "resolved">,
   isRead: boolean,
   isResolved: boolean,
   newReplyCount: number,
 ): number {
-  return nextReadMessageCount({
-    storedCount: existing.readMessageCount,
-    oldReplyCount: existing.replyCount,
-    newReplyCount,
+  // The extension scrapes the rendered thread, which never shows deleted
+  // replies, so there are no tombstone slots here and slot space is the same as
+  // render space (see src/lib/read-state.ts). The two counts are nonetheless
+  // read from the fields they actually mean — `hasActivity` below compares live
+  // counts, this compares slot counts — so nothing breaks if they ever diverge.
+  return nextReadSlotCount({
+    storedCount: existing.readSlotCount,
+    oldReplySlotCount: existing.replySlotCount,
+    replyDeleted: noTombstones(newReplyCount),
     hasActivity: newReplyCount > existing.replyCount || existing.resolved !== isResolved,
     iActedLast: isRead,
   });
@@ -149,6 +154,7 @@ function suggestionShouldUnarchive(opts: {
   previousStatus: CommentStatus;
   targetStatus: CommentStatus;
   hasNewReplies: boolean;
+  wasResolved: boolean;
   isResolved: boolean;
   iResolvedIt: boolean;
   isRead: boolean;
@@ -168,9 +174,9 @@ function suggestionShouldUnarchive(opts: {
   if (opts.previousStatus === CommentStatus.INBOX && opts.hasNewReplies && !(opts.isResolved && opts.iResolvedIt)) return true;
 
   // 3. INBOX suggestion is resolved by someone else — mirrors the comment rule
-  // at sync-comments.ts, which fires on stable resolved-by-not-me state too
-  // (not only on the resolve transition). Re-fires on each sync, but
-  // unarchiveDocIfNeeded is idempotent.
+  // at sync-comments.ts. Like it, this fires on the resolve *transition* only:
+  // a standing resolved-by-not-me state would re-fire on every sync and make
+  // the doc impossible to archive.
   //
   // Accept vs reject is NOT differentiated here — both are "resolved by
   // not-me". The distinction has already been made upstream in
@@ -178,7 +184,7 @@ function suggestionShouldUnarchive(opts: {
   // routes targetStatus to ARCHIVED (and is blocked by the gate above), while
   // a rejection, or an accept with discussion, leaves targetStatus on INBOX
   // and reaches this rule as "worth surfacing for follow-up".
-  if (opts.previousStatus === CommentStatus.INBOX && opts.isResolved && !opts.iResolvedIt) return true;
+  if (opts.previousStatus === CommentStatus.INBOX && !opts.wasResolved && opts.isResolved && !opts.iResolvedIt) return true;
 
   return false;
 }
@@ -249,6 +255,8 @@ function computeSuggestionStatusUpdate(
  */
 interface SuggestionCommentData {
   replyCount: number;
+  /** Equal to replyCount: the extension never sees deleted replies. */
+  replySlotCount: number;
   resolved: boolean;
   isThreadAuthor: boolean;
   isReplyAuthor: boolean;
@@ -275,18 +283,27 @@ function buildExtensionSuggestionUpdate(
   existing: Comment,
   commentData: SuggestionCommentData,
   contentHash: string,
-  effectiveReadMessageCount: number,
+  effectiveReadSlotCount: number,
   newStatus: CommentStatus | undefined,
 ): { changed: boolean; data: Prisma.CommentUncheckedUpdateInput } {
   const status = newStatus ?? existing.status;
+  // The slot count only ever grows. The extension scrapes the rendered thread,
+  // which hides deleted replies, so its count is a live one — a *lower bound* on
+  // slots, exactly as a Gmail notification's is (see suggestion-merge.ts). Writing
+  // it straight through would undo a higher value another path had already
+  // established and leave the next Drive sync reading the difference as new
+  // replies, re-unreading messages the user has seen.
+  const mergedSlotCount = Math.max(existing.replySlotCount, commentData.replySlotCount);
   const changed =
     existing.replyCount !== commentData.replyCount ||
+    existing.replySlotCount !== mergedSlotCount ||
     existing.resolved !== commentData.resolved ||
     existing.isThreadAuthor !== commentData.isThreadAuthor ||
     existing.isReplyAuthor !== commentData.isReplyAuthor ||
     existing.mentionedMe !== commentData.mentionedMe ||
     existing.mentionedMeUnreplied !== commentData.mentionedMeUnreplied ||
-    existing.readMessageCount !== effectiveReadMessageCount ||
+    existing.readSlotCount !== effectiveReadSlotCount ||
+    existing.readMessageCount !== effectiveReadSlotCount ||
     existing.status !== status ||
     existing.suggestionContentHash !== contentHash ||
     !datesEqual(existing.driveCreatedAt, commentData.driveCreatedAt) ||
@@ -294,8 +311,11 @@ function buildExtensionSuggestionUpdate(
 
   const data: Prisma.CommentUncheckedUpdateInput = {
     ...commentData,
+    replySlotCount: mergedSlotCount,
     suggestionContentHash: contentHash,
-    readMessageCount: effectiveReadMessageCount,
+    readSlotCount: effectiveReadSlotCount,
+    // No tombstones on this path, so the render-space cache equals the boundary.
+    readMessageCount: effectiveReadSlotCount,
     ...(newStatus ? { status: newStatus } : {}),
   };
 
@@ -361,11 +381,12 @@ export async function mergeExtensionSuggestions(
     // not read as resolved.
     const isResolved = parseExtSuggestionStatus(s.status) !== ExtSuggestionStatus.Open;
     const isRead = computeSuggestionIsRead(s.isMine, s.replies);
-    // Read count for rows seeded from this payload: messages through my last
-    // contribution (see initialReadMessageCount).
-    const readMessageCount = initialReadMessageCount(s.isMine, s.replies.map((r) => r.isMine));
+    // Read boundary for rows seeded from this payload: messages through my last
+    // contribution (see initialReadSlotCount).
+    const readSlotCount = initialReadSlotCount(s.isMine, s.replies.map((r) => r.isMine));
     const commentData: SuggestionCommentData = {
       replyCount: s.replies.length,
+      replySlotCount: s.replies.length,
       resolved: isResolved,
       isThreadAuthor: s.isMine,
       isReplyAuthor: s.replies.some(r => r.isMine),
@@ -419,21 +440,22 @@ export async function mergeExtensionSuggestions(
     if (existingById) {
       if (commentData.resolved && !existingById.resolved) resolved++;
       const newStatus = computeSuggestionStatusUpdate(doc, existingById, commentData, mention, iResolvedIt, lastResolveReply);
-      const effectiveReadMessageCount = effectiveReadMessageCountForUpdate(
+      const effectiveReadSlotCount = effectiveReadSlotCountForUpdate(
         existingById, isRead, isResolved, s.replies.length,
       );
       if (suggestionShouldUnarchive({
         previousStatus: existingById.status,
         targetStatus: newStatus ?? existingById.status,
         hasNewReplies: s.replies.length > existingById.replyCount,
+        wasResolved: existingById.resolved,
         isResolved,
         iResolvedIt,
-        isRead: isThreadRead({ readMessageCount: effectiveReadMessageCount, replyCount: s.replies.length }),
+        isRead: isThreadRead({ readMessageCount: effectiveReadSlotCount, replyCount: s.replies.length }),
       })) shouldUnarchive = true;
       // Skip the DB write when nothing would change — extension re-syncs run on
       // every pane snapshot and most suggestions are unchanged between syncs.
       const { changed, data } = buildExtensionSuggestionUpdate(
-        existingById, commentData, contentHash, effectiveReadMessageCount, newStatus,
+        existingById, commentData, contentHash, effectiveReadSlotCount, newStatus,
       );
       if (!changed) continue;
       logInfo(`[Suggestions:Ext] ${googleDocId}: ${s.id} already exists as ${existingById.commentId} — updating metadata`);
@@ -472,13 +494,14 @@ export async function mergeExtensionSuggestions(
           if (shouldBe === CommentStatus.INBOX) newStatus = CommentStatus.INBOX;
         }
         // First enrichment: the Drive/Gmail-first row had no authorship data so
-        // its readMessageCount is the schema default (0), not a manual toggle
+        // its readSlotCount is the schema default (0), not a manual toggle
         // worth preserving. Use the freshly computed value — matches how we
         // re-evaluate status here via computeInitialInboxStatus.
         if (suggestionShouldUnarchive({
           previousStatus: existing.status,
           targetStatus: newStatus ?? existing.status,
           hasNewReplies: s.replies.length > existing.replyCount,
+          wasResolved: existing.resolved,
           isResolved,
           iResolvedIt,
           isRead,
@@ -489,7 +512,8 @@ export async function mergeExtensionSuggestions(
             data: {
               googleCommentId: s.id,
               ...commentData,
-              readMessageCount,
+              readSlotCount,
+              readMessageCount: readSlotCount,
               ...(newStatus ? { status: newStatus } : {}),
             },
           });
@@ -524,7 +548,8 @@ export async function mergeExtensionSuggestions(
               suggestionType: actionType,
               suggestionContentHash: contentHash,
               status,
-              readMessageCount,
+              readSlotCount,
+              readMessageCount: readSlotCount,
               ...commentData,
             },
           });

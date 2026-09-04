@@ -212,7 +212,17 @@ export interface DriveComment {
   mentionedMeUnreplied: boolean;
   driveCreatedAt: Date | null;
   driveModifiedAt: Date | null;
+  /** Live replies only. The thread's display total is this + 1. */
   replyCount: number;
+  /** Every reply slot Drive returned, tombstones included. Monotonic. */
+  replySlotCount: number;
+  /** Per-slot tombstone flags, so read tracking can convert between slot and
+   *  render positions. Its length is `replySlotCount`. */
+  replyDeleted: boolean[];
+  /** The three flag arrays below are *slot*-indexed, so `.slice(replySlotCount)`
+   *  picks out exactly the replies added since the last sync. A tombstone
+   *  contributes false to all three: Drive strips a deleted reply's author and
+   *  mentions, and a message that no longer exists shouldn't ping anyone. */
   replyAuthorMeFlags: boolean[];
   replyMentionedMeFlags: boolean[];
   replyAssignedToMeFlags: boolean[];
@@ -305,7 +315,14 @@ export function liveReplies(c: RawDriveComment): NonNullable<RawDriveComment["re
 }
 
 // Parses a raw Drive comment into a DriveComment (sync metadata).
+//
+// Two views of the replies are needed and they answer different questions.
+// `slots` (tombstones included) carries positions: it's monotonic, so counting
+// and slicing against it can't be fooled by a delete. `replies` (live only)
+// carries meaning: who wrote what, who acted last, who the thread is assigned
+// to — none of which survives on a tombstone.
 function parseDriveComment(c: RawDriveComment, emailLower?: string): DriveComment {
+  const slots = c.replies ?? [];
   const replies = liveReplies(c);
   const flags = deriveCommentFlags(c.author, replies);
 
@@ -326,15 +343,17 @@ function parseDriveComment(c: RawDriveComment, emailLower?: string): DriveCommen
   const mentionedMe = emailLower
     ? (c.mentionedEmailAddresses ?? []).some((e) => e.toLowerCase() === emailLower)
     : false;
-  const replyAuthorMeFlags = replies.map((r) => r.author?.me === true);
-  const replyMentionedMeFlags = replies.map((r) =>
+  // Slot-indexed: a tombstone has no author, mentions or assignee, so it
+  // contributes false to each. See DriveComment.
+  const replyAuthorMeFlags = slots.map((r) => r.author?.me === true);
+  const replyMentionedMeFlags = slots.map((r) =>
     emailLower
       ? (r.mentionedEmailAddresses ?? []).some(
             (e) => e.toLowerCase() === emailLower
           )
       : false
   );
-  const replyAssignedToMeFlags = replies.map((r) =>
+  const replyAssignedToMeFlags = slots.map((r) =>
     emailLower
       ? r.assigneeEmailAddress?.toLowerCase() === emailLower
       : false
@@ -359,6 +378,8 @@ function parseDriveComment(c: RawDriveComment, emailLower?: string): DriveCommen
     driveCreatedAt: c.createdTime ? new Date(c.createdTime) : null,
     driveModifiedAt: c.modifiedTime ? new Date(c.modifiedTime) : null,
     replyCount: replies.length,
+    replySlotCount: slots.length,
+    replyDeleted: slots.map((r) => r.deleted === true),
     replyAuthorMeFlags,
     replyMentionedMeFlags: effectiveReplyMentionedMeFlags,
     replyAssignedToMeFlags,
@@ -367,9 +388,14 @@ function parseDriveComment(c: RawDriveComment, emailLower?: string): DriveCommen
 
 // Parses a raw Drive comment into a CommentThread (UI display).
 // Returns null if the comment has no content (deleted/empty comment).
+//
+// Deleted replies are kept in `replies`, flagged rather than dropped: they hold
+// the slot positions the stored read boundary is counted against. They carry no
+// author or content and are never drawn — the client filters them out at the
+// point it converts the boundary into a render position.
 function parseCommentThread(c: RawDriveComment): CommentThread | null {
   if (c.content == null || c.deleted === true) return null;
-  const replies = liveReplies(c);
+  const replies = c.replies ?? [];
 
   const threadReplies: ThreadReply[] = replies.map((r) => ({
     id: r.id ?? "",
@@ -379,6 +405,7 @@ function parseCommentThread(c: RawDriveComment): CommentThread | null {
     ...(r.htmlContent ? { htmlContent: r.htmlContent } : {}),
     createdTime: r.createdTime ?? "",
     ...(r.action === "resolve" || r.action === "reopen" ? { action: r.action } : {}),
+    ...(r.deleted === true ? { deleted: true } : {}),
   }));
 
   return {
@@ -422,9 +449,9 @@ function buildCommentFields(options: FetchCommentDataOptions): string {
   const { sync, threads } = options;
   // Author fields
   const authorFields = threads ? "me, displayName" : "me";
-  // Reply fields. `id` is needed to edit/delete a specific reply; `deleted` so
-  // deleted entries can be filtered out (comments.get returns them, unlike
-  // comments.list, which omits them unless includeDeleted is set).
+  // Reply fields. `id` is needed to edit/delete a specific reply; `deleted` to
+  // tell a tombstone from a live reply — both comments.list and comments.get
+  // omit tombstones entirely unless includeDeleted is set, which we do set.
   const replyParts = ["id", "deleted", "action", `author(${authorFields})`];
   if (threads) replyParts.push("content", "htmlContent", "createdTime");
   if (sync) replyParts.push("assigneeEmailAddress", "mentionedEmailAddresses");
@@ -475,6 +502,10 @@ export async function fetchCommentData(
           fileId: googleDocId,
           fields,
           pageSize: 100,
+          // Tombstones for deleted comments and replies. One flag covers both
+          // levels. Deleted *threads* are filtered out below; deleted *replies*
+          // are what keeps read positions stable (see src/lib/read-state.ts).
+          includeDeleted: true,
           ...(pageToken ? { pageToken } : {}),
         }),
         `[Drive] comments.list ${googleDocId} (${mode}${pageToken ? " page" : ""})`
@@ -482,6 +513,11 @@ export async function fetchCommentData(
 
       for (const c of res.data.comments ?? []) {
         if (!c.id) continue;
+        // A deleted thread is gone as far as Docreview is concerned: its head
+        // comment has no content left, and deleting a head takes every reply
+        // with it. Skipping it here keeps `includeDeleted` from resurrecting
+        // rows that sync would otherwise delete for being absent.
+        if (c.deleted === true) continue;
         const raw = c as RawDriveComment;
         if (sync) commentsList.push(parseDriveComment(raw, emailLower));
         if (threads) {
@@ -824,6 +860,11 @@ export interface ThreadReply {
   htmlContent?: string;
   createdTime: string;
   action?: "resolve" | "reopen" | "accept" | "reject";
+  /** A deleted reply. Drive keeps its slot so read positions stay stable, but
+   *  strips the author and content, so there is nothing to draw — Google Docs
+   *  hides these and so does Docreview. Present only on Drive-sourced threads;
+   *  callers rendering a thread must filter these out (see `liveThreadReplies`). */
+  deleted?: boolean;
 }
 
 // A comment thread on a document: the initial comment plus all replies.
@@ -890,6 +931,9 @@ export async function fetchThreadDetail(
     fileId: googleDocId,
     commentId,
     fields,
+    // As in comments.list: the panel needs the tombstone slots to place the
+    // stored read boundary, even though it never draws them.
+    includeDeleted: true,
   });
   logInfo(`[Drive] comments.get ${googleDocId} comment=${commentId} (${Date.now() - t0}ms)`);
 

@@ -203,12 +203,12 @@ Shadcn/ui components:
 | `disco-id.ts` | Disco ID validation — `isDiscoId()` for the `AAAB…` comment/suggestion identifier |
 | `bridge-to-extension.ts` | Client-side bridge for communicating with the Chrome extension — handles pinging, URL resolution, in-page comment navigation, and fetching suggestion and comment data (including tabName) from open doc tabs |
 | `extension-suggestions.ts` | Converts extension-scraped suggestion data into display objects — timestamp parsing, CommentThread/SuggestionContent creation (including tabName) for thread panel display |
-| `extension-suggestion-merge.ts` | Server-side merge of extension suggestions into DB — content-hash matching (same algorithm as Gmail merge), inserts or updates suggestion records with disco IDs, author data, computed `readMessageCount`, and comment-parallel unarchive rules |
+| `extension-suggestion-merge.ts` | Server-side merge of extension suggestions into DB — content-hash matching (same algorithm as Gmail merge), inserts or updates suggestion records with disco IDs, author data, computed `readSlotCount`, and comment-parallel unarchive rules |
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
 | `doc-filters.ts` | Client-side doc filtering (tri-state logic for inbox/comments/author/starred/mimeType/labels/title regex) and sorting; accepts optional cached titles map for when `doc.title` is empty |
 | `browser-cache.ts` | Generic localStorage cache — namespaced key-value store with JSON values, batch operations, and staleness-based eviction |
 | `thread-fold.ts` | Decides which already-read messages an expanded thread folds away — `estimateLines()`, `foldEnd()` |
-| `read-state.ts` | Per-thread read tracking helpers — `isThreadRead()`, `totalMessageCount()`, `unreadMessageCount()`, `initialReadMessageCount()` over the stored `readMessageCount` (shared by server sync and client UI) |
+| `read-state.ts` | Per-thread read tracking helpers — conversion between slot space (the stored `readSlotCount`, which counts deleted reply slots) and render space (the cached `readMessageCount`, live messages only), plus `unreadMessageCount()`, `isThreadRead()`, `totalMessageCount()`, `nextReadSlotCount()`, `initialReadSlotCount()` (shared by server sync and client UI) |
 | `extension-wire.ts` | `ExtCommentType` / `ExtSuggestionStatus` — the values the Chrome extension sends, with parsers for each boundary (the sync body uses the lowercase spelling, `commentSynced` the Prisma one) |
 | `suggestion-labels.ts` | `SuggestionLabel` — Google's Add/Delete/Replace/Other labels, shared by the Gmail parser and the extension scrape |
 | `mime-types.ts` | `GoogleMimeType` — the Doc/Sheet/Slides MIME types, plus `SUPPORTED_MIME_TYPES` and UI labels; client-safe (no Drive imports) |

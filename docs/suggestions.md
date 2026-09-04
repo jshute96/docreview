@@ -116,21 +116,28 @@ stripped before storage.
 | `resolved` | lifecycle (false→true) | — | Drive authoritative |
 | `driveCreatedAt` | `doc.lastModifiedInDrive` (approx) | `time` (minute precision) | Gmail preferred (more accurate) |
 | `driveModifiedAt` | `doc.lastModifiedInDrive` (approx) | `time` (minute precision) | Gmail preferred; extension updates with last reply timestamp |
-| `replyCount` | 0 (always) | `replies.length` | Gmail (Drive has no data) |
+| `replyCount` | 0 (always) | `replies.length` | High-water mark: `max(existing, replies.length)` |
+| `replySlotCount` | 0 (always) | `replies.length` (a lower bound) | High-water mark against the slot column. A notification lists only the messages Gmail shows, never deleted ones, so N replies proves there are *at least* N slots — see below. |
 | `isThreadAuthor` | false | — | false |
 | `isReplyAuthor` | false | — | false |
 | `mentionedMe` | false | — | false |
-| `readMessageCount` | 0 (default) | 0 (default) | Extension authoritative (messages through my last contribution) |
+| `readSlotCount` / `readMessageCount` | 0 (default) | 0 (default) | Extension authoritative (messages through my last contribution) |
 
 **Extension source:** When extension suggestions are merged into the DB, the merge also
 populates `isThreadAuthor` and `isReplyAuthor` from the `isMine` flag, `mentionedMe` and
 `mentionedMeUnreplied` by checking reply HTML for the user's email address, `resolved`
-from the accepted/rejected status, and `readMessageCount` from where my last action (reply
+from the accepted/rejected status, and `readSlotCount` from where my last action (reply
 or accept/reject) falls in the thread — see docs/comment-tracking.md#read-tracking. The extension merge also applies comment-like inbox status
 rules (see docs/inbox-states.md): new suggestions get status based on mention, doc
 role, and participation; existing suggestions are promoted to INBOX on new activity
 when relevant (e.g., new replies mentioning me, or new activity on a suggestion I'm
 involved in). MUTED suggestions are only promoted when a new reply @-mentions me.
+`replySlotCount` takes a high-water mark against its stored value, exactly as the Gmail
+path does and for the same reason: the extension scrapes the rendered thread, which hides
+deleted replies, so its count is a live one and only a lower bound on slots. Writing it
+straight through would undo a higher value Gmail had already established, and the next
+Drive sync would read the difference as new replies. `replyCount` is a plain overwrite --
+it is what the thread draws now.
 The `suggestionContentHash` is refreshed in case the formula or suggestion content
 changed — the extension reads live content, so two snapshots taken at different
 times may yield different hashes, and refreshing lets a later match succeed once
@@ -141,13 +148,24 @@ so it should not override a fresh hash written by Drive or Extension.
 Doc-level unarchive is gated on the thread being unread, so my own last action (typing a
 reply, accepting/rejecting) won't resurface an archived doc.
 
+**Gmail reply counts:** A notification carries no read state and never lists deleted
+replies, so the merge takes each count as a high-water mark against its own column and
+leaves the read boundary alone. Because the boundary is a *read* count, raising the total
+is by itself what makes the new replies unread. Raising `replySlotCount` matters for what
+happens next: if it lagged, the following Drive sync would see the true slot count exceed
+it, read that as new replies, and mark the thread unread a second time — including replies
+the user had already read through the notification. On a thread that has a tombstone the
+bound is loose (Gmail can't see the deleted reply), so the slot count can still lag; it
+only ever errs low, which over-reports later but never hides a reply.
+
 **Future:** `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, and `resolved` could
 potentially be derived from parsed Gmail notifications but are left for later.
 
 ### Merge scenarios
 
 **Drive syncs first (typical):** Creates row with `googleSuggestionId` + content hash.
-Gmail merge later finds by content hash, fills in `googleCommentId`, `replyCount`,
+Gmail merge later finds by content hash, fills in `googleCommentId`, raises both reply
+counts to their high-water marks,
 overwrites `driveCreatedAt` with the Gmail notification timestamp (more accurate than
 Drive's `doc.lastModifiedInDrive` approximation), and updates `driveModifiedAt` from
 the last reply timestamp if newer. If the suggestion is `ARCHIVED`, Gmail merge promotes
@@ -156,7 +174,7 @@ alone. Both promotion and insertion set `shouldUnarchive`, which moves the paren
 from ARCHIVED to INBOX via `unarchiveDocIfNeeded()`.
 
 **Gmail arrives first:** Inserts row with `googleCommentId`, content hash, `suggestionType`,
-`driveCreatedAt` from Gmail time, `replyCount`, and `status: "INBOX"`. Drive sync later finds by content hash
+`driveCreatedAt` from Gmail time, both reply counts, and `status: "INBOX"`. Drive sync later finds by content hash
 and fills in `googleSuggestionId`. The Gmail timestamp is preserved as `driveCreatedAt`.
 
 **Disco-only / Suggestion-only merge:** If a sync path (Extension, Gmail, or Docs API) finds

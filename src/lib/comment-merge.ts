@@ -85,6 +85,10 @@ export async function mergeCommentsFromGmail(
           driveCreatedAt: createdAt,
           driveModifiedAt: modifiedAt,
           replyCount,
+          // Gmail never reports deleted replies, so slot space and render space
+          // coincide (see src/lib/read-state.ts). Both read counts default to 0,
+          // leaving the whole thread unread.
+          replySlotCount: replyCount,
         },
       });
       await bumpLastCommentActivity(docId, [createdAt, modifiedAt], tx);

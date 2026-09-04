@@ -285,14 +285,19 @@ content/display fields when threads are also requested): `id, resolved, deleted,
 modifiedTime, author(me), assigneeEmailAddress, mentionedEmailAddresses, replies(id, deleted,
 action, author(me), assigneeEmailAddress, mentionedEmailAddresses)`
 
+The request also sets **`includeDeleted: true`**, so Drive returns tombstones for deleted
+comments and replies. Deleted threads are skipped; deleted replies are kept as the stable
+positions read tracking counts against (see
+[Read Tracking](./comment-tracking.md#read-tracking)).
+
 **Fields stored per comment:** `driveCreatedAt`, `driveModifiedAt`, `replyCount` (= number of
 live replies), `resolved`, `isThreadAuthor`, `isReplyAuthor`, `assignedToMe`, `mentionedMe`,
-`mentionedMeUnreplied`, `status`, and `readMessageCount`. All Drive API results are stored as
-`type: "COMMENT"`.
+`mentionedMeUnreplied`, `status`, `replySlotCount`, `readSlotCount`, and
+`readMessageCount`. All Drive API results are stored as `type: "COMMENT"`.
 
 Note that `iResolvedIt` and `isRead` are **not** columns — they're derived per sync on the
-`DriveComment` object and used to compute `status` and `readMessageCount`. Read state is
-stored as a message count; see [Read Tracking](./comment-tracking.md#read-tracking).
+`DriveComment` object and used to compute `status` and `readSlotCount`. Read state is
+stored as a slot boundary; see [Read Tracking](./comment-tracking.md#read-tracking).
 
 **Read state during sync:** someone else's new replies produce **no read-state write** at
 all — the stored count stays put while `replyCount` grows, which is what makes exactly the
@@ -328,6 +333,10 @@ For the full picture on suggestions specifically, see [`suggestions.md`](./sugge
 After comment sync completes, each doc's sync result includes a `shouldUnarchive` flag
 indicating whether meaningful new activity was detected. ARCHIVED docs are moved back to
 INBOX only when this flag is true — not merely because they have unresolved comments.
+Deleting a comment or reply is deliberately *not* meaningful activity: nothing would show as
+unread, so the doc would arrive in Inbox with nothing on it that explains the trip. See
+`docs/inbox-states.md` (Smart Unarchive) and `docs/comment-tracking.md` ("Deletions aren't
+activity") for the full trigger list.
 
 ### Recency cutoff
 

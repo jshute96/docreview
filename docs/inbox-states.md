@@ -65,8 +65,19 @@ These comment changes trigger moving the document to Inbox:
   3. When a comment in Inbox gets resolved, but not by me
      * This overrides other rules.  If the comment is resolved and I resolved it, the comment becomes Archived, and this comment doesn't
        trigger moving the document to Inbox.
+     * The three trigger rules above all describe *changes*, this one included: it's the sync that first sees the resolve that
+       triggers unarchive, not every later sync that finds the comment still resolved.  Otherwise a document
+       with a thread someone else resolved could never stay archived.
   4. Exception: comments in **read** state (where I'm the last commenter) never trigger unarchive.
      My own activity shouldn't resurface an archived document, regardless of whether I'm Author or Reviewer.
+  5. Exception: a **deletion with nothing live to replace it** is not activity, so it triggers neither a move to
+     Inbox nor an unarchive. That covers a reply being deleted, and a reply posted and deleted between two syncs
+     (which reaches us as a new but already-dead slot). The guiding rule: if nothing would show up as unread,
+     the comment shouldn't move to Inbox, and if no comment moves to Inbox, the document shouldn't either --
+     otherwise the document arrives in Inbox with nothing on it that explains why. Edits and resolve flips still
+     count, because both resurface the thread's last live message as unread -- a resolve flip stays exempt even
+     when a deletion lands in the same sync, since the flip is a state change no later sync would see again.
+     A deletion arriving alongside a live new reply also still counts -- the reply is the activity.
 
 The same three unarchive rules apply to suggestions when the Chrome extension
 provides reply-authorship data (accept/reject counts as a reply, and the user's
