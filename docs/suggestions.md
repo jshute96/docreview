@@ -158,6 +158,9 @@ the user had already read through the notification. On a thread that has a tombs
 bound is loose (Gmail can't see the deleted reply), so the slot count can still lag; it
 only ever errs low, which over-reports later but never hides a reply.
 
+That guarantee covers `replySlotCount` only — `replyCount` is a live count and *can* hide a
+reply. See [Read tracking can't see deleted replies](#read-tracking-cant-see-deleted-replies).
+
 **Future:** `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, and `resolved` could
 potentially be derived from parsed Gmail notifications but are left for later.
 
@@ -382,6 +385,32 @@ and `isReplyAuthor` from the `isMine` flag on the suggestion and its replies, an
 `mentionedMe`/`mentionedMeUnreplied` by checking reply HTML for the user's email.
 Without the extension, "Mine", "Replied", and "@mentioned" filters have no effect on
 suggestions.
+
+### Read tracking can't see deleted replies
+
+No suggestion source reports deleted replies. The Docs API returns no reply data at all;
+Gmail notifications and the extension's DOM scrape list only what Google currently renders,
+and Google hides deletions. Comments are protected against this by Drive's tombstones, which
+hold a deleted reply's slot so the read boundary is anchored to positions that never move
+(see [comment-tracking.md](./comment-tracking.md#read-tracking)) — suggestions have no
+equivalent, so their boundary is a plain count against a live count. Two things follow:
+
+- **A deletion below the boundary slides it.** Deleting a reply the user had already read
+  shifts every later message down one, so the boundary covers one message too many and the
+  first unread reply is silently credited as read.
+- **A deletion can cancel out a new reply.** `replyCount` is stored as
+  `max(source's live count, stored)`. A deletion and a new reply between two syncs leave the
+  live count unchanged, so the max writes nothing and the new reply never becomes unread.
+
+A third effect is cosmetic: because `replyCount` only ratchets up, a deleted reply leaves the
+total inflated on a suggestion Gmail is the only source for, showing a phantom unread message
+until an extension sync overwrites the count or the user marks the thread read.
+
+All three are known and accepted — most suggestions never get a reply thread, a reply being
+*deleted* on one is rarer still, and the error is one message wide and clears on the next
+activity in the thread. A timestamp-based read watermark was considered and rejected; the
+reasoning, and the identity-based mechanism to use if this ever needs to be exact, are in
+[comment-tracking.md](./comment-tracking.md#suggestions-have-no-tombstones-and-what-that-costs).
 
 ### Suggestion text content
 

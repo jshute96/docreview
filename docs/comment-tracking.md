@@ -405,9 +405,11 @@ Gmail bump.
 
 The bound is loose on a thread with tombstones, since Gmail can't see them, so the column can
 still lag there. That only errs low, which over-reports new replies later and never hides one —
-the same safe direction the migration relies on. The two maxes also preserve the
-live-≤-slots ordering: both take the max against the same N, and `replySlotCount` starts at or
-above `replyCount`.
+the same safe direction the migration relies on. (That guarantee is about `replySlotCount`
+alone. `replyCount` is a live count with no tombstone signal behind it, and it *can* hide a
+reply — see ["Suggestions have no tombstones"](#suggestions-have-no-tombstones-and-what-that-costs)
+below.) The two maxes also preserve the live-≤-slots ordering: both take the max against the
+same N, and `replySlotCount` starts at or above `replyCount`.
 
 The extension merge (`buildExtensionSuggestionUpdate`) takes the same max for the same
 reason: it scrapes the rendered thread, which hides deleted replies, so its count is a live
@@ -417,6 +419,53 @@ since it is meant to track what the thread currently draws.
 `mergeCommentsFromGmail` has no such interaction: it only inserts threads Drive couldn't
 supply (docs where `comments.list` returns 403) and is a no-op when the row already exists,
 so Gmail never revises an existing comment's reply count. Inserted rows start fully unread.
+
+### Suggestions have no tombstones, and what that costs
+
+Comments are safe against a deleted reply because Drive hands back a tombstone in its
+original slot, so the read boundary is anchored to positions that never move. **No suggestion
+source has that signal.** The Docs API returns no reply data at all; Gmail notifications and
+the extension's DOM scrape both list only what Google currently *renders*, and Google hides
+deleted replies. So for suggestions the read boundary is a plain count against a live count,
+and two things can go wrong. Both are known and accepted — see the rationale below.
+
+**A deletion below the boundary slides it.** Delete a reply the user had already read and
+every later message shifts down one position, so the stored boundary now covers one message
+more than it should and the first unread reply is silently credited as read. This is exactly
+the failure `readSlotCount` was introduced to stop for comments; there is no equivalent
+protection here.
+
+**A deletion can cancel out a new reply.** `replyCount` is stored as
+`max(source's live count, stored)`. If a reply is deleted and another is posted between two
+syncs, the live count is unchanged, the max writes nothing, and the new reply never becomes
+unread. This is the one case where the counts hide a reply rather than over-report — the
+"errs low, never hides one" guarantee above covers `replySlotCount`, not this.
+
+There is a third, cosmetic consequence: because `replyCount` only ratchets up, a deleted reply
+leaves the total permanently inflated on a suggestion Gmail is the only source for, showing a
+phantom unread message. The Docs API never writes `replyCount`, so only an extension sync
+(which overwrites it outright) or a manual "mark read" clears it.
+
+**Why we live with it.** Most suggestions never get a reply thread at all, and a reply being
+*deleted* on one is rarer still; when it does happen the error is one message wide and clears
+the next time anything else happens in the thread.
+
+**Why not a timestamp watermark.** The obvious fix is to store the timestamp of the last read
+reply instead of a count: deletions at or below it wouldn't move the boundary, and anything
+newer would still read as unread. It fails on the timestamps we actually have. Extension
+timestamps are DOM-scraped strings like `"6:29 PM Feb 21"` — minute precision, no year (the
+year is inferred with a roll-back-if-future heuristic) and **no timezone**, so
+`parseExtensionTimestamp` resolves them in the runtime's zone, which on the merge path is the
+*server's*. Gmail's are minute precision and explicitly UTC. The Docs API supplies none. So
+for one physical reply, two sources can disagree by the server's whole UTC offset, and a
+watermark written by one and compared by the other would be hours off in a direction that
+either hides new replies or re-unreads old ones — strictly worse than counts, which at least
+agree on a single integer scale across sources. Minute-level collisions are a second, smaller
+problem: two replies in the same minute are indistinguishable to a `>` test, where counts
+handle ties fine. If this ever needs to be exact, the mechanism to reach for is identity, not
+time — have the extension emit a stable per-reply key (author plus a text hash) and store the
+key of the last read reply, which handles deletions precisely with no ordering or clock
+assumptions.
 
 ### Display
 
