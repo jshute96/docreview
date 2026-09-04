@@ -617,8 +617,12 @@ async function updateExistingComment(
     if (previousStatus !== CommentStatus.INBOX && status === CommentStatus.INBOX) unarchive = true;
     // 2. Existing INBOX comment gets new replies (unless I resolved it myself)
     if (previousStatus === CommentStatus.INBOX && hasNewReplies && !(c.resolved && c.iResolvedIt)) unarchive = true;
-    // 3. INBOX comment resolved by someone else
-    if (previousStatus === CommentStatus.INBOX && c.resolved && !c.iResolvedIt) unarchive = true;
+    // 3. INBOX comment resolved by someone else. The *transition* is the
+    // activity worth surfacing, so this tests the resolve arriving, not the
+    // standing fact that the thread is resolved. Without `!existing.resolved`
+    // the condition never stops being true and every later sync re-unarchives
+    // the doc, which makes archiving it impossible.
+    if (previousStatus === CommentStatus.INBOX && !existing.resolved && c.resolved && !c.iResolvedIt) unarchive = true;
   }
 
   const { changed, data } = buildCommentUpdate(existing, c, status, hasNewActivity);

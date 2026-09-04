@@ -877,6 +877,51 @@ describe("syncComments shouldUnarchive doc-level rules", () => {
     expect(shouldUnarchive).toBe(true);
   });
 
+  // The resolve is activity worth surfacing exactly once. Testing the standing
+  // resolved state instead would re-unarchive on every sync, so a doc with a
+  // thread someone else resolved could never be archived.
+  it("does NOT unarchive again on a later sync of an already-resolved INBOX comment", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    const modDate = new Date("2024-06-11");
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX",
+      resolved: true, replyCount: 1, replySlotCount: 1, readSlotCount: 0, readMessageCount: 0,
+      driveModifiedAt: modDate,
+    }]);
+    mockFetchCommentData.mockResolvedValue({ comments: [
+      driveComment({
+        resolved: true, iResolvedIt: false,
+        replyCount: 1, replyAuthorMeFlags: [false],
+        driveModifiedAt: modDate,
+      }),
+    ] });
+
+    const { shouldUnarchive } = await syncComments(doc, driveAuth);
+    expect(shouldUnarchive).toBe(false);
+  });
+
+  // The rule-3 test above also adds a reply, so rule 2 alone would carry it. This
+  // one isolates rule 3: the reply count is unchanged and the only thing that
+  // moved is `resolved`.
+  it("unarchives on a bare resolve by someone else, with no new replies (rule 3 alone)", async () => {
+    const doc = makeDoc({ role: "AUTHOR" });
+    mockComment.findMany.mockResolvedValueOnce([{
+      commentId: "cr1", docId: "d1", googleCommentId: "c1", status: "INBOX",
+      resolved: false, replyCount: 1, replySlotCount: 1, readSlotCount: 0, readMessageCount: 0,
+      driveModifiedAt: new Date("2024-06-10"),
+    }]);
+    mockFetchCommentData.mockResolvedValue({ comments: [
+      driveComment({
+        resolved: true, iResolvedIt: false,
+        replyCount: 1, replyAuthorMeFlags: [false],
+        driveModifiedAt: new Date("2024-06-11"), // the resolve bumps modifiedTime
+      }),
+    ] });
+
+    const { shouldUnarchive } = await syncComments(doc, driveAuth);
+    expect(shouldUnarchive).toBe(true);
+  });
+
   it("does NOT unarchive when INBOX comment resolved by me", async () => {
     const doc = makeDoc({ role: "AUTHOR" });
     mockComment.findMany.mockResolvedValueOnce([{

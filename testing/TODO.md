@@ -344,6 +344,8 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Extension suggestion merge unarchives doc when suggestion moves to Inbox
 - [ ] Gmail suggestion merge unarchives doc when suggestion is promoted/inserted as Inbox
 - [ ] Does NOT unarchive on: muted comments (unless @mentioned), my own activity (thread already read)
+- [ ] Archiving a doc that has an Inbox thread someone else resolved sticks: repeated refreshes leave it archived, because the resolve unarchives only on the sync that first sees it (same for a suggestion someone else accepted)
+- [ ] Opening a thread on an archived doc at the moment someone else's resolve lands unarchives the doc: the single-thread refresh acts on the signal rather than consuming it silently
 - [ ] Does NOT unarchive on suggestions where I was the last actor (e.g., I typed my own suggestion, I accepted/rejected it myself)
 - [ ] Unarchives when existing INBOX suggestion gets a new non-self reply (suggestion rule 2)
 - [ ] Unarchives when my INBOX suggestion is accepted/rejected by someone else (suggestion rule 3)

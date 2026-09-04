@@ -27,6 +27,8 @@ Each comment thread has its own status, independent of the document's status:
 
 When you archive a document or comment, Docreview watches for meaningful new activity and automatically moves it back to Inbox. For documents, this includes new inbox comments, status transitions, or comments resolved by someone else. For comments, new replies from other people trigger unarchive.
 
+Each piece of activity brings the document back once, when Docreview first sees it -- archiving it again sticks until something new happens.
+
 This means you can archive freely without worrying about missing important updates.
 
 ## Labels

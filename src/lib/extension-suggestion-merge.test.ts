@@ -858,6 +858,39 @@ describe("mergeExtensionSuggestions", () => {
       expect(res.shouldUnarchive).toBe(true);
     });
 
+    // Mirrors the comment rule: the accept is activity worth surfacing once, so
+    // a later sync that finds the same standing state must not resurface the doc.
+    it("does NOT unarchive again on a later sync of an already-accepted INBOX suggestion (rule 3)", async () => {
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 2, replySlotCount: 2, resolved: true, readSlotCount: 1,
+      });
+      const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        isMine: true, status: "accepted",
+        replies: [
+          { author: "Alice", isMine: false, timestamp: "3:00 PM", text: "looks good" },
+          { author: "Alice", isMine: false, timestamp: "4:00 PM", text: "", action: "accept" },
+        ],
+      })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
+      expect(res.shouldUnarchive).toBe(false);
+    });
+
+    // As on the comment side, the rule-3 test above also adds replies, so rule 2
+    // alone would carry it. Here the reply count is unchanged and only the
+    // accept is new.
+    it("unarchives on a bare accept by someone else, with no new replies (rule 3 alone)", async () => {
+      mockComment.findFirst.mockResolvedValue({
+        commentId: "cr1", status: CommentStatus.INBOX, replyCount: 2, replySlotCount: 2, resolved: false, readSlotCount: 1,
+      });
+      const res = await mergeExtensionSuggestions("d1", "gdoc1", [makeSuggestion({
+        isMine: true, status: "accepted",
+        replies: [
+          { author: "Alice", isMine: false, timestamp: "3:00 PM", text: "looks good" },
+          { author: "Alice", isMine: false, timestamp: "4:00 PM", text: "", action: "accept" },
+        ],
+      })], userEmail, makeDoc({ role: DocRole.AUTHOR }));
+      expect(res.shouldUnarchive).toBe(true);
+    });
+
     it("does NOT unarchive when my INBOX suggestion is silently accepted by someone else (archive transition)", async () => {
       mockComment.findFirst.mockResolvedValue({
         commentId: "cr1", status: CommentStatus.INBOX, replyCount: 0, replySlotCount: 0, resolved: false, readSlotCount: 1,

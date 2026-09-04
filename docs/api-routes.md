@@ -161,6 +161,10 @@ not update the doc's `accessState` — the refresh route owns that state machine
 (see `docs/access-states.md`).
 
 POST with `?commentId=X` forces a fresh fetch and syncs the DB comment record.
+It runs the same per-comment sync a full refresh does, so it also auto-unarchives
+the parent doc when that sync reports one. Every unarchive trigger is a transition
+and the sync's own write consumes it, so a route that dropped the signal would leave
+the doc archived with no later refresh able to re-derive it.
 Returns `{ comment, threads }`, or a 403 if comment access was revoked — an empty
 200 would make the client erase the thread it is showing. A Drive 404 on the
 comment means it was deleted and removes the DB row; a 403 leaves the row alone

@@ -154,6 +154,7 @@ function suggestionShouldUnarchive(opts: {
   previousStatus: CommentStatus;
   targetStatus: CommentStatus;
   hasNewReplies: boolean;
+  wasResolved: boolean;
   isResolved: boolean;
   iResolvedIt: boolean;
   isRead: boolean;
@@ -173,9 +174,9 @@ function suggestionShouldUnarchive(opts: {
   if (opts.previousStatus === CommentStatus.INBOX && opts.hasNewReplies && !(opts.isResolved && opts.iResolvedIt)) return true;
 
   // 3. INBOX suggestion is resolved by someone else — mirrors the comment rule
-  // at sync-comments.ts, which fires on stable resolved-by-not-me state too
-  // (not only on the resolve transition). Re-fires on each sync, but
-  // unarchiveDocIfNeeded is idempotent.
+  // at sync-comments.ts. Like it, this fires on the resolve *transition* only:
+  // a standing resolved-by-not-me state would re-fire on every sync and make
+  // the doc impossible to archive.
   //
   // Accept vs reject is NOT differentiated here — both are "resolved by
   // not-me". The distinction has already been made upstream in
@@ -183,7 +184,7 @@ function suggestionShouldUnarchive(opts: {
   // routes targetStatus to ARCHIVED (and is blocked by the gate above), while
   // a rejection, or an accept with discussion, leaves targetStatus on INBOX
   // and reaches this rule as "worth surfacing for follow-up".
-  if (opts.previousStatus === CommentStatus.INBOX && opts.isResolved && !opts.iResolvedIt) return true;
+  if (opts.previousStatus === CommentStatus.INBOX && !opts.wasResolved && opts.isResolved && !opts.iResolvedIt) return true;
 
   return false;
 }
@@ -446,6 +447,7 @@ export async function mergeExtensionSuggestions(
         previousStatus: existingById.status,
         targetStatus: newStatus ?? existingById.status,
         hasNewReplies: s.replies.length > existingById.replyCount,
+        wasResolved: existingById.resolved,
         isResolved,
         iResolvedIt,
         isRead: isThreadRead({ readMessageCount: effectiveReadSlotCount, replyCount: s.replies.length }),
@@ -499,6 +501,7 @@ export async function mergeExtensionSuggestions(
           previousStatus: existing.status,
           targetStatus: newStatus ?? existing.status,
           hasNewReplies: s.replies.length > existing.replyCount,
+          wasResolved: existing.resolved,
           isResolved,
           iResolvedIt,
           isRead,

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getDriveClient, createDriveService, fetchThreadDetail, fetchDocData, fetchCommentData, invalidGrantResponse, isDriveErrorCode, getDriveErrorCode } from "@/lib/google-drive";
 import { OfflineModeError } from "@/lib/offline";
 import type { ThreadMap } from "@/lib/google-drive";
-import { bumpLastCommentActivity, syncSingleComment } from "@/lib/sync-comments";
+import { bumpLastCommentActivity, syncSingleComment, unarchiveDocIfNeeded } from "@/lib/sync-comments";
 import { logError, logWarning } from "@/lib/log";
 import { runWithRequestId } from "@/lib/request-context";
 import { GoogleMimeType } from "@/lib/mime-types";
@@ -203,6 +203,12 @@ export async function POST(
     if (!result.comment) {
       return NextResponse.json({ error: "Comment not found in Drive" }, { status: 404 });
     }
+    // This sync commits the same row changes a full refresh would, so it also has
+    // to act on the unarchive signal it just computed. Every trigger is a
+    // transition (moved to INBOX, new replies, someone else resolved it), and the
+    // write above consumes it — dropping the signal here would mean no later
+    // refresh could ever re-derive it, leaving the doc archived for good.
+    await unarchiveDocIfNeeded(doc.docId, doc.status, result.shouldUnarchive);
 
     return NextResponse.json({
       comment: result.comment,

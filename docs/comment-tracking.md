@@ -526,12 +526,16 @@ in inbox when first synced. See [Phase 3.5 — Smart Unarchive](./refresh.md#pha
 3. **Existing INBOX comment gets new replies** — even if the comment stays in INBOX, new
    replies on an already-INBOX comment trigger unarchive (unless I resolved it myself).
 4. **INBOX comment resolved by someone else** — the resolve is new activity that the user
-   should see.
+   should see. This fires on the *transition* only (the sync that first sees `resolved`
+   flip to true), not on the standing resolved state: a thread that stays INBOX and
+   resolved would otherwise re-unarchive its doc on every sync, and the doc could never
+   be archived.
 5. **New suggestion with INBOX status** — a new suggestion (from Docs API, Gmail, or
    extension) that gets INBOX status triggers unarchive.
 6. **Existing suggestion with new activity** — the suggestion mirror of comment rules
    2–4: a suggestion moving ARCHIVED → INBOX, a new non-self reply on an already-INBOX
-   suggestion, or someone else accepting/rejecting it triggers unarchive. Gated on the
+   suggestion, or someone else accepting/rejecting it for the first time triggers unarchive.
+   Like rule 4 above, that last one fires on the transition, not the standing state. Gated on the
    thread being unread, so my own last action (typing a reply, accepting/rejecting myself)
    won't resurface the doc.
 
@@ -558,7 +562,7 @@ in inbox when first synced. See [Phase 3.5 — Smart Unarchive](./refresh.md#pha
 - Doc-level unarchive rules for suggestions mirror comments and are gated on the thread being
   unread:
   (1) transition to INBOX, (2) existing INBOX with new replies (unless I resolved it),
-  (3) INBOX resolved by someone else. Rules 2 and 3 additionally require the target
+  (3) INBOX newly resolved by someone else. Rules 2 and 3 additionally require the target
   status to be INBOX — when silent-accept sends a suggestion to ARCHIVED, the doc is
   not resurfaced.
 

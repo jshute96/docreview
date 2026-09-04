@@ -65,6 +65,9 @@ These comment changes trigger moving the document to Inbox:
   3. When a comment in Inbox gets resolved, but not by me
      * This overrides other rules.  If the comment is resolved and I resolved it, the comment becomes Archived, and this comment doesn't
        trigger moving the document to Inbox.
+     * The three trigger rules above all describe *changes*, this one included: it's the sync that first sees the resolve that
+       triggers unarchive, not every later sync that finds the comment still resolved.  Otherwise a document
+       with a thread someone else resolved could never stay archived.
   4. Exception: comments in **read** state (where I'm the last commenter) never trigger unarchive.
      My own activity shouldn't resurface an archived document, regardless of whether I'm Author or Reviewer.
 
