@@ -549,6 +549,15 @@ to — and the last read message, so the first unread reply has its antecedent o
 between them (render indices 1 through `readMessageCount - 2`) is replaced by a grey "N hidden" rule
 with a button that reveals them.
 
+Clicking that button keeps the reader's view still: an empty marker sits at the fold boundary
+(just above the first message the fold leaves on screen), the panel records its viewport position
+before the reveal, and after the reveal renders it scrolls by however far the marker moved. The
+recovered messages therefore extend up the page while the unread ones stay where the reader was
+looking. Measuring a position rather than the document height keeps this right when something else
+changes the page height in the same frame (the row's own open animation, a refresh landing) and
+when the browser's own scroll anchoring has already absorbed part of the shift. Shift-click skips
+the adjustment and inserts the messages in place, pushing everything below the fold down.
+
 Two or more messages in the run always fold — the "N hidden" line costs less space than they do.
 A run of exactly one folds only if that message is long: at least `MIN_LINES_TO_HIDE_ONE` (8)
 estimated display lines, since folding a one-line reply behind a one-line rule gains nothing.

@@ -420,6 +420,30 @@ export function CommentThreadPanel({
     if (!stillFoldable) setFoldEnd(0);
   }, [foldEnd, searchFilter, readMessageCount, threads]);
 
+  /** Empty marker rendered at the fold boundary — directly above the first
+   *  message the fold leaves on screen. Revealing the run inserts content above
+   *  it and nothing below it, so holding this marker still is exactly what
+   *  "expand upwards" means. */
+  const foldBoundaryRef = useRef<HTMLDivElement | null>(null);
+  /** The marker's viewport position, captured just before a reveal that should
+   *  leave the reader's view alone; null when no such reveal is pending.
+   *  Measuring a position rather than the document height keeps the correction
+   *  right even when something else changed the page height in the same frame
+   *  (the row's own open animation, a refresh landing) or when the browser's
+   *  own scroll anchoring already absorbed part of the shift. */
+  const revealAnchorTop = useRef<number | null>(null);
+  // Fires on the render that draws the recovered messages — the reveal is the
+  // only thing that flips `showReadMessages` — and before paint, so the reader
+  // never sees the jump.
+  useLayoutEffect(() => {
+    const before = revealAnchorTop.current;
+    revealAnchorTop.current = null;
+    if (before === null) return;
+    const after = foldBoundaryRef.current?.getBoundingClientRect().top;
+    if (after === undefined) return;
+    window.scrollBy(0, after - before);
+  }, [showReadMessages]);
+
   const hiddenRead = (!foldEnd || showReadMessages || !onShowReadMessages)
     ? null
     : { start: 1, end: foldEnd };
@@ -444,11 +468,21 @@ export function CommentThreadPanel({
           type="button"
           variant="outline"
           size="sm"
-          title={`Show ${n} hidden read message${n === 1 ? "" : "s"}`}
+          title={`Show ${n} hidden read message${n === 1 ? "" : "s"}.\nClick to expand above. Shift-click to expand below.`}
           // More padding on the left than the right: the chevron carries its
           // own visual space, the text doesn't.
           className="h-5 pl-2 pr-1 text-xs font-normal text-zinc-500"
-          onClick={(e) => { e.stopPropagation(); onShowReadMessages?.(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            // Default: hold the view still so the recovered messages extend up
+            // the page. Shift-click does the plain thing instead, inserting
+            // them where they sit and pushing the unread messages down.
+            if (!e.shiftKey) {
+              revealAnchorTop.current =
+                foldBoundaryRef.current?.getBoundingClientRect().top ?? null;
+            }
+            onShowReadMessages?.();
+          }}
         >
           {n} hidden
           <ChevronDown className="!size-3" />
@@ -975,8 +1009,12 @@ export function CommentThreadPanel({
                 return divider && <div key={i}>{divider}</div>;
               }
               const unread = isUnread(threadIndex, i + 1);
+              // Rendered whether or not the run is currently folded, so the
+              // reveal can measure the same point before and after.
+              const isFoldBoundary = threadIndex === 0 && foldEnd > 0 && i === foldEnd;
               return (
                 <div key={i}>
+                  {isFoldBoundary && <div ref={foldBoundaryRef} />}
                   {unreadDivider(threadIndex, i + 1, thread)}
                   <div className={`mt-2 ml-8 ${reply.fromMe ? "bg-green-50 -mr-4 pr-4 pt-2 pb-1" : ""}`}>
                     <div className={cn("group/msg", railClass(unread))}>
