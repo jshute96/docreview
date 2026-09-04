@@ -45,7 +45,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DialogButtons } from "@/components/dialog-buttons";
-import { formatDate } from "@/lib/utils";
+import { formatDate, pluralize } from "@/lib/utils";
 import { createMatcher } from "@/lib/highlight";
 import { broadcastChange, useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
@@ -821,7 +821,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       }, 200);
 
       broadcastChange({ type: "comments", docId: doc.docId }, contextId);
-      toast.success(`${pastVerb} ${count} comments`);
+      toast.success(`${pastVerb} ${pluralize(count, "comment")}`);
     } catch (err) {
       if (!isAuthError(err)) toast.error(`Failed to ${verb} comments`);
     } finally {
@@ -922,7 +922,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
       }, 200);
 
       broadcastChange({ type: "comments", docId: doc.docId }, contextId);
-      toast.success(`Marked ${count} comments ${pastVerb}`);
+      toast.success(`Marked ${pluralize(count, "comment")} ${pastVerb}`);
     } catch (err) {
       if (!isAuthError(err)) toast.error(`Failed to mark comments ${pastVerb}`);
     } finally {

@@ -32,8 +32,8 @@ const eslintConfig = defineConfig([
     // browser devtools console opt out with an inline eslint-disable comment.
     // Not applied to `src/chrome-extension/**` (browser-only, no access to the
     // server logger) or `scripts/**` (CLI tools whose output *is* the console).
-    files: ["src/app/**", "src/components/**", "src/lib/**"],
-    ignores: ["src/lib/log.ts"],
+    files: ["src/**"],
+    ignores: ["src/chrome-extension/**", "src/lib/log.ts"],
     rules: {
       "no-console": "warn",
     },
@@ -89,8 +89,14 @@ const eslintConfig = defineConfig([
     ],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
-      // Playwright fixtures take a callback named `use`, which this rule
-      // mistakes for the React `use` hook.
+    },
+  },
+  {
+    // Playwright fixtures take a callback named `use`, which this rule mistakes
+    // for the React `use` hook. Scoped to the Playwright suites only, so React
+    // component tests keep the check.
+    files: ["testing/**/*.ts", "testing/**/*.tsx"],
+    rules: {
       "react-hooks/rules-of-hooks": "off",
     },
   },
