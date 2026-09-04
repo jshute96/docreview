@@ -484,7 +484,11 @@ export function CommentThreadPanel({
             onShowReadMessages?.();
           }}
         >
-          {n} hidden
+          {/* The glyphs sit above the button's centre line because the font
+              reserves descender space this label never uses — invisible on a
+              normal-height button, obvious on a 20px one. Nudged down a pixel
+              so the text reads as centred; the chevron is already symmetric. */}
+          <span className="relative top-[1px]">{n} hidden</span>
           <ChevronDown className="!size-3" />
         </Button>
         <hr className="flex-[2] border-zinc-300" />
