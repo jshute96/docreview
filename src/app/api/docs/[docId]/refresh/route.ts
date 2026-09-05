@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getDriveClient, createDriveService, invalidGrantResponse, fetchCommentData, fetchDocData, fetchFileTextViaExport, driveUrlFor, isDriveErrorCode, commentsAreHidden, COMMENT_VISIBILITY_FIELDS } from "@/lib/google-drive";
-import type { ThreadMap, SuggestionContent, DriveSuggestion, DriveDoc } from "@/lib/google-drive";
+import type { ThreadMap, SuggestionContent, DriveSuggestion, DriveDoc, DocDataResult } from "@/lib/google-drive";
 import { upsertDocsAndSyncComments } from "@/lib/refresh";
 import { docWithCommentsInclude, stripServerOnly } from "@/lib/doc-queries";
 import { logError, logWarning } from "@/lib/log";
@@ -117,7 +117,16 @@ export async function POST(
             })
           : mimeType === GoogleMimeType.Slides
             ? fetchFileTextViaExport(driveAuth, doc.googleDocId).then(
-                (text) => ({ suggestions: [] as DriveSuggestion[], suggestionContent: {} as Record<string, SuggestionContent>, documentText: text }),
+                // The export reads text only. Slides have no suggestions and the
+                // sync skips its suggestion phase for them anyway, but the flag
+                // keeps the empty list from being read as authoritative if the
+                // stored mimeType and Drive's ever disagree.
+                (text): DocDataResult => ({
+                  suggestions: [] as DriveSuggestion[],
+                  suggestionContent: {} as Record<string, SuggestionContent>,
+                  documentText: text,
+                  suggestionsUnavailable: "error",
+                }),
               ).catch(() => null)
             : Promise.resolve(null)),
       ]);
@@ -129,7 +138,16 @@ export async function POST(
         docId,
         prefetched: {
           ...(commentResult?.comments ? { comments: commentResult.comments } : {}),
-          ...(docDataResult ? { suggestions: docDataResult.suggestions } : {}),
+          // The flag must travel with the list: an empty `suggestions` from a
+          // doc we couldn't read must not look like a doc with none left open.
+          ...(docDataResult
+            ? {
+                suggestions: docDataResult.suggestions,
+                ...(docDataResult.suggestionsUnavailable
+                  ? { suggestionsUnavailable: docDataResult.suggestionsUnavailable }
+                  : {}),
+              }
+            : {}),
         },
       });
 

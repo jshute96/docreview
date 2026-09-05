@@ -6,7 +6,7 @@ import { GoogleMimeType } from "@/lib/mime-types";
 import { computeSuggestionHash } from "@/lib/suggestion-hash";
 import { initialReadSlotCount, nextReadSlotCount, renderReadCount } from "@/lib/read-state";
 import { CommentStatus, CommentType, DocRole, DocStatus, type Doc, type Comment, type Prisma } from "@prisma/client";
-import type { DriveComment, DriveSuggestion, CommentThread, ThreadDetailResult } from "@/lib/google-drive";
+import type { DriveComment, DriveSuggestion, SuggestionsUnavailable, CommentThread, ThreadDetailResult } from "@/lib/google-drive";
 
 // Extract Prisma's interactive-transaction client type from $transaction's callback signature.
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -68,7 +68,14 @@ interface SyncResult {
   suggestionsResolved: number;
   shouldUnarchive: boolean;
   isDeleted?: boolean;
+  /** Drive refused this doc's *comments* — nothing synced. Callers count it as
+   *  a failed doc (see `allFailed` in `docs/refresh.md`). */
   permissionDenied?: boolean;
+  /** Drive refused only this doc's *suggestions* (the view-only case). The
+   *  comment sync still succeeded, so this is not a failed doc — it's kept
+   *  separate from `permissionDenied` so one view-only doc can't drag the
+   *  success count to zero and block the Drive changes-token update. */
+  suggestionsDenied?: boolean;
   transientError?: boolean;
   /** Thread display data from single-comment sync, so callers can pass it
    *  to the client without a redundant Drive API fetch. */
@@ -107,6 +114,10 @@ export function datesEqual(a: Date | null | undefined, b: Date | null | undefine
 export interface SyncPrefetchedData {
   comments?: DriveComment[];
   suggestions?: DriveSuggestion[];
+  /** Why the pre-fetched `suggestions` list is empty, when it isn't because the
+   *  doc has none. Must be passed along with `suggestions` — without it an
+   *  unreadable doc looks like one whose suggestions were all closed. */
+  suggestionsUnavailable?: SuggestionsUnavailable;
 }
 
 /**
@@ -304,8 +315,10 @@ export async function syncComments(
   let suggestionPermissionDenied = false;
   if (skipSuggestions) {
     docsSuggestions = [];
-  } else if (prefetched?.suggestions) {
-    docsSuggestions = prefetched.suggestions;
+  } else if (prefetched?.suggestions || prefetched?.suggestionsUnavailable) {
+    docsSuggestions = prefetched.suggestions ?? [];
+    suggestionFetchFailed = prefetched.suggestionsUnavailable === "error";
+    suggestionPermissionDenied = prefetched.suggestionsUnavailable === "denied";
   } else {
     const result = await fetchDocsSuggestions(doc, driveAuth);
     docsSuggestions = result.suggestions;
@@ -341,10 +354,17 @@ export async function syncComments(
   if (suggestionPermissionDenied) {
     if (!hints) await stampSyncTime(doc.docId, syncStartedAt);
     logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive (${commentResult.commentsCreated} new, ${commentResult.commentsUpdated} updated) (suggestions skipped: permission denied)`);
-    return { ...EMPTY_RESULT, ...commentResult, permissionDenied: true };
+    return { ...EMPTY_RESULT, ...commentResult, suggestionsDenied: true };
   }
 
-  const suggestionResult = await syncDocsSuggestions(doc, docsSuggestions);
+  // Reaching here means the Docs API read succeeded: both the failed and the
+  // denied cases returned above. So an empty `docsSuggestions` is authoritative
+  // — but only on a full sync. Hint-driven syncs run moments after the user
+  // acted in the doc, where a lagging Docs read can report an empty document
+  // that isn't (the same read-after-write lag `syncSingleComment` retries
+  // around). They're partial by design and don't even stamp the sync time, so
+  // leave the ID-less rows for the next full sync to close.
+  const suggestionResult = await syncDocsSuggestions(doc, docsSuggestions, { closeIdlessRows: !hints });
 
   // Only stamp commentsLastSyncedAt for full syncs (no hints) — hint-based
   // syncs are partial and the periodic full sync should still reconcile.
@@ -405,7 +425,13 @@ async function fetchDocsSuggestions(
   }
   try {
     const result = await fetchDocData(driveAuth, doc.googleDocId);
-    return { suggestions: result.suggestions, failed: false, denied: false };
+    // fetchDocData swallows its own errors, so an empty list needs the
+    // accompanying flag to be read correctly (see SuggestionsUnavailable).
+    return {
+      suggestions: result.suggestions,
+      failed: result.suggestionsUnavailable === "error",
+      denied: result.suggestionsUnavailable === "denied",
+    };
   } catch (err) {
     logError(`[Suggestions:Docs] fetch failed for ${doc.googleDocId}:`, err);
     return { suggestions: [], failed: true, denied: false };
@@ -794,10 +820,15 @@ interface SuggestionSyncResult {
  *
  * After upserting, any unresolved suggestion rows NOT in the live set are marked
  * resolved. This includes Gmail-first rows that couldn't be matched by hash.
+ *
+ * `docsSuggestions` must be an authoritative read — callers resolve rows from
+ * its absences, so a list left empty by a failed or forbidden fetch would close
+ * every suggestion on the doc.
  */
 async function syncDocsSuggestions(
   doc: Doc,
   docsSuggestions: DriveSuggestion[],
+  options: { closeIdlessRows: boolean },
 ): Promise<SuggestionSyncResult> {
   // Build lookup maps: by googleSuggestionId (primary) and by content hash
   // (fallback for Gmail-first rows that don't have a googleSuggestionId yet).
@@ -925,16 +956,39 @@ async function syncDocsSuggestions(
   }
 
   // Identify suggestions to resolve (no longer in the document).
-  // Only resolve rows that have a googleSuggestionId — those were matched to a
-  // Docs API suggestion and can be reliably tracked by ID.  Rows without a
-  // googleSuggestionId came from Gmail or the extension and may not be findable
-  // via the Docs API (e.g. content hash mismatch), so we can't infer resolution
-  // from their absence.  Those will be resolved when the extension reports
-  // accepted/rejected status.
+  // Normally we only resolve rows that have a googleSuggestionId — those were
+  // matched to a Docs API suggestion and can be reliably tracked by ID.  Rows
+  // without one came from Gmail or the extension and may not be findable via
+  // the Docs API (e.g. content hash mismatch), so their absence from a
+  // non-empty live set proves nothing.
+  //
+  // The exception is an empty live set on a full sync: the read found no open
+  // suggestions anywhere it looks, so there is no live suggestion any row could
+  // have failed to match, and a hash mismatch can't explain the absence.  Every
+  // unresolved row is therefore closed, whatever IDs it carries.  ("Anywhere it
+  // looks" is the caveat: the fields mask covers tab bodies, tables and TOCs,
+  // not headers/footers/footnotes — see docs/suggestions.md.)  Without this, an accept/reject that
+  // happened while neither Docreview nor the extension was watching leaves
+  // disco-only rows stuck open forever — a refresh alone could never clear
+  // them.  We can't tell accepted from rejected from deleted here, but we don't
+  // make that distinction for googleSuggestionId rows either: absence is the
+  // only signal the Docs API gives us, and it means closed.
+  const closeIdlessRows = options.closeIdlessRows && docsSuggestions.length === 0;
   const activeSuggestions = await prisma.comment.findMany({
-    where: { docId: doc.docId, type: CommentType.SUGGESTION, resolved: false, googleSuggestionId: { not: null } },
+    where: {
+      docId: doc.docId,
+      type: CommentType.SUGGESTION,
+      resolved: false,
+      ...(closeIdlessRows ? {} : { googleSuggestionId: { not: null } }),
+    },
   });
-  const toResolve = activeSuggestions.filter(s => !liveIds.has(s.googleSuggestionId!));
+  const toResolve = activeSuggestions.filter(
+    s => !s.googleSuggestionId || !liveIds.has(s.googleSuggestionId)
+  );
+  const idless = toResolve.filter(s => !s.googleSuggestionId).length;
+  if (idless > 0) {
+    logInfo(`[Suggestions:Docs] ${doc.googleDocId}: no live suggestions — closing ${idless} row(s) with no suggestion ID`);
+  }
 
   if (toCreate.length > 0) {
     const newTs = toCreate.map(c => c.driveCreatedAt instanceof Date ? c.driveCreatedAt : null);

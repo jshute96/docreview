@@ -7,8 +7,14 @@ vi.mock("@googleapis/drive", () => ({
   drive: vi.fn(() => ({ comments: { list: commentsList } })),
 }));
 
+const { documentsGet } = vi.hoisted(() => ({ documentsGet: vi.fn() }));
+vi.mock("@googleapis/docs", () => ({
+  docs: vi.fn(() => ({ documents: { get: documentsGet } })),
+}));
+
 import {
   fetchCommentData,
+  fetchDocData,
   parseGoogleDocId,
   deriveCommentFlags,
   liveReplies,
@@ -426,5 +432,66 @@ describe("commentsAreHidden", () => {
 
   it("stays off when threads weren't requested at all", () => {
     expect(commentsAreHidden({ canComment: false, threadCount: undefined })).toBe(false);
+  });
+});
+
+// A minimal documents.get response: one paragraph, no suggestions.
+function plainDocResponse() {
+  return {
+    data: {
+      tabs: [{ documentTab: { body: { content: [
+        { paragraph: { elements: [{ textRun: { content: "Hello" } }] } },
+      ] } } }],
+    },
+  };
+}
+
+function driveError(code: number, message: string) {
+  return Object.assign(new Error(message), { code });
+}
+
+describe("fetchDocData suggestion readability", () => {
+  const auth = {} as Parameters<typeof fetchDocData>[0];
+
+  it("leaves suggestionsUnavailable unset when the read succeeds", async () => {
+    documentsGet.mockReset().mockResolvedValue(plainDocResponse());
+
+    const result = await fetchDocData(auth, "doc1");
+
+    // An empty list here is authoritative — the doc really has no suggestions.
+    expect(result.suggestions).toEqual([]);
+    expect(result.suggestionsUnavailable).toBeUndefined();
+  });
+
+  it("reports 'denied' when suggestions are withheld but the text reads", async () => {
+    documentsGet
+      .mockReset()
+      .mockRejectedValueOnce(
+        driveError(403, "The caller does not have permission to access the document suggestions")
+      )
+      .mockResolvedValueOnce(plainDocResponse());
+
+    const result = await fetchDocData(auth, "doc1");
+
+    // The retry drops the suggestion fields, so the empty list proves nothing.
+    expect(result.documentText).toContain("Hello");
+    expect(result.suggestionsUnavailable).toBe("denied");
+  });
+
+  it("reports 'denied' when the document itself is inaccessible", async () => {
+    documentsGet.mockReset().mockRejectedValue(driveError(404, "File not found"));
+
+    const result = await fetchDocData(auth, "doc1");
+
+    expect(result.documentText).toBeNull();
+    expect(result.suggestionsUnavailable).toBe("denied");
+  });
+
+  it("reports 'error' for any other failure", async () => {
+    documentsGet.mockReset().mockRejectedValue(driveError(500, "Backend error"));
+
+    const result = await fetchDocData(auth, "doc1");
+
+    expect(result.suggestionsUnavailable).toBe("error");
   });
 });

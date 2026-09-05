@@ -39,7 +39,8 @@ import { syncComments, syncSingleComment } from "./sync-comments";
 import { prisma } from "@/lib/prisma";
 import { fetchCommentData, fetchDocData, fetchThreadDetail } from "@/lib/google-drive";
 import { computeSuggestionHash } from "./suggestion-hash";
-import { SuggestionType, type Doc } from "@prisma/client";
+import { ExtCommentType } from "@/lib/extension-wire";
+import { CommentStatus, SuggestionType, type Doc } from "@prisma/client";
 
 const mockComment = prisma.comment as unknown as {
   findFirst: ReturnType<typeof vi.fn>;
@@ -991,21 +992,124 @@ describe("syncComments suggestion resolution", () => {
     expect(mockFetchDocData).not.toHaveBeenCalled();
   });
 
-  it("does not resolve suggestions without googleSuggestionId", async () => {
+  // The resolution pass is the only findMany that filters on `resolved: false`;
+  // finding it by shape keeps these tests from breaking whenever another query
+  // is added earlier in the sync.
+  function activeSuggestionsQuery() {
+    const call = mockComment.findMany.mock.calls.find(
+      ([arg]) => arg?.where?.type === "SUGGESTION" && arg?.where?.resolved === false
+    );
+    return call?.[0];
+  }
+
+  it("does not resolve suggestions without googleSuggestionId while others are live", async () => {
     const doc = makeDoc();
     mockFetchCommentData.mockResolvedValue({ comments: [] });
-    mockFetchDocData.mockResolvedValue({ suggestions: [], suggestionContent: {}, documentText: null });
+    // One live suggestion — so an unmatched disco-only row might simply be that
+    // suggestion under a hash we failed to match.
+    mockFetchDocData.mockResolvedValue({
+      suggestions: [{ id: "suggest.abc", suggestionType: SuggestionType.EDIT, insertedText: "x", deletedText: "" }],
+      suggestionContent: {}, documentText: "doc",
+    });
     mockComment.findMany
       .mockResolvedValueOnce([])  // batch fetch comments
-      .mockResolvedValueOnce([])  // existingSuggestions
+      .mockResolvedValueOnce([{ commentId: "cr1", googleSuggestionId: "suggest.abc", suggestionType: SuggestionType.EDIT, suggestionContentHash: null }])
       .mockResolvedValueOnce([]); // activeSuggestions — query filters to googleSuggestionId != null
 
     await syncComments(doc, driveAuth);
 
-    // The Prisma query for active suggestions filters to googleSuggestionId != null,
-    // so rows without one are never candidates for resolution.
-    const findManyCall = mockComment.findMany.mock.calls[2][0];
-    expect(findManyCall.where.googleSuggestionId).toEqual({ not: null });
+    // With a non-empty live set the Prisma query filters to googleSuggestionId
+    // != null, so rows without one are never candidates for resolution.
+    expect(activeSuggestionsQuery().where.googleSuggestionId).toEqual({ not: null });
+    expect(mockComment.updateMany).not.toHaveBeenCalled();
+  });
+
+  // An empty live set is proof that nothing is open, so disco-only rows (from
+  // the extension or a Gmail notification) can be closed too — otherwise an
+  // accept/reject that happened with nothing watching leaves them stuck open.
+  it("resolves suggestions without googleSuggestionId when the doc has none live", async () => {
+    const doc = makeDoc();
+    mockFetchCommentData.mockResolvedValue({ comments: [] });
+    mockFetchDocData.mockResolvedValue({ suggestions: [], suggestionContent: {}, documentText: "doc" });
+    mockComment.findMany
+      .mockResolvedValueOnce([])  // batch fetch comments
+      .mockResolvedValueOnce([])  // existingSuggestions
+      .mockResolvedValueOnce([{   // activeSuggestions — disco-only row
+        commentId: "cr1", googleSuggestionId: null, googleCommentId: "AAAB0xx", resolved: false, status: CommentStatus.INBOX,
+      }]);
+
+    await syncComments(doc, driveAuth);
+
+    // No googleSuggestionId filter — every unresolved suggestion is a candidate.
+    expect(activeSuggestionsQuery().where.googleSuggestionId).toBeUndefined();
+    // Same treatment as an ID-tracked row: resolved, and INBOX → ARCHIVED.
+    const updateManyCall = mockComment.updateMany.mock.calls[0][0];
+    expect(updateManyCall.where.commentId).toEqual({ in: ["cr1"] });
+    expect(updateManyCall.data.resolved).toBe(true);
+    expect(updateManyCall.data.status).toBe(CommentStatus.ARCHIVED);
+  });
+
+  // Hint-driven syncs run right after the user acted in the doc, where a lagging
+  // Docs read can report an empty document that isn't.
+  it("does not close disco-only rows on a hint-driven sync", async () => {
+    const doc = makeDoc();
+    mockFetchDocData.mockResolvedValue({ suggestions: [], suggestionContent: {}, documentText: "doc" });
+    mockComment.findMany
+      .mockResolvedValueOnce([])  // existingSuggestions (comments are skipped by the hint)
+      .mockResolvedValueOnce([]); // activeSuggestions
+
+    await syncComments(doc, driveAuth, undefined, undefined, { commentType: ExtCommentType.Suggestion });
+
+    expect(activeSuggestionsQuery().where.googleSuggestionId).toEqual({ not: null });
+  });
+
+  it("honours a prefetched suggestionsUnavailable flag", async () => {
+    const doc = makeDoc();
+    mockFetchCommentData.mockResolvedValue({ comments: [] });
+    mockComment.findMany.mockResolvedValueOnce([]); // batch fetch comments
+
+    // The single-doc refresh route fetches doc data itself and passes the result
+    // in. The empty list must not be treated as authoritative without the flag.
+    const result = await syncComments(doc, driveAuth, undefined, {
+      comments: [], suggestions: [], suggestionsUnavailable: "denied",
+    });
+
+    expect(result.suggestionsDenied).toBe(true);
+    expect(mockFetchDocData).not.toHaveBeenCalled();
+    expect(mockComment.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("does not resolve anything when suggestions could not be read", async () => {
+    const doc = makeDoc();
+    mockFetchCommentData.mockResolvedValue({ comments: [] });
+    // View-only access: the doc read succeeds but suggestions are withheld, so
+    // the empty list says nothing about what is still open.
+    mockFetchDocData.mockResolvedValue({
+      suggestions: [], suggestionContent: {}, documentText: "doc", suggestionsUnavailable: "denied",
+    });
+    mockComment.findMany.mockResolvedValueOnce([]); // batch fetch comments
+
+    const result = await syncComments(doc, driveAuth);
+
+    // Phase 3 never runs: no existingSuggestions lookup, nothing resolved.
+    expect(activeSuggestionsQuery()).toBeUndefined();
+    expect(mockComment.updateMany).not.toHaveBeenCalled();
+    // Withheld suggestions are not a failed doc — the comment sync succeeded.
+    expect(result.suggestionsDenied).toBe(true);
+    expect(result.permissionDenied).toBeUndefined();
+  });
+
+  it("reports a transient error when the Docs read fails", async () => {
+    const doc = makeDoc();
+    mockFetchCommentData.mockResolvedValue({ comments: [] });
+    mockFetchDocData.mockResolvedValue({
+      suggestions: [], suggestionContent: {}, documentText: null, suggestionsUnavailable: "error",
+    });
+    mockComment.findMany.mockResolvedValueOnce([]); // batch fetch comments
+
+    const result = await syncComments(doc, driveAuth);
+
+    expect(result.transientError).toBe(true);
     expect(mockComment.updateMany).not.toHaveBeenCalled();
   });
 });

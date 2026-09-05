@@ -596,6 +596,16 @@ export interface SuggestionContent {
   anchorText?: string;
 }
 
+/**
+ * Why `suggestions` came back empty when it wasn't because the doc has none.
+ * The parallel of `permissionDenied` on {@link CommentDataResult}: an empty
+ * array alone can't be told apart from "we weren't allowed to look".
+ *  - `denied` — Drive refused the document or its suggestions. Won't change on
+ *    a retry, so callers should stop asking rather than treat it as an outage.
+ *  - `error` — the call failed for some other reason (transient).
+ */
+export type SuggestionsUnavailable = "denied" | "error";
+
 /** Result of fetchDocData — always returns all fields from a single documents.get call. */
 export interface DocDataResult {
   /** Full document text (with suggestion text inlined). Null on permission error. */
@@ -604,6 +614,10 @@ export interface DocDataResult {
   suggestionContent: Record<string, SuggestionContent>;
   /** DriveSuggestion[] — for DB sync (type classification + content hashing). */
   suggestions: DriveSuggestion[];
+  /** Set when `suggestions` is empty because we couldn't read them, not because
+   *  the doc has none. Absent means the empty list is authoritative — callers
+   *  may conclude every suggestion they know about has been closed. */
+  suggestionsUnavailable?: SuggestionsUnavailable;
 }
 
 /**
@@ -687,6 +701,7 @@ export async function fetchDocData(
     `tabs(documentTab(body(content(${contentFields(textRunFieldsNoSuggestions, 2)}))))`;
 
   let res;
+  let suggestionsUnavailable: SuggestionsUnavailable | undefined;
   try {
     res = await withProgressLogging(
       docs.documents.get({
@@ -708,6 +723,10 @@ export async function fetchDocData(
       logWarning(
         `[Docs] Permission denied for suggestions on ${googleDocId}, retrying without suggestions.`
       );
+      // The retry succeeds and yields real text, but with no suggestion fields
+      // requested we learn nothing about suggestions — not even that there are
+      // none. Flag it so callers don't read the empty list as authoritative.
+      suggestionsUnavailable = "denied";
       try {
         res = await withProgressLogging(
           docs.documents.get({
@@ -724,11 +743,16 @@ export async function fetchDocData(
           }ms):`,
           innerErr
         );
-        return { documentText: null, suggestionContent: {}, suggestions: [] };
+        return { documentText: null, suggestionContent: {}, suggestions: [], suggestionsUnavailable: "error" };
       }
     } else {
-      const isPermission = isDriveErrorCode(err, 403) || isDriveErrorCode(err, 404) ||
-        /permission|forbidden|not found/i.test(message);
+      // Refusals (403/404) won't clear on a retry; anything else might, so the
+      // two get different `suggestionsUnavailable` values. The message regex
+      // widens the *log level* choice only — it's too loose to decide whether a
+      // caller should stop retrying (a transient error whose text happens to
+      // say "not found" would be stamped as settled and not looked at again).
+      const refused = isDriveErrorCode(err, 403) || isDriveErrorCode(err, 404);
+      const isPermission = refused || /permission|forbidden|not found/i.test(message);
       if (isPermission) {
         // Expected whenever the doc was deleted or access was revoked (Drive
         // returns 404 for both) — a warning, not an error.
@@ -736,7 +760,12 @@ export async function fetchDocData(
       } else {
         logError(`[Docs] documents.get ${googleDocId} failed (${Date.now() - t0}ms):`, err);
       }
-      return { documentText: null, suggestionContent: {}, suggestions: [] };
+      return {
+        documentText: null,
+        suggestionContent: {},
+        suggestions: [],
+        suggestionsUnavailable: refused ? "denied" : "error",
+      };
     }
   }
 
@@ -871,8 +900,8 @@ export async function fetchDocData(
     allIds.add(id);
   }
 
-  logInfo(`[Docs] documents.get ${googleDocId} (${documentText.length} chars, ${allIds.size} suggestions) (${Date.now() - t0}ms)`);
-  return { documentText, suggestionContent, suggestions };
+  logInfo(`[Docs] documents.get ${googleDocId} (${documentText.length} chars, ${allIds.size} suggestions) (${Date.now() - t0}ms)${suggestionsUnavailable ? ` (suggestions ${suggestionsUnavailable})` : ""}`);
+  return { documentText, suggestionContent, suggestions, ...(suggestionsUnavailable ? { suggestionsUnavailable } : {}) };
 }
 
 // A single reply within a comment thread (not the initial comment).

@@ -138,6 +138,17 @@ Update this list when adding or changing user-facing behaviors.
       (sync behaviour around deletions is covered under Comment Status & Sync Logic → Deleted Replies)
 - [ ] Suggestions have no edit/delete menu
 
+### Suggestions Sync
+
+These need a suite that can serve Drive/Docs API responses — the offline suite never runs
+sync at all (`getDriveClient()` throws `OfflineModeError`), so they aren't implementable
+against `app-offline/` as it stands.
+
+- [*] Refresh on a doc whose Docs API read returns no suggestions archives suggestion rows that have only a disco ID (no suggestion ID), not just the ID-tracked ones
+- [*] Refresh on a doc with at least one live suggestion leaves disco-only rows alone
+- [*] Refresh on a doc whose suggestions can't be read (view-only access) resolves nothing
+- [*] An extension-triggered sync (not a full refresh) never closes disco-only rows, even when the Docs read comes back empty
+
 ### Suggestions Display
 - [ ] Suggestions appear in same table as comments
 - [ ] Orphaned suggestions (original content deleted) show "Original content deleted" warning (using state from the extension)

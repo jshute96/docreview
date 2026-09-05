@@ -39,7 +39,7 @@ store suggestions**. All suggestion data comes from the Docs API.
 
 ## Sync Approach (Docs API)
 
-Every Refresh calls `fetchSuggestions`, which calls `documents.get` with
+Every Refresh calls `fetchDocData`, which calls `documents.get` with
 `suggestionsViewMode: "SUGGESTIONS_INLINE"` and `includeTabsContent: true`, then
 recursively walks the structural elements of every tab (including nested child tabs,
 tables, and table-of-contents blocks) to collect all pending suggestion IDs (`suggest.xxx`). Each is upserted into the Comment table:
@@ -52,7 +52,26 @@ tables, and table-of-contents blocks) to collect all pending suggestion IDs (`su
 
 After upserting, any `suggest.xxx` records **no longer in the Docs API response** are
 marked `resolved: true` (the suggestion was accepted or rejected). This runs even when the
-Docs API returns zero suggestions, so the last remaining suggestion is correctly resolved.
+Docs API returns zero suggestions, so the last remaining suggestion is correctly resolved —
+and in that case rows without a `googleSuggestionId` are resolved too (see
+[Resolution and cleanup](#resolution-and-cleanup)).
+
+The resolution step treats absence as proof of closure, so it only runs on an
+**authoritative** read. `fetchDocData` handles its own errors and returns an empty
+suggestion list on failure, so it also sets `suggestionsUnavailable` to say why the list is
+empty: `"denied"` when Drive refused the call with a 403 or 404 — including the view-only case,
+where it is retried without suggestion fields and succeeds with text but no suggestion data
+— and `"error"` for any other failure. Only the HTTP status decides which; the message
+regex nearby widens the choice of log level, not this, since "settled" means callers stop
+retrying. `syncComments` returns before Phase 3 either way — `suggestionsDenied` for
+`"denied"`, `transientError` for `"error"` — so nothing is resolved from a list we were
+never allowed to see. This mirrors `permissionDenied` / `commentsAreHidden()` on the
+comments side.
+
+`suggestionsDenied` is deliberately **not** `permissionDenied`: the doc's comments synced
+fine, so it isn't a failed doc, and counting it as one would let a set of view-only docs
+zero out the success count and block the Drive changes-token update (see
+[`refresh.md` § Systemic Failure Protection](./refresh.md#systemic-failure-protection-allfailed)).
 
 ---
 
@@ -196,11 +215,49 @@ When the Docs API is scanned, only pending (unresolved) suggestions appear in th
 body. After upserting live suggestions, any suggestion row **with a `googleSuggestionId`**
 that is not in the live set is marked `resolved: true` and archived.
 
-Rows without a `googleSuggestionId` (extension-only or Gmail-first rows) are **never
-resolved by the Docs API sync**. The Docs API cannot reliably determine whether these
-suggestions are gone — content hash matching is too fragile (normalization differences,
-formatting suggestions with colliding hashes). These rows are resolved when the Chrome
-extension reports `accepted`/`rejected` status from the DOM.
+Rows without a `googleSuggestionId` (extension-only or Gmail-first rows) are **not
+resolved by the Docs API sync while any suggestion is still live**. The Docs API cannot
+reliably determine whether an individual one of these suggestions is gone — content hash
+matching is too fragile (normalization differences, formatting suggestions with colliding
+hashes), so absence from a non-empty live set proves nothing. Normally these rows are
+resolved when the Chrome extension reports `accepted`/`rejected` status from the DOM.
+
+**Exception — an empty live set closes everything.** When an authoritative read on a full
+sync returns *zero* suggestions, there is no live suggestion a row could have failed to
+match, so a hash mismatch can't explain the absence either. Every unresolved suggestion row
+is then closed regardless of which IDs it carries.
+
+Two limits on that "zero":
+
+- **Only full syncs.** Hint-driven syncs from the extension run seconds after the user acted
+  in the doc, where a lagging Docs read can report an empty document that isn't (the same
+  read-after-write lag `syncSingleComment` retries around). They're partial by design — they
+  don't stamp `commentsLastSyncedAt` either — so they leave ID-less rows to the next full
+  sync.
+- **Only where we look.** The `fields` mask covers tab bodies, tables (two levels of
+  nesting) and tables of contents, and within those only text runs and their style changes.
+  A suggestion that lives *only* in a header, footer or footnote, or that is purely an
+  inline-object or paragraph-level change, is invisible to `documents.get` as we call it,
+  and would make the live set look empty. Those suggestions never produce a
+  `googleSuggestionId` row, but the extension and Gmail *do* see them, so a doc whose only
+  open suggestions are of that kind will have its disco-only rows closed on each refresh
+  and re-opened by the next extension scrape. Widening the mask to headers/footers/footnotes
+  would close most of that gap. Without this, a
+suggestion accepted or rejected while neither Docreview nor the extension was watching
+leaves a disco-only row stuck open forever — refresh alone could never clear it, and the
+only cure was opening the doc with the extension running.
+
+Disco-only rows get exactly the same treatment as ID-tracked ones: `resolved: true`, with
+`INBOX → ARCHIVED` and any other status (e.g. `MUTED`) left as-is. Nothing else is
+considered — not the doc role, not who authored the suggestion, not whether it was
+accepted, rejected, or deleted. We don't distinguish those for `googleSuggestionId` rows
+either; absence is the only signal the Docs API gives, and it means closed.
+
+Recovery from a wrong close is partial, not guaranteed: a later extension scrape that still
+sees the suggestion open can unarchive it (`suggestionShouldUnarchive()`, plus the ARCHIVED
+re-evaluation in `extension-suggestion-merge.ts`), but only for a row it can re-match by
+disco ID — and a user without the extension has no recovery path at all. That is the real
+cost of the rule, weighed against rows that would otherwise stay open forever.
 
 ### Event ordering
 
@@ -218,7 +275,9 @@ When the suggestion is later accepted, the next refresh resolves it normally. Cl
 **Gmail first → suggestion already resolved before Drive syncs:** Gmail inserts a row
 with `resolved: false`. Drive sync doesn't find the suggestion in the doc, so the hash
 lookup is never attempted. The row has no `googleSuggestionId`, so the Docs API sync
-leaves it alone. It will be resolved when the extension reports accepted/rejected status.
+leaves it alone while other suggestions are still live; it is resolved when the extension
+reports accepted/rejected status, or by the next sync that finds the doc has no live
+suggestions at all.
 
 ### Hash mismatch scenarios
 
@@ -237,8 +296,10 @@ Row A is resolved normally when the suggestion leaves the document.
 **Consequence of hash mismatch:** The Drive row never gets a `googleCommentId`, so it
 won't have a `?disco=` deep link. This is inherent — we can't merge what we can't
 correlate. The user may see a duplicate suggestion. Without the extension, the
-Gmail/extension-only row won't be auto-resolved — this is acceptable because incorrectly
-resolving live suggestions (the previous behavior) was worse than leaving stale duplicates.
+Gmail/extension-only row isn't auto-resolved while other suggestions are live — this is
+acceptable because incorrectly resolving live suggestions (the behavior before that rule)
+was worse than leaving stale duplicates. Once the doc has no live suggestions left, the
+empty-live-set rule clears it.
 
 ---
 
@@ -414,7 +475,7 @@ reasoning, and the identity-based mechanism to use if this ever needs to be exac
 
 ### Suggestion text content
 
-Suggestion text (inserted and deleted strings) is fetched on page load via `fetchDocContent`,
+Suggestion text (inserted and deleted strings) is fetched on page load via `fetchDocData`,
 which makes a single `documents.get` call with `SUGGESTIONS_INLINE` and `includeTabsContent: true`
 to extract both suggestion content and document body text from all tabs. Results are keyed by
 `suggest.xxx` (`googleSuggestionId`) and display correctly for all suggestion records.
@@ -450,6 +511,6 @@ Non-text suggestions use `suggestionType: OTHER` in the DB with empty `insertedT
 If a user has "Viewer" access to a document but lacks permission to view suggestions or comments, the Docs API call with `suggestionsViewMode: "SUGGESTIONS_INLINE"` will fail with a `403 Forbidden` error indicating `permission to access the document suggestions`. 
 
 Docreview handles this gracefully:
-- In `fetchDocContent`, it logs a warning and retries the fetch *without* requesting suggestions so the document text can still be displayed.
-- In `syncComments`, the suggestion fetch is skipped, and a warning is logged. Existing suggestions in the database are left untouched (not incorrectly marked as resolved).
+- In `fetchDocData`, it logs a warning and retries the fetch *without* requesting suggestions so the document text can still be displayed. The retry can't see suggestions at all, so the result is flagged `suggestionsUnavailable: "denied"` — otherwise its empty suggestion list would be indistinguishable from a doc with none.
+- In `syncComments`, that flag makes the suggestion phase return early with `permissionDenied` before any resolution runs, so existing suggestions in the database are left untouched (not incorrectly marked as resolved).
 - In `fetchAllThreads` (which powers the thread view for the UI), 403 errors are caught and logged as warnings, returning empty lists so the page can continue functioning and load the document text.

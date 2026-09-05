@@ -320,7 +320,12 @@ to capture all pending suggestions. These are stored as `type: "SUGGESTION"`
 with `suggest.xxx` IDs. New suggestions are bulk-inserted with `createMany` (like comments).
 Existing suggestions are only updated if `suggestionType` changed (which is rare), and
 skipped entirely otherwise — no write at all. Any previously-active suggestion no longer
-returned by the Docs API is marked resolved.
+returned by the Docs API is marked resolved. Rows that have only a disco ID (from Gmail or
+the extension, with no `suggest.xxx` ID) are exempt from that — their absence is ambiguous —
+except when a full sync's read comes back with *no* live suggestions at all, which closes
+them too. This only applies to an authoritative read: when
+`documents.get` fails or Drive withholds suggestions, the empty list is flagged and the
+resolution pass is skipped entirely. See [`suggestions.md`](./suggestions.md).
 
 For full details on comment status logic (INBOX / ARCHIVED / MUTED, who-resolved-it
 detection, `isThreadAuthor` / `isReplyAuthor`), see [`comment-tracking.md`](./comment-tracking.md).
@@ -400,7 +405,7 @@ crash the entire sync.
   for that doc. This is **not** considered a transient error and does **not** block the
   token update.
 - **Transient errors** (429 rate limit, 500 server error, network timeouts) return
-  `transientError: true`. This also applies when `fetchSuggestions` fails for unexpected
+  `transientError: true`. This also applies when `fetchDocData` fails for unexpected
   reasons.
 
 After all comment syncs complete, the POST handler checks whether any sync result had
@@ -428,9 +433,12 @@ Gmail is later enabled on the account.
 
 This prevents the system from "skipping ahead" in the changes feed or Gmail window if a broad
 issue (like a network outage or expired OAuth scope) is preventing access to all documents.
-Permission-denied docs (typically from the Docs suggestions API returning 403) count as
-failures here intentionally — the next refresh will retry, and if even one doc succeeds we
-know the service is healthy and can safely advance the token.
+Permission-denied docs count as failures here intentionally — the next refresh will retry,
+and if even one doc succeeds we know the service is healthy and can safely advance the
+token. This means a 403 from Drive's *comment* list, which leaves the doc unsynced. A doc
+whose comments synced fine but whose *suggestions* Drive withheld (the view-only case)
+reports `suggestionsDenied` instead and still counts as a success — otherwise a user whose
+docs are all view-only would never get past full-scan mode.
 
 ---
 
