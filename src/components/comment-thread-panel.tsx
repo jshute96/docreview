@@ -961,7 +961,7 @@ export function CommentThreadPanel({
                     <div className="mb-2">
                       <div className="rounded border-l-2 border-zinc-300 bg-zinc-100 px-3 py-1.5">
                         {thread.quotedFileContent.mimeType === "text/html" ? (
-                          <p className="text-xs text-zinc-500 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: sanitizeHtml(thread.quotedFileContent.value) }} />
+                          <p className="text-xs text-zinc-500 whitespace-pre-wrap [&_a]:text-blue-600 [&_a]:underline" dangerouslySetInnerHTML={{ __html: sanitizeHtml(thread.quotedFileContent.value) }} />
                         ) : (
                           <p className="text-xs text-zinc-500 whitespace-pre-wrap">{thread.quotedFileContent.value}</p>
                         )}

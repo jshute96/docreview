@@ -123,6 +123,7 @@ Update this list when adding or changing user-facing behaviors.
 - [x] Reopen with text reopens comment (Reopened badge, text shown, open count increases)
 - [x] Resolve with text resolves comment (Resolved badge + text shown, open count decreases)
 - [ ] Shows quoted document text
+- [ ] Links inside comment/reply text open in a new tab, leaving the Docreview tab in place
 - [ ] All replies in chronological order
 - [ ] Status controls: inbox / archived / muted
 - [ ] Star toggle per comment
