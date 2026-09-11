@@ -766,6 +766,16 @@ in Google Docs (or from Docreview) and then a sync, so they belong to the live s
 
 ---
 
+## Rendering & Hydration
+
+**Files:** `app-offline/hydration.spec.ts`
+
+- [x] No React render errors when the client clock disagrees with the server's friendly-date formatting (e.g. SSR and hydration straddle midnight)
+- [ ] Page body is hidden until cached titles render, and is always revealed (even with no docs, or when the metadata fetch fails)
+- [ ] Client-side navigation to a doc page (after adding a doc from `/add`) renders titles from the localStorage cache
+
+---
+
 ## Browser Cache & Performance
 
 - [ ] Document titles cached in localStorage (prevents title flicker on load)

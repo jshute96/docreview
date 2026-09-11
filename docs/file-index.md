@@ -138,6 +138,7 @@ One-line descriptions of every source file, grouped by layer.
 | `dialog-buttons.tsx` | Reusable Save/Cancel button pair for dialogs |
 | `friendly-date.tsx` | `<FriendlyDate>` — renders relative timestamps: time-only (today), weekday + time (<6d), date (older); full timestamp on hover; the one place date strings are converted to Dates |
 | `doc-type-icon.tsx` | SVG icons for Google Docs/Sheets/Slides by mime type |
+| `hide-until-titles.tsx` | `<HideUntilTitles>` — inline script that hides the page body until cached titles are rendered; emitted only on an initial document request |
 | `x-icon.tsx` | Small X (close) icon used in badges and buttons |
 | `help-dialog.tsx` | Multi-page help viewer dialog — iframe + pages.json navigation, keyboard shortcuts, page dropdown |
 | `welcome-dialog.tsx` | First-login welcome dialog — single Quick Start page in iframe, marks `hasSeenHelp` on close |
@@ -301,6 +302,7 @@ Shadcn/ui components:
 | `app-offline/docs.spec.ts` | Doc list and individual doc page tests |
 | `app-offline/labels.spec.ts` | Label management tests: create, assign, reorder, color change, delete, cancel — with DB verification |
 | `app-offline/labels-crosstab.spec.ts` | Cross-tab label sync: verifies label changes broadcast to all open pages and dialogs |
+| `app-offline/hydration.spec.ts` | Hydration regression tests: no React render errors when the client clock disagrees with the server's date formatting |
 | `extension-live/playwright.config.ts` | Config for extension + app tests (bundled Chromium with --load-extension) |
 | `extension-live/fixtures.ts` | Test fixtures: persistent context with extension (--headless=new), service worker, chrome API page |
 | `extension-live/toolbar.spec.ts` | Toolbar icon click behavior: blank page opens docreview, non-doc shows error |

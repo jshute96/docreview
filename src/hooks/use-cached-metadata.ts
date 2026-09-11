@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useLayoutEffect, useCallback, useRef, useMemo } from "react";
-import type { CacheEntry } from "@/lib/browser-cache";
 import { getCachedBatch, setCachedBatch, evictStale, touchCached } from "@/lib/browser-cache";
 import { apiFetch } from "@/lib/api-fetch";
 import type { DocMetadataEntry } from "@/app/api/docs/metadata/route";
@@ -9,12 +8,6 @@ import type { DocMetadataEntry } from "@/app/api/docs/metadata/route";
 const NAMESPACE = "meta";
 const BATCH_SIZE = 100;
 const EVICT_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-
-declare global {
-  interface Window {
-    __docrMetaCache?: Record<string, CacheEntry<DocMetadataEntry>>;
-  }
-}
 
 interface DocForMetaCache {
   googleDocId: string;
@@ -37,13 +30,12 @@ export interface CachedMetadata {
 /**
  * Manages a localStorage cache of doc metadata (titles and owners).
  *
- * Each page component includes an inline script that reads cached metadata for
- * its doc IDs from localStorage into window.__docrMetaCache before React
- * hydrates. This hook reads from that global in useLayoutEffect (after
- * hydration, before the next paint), populates state, then removes the
- * body-hiding style (from layout.tsx) so the page appears with titles already
- * in place. Stale/missing entries are fetched from /api/docs/metadata in the
- * background.
+ * Pages that show titles render <HideUntilTitles />, an inline script that hides
+ * the body until titles are ready. This hook reads the cached metadata from
+ * localStorage in useLayoutEffect (after hydration, before the next paint),
+ * populates state, then removes that body-hiding style so the page appears with
+ * titles already in place. Stale/missing entries are fetched from
+ * /api/docs/metadata in the background.
  *
  * Returns maps of googleDocId → title and googleDocId → owner.
  */
@@ -53,9 +45,6 @@ export function useCachedMetadata(userId: string, docs: DocForMetaCache[]): Cach
   const docsRef = useRef(docs);
   docsRef.current = docs;
   const hasEvicted = useRef(false);
-
-  // Global cache populated by inline script in page component (reads localStorage before React hydrates)
-  const globalCache = typeof window !== "undefined" ? window.__docrMetaCache : undefined;
 
   // Evict stale cache entries once per page load
   useLayoutEffect(() => {
@@ -104,11 +93,9 @@ export function useCachedMetadata(userId: string, docs: DocForMetaCache[]): Cach
   useLayoutEffect(() => {
     if (!userId || docs.length === 0) return;
 
-    // Use pre-parsed global cache if available, otherwise read from localStorage
+    // Runs before the browser paints, while the body is still hidden by HideUntilTitles
     const googleDocIds = docs.map((d) => d.googleDocId);
-    const cached = globalCache
-      ? Object.fromEntries(googleDocIds.filter((id) => globalCache[id]).map((id) => [id, globalCache[id]]))
-      : getCachedBatch<DocMetadataEntry>(userId, NAMESPACE, googleDocIds);
+    const cached = getCachedBatch<DocMetadataEntry>(userId, NAMESPACE, googleDocIds);
 
     const metaMap: Record<string, DocMetadataEntry> = {};
     const staleIds: string[] = [];

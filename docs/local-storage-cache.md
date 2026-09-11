@@ -53,16 +53,15 @@ We use `lastModifiedInDrive` rather than `commentsLastSyncedAt` because `comment
 ```
 Page load
   |
-  +- Inline <style> in page component hides body (visibility:hidden)
-  +- Inline <script> in page component sets 2s fallback to remove hiding style
-  |    (only docs/page.tsx and comments/[docId]/page.tsx include these)
+  +- <HideUntilTitles /> inline <script> hides body (visibility:hidden)
+  |    and sets a 2s fallback to remove the hiding style
+  |    (only docs/page.tsx and comments/[docId]/page.tsx render it, and only
+  |     on an initial document request — see below)
   |
   +- Server returns docs WITHOUT titles or owners (stripped via stripServerOnly())
-  +- Inline <script> in page component reads only needed doc IDs
-  |    from localStorage into window.__docrMetaCache
   |
   +- React hydrates -> useLayoutEffect fires (before next paint)
-  |    +- Read cached metadata from window.__docrMetaCache (or localStorage fallback)
+  |    +- Read cached metadata for the page's doc IDs from localStorage
   |    +- For each doc:
   |    |    +- Cache fresh (syncedAt matches)? -> use cached value, touch cachedAt
   |    |    +- Cache stale or missing? -> add to stale list
@@ -75,6 +74,8 @@ Page load
 ```
 
 The fallback timeout ensures the page is never permanently hidden if the hook doesn't run (e.g. JS error).
+
+`HideUntilTitles` (`src/components/hide-until-titles.tsx`) emits its `<script>` only when `Sec-Fetch-Dest` is `document`, i.e. a real page load. On a client-side navigation or prefetch the page arrives as an RSC (React Server Component) payload and React mounts the tree in the browser, where an inline `<script>` is never executed — React 19 logs "Encountered a script tag while rendering React component". Hiding the body is unnecessary on that path anyway, because the hook's `useLayoutEffect` runs before the browser paints.
 
 ### Staleness Detection
 
@@ -108,7 +109,7 @@ All operations are wrapped in try/catch — cache failures are silent since the 
 ### use-cached-metadata.ts
 
 React hook used by `DocTable` and `DocDetail`. Returns `{ titles, owners }` maps. Handles:
-- Cache read from `window.__docrMetaCache` (pre-populated by page-level inline script) in `useLayoutEffect`
+- Cache read from localStorage in `useLayoutEffect` (runs before the browser paints, while the body is still hidden)
 - Removing the body-hiding `<style>` element after populating state
 - Staleness detection and cache maintenance
 - Async fetch for stale/missing entries via `/api/docs/metadata`

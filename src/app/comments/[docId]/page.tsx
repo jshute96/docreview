@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { DocDetail } from "@/components/doc-detail";
+import { HideUntilTitles } from "@/components/hide-until-titles";
 import { requireAuth } from "@/lib/auth-utils";
 import { docWithCommentsInclude, stripServerOnly } from "@/lib/doc-queries";
 import type { DocWithComments } from "@/types";
@@ -33,10 +34,7 @@ export default async function DocDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      {/* Hide page until useCachedMetadata populates title from localStorage, preventing a flash of untitled doc */}
-      <script dangerouslySetInnerHTML={{ __html: `(function(){var s=document.createElement('style');s.id='hide-until-titles';s.innerHTML='body{visibility:hidden}';document.head.appendChild(s);setTimeout(function(){if(s.parentNode)s.remove()},2000);})()` }} />
-      {/* Pre-read cached metadata from localStorage for this doc (runs before React hydrates) */}
-      <script dangerouslySetInnerHTML={{ __html: `try{var k="docr:"+${JSON.stringify(userId)}+":meta:"+${JSON.stringify(doc.googleDocId)};var e=JSON.parse(localStorage.getItem(k));window.__docrMetaCache=e&&e.value?{${JSON.stringify(doc.googleDocId)}:e}:{}}catch(x){}` }} />
+      <HideUntilTitles />
       <div className="px-4 py-8">
         <DocDetail doc={stripServerOnly(doc) as DocWithComments} allLabels={allLabels} userId={userId} userName={userName} />
       </div>

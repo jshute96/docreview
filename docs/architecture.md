@@ -163,12 +163,12 @@ to re-fetch. See [`docs/cross-tab.md`](./cross-tab.md).
 database for privacy. Instead, they're cached in `localStorage` and fetched on
 demand from Google Drive. To avoid a flash of "Unknown title" during SSR
 hydration, the two pages that display titles (`docs/page.tsx` and
-`comments/[docId]/page.tsx`) hide the page body (`visibility:hidden`) and
-include inline `<script>` tags that pre-read cached metadata for their doc IDs
-into `window.__docrMetaCache`. After React hydrates, a `useLayoutEffect` in
-`useCachedMetadata` populates title and owner state and removes the hiding
-style — so the page appears with titles already in place. A 2-second fallback
-removes the hiding style if the hook never runs (e.g. JS error). See
+`comments/[docId]/page.tsx`) render `<HideUntilTitles />`, an inline `<script>`
+that hides the page body (`visibility:hidden`). After React hydrates, a
+`useLayoutEffect` in `useCachedMetadata` reads the cached metadata from
+localStorage, populates title and owner state and removes the hiding style — so
+the page appears with titles already in place. A 2-second fallback removes the
+hiding style if the hook never runs (e.g. JS error). See
 [`docs/local-storage-cache.md`](./local-storage-cache.md).
 
 ## Observability

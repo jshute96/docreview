@@ -28,5 +28,15 @@ export function FriendlyDate({ date, className }: { date: Date | string | null; 
     parsed = date;
   }
   const { text, tooltip } = formatDateFriendly(parsed);
-  return <span className={className} title={tooltip || undefined}>{text}</span>;
+  // suppressHydrationWarning: formatDateFriendly compares the date against "now",
+  // so a server render just before midnight ("18:47") and a client hydration just
+  // after it ("Thu, 18:47") legitimately disagree. Without this, React treats the
+  // difference as a hydration failure and re-renders the whole page tree on the
+  // client, which also breaks the pre-hydration inline scripts (see HideUntilTitles).
+  // Note React does not repair a suppressed mismatch: the server's text stays on
+  // screen until something re-renders this span, so on the rare load that straddles
+  // midnight the date reads as it did a moment earlier. It also silences any other
+  // mismatch inside this span — acceptable because "now" is the only thing that can
+  // differ here, the timezone being pinned to America/Los_Angeles on both sides.
+  return <span suppressHydrationWarning className={className} title={tooltip || undefined}>{text}</span>;
 }
