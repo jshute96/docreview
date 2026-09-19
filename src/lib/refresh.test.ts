@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { upsertDocsAndSyncComments, executeRefresh } from "./refresh";
 import { prisma } from "./prisma";
 import { getDriveClient } from "./google-drive";
-import { syncComments } from "./sync-comments";
+import { bumpLastCommentActivity, syncComments } from "./sync-comments";
 import { scanGmailForDocIds } from "./gmail";
 import { getStatus, updateGmailTimestamp } from "./status";
 
@@ -152,6 +152,42 @@ describe("upsertDocsAndSyncComments", () => {
     );
   });
 
+  it("appends a new share note to an existing archived doc, unarchives, and bumps activity", async () => {
+    const driveDocs = [{ googleDocId: "g1", driveUrl: "http://g1", mimeType: "doc", role: "REVIEWER", lastModifiedInDrive: new Date(), createdTimeInDrive: new Date() }];
+    vi.mocked(prisma.doc.upsert).mockResolvedValue({ docId: "d1", googleDocId: "g1", status: "ARCHIVED", notes: "Old note" } as any);
+    const shareDate = new Date("2026-03-01T00:00:00Z");
+
+    const res = await upsertDocsAndSyncComments(userId, userEmail, driveDocs as any, {
+      existingDocIds: new Set(["g1"]),
+      fromGmailDocIdSet: new Set(["g1"]),
+      shareNotes: new Map([["g1", "Shared by Alice"]]),
+      shareDates: new Map([["g1", shareDate]]),
+      mode: "refresh",
+    });
+
+    expect(prisma.doc.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { docId: "d1" }, data: { notes: "Old note\nShared by Alice", status: "INBOX" } }),
+    );
+    expect(bumpLastCommentActivity).toHaveBeenCalledWith("d1", [shareDate]);
+    expect(res.unarchived).toBe(1);
+  });
+
+  it("does not re-unarchive or bump when the share note is already present", async () => {
+    const driveDocs = [{ googleDocId: "g1", driveUrl: "http://g1", mimeType: "doc", role: "REVIEWER", lastModifiedInDrive: new Date(), createdTimeInDrive: new Date() }];
+    vi.mocked(prisma.doc.upsert).mockResolvedValue({ docId: "d1", googleDocId: "g1", status: "ARCHIVED", notes: "Shared by Alice" } as any);
+
+    const res = await upsertDocsAndSyncComments(userId, userEmail, driveDocs as any, {
+      existingDocIds: new Set(["g1"]),
+      fromGmailDocIdSet: new Set(["g1"]),
+      shareNotes: new Map([["g1", "Shared by Alice"]]),
+      mode: "refresh",
+    });
+
+    expect(prisma.doc.update).not.toHaveBeenCalled();
+    expect(bumpLastCommentActivity).not.toHaveBeenCalled();
+    expect(res.unarchived).toBe(0);
+  });
+
   it("promotes a new Gmail-discovered doc to INBOX when shouldUnarchive is set by comment sync", async () => {
     const driveDocs = [
       {
@@ -286,6 +322,7 @@ describe("upsertDocsAndSyncComments", () => {
     vi.mocked(scanGmailForDocIds).mockResolvedValue({
       docIds: [],
       shareNotes: new Map(),
+      shareDates: new Map(),
       emailMeta: new Map(),
       errorCount: 0,
       noGmailAccount: true,
@@ -304,6 +341,7 @@ describe("upsertDocsAndSyncComments", () => {
     vi.mocked(scanGmailForDocIds).mockResolvedValue({
       docIds: [],
       shareNotes: new Map(),
+      shareDates: new Map(),
       emailMeta: new Map(),
       errorCount: 0,
     });

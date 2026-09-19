@@ -335,6 +335,8 @@ against `app-offline/` as it stands.
 - [ ] Summary toast: "N documents (M new, P updated, Q deleted)"
 - [ ] Newly discovered docs (Drive or Gmail) go to Archived by default
 - [ ] Newly discovered Gmail doc with sharing email goes to Inbox (share-note promotion)
+- [ ] Existing archived doc with a new sharing email gets the note appended, goes to Inbox, and sorts to the top (activity bumped to the email date)
+- [ ] Re-scanning an already-recorded sharing email (same Gmail window) does not duplicate the note or re-unarchive the doc
 - [ ] Newly discovered Gmail doc with only resolves on already-resolved comments stays Archived
 - [ ] Newly discovered Gmail doc with new INBOX-relevant comment activity goes to Inbox via Smart Unarchive
 - [ ] First Refresh does 7 day lookback, later ones do incremental reads

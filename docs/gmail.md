@@ -148,8 +148,13 @@ with different options — see [`refresh.md`](./refresh.md) for the full archite
    Promotion to INBOX happens later (step 6 share-notes or step 8 `shouldUnarchive`).
 6. **Share notes**: for sharing emails, a note is set (new docs) or appended (existing docs)
    with format `"Shared by Name (email) on DATE\nmessage"` (or `"Requested to share by..."`
-   for access requests). ARCHIVED docs (new or existing) with a share note are promoted
-   to INBOX — a (re)share is a strong signal the doc needs attention.
+   for access requests). Lines already present in the doc's notes are skipped, so
+   re-scanning the same email (e.g. when the Gmail cursor didn't advance) is a no-op.
+   (Dedup is per line, and the note's first line has day precision, so a second share from
+   the same person on the same day with no message is also treated as already recorded.)
+   When the note is new, ARCHIVED docs (new or existing) are promoted to INBOX — a
+   (re)share is a strong signal the doc needs attention — and `lastCommentActivity` is
+   bumped to the sharing email's date so the doc sorts to the top of the inbox.
 7. **Deletions**: Drive `changes.list` deletions + `findDeletedDocIds` for missing Gmail docs
 8. **Comment sync** + **unarchive** for all upserted/updated docs
 9. **Gmail comment merge**: for docs where Drive can't list comments (`noCommentsPermission`

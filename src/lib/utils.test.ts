@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appendNotes, contrastText, formatDate, formatDateFriendly, isUnparseableDateString } from "./utils";
+import { appendMissingNotes, appendNotes, contrastText, formatDate, formatDateFriendly, isUnparseableDateString } from "./utils";
 
 describe("appendNotes", () => {
   it("returns addition when existing is null", () => {
@@ -20,6 +20,33 @@ describe("appendNotes", () => {
 
   it("handles multi-line existing notes", () => {
     expect(appendNotes("line1\nline2", "line3")).toBe("line1\nline2\nline3");
+  });
+});
+
+describe("appendMissingNotes", () => {
+  it("appends when nothing matches", () => {
+    expect(appendMissingNotes("existing", "new note")).toBe("existing\nnew note");
+  });
+
+  it("returns the same string when every line is already present", () => {
+    const existing = "line1\nShared by A on 2026-01-01";
+    expect(appendMissingNotes(existing, "Shared by A on 2026-01-01")).toBe(existing);
+  });
+
+  it("appends only the missing lines of a multi-line addition", () => {
+    expect(appendMissingNotes("Shared by A", "Shared by A\nShared by B")).toBe("Shared by A\nShared by B");
+  });
+
+  it("handles null existing", () => {
+    expect(appendMissingNotes(null, "note")).toBe("note");
+  });
+
+  it("keeps blank paragraph separators inside a new note", () => {
+    expect(appendMissingNotes("", "Shared by A\n\npara2")).toBe("Shared by A\n\npara2");
+  });
+
+  it("collapses duplicate lines within the addition", () => {
+    expect(appendMissingNotes(null, "Shared by A\nShared by A")).toBe("Shared by A");
   });
 });
 

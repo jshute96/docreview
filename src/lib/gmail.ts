@@ -108,6 +108,8 @@ type InaccessibleState = typeof AccessState.NOT_FOUND | typeof AccessState.DENIE
 export interface GmailDocIdResult {
   docIds: string[];
   shareNotes: Map<string, string>;
+  /** Latest sharing-email date per doc ID (for bumping lastCommentActivity). */
+  shareDates: Map<string, Date>;
   emailMeta: Map<string, ParsedEmail[]>;
   errorCount: number;
   /** True when the Google account has no Gmail mailbox (Gmail returned failedPrecondition). */
@@ -238,6 +240,7 @@ export async function scanGmailForDocIds(
       return {
         docIds: [],
         shareNotes: new Map(),
+        shareDates: new Map(),
         emailMeta: new Map<string, ParsedEmail[]>(),
         errorCount: 0,
         noGmailAccount: true,
@@ -248,7 +251,7 @@ export async function scanGmailForDocIds(
 
   if (messageIds.length === 0) {
     logInfo("[Gmail] No notification emails found");
-    return { docIds: [], shareNotes: new Map(), emailMeta: new Map<string, ParsedEmail[]>(), errorCount: 0 };
+    return { docIds: [], shareNotes: new Map(), shareDates: new Map(), emailMeta: new Map<string, ParsedEmail[]>(), errorCount: 0 };
   }
 
   const total = messageIds.length;
@@ -258,6 +261,7 @@ export async function scanGmailForDocIds(
   let errorCount = 0;
   const docIdSet = new Set<string>();
   const shareNotes = new Map<string, string>();
+  const shareDates = new Map<string, Date>();
   const emailMeta = new Map<string, ParsedEmail[]>();
 
   let processedCount = 0;
@@ -339,6 +343,11 @@ export async function scanGmailForDocIds(
             if (note) {
               const existingNote = shareNotes.get(docId);
               shareNotes.set(docId, existingNote ? appendNotes(existingNote, note) : note);
+              const date = notif.date ? new Date(notif.date) : null;
+              if (date && !isNaN(date.getTime())) {
+                const prev = shareDates.get(docId);
+                if (!prev || date > prev) shareDates.set(docId, date);
+              }
             }
           }
         } else {
@@ -357,7 +366,7 @@ export async function scanGmailForDocIds(
 
   const docIds = [...docIdSet];
   logInfo(`[Gmail] Scan complete: ${docIds.length} unique doc IDs, ${shareNotes.size} share notes, ${errorCount} errors`);
-  return { docIds, shareNotes, emailMeta, errorCount };
+  return { docIds, shareNotes, shareDates, emailMeta, errorCount };
 }
 
 /**

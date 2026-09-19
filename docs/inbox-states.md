@@ -25,7 +25,7 @@ I am not longer interested in acting like the author.
   1. The doc starts as **Archived** (even if I am the Author, and even if discovered via a Gmail notification).
      * This avoids noise from old documents resurfacing with no current attention-worthy activity (e.g., a Gmail notification that turns out to be only resolves on old comments).
   2. The doc is promoted to **Inbox** if any of the following happen during the same refresh:
-     * A sharing email arrived for the doc (share-note branch — sharing is treated as a strong attention signal).
+     * A sharing email arrived for the doc and its share note wasn't already recorded (share-note branch — sharing is treated as a strong attention signal; `lastCommentActivity` is bumped to the email's date).
      * The subsequent comment sync produces `shouldUnarchive` for relevant new activity (see "Smart Unarchive" below).
      * A Gmail-merged comment or suggestion is inserted (e.g., notifications for docs the user lacks comment access to).
 

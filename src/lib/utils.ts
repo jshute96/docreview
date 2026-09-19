@@ -111,6 +111,27 @@ export function appendNotes(existing: string | null, addition: string): string {
   return notes;
 }
 
+/**
+ * Append only the lines of `addition` that aren't already present as lines in
+ * `existing`. Returns `existing` unchanged (same string) when nothing is new,
+ * so callers can detect "no-op" with `!==`. Used for sync-generated notes
+ * (e.g. share notifications) that may be re-processed when the same Gmail
+ * window is scanned again.
+ */
+export function appendMissingNotes(existing: string | null, addition: string): string {
+  const have = new Set((existing ?? "").split("\n"));
+  const missing: string[] = [];
+  for (const line of addition.split("\n")) {
+    // Blank lines are paragraph separators, not content — always keep them.
+    if (line !== "" && have.has(line)) continue;
+    have.add(line);
+    missing.push(line);
+  }
+  // Nothing new if every line was skipped, or only blank lines remain.
+  if (missing.every(line => line === "")) return existing ?? "";
+  return appendNotes(existing, missing.join("\n"));
+}
+
 /** Simple pluralization: pluralize(count, "apple") -> "1 apple", "2 apples", "0 apples". */
 export function pluralize(count: number, singular: string, plural?: string): string {
   const p = plural ?? `${singular}s`;

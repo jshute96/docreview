@@ -12,12 +12,12 @@ import {
 } from "@/lib/google-drive";
 import { scanGmailForDocIds, buildInaccessibleDocs, type GmailInaccessibleDoc } from "@/lib/gmail";
 import type { ParsedEmail } from "@/lib/parse-gmail-notification";
-import { syncComments, type SyncPrefetchedData } from "@/lib/sync-comments";
+import { bumpLastCommentActivity, syncComments, type SyncPrefetchedData } from "@/lib/sync-comments";
 import { mergeSuggestionsFromGmail } from "@/lib/suggestion-merge";
 import { mergeCommentsFromGmail } from "@/lib/comment-merge";
 import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "@/lib/status";
 import { logWarning, logInfo } from "@/lib/log";
-import { appendNotes, formatDate, pluralize } from "@/lib/utils";
+import { appendMissingNotes, appendNotes, formatDate, pluralize } from "@/lib/utils";
 import type { OnProgress } from "@/lib/progress-events";
 import { AccessState, DocRole, DocStatus, type Doc } from "@prisma/client";
 import pLimit from "p-limit";
@@ -60,6 +60,8 @@ export async function upsertDocsAndSyncComments(
     existingDocIds: Set<string>;
     fromGmailDocIdSet?: Set<string>;
     shareNotes?: Map<string, string>;
+    /** Sharing-email date per doc ID; used to bump lastCommentActivity when a share note is added. */
+    shareDates?: Map<string, Date>;
     gmailEmailMeta?: Map<string, ParsedEmail[]>;
     mode?: "refresh" | "full-refresh" | "selected" | "load";
     docId?: string; // Optional: restrict upsert to a specific docId (for single-doc refresh)
@@ -70,7 +72,7 @@ export async function upsertDocsAndSyncComments(
   },
   onProgress?: OnProgress,
 ): Promise<RefreshResult> {
-  const { existingDocIds, fromGmailDocIdSet = new Set(), shareNotes, gmailEmailMeta, mode = "refresh", docId, prefetched, unarchiveCutoff } = options;
+  const { existingDocIds, fromGmailDocIdSet = new Set(), shareNotes, shareDates, gmailEmailMeta, mode = "refresh", docId, prefetched, unarchiveCutoff } = options;
   const driveAuth = await getDriveClient(userId);
 
   let added = 0;
@@ -129,17 +131,25 @@ export async function upsertDocsAndSyncComments(
     // was already set in the create block; we still need to promote ARCHIVED
     // (the new default) to INBOX. parseShareNote() returns a note for ALL share
     // emails (even without a custom message), so this fires for every share.
+    //
+    // The same share email can be re-scanned (e.g. when the Gmail cursor didn't
+    // advance after an error), so only act when the note is actually new —
+    // otherwise an archived doc would resurface on every refresh. Like other
+    // unarchive paths, a new note also bumps lastCommentActivity (to the share
+    // email's date) so the doc sorts to the top of the inbox.
     const shareNote = shareNotes?.get(doc.googleDocId);
     if (shareNote) {
       const updates: { notes?: string; status?: DocStatus } = {};
+      let noteIsNew = !isExisting;
       if (isExisting) {
-        const newNotes = appendNotes(result.notes, shareNote);
+        const newNotes = appendMissingNotes(result.notes, shareNote);
         if (newNotes !== result.notes) {
           updates.notes = newNotes;
           result.notes = newNotes;
+          noteIsNew = true;
         }
       }
-      if (result.status === DocStatus.ARCHIVED) {
+      if (noteIsNew && result.status === DocStatus.ARCHIVED) {
         updates.status = DocStatus.INBOX;
         result.status = DocStatus.INBOX;
         // Only count as "unarchived" for existing docs; new docs are already
@@ -148,6 +158,10 @@ export async function upsertDocsAndSyncComments(
       }
       if (Object.keys(updates).length > 0) {
         await prisma.doc.update({ where: { docId: result.docId }, data: updates });
+      }
+      if (noteIsNew) {
+        await bumpLastCommentActivity(result.docId, [shareDates?.get(doc.googleDocId) ?? new Date()]);
+        logInfo(`[Refresh]   SHARE ${doc.googleDocId} — note added${updates.status ? ", unarchived" : ""}, activity bumped`);
       }
     }
 
@@ -478,6 +492,7 @@ export async function executeRefresh(
 
   let gmailDocIds: string[] = [];
   let gmailShareNotes = new Map<string, string>();
+  let gmailShareDates = new Map<string, Date>();
   let gmailEmailMeta = new Map<string, ParsedEmail[]>();
   let gmailErrorCount = 0;
   let gmailSucceeded = false;
@@ -575,6 +590,7 @@ export async function executeRefresh(
       });
       gmailDocIds = result.docIds;
       gmailShareNotes = result.shareNotes;
+      gmailShareDates = result.shareDates;
       gmailEmailMeta = result.emailMeta;
       gmailErrorCount = result.errorCount;
       gmailSucceeded = true;
@@ -669,7 +685,7 @@ export async function executeRefresh(
     userId,
     userEmail,
     allDiscoveryDocs,
-    { existingDocIds, fromGmailDocIdSet: gmailDocIdSet, shareNotes: gmailShareNotes, gmailEmailMeta, mode: "refresh", unarchiveCutoff },
+    { existingDocIds, fromGmailDocIdSet: gmailDocIdSet, shareNotes: gmailShareNotes, shareDates: gmailShareDates, gmailEmailMeta, mode: "refresh", unarchiveCutoff },
     onProgress,
   );
 
