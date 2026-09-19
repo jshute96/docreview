@@ -1,6 +1,16 @@
 import { toast } from "sonner";
 
 const REAUTH_TOAST_ID = "reauth-required";
+
+/** Messages an expanded thread panel shows in place of the thread when it
+ *  can't be displayed. Shared so the two places that set them (the page-level
+ *  bulk fetch and the per-row fetch) and the help page stay in sync. */
+export const THREAD_LOAD_MESSAGES = {
+  authExpired: "Couldn't load comments: Google authorization has expired.",
+  failed: "Couldn't load comments from Google Drive.",
+  deleted: "This comment no longer exists in Google Drive.",
+  forbidden: "Comments not visible on this document.",
+} as const;
 const CONTEXT_ID_HEADER = "x-context-id";
 const CONTEXT_REASON_HEADER = "x-context-reason";
 

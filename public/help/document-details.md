@@ -74,6 +74,8 @@ Click a comment row to expand it and see the full thread. The expanded view show
 
 All threads are pre-fetched when the page loads, so expanding a comment is instant.
 
+If a thread can't be shown, the expanded view says why instead of the messages: "Couldn't load comments: Google authorization has expired." (sign out and back in, then Refresh), "Couldn't load comments from Google Drive." (a temporary failure -- try Refresh), "This comment no longer exists in Google Drive." (it was deleted), or "Comments not visible on this document." (the owner has restricted comment access).
+
 ## Suggestions
 
 Suggestions (tracked changes) appear in the same table as comments. They show the proposed insertion, deletion, or edit text. Suggestions have some limitations compared to comments:

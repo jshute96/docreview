@@ -57,9 +57,10 @@ and in that case rows without a `googleSuggestionId` are resolved too (see
 [Resolution and cleanup](#resolution-and-cleanup)).
 
 The resolution step treats absence as proof of closure, so it only runs on an
-**authoritative** read. `fetchDocData` handles its own errors and returns an empty
-suggestion list on failure, so it also sets `suggestionsUnavailable` to say why the list is
-empty: `"denied"` when Drive refused the call with a 403 or 404 — including the view-only case,
+**authoritative** read. `fetchDocData` handles its own errors (except `invalid_grant`, an
+expired OAuth token, which it rethrows so the route can answer 401 — see `docs/auth.md`)
+and returns an empty suggestion list on failure, so it also sets `suggestionsUnavailable`
+to say why the list is empty: `"denied"` when Drive refused the call with a 403 or 404 — including the view-only case,
 where it is retried without suggestion fields and succeeds with text but no suggestion data
 — and `"error"` for any other failure. Only the HTTP status decides which; the message
 regex nearby widens the choice of log level, not this, since "settled" means callers stop

@@ -10,7 +10,7 @@ import { highlightText } from "@/lib/highlight";
 import { FriendlyDate } from "@/components/friendly-date";
 import { StarButton } from "@/components/star-button";
 import { broadcastChange } from "@/lib/cross-tab";
-import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
+import { apiFetch, generateContextId, isAuthError, THREAD_LOAD_MESSAGES } from "@/lib/api-fetch";
 import { navigateToComment, supportsCommentNavigation, getSuggestionFromDoc, getCommentFromDoc, getExtensionStatus, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
 import { extensionToThread, extensionToSuggestionContent } from "@/lib/extension-suggestions";
 import { docTarget } from "@/lib/tab-targets";
@@ -81,6 +81,10 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
     setThreadsState(threadsRef.current);
   }
   const [loadingThreads, setLoadingThreads] = useState(false);
+  // Set when the thread fetch failed (expired auth, network, 5xx). Without it
+  // the panel would fall through to "Comment thread not available", which is
+  // wrong — the comments exist, we just couldn't load them.
+  const [threadLoadError, setThreadLoadError] = useState<string | null>(null);
   const [refreshingThread, setRefreshingThread] = useState(false);
   const [hasDirtyReply, setHasDirtyReply] = useState(false);
   // Which control holds the unsaved text, so the blocked-close toast can say
@@ -124,6 +128,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   useEffect(() => {
     if (!initialThread) return;
     setThreads([initialThread]);
+    setThreadLoadError(null);
     const modMs = initialThread.modifiedTime
       ? new Date(initialThread.modifiedTime).getTime()
       : currentModifiedMs;
@@ -205,6 +210,14 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       const threadList: CommentThread[] = Object.values(data.threads);
+      // The GET route answers 200 with an empty map for Drive 403/404 (see
+      // threads/route.ts). Those are answers, not failures — say what Drive
+      // told us rather than leaving the panel with the generic empty message.
+      if (threadList.length === 0) {
+        setThreadLoadError(data.forbidden ? THREAD_LOAD_MESSAGES.forbidden : THREAD_LOAD_MESSAGES.deleted);
+      } else {
+        setThreadLoadError(null);
+      }
       setThreads(prev => preserveExtensionFields(prev, threadList));
       if (onThreadUpdate && threadList.length > 0) {
         onThreadUpdate(threadId, threadList[0]);
@@ -215,7 +228,12 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         mergeCommentInfo(await getCommentFromDoc(googleDocId, comment.googleCommentId));
       }
     } catch (err) {
-      if (!isAuthError(err)) toast.error("Failed to load comment thread");
+      if (isAuthError(err)) {
+        setThreadLoadError(THREAD_LOAD_MESSAGES.authExpired);
+      } else {
+        setThreadLoadError(THREAD_LOAD_MESSAGES.failed);
+        toast.error("Failed to load comment thread");
+      }
     } finally {
       setLoadingThreads(false);
     }
@@ -247,6 +265,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
       );
       if (!res.ok) throw new Error("Failed");
       applyThreadUpdate(await res.json());
+      setThreadLoadError(null);
       broadcastChange({ type: "comments", docId, googleCommentId: threadId, commentType: comment.type }, contextId);
       // After Drive thread refresh, check the extension for fields it provides
       // (originalContentDeleted, tabName — Drive API doesn't have these)
@@ -930,7 +949,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
                   threads={panelThreads}
                   loading={loadingThreads}
                   resolved={comment.resolved}
-                  emptyMessage={emptyMessage}
+                  emptyMessage={threadLoadError ?? emptyMessage}
                   commentUrl={commentUrl()}
                   openLabel={openLabel}
                   openTitle={openTitle}

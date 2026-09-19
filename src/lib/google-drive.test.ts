@@ -494,4 +494,13 @@ describe("fetchDocData suggestion readability", () => {
 
     expect(result.suggestionsUnavailable).toBe("error");
   });
+
+  it("rethrows invalid_grant so the route can answer 401", async () => {
+    // An expired OAuth token isn't a property of the doc, so it must not be
+    // folded into the "error" result — that would give the client an empty 200.
+    const err = driveError(400, "invalid_grant");
+    documentsGet.mockReset().mockRejectedValue(err);
+
+    await expect(fetchDocData(auth, "doc1")).rejects.toBe(err);
+  });
 });

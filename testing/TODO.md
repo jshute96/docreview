@@ -138,6 +138,7 @@ Update this list when adding or changing user-facing behaviors.
 - [ ] Deleting my first comment removes the whole thread row from the list
 - [ ] Deleted replies are never drawn in the thread panel, and the "unread / total" column counts live messages only
       (sync behaviour around deletions is covered under Comment Status & Sync Logic → Deleted Replies)
+- [ ] Expanded thread shows "Couldn't load comments..." (not "Comment thread not available") when the thread fetch fails, e.g. expired Google auth
 - [ ] Suggestions have no edit/delete menu
 
 ### Suggestions Sync

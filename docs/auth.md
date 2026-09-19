@@ -133,7 +133,9 @@ When a Google API call fails with `invalid_grant`:
 2. **Client side** (`src/lib/api-fetch.ts`): `apiFetch()` intercepts `401` responses and shows a toast telling the user to sign out and sign back in
 3. **On re-login** (`src/auth.ts`): The `events.signIn` hook writes fresh tokens to the `accounts` row
 
-Every API route that calls Google wraps its catch block with `invalidGrantResponse()` to convert `invalid_grant` into a consistent `401`. The `apiFetch()` wrapper on the client side ensures a single deduplicated toast (using a fixed toast ID) regardless of how many concurrent API calls fail.
+Every API route that calls Google wraps its catch block with `invalidGrantResponse()` to convert `invalid_grant` into a consistent `401`. Library helpers that normally swallow Drive/Docs errors and return an empty result (`fetchDocData`, `fetchFileTextViaExport`) rethrow `invalid_grant` so the route still reaches that path instead of answering an empty 200. The `apiFetch()` wrapper on the client side ensures a single deduplicated toast (using a fixed toast ID) regardless of how many concurrent API calls fail. Expanded thread panels on the comments page also show a "Couldn't load comments: Google authorization has expired." message in place of the thread, since the toast alone leaves the panel looking empty.
+
+**Never log the raw error object** for `invalid_grant`: the gaxios error includes the token-refresh request body, which contains the refresh token in plaintext. Log a one-line warning instead.
 
 ## Key Files
 

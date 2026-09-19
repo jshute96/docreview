@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
-import { getDriveClient, createDriveService, invalidGrantResponse, fetchCommentData, fetchDocData, fetchFileTextViaExport, driveUrlFor, isDriveErrorCode, commentsAreHidden, COMMENT_VISIBILITY_FIELDS } from "@/lib/google-drive";
+import { getDriveClient, createDriveService, invalidGrantResponse, isInvalidGrantError, fetchCommentData, fetchDocData, fetchFileTextViaExport, driveUrlFor, isDriveErrorCode, commentsAreHidden, COMMENT_VISIBILITY_FIELDS } from "@/lib/google-drive";
 import type { ThreadMap, SuggestionContent, DriveSuggestion, DriveDoc, DocDataResult } from "@/lib/google-drive";
 import { upsertDocsAndSyncComments } from "@/lib/refresh";
 import { docWithCommentsInclude, stripServerOnly } from "@/lib/doc-queries";
@@ -107,12 +107,20 @@ export async function POST(
             commentsForbidden = true;
             return null;
           }
-          logWarning("[Refresh] fetchCommentData failed, will fall back to individual fetches:", err);
+          // Never pass an invalid_grant error to the logger: the raw gaxios
+          // error includes the refresh token.
+          if (isInvalidGrantError(err)) {
+            logWarning("[Refresh] fetchCommentData failed: invalid_grant, will fall back to individual fetches");
+          } else {
+            logWarning("[Refresh] fetchCommentData failed, will fall back to individual fetches:", err);
+          }
           return null;
         }),
         (mimeType === GoogleMimeType.Doc
           ? fetchDocData(driveAuth, doc.googleDocId).catch((err) => {
-              logWarning("[Refresh] fetchDocData failed:", err);
+              // An expired token was already logged by fetchDocData (the raw
+              // gaxios error would include the refresh token).
+              if (!isInvalidGrantError(err)) logWarning("[Refresh] fetchDocData failed:", err);
               return null;
             })
           : mimeType === GoogleMimeType.Slides

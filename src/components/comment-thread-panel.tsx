@@ -214,7 +214,9 @@ interface CommentThreadPanelProps {
   headerContent?: React.ReactNode;
   /** Content rendered below threads, above buttons (e.g., hint for synthesized suggestion threads). */
   footerContent?: React.ReactNode;
-  /** Message shown when threads is empty. Defaults to "No comments on this document." */
+  /** Message shown when threads is empty. Defaults to "Comment thread not
+   *  available." — a thread-level statement, since a doc-level one ("no
+   *  comments on this document") can't be true for a row that exists. */
   emptyMessage?: string;
   /** Whether this is a suggestion (vs a comment). Used for display labels. */
   isSuggestion?: boolean;
@@ -917,7 +919,7 @@ export function CommentThreadPanel({
     return (
       <div ref={panelRef} className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
         {headerContent}
-        <p className="text-sm text-zinc-400">{emptyMessage ?? "No comments on this document."}</p>
+        <p className="text-sm text-zinc-400">{emptyMessage ?? "Comment thread not available."}</p>
         {footerContent}
         {replyBox}
       </div>

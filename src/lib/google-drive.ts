@@ -713,6 +713,13 @@ export async function fetchDocData(
       `[Docs] documents.get ${googleDocId}`
     );
   } catch (err) {
+    // An expired OAuth token isn't a property of this doc — surface it so the
+    // route returns 401 (reauth prompt) instead of an empty 200. Don't pass
+    // the raw error to the logger: gaxios includes the refresh token in it.
+    if (isInvalidGrantError(err)) {
+      logWarning(`[Docs] documents.get ${googleDocId} failed: invalid_grant (${Date.now() - t0}ms)`);
+      throw err;
+    }
     const message = (err as { message?: string }).message ?? "";
     // If we have view-only access but no permission for comments/suggestions,
     // Google might fail the entire call. Retry without asking for suggestions.
@@ -1140,7 +1147,7 @@ export async function withViewedTimePinned<T>(
 
 // Exports a Google Workspace file as plain text via the Drive API.
 // Works for Slides (and Sheets) without needing additional OAuth scopes.
-// Returns null on error.
+// Returns null on error, except invalid_grant (expired OAuth token), which is rethrown.
 export async function fetchFileTextViaExport(
   auth: Awaited<ReturnType<typeof getDriveClient>>,
   fileId: string
@@ -1157,6 +1164,11 @@ export async function fetchFileTextViaExport(
     logInfo(`[Drive] files.export ${fileId} (plain text, ${text.length} chars) (${Date.now() - t0}ms)`);
     return text;
   } catch (err) {
+    // Expired OAuth token: let the route turn it into a 401 (see fetchDocData).
+    if (isInvalidGrantError(err)) {
+      logWarning(`[Drive] files.export ${fileId} failed: invalid_grant (${Date.now() - t0}ms)`);
+      throw err;
+    }
     // 403/404 just mean the file is gone or access was revoked — expected, not an error.
     if (isDriveErrorCode(err, 403) || isDriveErrorCode(err, 404)) {
       logWarning(`[Drive] files.export ${fileId} unavailable (code ${getDriveErrorCode(err)}) (${Date.now() - t0}ms)`);

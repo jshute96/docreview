@@ -48,7 +48,7 @@ import { DialogButtons } from "@/components/dialog-buttons";
 import { formatDate, pluralize } from "@/lib/utils";
 import { createMatcher } from "@/lib/highlight";
 import { broadcastChange, useCrossTabListener, crossTabReason, type CrossTabReceivedEvent } from "@/lib/cross-tab";
-import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
+import { apiFetch, generateContextId, isAuthError, THREAD_LOAD_MESSAGES } from "@/lib/api-fetch";
 import { HelpDialog } from "@/components/help-dialog";
 import { StarButton } from "@/components/star-button";
 import { LabelProvider } from "@/contexts/label-context";
@@ -134,6 +134,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
   const [bulkMarkingUnread, setBulkMarkingUnread] = useState(false);
   const [threadMap, setThreadMap] = useState<ThreadMap>({});
   const [threadsForbidden, setThreadsForbidden] = useState(false);
+  // Set when the bulk thread fetch failed (expired auth, network, 5xx).
+  // Expanded rows draw from threadMap, so without this they'd show
+  // "Comment thread not available" for threads that simply didn't load.
+  const [threadsLoadError, setThreadsLoadError] = useState<string | null>(null);
   const [suggestionContent, setSuggestionContent] = useState<Record<string, SuggestionContent>>({});
   const [documentText, setDocumentText] = useState<string | undefined>(undefined);
   const [viewedByMeTime, setViewedByMeTime] = useState<string | null>(null);
@@ -260,8 +264,15 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
         setThreadMap(prev => mergeThreads(prev, data.threads ?? {}));
         if (data.viewedByMeTime !== undefined) setViewedByMeTime(data.viewedByMeTime);
         setThreadsForbidden(data.forbidden ?? false);
+        setThreadsLoadError(null);
+      } else {
+        setThreadsLoadError(THREAD_LOAD_MESSAGES.failed);
       }
-    } catch { /* threads are optional */ }
+    } catch (err) {
+      // Threads are optional for the page, but the panels need to know why
+      // they're empty. apiFetch already toasted the reauth message.
+      setThreadsLoadError(isAuthError(err) ? THREAD_LOAD_MESSAGES.authExpired : THREAD_LOAD_MESSAGES.failed);
+    }
   }
 
   async function fetchDocContent(contextId?: string) {
@@ -1437,7 +1448,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                     : undefined}
                   onSuggestionRefresh={comment.type === CommentType.SUGGESTION ? handleSuggestionRefresh : undefined}
                   userName={userName}
-                  emptyMessage={threadsForbidden ? "Comments not visible on this document." : undefined}
+                  emptyMessage={threadsForbidden ? THREAD_LOAD_MESSAGES.forbidden : threadsLoadError ?? undefined}
                 />
               ))}
           </table>

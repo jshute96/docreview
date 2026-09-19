@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { fetchCommentData, fetchDocData, fetchThreadDetail, getDriveClient, isDriveErrorCode } from "@/lib/google-drive";
+import { fetchCommentData, fetchDocData, fetchThreadDetail, getDriveClient, isDriveErrorCode, isInvalidGrantError } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { ExtCommentType } from "@/lib/extension-wire";
 import { GoogleMimeType } from "@/lib/mime-types";
@@ -427,15 +427,19 @@ async function fetchDocsSuggestions(
   }
   try {
     const result = await fetchDocData(driveAuth, doc.googleDocId);
-    // fetchDocData swallows its own errors, so an empty list needs the
-    // accompanying flag to be read correctly (see SuggestionsUnavailable).
+    // fetchDocData swallows its own errors (except invalid_grant), so an empty
+    // list needs the accompanying flag to be read correctly (see SuggestionsUnavailable).
     return {
       suggestions: result.suggestions,
       failed: result.suggestionsUnavailable === "error",
       denied: result.suggestionsUnavailable === "denied",
     };
   } catch (err) {
-    logError(`[Suggestions:Docs] fetch failed for ${doc.googleDocId}:`, err);
+    // fetchDocData already logged an expired token (and the raw gaxios error
+    // would include the refresh token), so just mark the fetch as failed.
+    if (!isInvalidGrantError(err)) {
+      logError(`[Suggestions:Docs] fetch failed for ${doc.googleDocId}:`, err);
+    }
     return { suggestions: [], failed: true, denied: false };
   }
 }
