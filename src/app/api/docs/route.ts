@@ -159,9 +159,12 @@ async function executeLoad(opts: {
   const docIds = selectedSet ? [...selectedSet].filter(id => !inaccessibleIds.has(id)) : [];
   logInfo(`[Sync] Load (${source}): fetching metadata for ${docIds.length} docs by ID${inaccessibleIds.size > 0 ? `, ${inaccessibleIds.size} inaccessible` : ""}`);
   send({ phase: "metadata", completed: 0, total: docIds.length });
-  const driveDocs = await fetchDocsByIds(userId, docIds, (count) => {
+  const { docs: driveDocs, transientErrorIds: metadataErrorIds } = await fetchDocsByIds(userId, docIds, (count) => {
     send({ phase: "metadata", completed: count, total: docIds.length });
   });
+  if (metadataErrorIds.length > 0) {
+    logWarning(`[Sync] Load: ${metadataErrorIds.length} docs failed metadata fetch transiently and were not loaded: ${metadataErrorIds.join(", ")}`);
+  }
 
   let added = 0;
   let updated = 0;
@@ -300,7 +303,8 @@ async function executeLoad(opts: {
   // Safety: if *every* doc failed transiently (likely auth/outage), skip the
   // token update. 403/404 are expected outcomes and don't count.
   const transientErrors = syncResults.filter(r => r.transientError).length;
-  const allFailed = commentDocs.length > 0 && transientErrors === commentDocs.length;
+  const attempted = commentDocs.length + metadataErrorIds.length;
+  const allFailed = attempted > 0 && transientErrors + metadataErrorIds.length === attempted;
 
   if (!allFailed) {
     if (transientErrors > 0) {
@@ -310,7 +314,7 @@ async function executeLoad(opts: {
     const token = await getChangesStartPageToken(userId);
     await updateDriveChangesToken(userId, token);
   } else {
-    logWarning(`[Sync] Load: all ${commentDocs.length} document syncs failed transiently, skipping changes token initialization for safety`);
+    logWarning(`[Sync] Load: all ${attempted} documents failed transiently (metadata or sync), skipping changes token initialization for safety`);
   }
 
   const elapsed = Date.now() - t0;
@@ -338,5 +342,6 @@ async function executeLoad(opts: {
     suggestionsUpdated,
     driveChangesRead: driveDocs.length,
     totalDocuments: driveDocs.length,
+    errorCount: metadataErrorIds.length + transientErrors,
   };
 }

@@ -1289,13 +1289,29 @@ export async function listChanges(
   return { docs, trashedDocIds, removedDocIds, newPageToken, rawChangeCount, oldestChangeTime };
 }
 
+export interface FetchDocsByIdsResult {
+  docs: DriveDoc[];
+  /** IDs whose files.get failed transiently (429, 5xx, or no HTTP status —
+   *  i.e. a network error). Callers must NOT treat these as deleted/denied —
+   *  the doc is simply unknown this time and should be retried. Other 4xx
+   *  errors (e.g. 400 for a malformed ID) are permanent: they're logged and
+   *  dropped, and appear in neither list, so they can't pin a cursor. */
+  transientErrorIds: string[];
+}
+
+/** True for Drive errors worth retrying: rate limit, server error, or no HTTP status (network). */
+function isTransientDriveError(err: unknown): boolean {
+  const code = getDriveErrorCode(err);
+  return code === undefined || code === 429 || code >= 500;
+}
+
 /** Fetch Drive metadata for specific doc IDs (via individual files.get calls). */
 export async function fetchDocsByIds(
   userId: string,
   docIds: string[],
   onProgress?: (count: number) => void
-): Promise<DriveDoc[]> {
-  if (docIds.length === 0) return [];
+): Promise<FetchDocsByIdsResult> {
+  if (docIds.length === 0) return { docs: [], transientErrorIds: [] };
 
   const auth = await getDriveClient(userId);
   const drive = createDrive({ version: "v3", auth });
@@ -1303,6 +1319,7 @@ export async function fetchDocsByIds(
   let completedCount = 0;
   onProgress?.(0);
 
+  const transientErrorIds: string[] = [];
   const results = await Promise.all(
     docIds.map(async (id) => {
       const t0 = Date.now();
@@ -1329,8 +1346,13 @@ export async function fetchDocsByIds(
           logWarning(`[Drive] files.get ${id} → permission denied (${Date.now() - t0}ms)`);
         } else if (isDriveErrorCode(err, 404)) {
           logWarning(`[Drive] files.get ${id} → not found (${Date.now() - t0}ms)`);
+        } else if (isTransientDriveError(err)) {
+          logError(`[Drive] files.get ${id} failed transiently (${Date.now() - t0}ms):`, err);
+          transientErrorIds.push(id);
         } else {
-          logError(`[Drive] files.get ${id} failed (${Date.now() - t0}ms):`, err);
+          // Permanent client error (e.g. 400 for a malformed ID). Not retryable,
+          // and not "deleted" either — just drop it.
+          logWarning(`[Drive] files.get ${id} → permanent error ${getDriveErrorCode(err)}, skipping (${Date.now() - t0}ms):`, err);
         }
         return null;
       } finally {
@@ -1340,7 +1362,7 @@ export async function fetchDocsByIds(
     })
   );
 
-  return results.filter((d): d is DriveDoc => d !== null);
+  return { docs: results.filter((d): d is DriveDoc => d !== null), transientErrorIds };
 }
 
 export interface ListRecentDocsOptions {

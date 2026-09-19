@@ -416,9 +416,12 @@ async function executeDirectRefresh(
   logInfo(`[Refresh] Refreshing ${googleDocIds.length} docs (${mode})`);
   // Metadata fetch
   onProgress?.({ phase: "metadata", completed: 0, total: googleDocIds.length });
-  const driveDocs = (await fetchDocsByIds(userId, googleDocIds, (count) => {
+  const { docs: driveDocs, transientErrorIds } = await fetchDocsByIds(userId, googleDocIds, (count) => {
     onProgress?.({ phase: "metadata", completed: count, total: googleDocIds.length });
-  })) || [];
+  });
+  if (transientErrorIds.length > 0) {
+    logWarning(`[Refresh] ${transientErrorIds.length} docs failed metadata fetch transiently and were skipped: ${transientErrorIds.join(", ")}`);
+  }
 
   const dbDocs = await prisma.doc.findMany({
     where: { userId },
@@ -434,13 +437,19 @@ async function executeDirectRefresh(
     onProgress,
   );
 
-  // Deletion detection: docs not returned by fetchDocsByIds may be deleted
+  // Deletion detection: docs not returned by fetchDocsByIds may be deleted.
+  // Transient failures are excluded — they're unknown, not missing.
   const foundIds = new Set(driveDocs.map(d => d.googleDocId));
-  const missingIds = googleDocIds.filter(id => !foundIds.has(id));
+  const transientSet = new Set(transientErrorIds);
+  const missingIds = googleDocIds.filter(id => !foundIds.has(id) && !transientSet.has(id));
   const additionalDeleted = await markMissingAsDeletedOrDenied(userId, missingIds, mode);
 
   const elapsed = Date.now() - t0;
-  const result = { ...syncRes, deleted: syncRes.deleted + additionalDeleted };
+  const result = {
+    ...syncRes,
+    deleted: syncRes.deleted + additionalDeleted,
+    errorCount: syncRes.errorCount + transientErrorIds.length,
+  };
   const counts = [
     pluralize(result.updated, "doc") + " updated",
     pluralize(result.deleted, "doc") + " deleted",
@@ -613,14 +622,27 @@ export async function executeRefresh(
   // Fetch metadata for Gmail-only and stale-only docs in one batch
   const extraIds = [...gmailOnlyIds, ...staleOnlyIds];
   let extraDocs: DriveDoc[] = [];
+  // Docs whose files.get failed transiently. They are neither inserted as
+  // inaccessible nor checked for deletion — we don't know their state. Ones
+  // that are new AND Gmail-only also hold the Gmail timestamp back so the
+  // notification is re-scanned (otherwise the doc would never be created).
+  // Already-tracked ones don't hold it: their Gmail-side data is merged below
+  // regardless, and metadata catches up via the changes feed or stale query.
+  const metadataTransientIds = new Set<string>();
   if (extraIds.length > 0) {
     const staleSuffix = staleOnlyIds.length > 0 ? `, ${staleOnlyIds.length} stale catch-up` : "";
     logInfo(`[Refresh] Fetching Drive metadata for ${extraIds.length} extra docs (${gmailOnlyIds.length} Gmail-only${staleSuffix})`);
     onProgress?.({ phase: "metadata", completed: 0, total: extraIds.length });
-    extraDocs = await fetchDocsByIds(userId, extraIds, (count) => {
+    const fetched = await fetchDocsByIds(userId, extraIds, (count) => {
       onProgress?.({ phase: "metadata", completed: count, total: extraIds.length });
     });
+    extraDocs = fetched.docs;
+    for (const id of fetched.transientErrorIds) metadataTransientIds.add(id);
+    if (metadataTransientIds.size > 0) {
+      logWarning(`[Refresh] ${metadataTransientIds.size} extra docs failed metadata fetch transiently and were skipped: ${[...metadataTransientIds].join(", ")}`);
+    }
   }
+  let gmailMetadataErrorCount = 0; // computed once existingDocIds is known
 
   const allDiscoveryDocs = [...driveDocs, ...extraDocs];
   const gmailDocIdSet = new Set(gmailDocIds);
@@ -632,11 +654,13 @@ export async function executeRefresh(
     })).map((d) => d.googleDocId)
   );
 
+  gmailMetadataErrorCount = gmailOnlyIds.filter(id => metadataTransientIds.has(id) && !existingDocIds.has(id)).length;
+
   // Insert inaccessible docs discovered via Gmail that failed Drive metadata fetch
   let inaccessibleAdded = 0;
   if (gmailOnlyIds.length > 0 && gmailEmailMeta.size > 0) {
     const returnedExtraIds = new Set(extraDocs.map((d) => d.googleDocId));
-    const failedNewIds = gmailOnlyIds.filter((id) => !returnedExtraIds.has(id) && !existingDocIds.has(id));
+    const failedNewIds = gmailOnlyIds.filter((id) => !returnedExtraIds.has(id) && !existingDocIds.has(id) && !metadataTransientIds.has(id));
     if (failedNewIds.length > 0) {
       const inaccessible = buildInaccessibleDocs(failedNewIds, gmailEmailMeta);
       inaccessibleAdded = await insertInaccessibleDocs(userId, inaccessible);
@@ -726,7 +750,8 @@ export async function executeRefresh(
   // Gmail docs that failed fetchDocsByIds — check if tracked and deleted
   if (gmailOnlyIds.length > 0) {
     const returnedExtraIds = new Set(extraDocs.map((d) => d.googleDocId));
-    extraDeleted += await handleMissingGmailDocs(userId, gmailOnlyIds, returnedExtraIds, existingDocIds);
+    const checkableIds = gmailOnlyIds.filter((id) => !metadataTransientIds.has(id));
+    extraDeleted += await handleMissingGmailDocs(userId, checkableIds, returnedExtraIds, existingDocIds);
   }
 
   // --- Advance the Drive and Gmail cursors, each independently ---
@@ -761,7 +786,9 @@ export async function executeRefresh(
       ? `all ${syncRes.totalAttempted} document syncs failed transiently`
       : gmailErrorCount > 0
         ? `${pluralize(gmailErrorCount, "email")} failed to scan`
-        : null;
+        : gmailMetadataErrorCount > 0
+          ? `${pluralize(gmailMetadataErrorCount, "new Gmail-discovered doc")} failed metadata fetch transiently`
+          : null;
     if (gmailReason) {
       logWarning(`[Refresh] Gmail: ${gmailReason} — keeping timestamp ${status?.lastGmailUpdateTimestamp?.toISOString() ?? "(none)"} instead of advancing to ${gmailTarget.toISOString()}`);
     } else {
@@ -771,7 +798,7 @@ export async function executeRefresh(
   }
 
   const elapsed = Date.now() - t0;
-  const totalErrorCount = gmailErrorCount + syncRes.errorCount;
+  const totalErrorCount = gmailErrorCount + metadataTransientIds.size + syncRes.errorCount;
   const totalDeleted = syncRes.deleted + extraDeleted;
   const counts = [
     pluralize(syncRes.added + inaccessibleAdded, "doc") + " added",

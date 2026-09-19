@@ -240,8 +240,12 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       setOpen(false);
 
       dismissProgressToasts();
-      const { summary } = formatResultParts(data);
-      toast.success(`Load complete — ${summary}`, { duration: 8000 });
+      const { summary, errorSuffix } = formatResultParts(data);
+      if ((data.errorCount ?? 0) > 0 && (data.added ?? 0) + (data.updated ?? 0) === 0) {
+        toast.warning(`Load finished with errors — ${summary}${errorSuffix}`, { duration: 8000 });
+      } else {
+        toast.success(`Load complete — ${summary}${errorSuffix}`, { duration: 8000 });
+      }
     } catch (err) {
       dismissProgressToasts();
       if (err instanceof Error && err.name === "AbortError") return;

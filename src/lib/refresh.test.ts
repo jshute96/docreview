@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { upsertDocsAndSyncComments, executeRefresh, insertInaccessibleDocs } from "./refresh";
 import { prisma } from "./prisma";
-import { getDriveClient, listChanges } from "./google-drive";
+import { fetchDocsByIds, findDeletedOrDeniedDocIds, getDriveClient, listChanges } from "./google-drive";
 import { bumpLastCommentActivity, syncComments } from "./sync-comments";
-import { scanGmailForDocIds } from "./gmail";
+import { buildInaccessibleDocs, scanGmailForDocIds } from "./gmail";
 import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "./status";
 
 vi.mock("./prisma");
@@ -403,6 +403,53 @@ describe("upsertDocsAndSyncComments", () => {
       expect(updateGmailTimestamp).toHaveBeenCalledTimes(1);
     });
 
+    const gmailScanWith = (ids: string[]) => ({
+      docIds: ids, shareNotes: new Map(), shareDates: new Map(),
+      emailMeta: new Map(ids.map(id => [id, [{ headers: new Map(), textBody: "", htmlBody: "" }]])), errorCount: 0,
+    });
+
+    it("holds the Gmail timestamp and inserts nothing when a NEW Gmail-only doc's metadata fetch fails transiently", async () => {
+      vi.mocked(scanGmailForDocIds).mockResolvedValue(gmailScanWith(["gmail-1"]));
+      vi.mocked(fetchDocsByIds).mockResolvedValue({ docs: [], transientErrorIds: ["gmail-1"] });
+
+      const result = await executeRefresh(userId, userEmail, { drive: true, gmail: true });
+
+      // Not treated as inaccessible (would have been inserted as NOT_FOUND before).
+      expect(buildInaccessibleDocs).not.toHaveBeenCalled();
+      expect(result.errorCount).toBe(1);
+      // Drive side is fine; Gmail must re-scan the notification so the doc gets created.
+      expect(updateDriveChangesToken).toHaveBeenCalledWith(userId, "new-token");
+      expect(updateGmailTimestamp).not.toHaveBeenCalled();
+    });
+
+    it("does not deletion-check or hold the Gmail timestamp for an EXISTING Gmail-only doc that fails transiently", async () => {
+      vi.mocked(scanGmailForDocIds).mockResolvedValue(gmailScanWith(["gmail-1"]));
+      vi.mocked(fetchDocsByIds).mockResolvedValue({ docs: [], transientErrorIds: ["gmail-1"] });
+      vi.mocked(prisma.doc.findMany).mockResolvedValue([{ docId: "d1", googleDocId: "gmail-1", status: "INBOX" }] as any);
+      vi.mocked(findDeletedOrDeniedDocIds).mockResolvedValue({ trashedIds: new Set(), deletedIds: new Set(), permissionDeniedIds: new Set() });
+
+      const result = await executeRefresh(userId, userEmail, { drive: true, gmail: true });
+
+      // Unknown state ≠ missing: must not be marked deleted/denied.
+      expect(findDeletedOrDeniedDocIds).not.toHaveBeenCalled();
+      expect(result.errorCount).toBe(1);
+      // Already tracked, so nothing is lost by advancing; metadata catches up later.
+      expect(updateGmailTimestamp).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not hold the Gmail timestamp for a stale-only doc that fails transiently", async () => {
+      // Stale catch-up query returns a doc that Gmail didn't mention.
+      vi.mocked(prisma.$queryRaw).mockResolvedValue([{ google_doc_id: "stale-1", title: "", comments_last_synced_at: null }] as any);
+      vi.mocked(fetchDocsByIds).mockResolvedValue({ docs: [], transientErrorIds: ["stale-1"] });
+
+      const result = await executeRefresh(userId, userEmail, { drive: true, gmail: true });
+
+      expect(result.errorCount).toBe(1);
+      // Retried by the stale query next time regardless, so both cursors advance.
+      expect(updateDriveChangesToken).toHaveBeenCalledWith(userId, "new-token");
+      expect(updateGmailTimestamp).toHaveBeenCalledTimes(1);
+    });
+
     it("keeps the Gmail timestamp but advances the Drive token when the Gmail scan had errors", async () => {
       vi.mocked(scanGmailForDocIds).mockResolvedValue({
         docIds: [], shareNotes: new Map(), shareDates: new Map(), emailMeta: new Map(), errorCount: 2,
@@ -460,6 +507,24 @@ describe("upsertDocsAndSyncComments", () => {
         data: { status: "INBOX" },
       })
     );
+  });
+});
+
+describe("executeDirectRefresh", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(getDriveClient).mockResolvedValue({} as any);
+    vi.mocked(prisma.doc.findMany).mockResolvedValue([] as any);
+    vi.mocked(findDeletedOrDeniedDocIds).mockResolvedValue({ trashedIds: new Set(), deletedIds: new Set(), permissionDeniedIds: new Set() });
+  });
+
+  it("does not check transiently-failed docs for deletion and counts them as errors", async () => {
+    vi.mocked(fetchDocsByIds).mockResolvedValue({ docs: [], transientErrorIds: ["g-transient"] });
+
+    const result = await executeRefresh("u1", "test@example.com", { googleDocIds: ["g-transient", "g-missing"], mode: "selected" });
+
+    expect(findDeletedOrDeniedDocIds).toHaveBeenCalledWith("u1", ["g-missing"]);
+    expect(result.errorCount).toBe(1);
   });
 });
 

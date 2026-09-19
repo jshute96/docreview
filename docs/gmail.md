@@ -145,7 +145,11 @@ with different options — see [`refresh.md`](./refresh.md) for the full archite
    - Drive (if active): `changes.list` with saved token, fallback to `listRecentDocs`
    - Gmail (if active): `scanGmailForDocIds(userId, since)` → doc IDs only
 3. **Merge**: build `driveDocMap`, compute `gmailOnlyIds` (Gmail IDs not in Drive results)
-4. **Single metadata fetch**: `fetchDocsByIds` for Gmail-only IDs (no double-fetch)
+4. **Single metadata fetch**: `fetchDocsByIds` for Gmail-only IDs (no double-fetch). IDs that
+   fail transiently (429/5xx/network) are skipped entirely (not inserted as inaccessible, not
+   deletion-checked); if the doc is new, the Gmail timestamp is held so the notification is
+   re-scanned next time. Other 4xx errors (e.g. 400 for a malformed ID) are dropped with a
+   warning and never hold the cursor.
 5. **Upsert loop**: all new docs created ARCHIVED; new non-AUTHOR docs are skipped
    unless `fromGmail` (so shared docs with notifications are still added).
    Promotion to INBOX happens later (step 6 share-notes or step 8 `shouldUnarchive`).
@@ -165,9 +169,10 @@ with different options — see [`refresh.md`](./refresh.md) for the full archite
    body. Runs in both the upsert loop (step 8) and a second pass for docs that didn't go
    through upsert (inaccessible/failed-fetch docs). Triggers unarchive with cutoff check.
 10. **Save cursors** (independently): Drive token if Drive discovery succeeded; Gmail timestamp if the Gmail scan
-    succeeded with no email-level errors. Per-doc sync errors block neither (failed docs get
-    `commentsLastSyncedAt` cleared and are retried via stale catch-up); only `allFailed` (every doc sync
-    failed transiently) holds both. See `refresh.md` § Cursor Advancement.
+    succeeded with no email-level errors and no *new* Gmail-discovered doc failed its metadata fetch
+    transiently. Per-doc sync errors block neither (failed docs get `commentsLastSyncedAt` cleared and
+    are retried via stale catch-up); only `allFailed` (every doc sync failed transiently) holds both.
+    See `refresh.md` § Cursor Advancement.
 
 ### Timestamp Lifecycle
 

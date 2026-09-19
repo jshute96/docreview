@@ -229,7 +229,9 @@ and sets their `accessState` to `TRASHED` or `NOT_FOUND`. No extra API calls nee
 These modes perform exhaustive `fetchDocsByIds` calls. If a document ID known to the
 database is *not* returned in the metadata results, the system performs a final verification
 via `findDeletedDocIds` (which checks for 404/403 responses on direct file gets). This
-ensures the database stays in sync even when the changes feed is bypassed.
+ensures the database stays in sync even when the changes feed is bypassed. IDs whose
+`files.get` failed transiently (`transientErrorIds`) are excluded from this check and
+counted as errors instead.
 
 ### Load mode: no deletion detection
 
@@ -427,8 +429,17 @@ After comment sync, the two cursors are advanced **independently**:
 - **Drive `driveChangesPageToken`** advances whenever Drive discovery succeeded and the sync
   was not `allFailed` (below).
 - **Gmail `lastGmailUpdateTimestamp`** advances whenever the Gmail scan succeeded with zero
-  email-level errors (`gmailErrorCount === 0`) and the sync was not `allFailed`. Per-doc
-  sync errors don't affect it.
+  email-level errors (`gmailErrorCount === 0`), no *new* Gmail-discovered doc failed its
+  metadata fetch transiently, and the sync was not `allFailed`. Per-doc sync errors don't
+  affect it.
+
+  The metadata-fetch hold exists because a brand-new Gmail-discovered doc has no DB row,
+  so nothing else would ever retry it; re-scanning the notification is the only path. It
+  applies only to transient errors (429, 5xx, network) — permanent client errors such as
+  400 for a malformed ID are dropped with a warning and never hold the cursor. A doc
+  whose `files.get` *persistently* returns 5xx would pin the timestamp; this is
+  deliberate (the alternative is silently losing the doc) and the held/would-be values
+  are logged every refresh so it's visible.
 
 Each outcome is logged: `[Refresh] Drive: changes token advanced to …` /
 `[Refresh] Gmail: timestamp advanced to …` on success, or a `WARNING` naming the reason and

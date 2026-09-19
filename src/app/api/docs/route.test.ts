@@ -171,7 +171,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockFetchDocsByIds.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue({ docs: [
       {
         googleDocId: "g1",
         title: "New Doc",
@@ -183,7 +183,7 @@ describe("POST /api/docs", () => {
 
 
       },
-    ]);
+    ], transientErrorIds: [] });
 
     // Pre-fetch: no existing docs (so g1 is an "add")
     mockDoc.findMany
@@ -213,7 +213,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockFetchDocsByIds.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue({ docs: [
       {
         googleDocId: "g1",
         title: "Existing Doc",
@@ -224,7 +224,7 @@ describe("POST /api/docs", () => {
         createdTimeInDrive: null,
 
       },
-    ]);
+    ], transientErrorIds: [] });
 
     // g1 already exists
     mockDoc.findMany
@@ -250,7 +250,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockFetchDocsByIds.mockResolvedValue([]);
+    mockFetchDocsByIds.mockResolvedValue({ docs: [], transientErrorIds: [] });
 
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
@@ -272,7 +272,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockFetchDocsByIds.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue({ docs: [
       {
         googleDocId: "g1",
         title: "Archived Doc",
@@ -284,7 +284,7 @@ describe("POST /api/docs", () => {
 
 
       },
-    ]);
+    ], transientErrorIds: [] });
 
     const archivedDoc = { docId: "d1", googleDocId: "g1", status: "ARCHIVED" };
     mockDoc.findMany
@@ -314,7 +314,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockFetchDocsByIds.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue({ docs: [
       {
         googleDocId: "g1",
         title: "Archived Doc",
@@ -326,7 +326,7 @@ describe("POST /api/docs", () => {
 
 
       },
-    ]);
+    ], transientErrorIds: [] });
 
     const archivedDoc = { docId: "d1", googleDocId: "g1", status: "ARCHIVED" };
     mockDoc.findMany
@@ -356,7 +356,7 @@ describe("POST /api/docs", () => {
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
     // fetchDocsByIds returns only g1 (only selected doc)
-    mockFetchDocsByIds.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue({ docs: [
       {
         googleDocId: "g1",
         title: "Selected Doc",
@@ -368,7 +368,7 @@ describe("POST /api/docs", () => {
 
 
       },
-    ]);
+    ], transientErrorIds: [] });
 
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
@@ -407,7 +407,7 @@ describe("POST /api/docs", () => {
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
     mockLabel.findMany.mockResolvedValue([{ labelId: "l1" }]);
-    mockFetchDocsByIds.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue({ docs: [
       {
         googleDocId: "g1",
         title: "New Doc",
@@ -419,7 +419,7 @@ describe("POST /api/docs", () => {
 
 
       },
-    ]);
+    ], transientErrorIds: [] });
 
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
@@ -450,7 +450,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockFetchDocsByIds.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue({ docs: [
       {
         googleDocId: "g1",
         title: "New Doc",
@@ -462,7 +462,7 @@ describe("POST /api/docs", () => {
 
 
       },
-    ]);
+    ], transientErrorIds: [] });
 
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
@@ -489,7 +489,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockFetchDocsByIds.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue({ docs: [
       {
         googleDocId: "g1",
         title: "Existing Doc",
@@ -501,7 +501,7 @@ describe("POST /api/docs", () => {
 
 
       },
-    ]);
+    ], transientErrorIds: [] });
 
     // g1 already exists
     mockDoc.findMany
@@ -531,7 +531,7 @@ describe("POST /api/docs", () => {
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
     mockLabel.findMany.mockResolvedValue([{ labelId: "l1" }]);
-    mockFetchDocsByIds.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue({ docs: [
       {
         googleDocId: "g1",
         title: "Existing Doc",
@@ -543,7 +543,7 @@ describe("POST /api/docs", () => {
 
 
       },
-    ]);
+    ], transientErrorIds: [] });
 
     // g1 already exists
     mockDoc.findMany
@@ -573,7 +573,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockFetchDocsByIds.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue({ docs: [
       {
         googleDocId: "g1",
         title: "Existing Doc",
@@ -585,7 +585,7 @@ describe("POST /api/docs", () => {
 
 
       },
-    ]);
+    ], transientErrorIds: [] });
 
     // g1 already exists with existing notes
     mockDoc.findMany
@@ -615,7 +615,7 @@ describe("POST /api/docs", () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
-    mockFetchDocsByIds.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue({ docs: [
       {
         googleDocId: "g1",
         title: "Some Doc",
@@ -626,7 +626,7 @@ describe("POST /api/docs", () => {
         createdTimeInDrive: new Date("2024-05-01"),
 
       },
-    ]);
+    ], transientErrorIds: [] });
 
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
@@ -653,7 +653,7 @@ describe("POST /api/docs", () => {
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
     const createdTime = new Date("2024-05-01T00:00:00.000Z");
-    mockFetchDocsByIds.mockResolvedValue([
+    mockFetchDocsByIds.mockResolvedValue({ docs: [
       {
         googleDocId: "g1",
         title: "New Doc",
@@ -663,7 +663,7 @@ describe("POST /api/docs", () => {
         lastModifiedInDrive: new Date("2024-06-01"),
         createdTimeInDrive: createdTime,
       },
-    ]);
+    ], transientErrorIds: [] });
 
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds
@@ -690,7 +690,7 @@ describe("POST /api/docs", () => {
     const driveAuth = {} as Awaited<ReturnType<typeof getDriveClient>>;
     mockGetDriveClient.mockResolvedValue(driveAuth);
     mockLabel.findMany.mockResolvedValue([{ labelId: "l1" }]);
-    mockFetchDocsByIds.mockResolvedValue([]); // no docs fetched
+    mockFetchDocsByIds.mockResolvedValue({ docs: [], transientErrorIds: [] }); // no docs fetched
 
     mockDoc.findMany
       .mockResolvedValueOnce([]) // existingDocIds

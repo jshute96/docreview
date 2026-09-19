@@ -102,7 +102,11 @@ IDs, source, labels, and notes. The backend fetches metadata for the selected do
 ID via `files.get` (both Drive and Gmail sources). These individual fetches always
 support **Shared Drives**, regardless of whether the scan options had the Shared Drives
 checkbox enabled. After the sync completes, the doc list refreshes and a toast summarizes
-results.
+results, with an "(N errors)" suffix when any doc's metadata fetch or comment sync failed
+transiently (those docs are not loaded / are retried by the next refresh). If nothing was
+loaded and there were errors, the toast is a warning instead of a success. If *every*
+selected doc failed transiently, the changes token is not initialized (same `allFailed`
+rule as refresh).
 
 Clicking **Rescan** re-runs the scan with current options (useful after changing the
 time window or ownership filter).

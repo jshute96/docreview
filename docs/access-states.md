@@ -70,6 +70,13 @@ from `TRASHED` (via 404, meaning permanently deleted from trash).
   - 404 from `OK` or `TRASHED` → `NOT_FOUND`
   - 404 from `DENIED` → stays `DENIED`
   - 403 → `DENIED`
+- Docs whose `files.get` failed **transiently** (429, 5xx, network) are
+  reported separately in `fetchDocsByIds().transientErrorIds` and are excluded
+  from all of the above — their state is unknown, not missing. They count toward
+  the refresh's `errorCount`; new Gmail-only ones also hold the Gmail timestamp
+  back so the notification is re-scanned, and stale ones are retried by the
+  catch-up query. Other 4xx errors (e.g. 400 for a malformed ID) are permanent:
+  logged and dropped, in neither list.
 - After successful metadata fetch, `upsertDocsAndSyncComments` sets state to `OK`
 
 ### Full refresh (executeFullRefresh)
@@ -137,7 +144,7 @@ DB, skipping docs already tracked). All three Gmail code paths support this:
 
 | Path | How inaccessible docs are handled |
 |------|-----------------------------------|
-| **Refresh** (`executeRefresh`) | Gmail-only IDs that fail `fetchDocsByIds` and aren't already tracked → insert with default `NOT_FOUND` |
+| **Refresh** (`executeRefresh`) | Gmail-only IDs that fail `fetchDocsByIds` with 403/404 and aren't already tracked → insert with default `NOT_FOUND` (transient failures are skipped, not inserted) |
 | **Gmail Refresh** (`gmail-refresh/route.ts`) | `scanGmailNotifications` returns `inaccessibleDocs` with per-doc access state → insert |
 | **Load** (`scan/route.ts` + `docs/route.ts`) | Inaccessible docs included in scan results, passed through load body → insert with user's chosen labels/notes/status |
 
