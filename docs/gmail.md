@@ -161,7 +161,10 @@ with different options — see [`refresh.md`](./refresh.md) for the full archite
    in the email), `mergeCommentsFromGmail()` inserts comment records from the parsed email
    body. Runs in both the upsert loop (step 8) and a second pass for docs that didn't go
    through upsert (inaccessible/failed-fetch docs). Triggers unarchive with cutoff check.
-10. **Save tokens**: Drive token if Drive succeeded (and no transient errors); Gmail timestamp if Gmail succeeded
+10. **Save cursors** (independently): Drive token if Drive discovery succeeded; Gmail timestamp if the Gmail scan
+    succeeded with no email-level errors. Per-doc sync errors block neither (failed docs get
+    `commentsLastSyncedAt` cleared and are retried via stale catch-up); only `allFailed` (every doc sync
+    failed transiently) holds both. See `refresh.md` § Cursor Advancement.
 
 ### Timestamp Lifecycle
 

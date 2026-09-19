@@ -159,6 +159,8 @@ describe("syncComments error handling", () => {
       suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0,
       shouldUnarchive: false, transientError: true
     });
+    // Cleared so the refresh's stale catch-up retries this doc.
+    expect(mockDoc.update).toHaveBeenCalledWith({ where: { docId: doc.docId }, data: { commentsLastSyncedAt: null } });
   });
 });
 
@@ -1111,6 +1113,7 @@ describe("syncComments suggestion resolution", () => {
 
     expect(result.transientError).toBe(true);
     expect(mockComment.updateMany).not.toHaveBeenCalled();
+    expect(mockDoc.update).toHaveBeenCalledWith({ where: { docId: doc.docId }, data: { commentsLastSyncedAt: null } });
   });
 });
 

@@ -729,20 +729,45 @@ export async function executeRefresh(
     extraDeleted += await handleMissingGmailDocs(userId, gmailOnlyIds, returnedExtraIds, existingDocIds);
   }
 
-  // Save tokens - only if not all failed (safety check)
-  const allFailed = (syncRes.totalAttempted ?? 0) > 0 && (syncRes.successCount ?? 0) === 0;
+  // --- Advance the Drive and Gmail cursors, each independently ---
+  // Per-doc transient sync errors (syncRes.errorCount) deliberately do NOT
+  // hold back either cursor: syncComments clears commentsLastSyncedAt on a
+  // transient failure, so the stale catch-up query retries that doc on every
+  // refresh until it succeeds. Holding the cursor instead would re-process the
+  // whole growing backlog every time, and one persistently failing doc would
+  // stall progress forever (issue #24). The only sync-side guard is
+  // `allFailed` — every doc failing transiently suggests a systemic problem
+  // (auth, outage), so keep the old cursors and re-read the same window next
+  // time. 403/404 results are expected outcomes, not failures, so they don't
+  // count toward it (a window containing only a view-only doc must not pin
+  // the cursors).
+  const allFailed = (syncRes.totalAttempted ?? 0) > 0 && syncRes.errorCount === syncRes.totalAttempted;
 
-  if (driveSucceeded && newPageToken && syncRes.errorCount === 0 && !allFailed) {
-    await updateDriveChangesToken(userId, newPageToken);
-  } else if (driveSucceeded && newPageToken && allFailed) {
-    logWarning(`[Refresh] All document syncs failed, skipping Drive token update for safety`);
+  if (driveSucceeded && newPageToken) {
+    if (allFailed) {
+      logWarning(`[Refresh] Drive: all ${syncRes.totalAttempted} document syncs failed transiently — keeping changes token ${status?.driveChangesPageToken ?? "(none)"} instead of advancing to ${newPageToken}`);
+    } else {
+      await updateDriveChangesToken(userId, newPageToken);
+      logInfo(`[Refresh] Drive: changes token advanced to ${newPageToken}`);
+    }
   }
 
   // Skip the timestamp update when the account has no Gmail mailbox — we never
   // actually scanned anything, so advancing the cursor would silently lose any
   // window if Gmail later becomes available for this account.
-  if (gmailSucceeded && !gmailNoAccount && syncRes.errorCount === 0 && !allFailed && gmailErrorCount === 0) {
-    await updateGmailTimestamp(userId, new Date());
+  if (gmailSucceeded && !gmailNoAccount) {
+    const gmailTarget = new Date();
+    const gmailReason = allFailed
+      ? `all ${syncRes.totalAttempted} document syncs failed transiently`
+      : gmailErrorCount > 0
+        ? `${pluralize(gmailErrorCount, "email")} failed to scan`
+        : null;
+    if (gmailReason) {
+      logWarning(`[Refresh] Gmail: ${gmailReason} — keeping timestamp ${status?.lastGmailUpdateTimestamp?.toISOString() ?? "(none)"} instead of advancing to ${gmailTarget.toISOString()}`);
+    } else {
+      await updateGmailTimestamp(userId, gmailTarget);
+      logInfo(`[Refresh] Gmail: timestamp advanced to ${gmailTarget.toISOString()}`);
+    }
   }
 
   const elapsed = Date.now() - t0;

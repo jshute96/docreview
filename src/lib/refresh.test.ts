@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { upsertDocsAndSyncComments, executeRefresh } from "./refresh";
 import { prisma } from "./prisma";
-import { getDriveClient } from "./google-drive";
+import { getDriveClient, listChanges } from "./google-drive";
 import { bumpLastCommentActivity, syncComments } from "./sync-comments";
 import { scanGmailForDocIds } from "./gmail";
-import { getStatus, updateGmailTimestamp } from "./status";
+import { getStatus, updateDriveChangesToken, updateGmailTimestamp } from "./status";
 
 vi.mock("./prisma");
 vi.mock("./google-drive");
@@ -352,6 +352,67 @@ describe("upsertDocsAndSyncComments", () => {
 
     expect(result.noGmailAccount).toBeUndefined();
     expect(updateGmailTimestamp).toHaveBeenCalledTimes(1);
+  });
+
+  describe("cursor advancement (issue #24)", () => {
+    const driveDoc = { googleDocId: "g1", driveUrl: "http://g1", mimeType: "doc", role: "AUTHOR", lastModifiedInDrive: new Date(), createdTimeInDrive: new Date() };
+    const transientResult = { commentsCreated: 0, commentsUpdated: 0, suggestionsCreated: 0, suggestionsUpdated: 0, suggestionsResolved: 0, shouldUnarchive: false, transientError: true };
+
+    beforeEach(() => {
+      vi.mocked(getStatus).mockResolvedValue({ userId, driveChangesPageToken: "old-token", lastGmailUpdateTimestamp: new Date(0) } as any);
+      vi.mocked(prisma.$queryRaw).mockResolvedValue([] as any);
+      vi.mocked(prisma.doc.findMany).mockResolvedValue([] as any);
+      vi.mocked(prisma.doc.upsert).mockResolvedValue({ docId: "d1", googleDocId: "g1", status: "INBOX" } as any);
+      vi.mocked(listChanges).mockResolvedValue({
+        docs: [driveDoc], rawChangeCount: 1, trashedDocIds: new Set(), removedDocIds: new Set(), newPageToken: "new-token",
+      } as any);
+      vi.mocked(scanGmailForDocIds).mockResolvedValue({
+        docIds: [], shareNotes: new Map(), shareDates: new Map(), emailMeta: new Map(), errorCount: 0,
+      });
+    });
+
+    it("advances both cursors even when a doc's comment sync has a transient error", async () => {
+      // Two docs: one fails transiently, one succeeds → not allFailed.
+      vi.mocked(listChanges).mockResolvedValue({
+        docs: [driveDoc, { ...driveDoc, googleDocId: "g2" }], rawChangeCount: 2, trashedDocIds: new Set(), removedDocIds: new Set(), newPageToken: "new-token",
+      } as any);
+      vi.mocked(syncComments).mockResolvedValueOnce(transientResult as any);
+
+      const result = await executeRefresh(userId, userEmail, { drive: true, gmail: true });
+
+      expect(result.errorCount).toBe(1);
+      expect(updateDriveChangesToken).toHaveBeenCalledWith(userId, "new-token");
+      expect(updateGmailTimestamp).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps both cursors when every doc sync fails (allFailed)", async () => {
+      vi.mocked(syncComments).mockResolvedValue(transientResult as any);
+
+      await executeRefresh(userId, userEmail, { drive: true, gmail: true });
+
+      expect(updateDriveChangesToken).not.toHaveBeenCalled();
+      expect(updateGmailTimestamp).not.toHaveBeenCalled();
+    });
+
+    it("does not treat a permission-denied (403) doc as a failure for allFailed", async () => {
+      vi.mocked(syncComments).mockResolvedValue({ ...transientResult, transientError: undefined, permissionDenied: true } as any);
+
+      await executeRefresh(userId, userEmail, { drive: true, gmail: true });
+
+      expect(updateDriveChangesToken).toHaveBeenCalledWith(userId, "new-token");
+      expect(updateGmailTimestamp).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the Gmail timestamp but advances the Drive token when the Gmail scan had errors", async () => {
+      vi.mocked(scanGmailForDocIds).mockResolvedValue({
+        docIds: [], shareNotes: new Map(), shareDates: new Map(), emailMeta: new Map(), errorCount: 2,
+      });
+
+      await executeRefresh(userId, userEmail, { drive: true, gmail: true });
+
+      expect(updateDriveChangesToken).toHaveBeenCalledWith(userId, "new-token");
+      expect(updateGmailTimestamp).not.toHaveBeenCalled();
+    });
   });
 
   it("still unarchives when lastCommentActivity is newer than unarchiveCutoff", async () => {

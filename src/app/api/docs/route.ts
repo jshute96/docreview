@@ -295,19 +295,22 @@ async function executeLoad(opts: {
   const suggestionsUpdated = syncResults.reduce((sum, r) => sum + r.suggestionsUpdated, 0);
 
   // Initialize the Drive changes token so subsequent refreshes use changes.list.
-  // Safety: if *every* doc failed, skip the token update.
-  const successCount = syncResults.filter(r => !r.transientError && !r.permissionDenied && !r.isDeleted).length;
-  const allFailed = commentDocs.length > 0 && successCount === 0;
+  // Per-doc transient errors don't block this: syncComments clears those docs'
+  // commentsLastSyncedAt so the next refresh's stale catch-up retries them.
+  // Safety: if *every* doc failed transiently (likely auth/outage), skip the
+  // token update. 403/404 are expected outcomes and don't count.
   const transientErrors = syncResults.filter(r => r.transientError).length;
+  const allFailed = commentDocs.length > 0 && transientErrors === commentDocs.length;
 
-  if (transientErrors === 0 && !allFailed) {
+  if (!allFailed) {
+    if (transientErrors > 0) {
+      logWarning(`[Sync] Load: ${transientErrors} of ${commentDocs.length} doc syncs failed transiently; they will be retried by the next refresh`);
+    }
     logInfo("[Sync] Load complete, initializing changes token for future refreshes");
     const token = await getChangesStartPageToken(userId);
     await updateDriveChangesToken(userId, token);
-  } else if (allFailed) {
-    logWarning(`[Sync] All ${commentDocs.length} document fetches failed, skipping token update for safety`);
   } else {
-    logWarning(`[Sync] Transient errors during comment sync for ${transientErrors} docs, skipping token update`);
+    logWarning(`[Sync] Load: all ${commentDocs.length} document syncs failed transiently, skipping changes token initialization for safety`);
   }
 
   const elapsed = Date.now() - t0;

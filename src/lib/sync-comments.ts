@@ -348,6 +348,7 @@ export async function syncComments(
 
   if (suggestionFetchFailed) {
     logInfo(`[Comments] ${doc.googleDocId}: ${comments.length} from Drive (${commentResult.commentsCreated} new, ${commentResult.commentsUpdated} updated) (suggestions skipped: fetch failed)`);
+    await clearSyncTime(doc.docId);
     return { ...EMPTY_RESULT, ...commentResult, transientError: true };
   }
 
@@ -408,6 +409,7 @@ async function fetchDriveComments(
       return { ...EMPTY_RESULT, permissionDenied: true };
     }
     logError(`[Comments] failed for ${doc.googleDocId}:`, err);
+    await clearSyncTime(doc.docId);
     return { ...EMPTY_RESULT, transientError: true };
   }
 }
@@ -1053,6 +1055,26 @@ async function stampSyncTime(docId: string, syncStartedAt: Date) {
   await prisma.doc.update({
     where: { docId },
     data: { commentsLastSyncedAt: syncStartedAt },
+  });
+}
+
+/**
+ * Clears commentsLastSyncedAt after a transient sync failure so the doc lands
+ * in the refresh's stale catch-up query ("never synced") and is retried on
+ * every refresh until a sync succeeds. This is the retry mechanism for per-doc
+ * failures: the Drive/Gmail cursors advance regardless of individual doc
+ * errors, and Drive's file modifiedTime doesn't change on comment activity, so
+ * without this a previously-synced doc's failed sync would never be retried.
+ *
+ * Deliberately NOT wrapped in try/catch: if the clear itself fails, the error
+ * propagates out of syncComments and aborts the whole refresh before the
+ * cursors advance. Swallowing it would let the cursors move past a doc that
+ * nothing will ever retry.
+ */
+async function clearSyncTime(docId: string) {
+  await prisma.doc.update({
+    where: { docId },
+    data: { commentsLastSyncedAt: null },
   });
 }
 

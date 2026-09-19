@@ -340,6 +340,8 @@ against `app-offline/` as it stands.
 - [ ] Newly discovered Gmail doc with only resolves on already-resolved comments stays Archived
 - [ ] Newly discovered Gmail doc with new INBOX-relevant comment activity goes to Inbox via Smart Unarchive
 - [ ] First Refresh does 7 day lookback, later ones do incremental reads
+- [ ] A refresh where one doc's comment sync fails still advances the Drive token and Gmail timestamp; the failed doc is retried via stale catch-up on the next refresh
+- [ ] A refresh where every doc sync fails keeps both cursors (logged with the kept and would-be values)
 
 ### Full Refresh
 - [ ] Fetches metadata for every tracked document

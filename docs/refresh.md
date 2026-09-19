@@ -118,9 +118,10 @@ This means subsequent Refresh operations use `changes.list` even if the user's f
 was manual. Individual metadata fetches (`files.get`) always support Shared Drives
 automatically.
 
-**Transient errors:** If any comment sync has a transient error, the token is **not** updated.
-This preserves the old token so the next Refresh re-processes any changes that may have been
-partially handled.
+**Transient errors:** Per-doc comment sync errors do **not** hold back the token. A doc whose
+sync fails transiently has its `commentsLastSyncedAt` cleared, so the stale catch-up query
+retries it on every Refresh until it succeeds. The token is only kept when *every* doc sync
+fails transiently (see [Systemic Failure Protection](#systemic-failure-protection-allfailed)).
 
 ---
 
@@ -406,20 +407,41 @@ crash the entire sync.
   token update.
 - **Transient errors** (429 rate limit, 500 server error, network timeouts) return
   `transientError: true`. This also applies when `fetchDocData` fails for unexpected
-  reasons.
+  reasons. On this path `syncComments` **clears the doc's `commentsLastSyncedAt`** (sets it
+  to NULL), which is what guarantees a retry — see below.
 
-After all comment syncs complete, the POST handler checks whether any sync result had
-`transientError: true`. If so, it **skips saving the changes page token**. This preserves the
-old token so the next Refresh re-processes changes from the same point and re-attempts the
-docs whose comment sync failed. A single `permissionDenied: true` (403) doc does not trigger
-this skip on its own — but it does reduce the success count for the `allFailed` safety check
-below.
+Transient errors do **not** block the Drive token or Gmail timestamp from advancing. Because
+the failed doc's `commentsLastSyncedAt` is cleared, the stale catch-up query at the start of
+every subsequent Refresh treats it as "never synced" and re-syncs it until a sync succeeds.
+(Simply *not stamping* would not be enough: Drive's file `modifiedTime` doesn't change on
+comment activity, so a previously-synced doc with new comments would look up to date.)
+Holding the cursors instead used to cause a self-perpetuating loop: one persistently failing
+doc (e.g. a Docs API 500) kept every cursor pinned, so each refresh re-processed the entire
+growing backlog — and re-triggered Gmail share-note handling for docs in that window
+(issue #24).
+
+### Cursor Advancement
+
+After comment sync, the two cursors are advanced **independently**:
+
+- **Drive `driveChangesPageToken`** advances whenever Drive discovery succeeded and the sync
+  was not `allFailed` (below).
+- **Gmail `lastGmailUpdateTimestamp`** advances whenever the Gmail scan succeeded with zero
+  email-level errors (`gmailErrorCount === 0`) and the sync was not `allFailed`. Per-doc
+  sync errors don't affect it.
+
+Each outcome is logged: `[Refresh] Drive: changes token advanced to …` /
+`[Refresh] Gmail: timestamp advanced to …` on success, or a `WARNING` naming the reason and
+both the kept and the would-be-new value when a cursor is held.
 
 ### Systemic Failure Protection (`allFailed`)
 
-As a safety measure, if a sync attempt includes one or more documents but **every single
-document fetch fails** (due to transient errors, permission denied, or deletions), the sync
-is treated as a systemic failure.
+As a safety measure, if a sync attempt includes one or more documents and **every single
+one fails transiently**, the sync is treated as a systemic failure (likely auth or an outage
+rather than one bad doc). Permission-denied (403) and deleted (404) docs are expected
+outcomes and do not count — otherwise a change window containing only a view-only doc would
+pin the cursors forever. The same rule applies to the Load path's initial token setup
+(`POST /api/docs?mode=load`).
 
 In this state:
 - The Drive `driveChangesPageToken` is **not** updated.
@@ -487,15 +509,15 @@ everything else.
 | **Add** (`/api/docs/add`) | Doc created, `syncComments` hits transient error | `commentsLastSyncedAt` stays null; caught by next Refresh |
 | **Re-add** (`/api/docs/[docId]/re-add`) | Transaction deletes old + creates new, `syncComments` fails outside transaction | Same as Add, but old comments are lost |
 | **Load** (`POST /api/docs?mode=load`) | Docs upserted, comment sync fails for some | Same as Add |
-| **Refresh** (Drive token held back) | `syncComments` transient error → Drive token not advanced | Doc reappears in next `changes.list` AND caught by stale query |
+| **Refresh** | `syncComments` transient error for one doc | `commentsLastSyncedAt` cleared to NULL, so caught by stale query on every Refresh until it succeeds (cursors still advance — see Cursor Advancement) |
 
-### Token holdback interaction
+### Cursor interaction
 
-The stale catch-up is complementary to the existing Drive token holdback (see Transient
-Error Handling above). Token holdback ensures that docs with transient errors during
-Refresh reappear in the next `changes.list`. The stale catch-up additionally covers docs
-that were added outside the changes feed (Add, Re-add, Load) where there is no token to
-hold back.
+The stale catch-up is the retry mechanism for per-doc failures: because the Drive token and
+Gmail timestamp advance regardless of individual doc errors, a failed doc is *not* re-delivered
+by `changes.list` or the Gmail scan — it's re-synced because `syncComments` clears its
+`commentsLastSyncedAt` on a transient failure. The only time cursors are held is `allFailed`
+(see Systemic Failure Protection).
 
 ---
 
