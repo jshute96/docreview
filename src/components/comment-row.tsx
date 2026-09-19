@@ -7,6 +7,7 @@ import type { CommentThread, ThreadMap, SuggestionContent } from "@/lib/google-d
 import { Button } from "@/components/ui/button";
 import { CommentThreadPanel, type DirtyKind } from "@/components/comment-thread-panel";
 import { highlightText } from "@/lib/highlight";
+import { deletedContentWarning } from "@/lib/deleted-content-warning";
 import { FriendlyDate } from "@/components/friendly-date";
 import { StarButton } from "@/components/star-button";
 import { broadcastChange } from "@/lib/cross-tab";
@@ -769,6 +770,8 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
   // the panel free of index arithmetic. Suggestions have no tombstones, so both
   // conversions are the identity there.
   const sourceThreads = isSuggestion ? suggestionThreads : threads;
+  // "Deleted" badge: the extension reported the anchored text is gone from the doc.
+  const deletedWarning = deletedContentWarning(sourceThreads[0], isSuggestion, comment.resolved);
   const slotFlags = useMemo(
     () => replyDeletedFlags(sourceThreads[0]?.replies ?? []),
     [sourceThreads],
@@ -857,6 +860,11 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
           {comment.resolved && (
             <span title="This comment has been resolved" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-zinc-100 text-zinc-500">
               Resolved
+            </span>
+          )}
+          {deletedWarning && (
+            <span title={deletedWarning} className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700">
+              Deleted
             </span>
           )}
         </div>

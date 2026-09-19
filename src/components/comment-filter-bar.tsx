@@ -31,6 +31,11 @@ const COMMENT_TRISTATE_COLORS: Record<string, TriStateColorConfig> = {
     include: "bg-zinc-600 text-white ring-1 ring-zinc-700",
     exclude: "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-300",
   },
+  deleted: {
+    off: "bg-red-100 text-red-700 ring-1 ring-red-300 hover:bg-red-200",
+    include: "bg-red-600 text-white ring-1 ring-red-700",
+    exclude: "bg-red-100 text-red-700 ring-1 ring-red-300",
+  },
   suggestions: {
     off: "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-300 hover:bg-zinc-200",
     include: "bg-zinc-600 text-white ring-1 ring-zinc-700",
@@ -54,6 +59,10 @@ interface CommentFilterBarProps {
   showAssigned?: boolean;
   showMentioned?: boolean;
   resolvedFilter: TriState;
+  deletedFilter: TriState;
+  /** Deleted state comes only from the browser extension, so the filter is
+   *  shown only when at least one comment is known to be in that state. */
+  showDeleted: boolean;
   showMode: ShowMode;
   suggestionsFilter: TriState;
   isStarred: TriState;
@@ -64,6 +73,7 @@ interface CommentFilterBarProps {
   onAssignedChange: (v: TriState) => void;
   onMentionedChange: (v: TriState) => void;
   onResolvedChange: (v: TriState) => void;
+  onDeletedChange: (v: TriState) => void;
   onShowModeChange: (v: ShowMode) => void;
   onSuggestionsChange: (v: TriState) => void;
   onIsStarredChange: (v: TriState) => void;
@@ -81,6 +91,8 @@ export function CommentFilterBar({
   showAssigned = true,
   showMentioned = true,
   resolvedFilter,
+  deletedFilter,
+  showDeleted,
   showMode,
   suggestionsFilter,
   isStarred,
@@ -91,6 +103,7 @@ export function CommentFilterBar({
   onAssignedChange,
   onMentionedChange,
   onResolvedChange,
+  onDeletedChange,
   onShowModeChange,
   onSuggestionsChange,
   onIsStarredChange,
@@ -111,6 +124,7 @@ export function CommentFilterBar({
           {showAssigned && <TriStateButton label="Assigned" value={assignedFilter} onChange={onAssignedChange} colors={COMMENT_TRISTATE_COLORS.assigned} title="Comments assigned to you" className="rounded" />}
           {showMentioned && <TriStateButton label="@Mentioned" value={mentionedFilter} onChange={onMentionedChange} colors={COMMENT_TRISTATE_COLORS.mentioned} title="Threads where you were @mentioned" className="rounded" />}
           <TriStateButton label="Resolved" value={resolvedFilter} onChange={onResolvedChange} colors={COMMENT_TRISTATE_COLORS.resolved} title="Resolved comments" className="rounded" />
+          {showDeleted && <TriStateButton label="Deleted" value={deletedFilter} onChange={onDeletedChange} colors={COMMENT_TRISTATE_COLORS.deleted} title="Comments on deleted text, not visible in the document" className="rounded" />}
           <TriStateButton label="Unread" value={unreadFilter} onChange={onUnreadChange} colors={COMMENT_TRISTATE_COLORS.unread} title="Unread comments" className="rounded" />
         </div>
         <div className="h-4 w-px bg-zinc-200" />

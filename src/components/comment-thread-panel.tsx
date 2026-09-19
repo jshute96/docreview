@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { highlightText, highlightHtml } from "@/lib/highlight";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import { deletedContentWarning } from "@/lib/deleted-content-warning";
 import { cn } from "@/lib/utils";
 import { foldEnd as foldThread } from "@/lib/thread-fold";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
@@ -943,11 +944,9 @@ export function CommentThreadPanel({
                 // 1. Extension says content deleted → definitive orphaned warning
                 // 2. Quoted text not found in document + extension says not deleted → text changed
                 // 3. Quoted text not found in document + no extension data → uncertain warning
-                let anchorWarning: string | undefined;
+                let anchorWarning = deletedContentWarning(thread, !!isSuggestion, !!resolved);
                 let anchorWarningTitle: string | undefined;
-                if (thread.originalContentDeleted && !(isSuggestion && resolved)) {
-                  anchorWarning = `Original content deleted. This ${resolved && thread.quotedFileContent?.value ? "text" : typeLabel} is not visible in the document.`;
-                } else if (!thread.originalContentDeleted && thread.quotedFileContent?.value && documentText !== undefined) {
+                if (!anchorWarning && !thread.originalContentDeleted && thread.quotedFileContent?.value && documentText !== undefined) {
                   const trimmed = thread.quotedFileContent.value.replace(/\.{3}$|…$/, "");
                   if (!documentText.toLowerCase().includes(trimmed.toLowerCase())) {
                     if (thread.originalContentDeleted === false) {

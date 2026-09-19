@@ -25,6 +25,7 @@ Below the show mode buttons, badge filters let you narrow the list further. Each
 - **Assigned** -- Comments assigned to you (only shown if any exist).
 - **@Mentioned** -- Threads where you were @mentioned (only shown if any exist).
 - **Resolved** -- Filter by resolved/unresolved state.
+- **Deleted** -- Comments whose original text was deleted from the document (they no longer appear in Google Docs). Only shown when the browser extension has reported at least one such comment.
 - **Unread** -- Comments with messages you have not read yet (usually because someone else commented last).
 - **Starred** -- Comment-level stars.
 - **Suggestions** -- Tracked changes from Google Docs suggestion mode.
@@ -36,7 +37,7 @@ Type in the search box to filter comments by content. Search matches against com
 ## Comment table
 
 Each row shows:
-- **Status badges** -- Star, Mine/Replied, Assigned/@Mentioned indicators.
+- **Status badges** -- Star, Mine/Replied, Assigned/@Mentioned, Resolved, and Deleted indicators.
 - **Preview** -- First line of the comment with the author name.
 - **Created** -- When the thread was started.
 - **Modified** -- When the last reply was added ("--" if no replies).

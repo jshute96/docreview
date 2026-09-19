@@ -220,6 +220,7 @@ Shadcn/ui components:
 | `prisma.ts` | Singleton PrismaClient with dev-mode write-op logging and base64 field obscuring |
 | `prisma-obscure.ts` | Prisma client extension that base64-encodes/decodes Doc.title, Doc.notes, Label.name transparently |
 | `sanitize-html.ts` | `sanitizeHtml()` — DOMPurify wrapper that scrubs Drive comment `htmlContent`/`quotedFileContent` before `dangerouslySetInnerHTML` and forces links to `target="_blank"`; strips tags on the server (no DOM) |
+| `deleted-content-warning.ts` | `deletedContentWarning()` — the "Original content deleted" message shown when the extension reports a thread's anchored text is gone; shared by the thread panel warning and the collapsed row's "Deleted" badge tooltip |
 | `bulk-edit.ts` | `BulkEditState` type and `cycleBulkEditState` helper for multi-doc editing |
 | `env-config.ts` | Client-accessible environment config — `CHROME_EXTENSION_URL` with env var override |
 | `tab-targets.ts` | Named window targets for tab reuse — `commentsTarget()`, `docTarget()`, `openCommentsPage()`, `openDocPage()` |

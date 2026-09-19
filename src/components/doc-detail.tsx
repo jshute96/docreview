@@ -15,6 +15,7 @@ import { DeleteReAddDialog } from "@/components/delete-readd-dialog";
 import { ROLE_COLORS } from "@/lib/role-colors";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
+import { deletedContentWarning } from "@/lib/deleted-content-warning";
 import { isThreadRead, liveThreadReplies, totalMessageCount, totalSlotCount } from "@/lib/read-state";
 import { CommentRow } from "@/components/comment-row";
 import { pingExtension, handleOpenDocClick, supportsCommentNavigation, selectCommentInDoc, setCommentSelectionHandler, setDocReadyHandler, getCommentsAndSuggestionsFromDoc, getSuggestionFromDoc, type ExtensionSuggestion, type ExtensionCommentInfo } from "@/lib/bridge-to-extension";
@@ -195,8 +196,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
     return result;
   }, [threadMap]);
 
+  // Goes through mergeThreads so a row's Drive-sourced update doesn't strip the
+  // extension flags — the Deleted filter reads originalContentDeleted from here.
   const handleThreadUpdate = useCallback((id: string, thread: CommentThread) => {
-    setThreadMap((prev) => ({ ...prev, [id]: thread }));
+    setThreadMap((prev) => mergeThreads(prev, { [id]: thread }));
   }, []);
 
   // Push extension suggestions to the server for DB merge, then replace the
@@ -641,12 +644,23 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
   const hasAnyReplied = comments.some((c) => c.isReplyAuthor);
   const hasAnyAssigned = comments.some((c) => c.assignedToMe);
   const hasAnyMentioned = comments.some((c) => c.mentionedMe);
+  /** Thread entry for a comment, with the same fallback the row uses for its initial thread. */
+  const threadFor = (c: Comment) =>
+    threadMap[commentKey(c)] ?? (c.googleCommentId ? threadMap[c.googleCommentId] : undefined);
+  /** True when the extension reported this thread's anchored text was deleted
+   *  from the doc (same rule as the row's "Deleted" badge). Only known once the
+   *  extension has supplied state, so the filter is hidden until at least one
+   *  comment is in this state. */
+  const isDeleted = (c: Comment) =>
+    !!deletedContentWarning(threadFor(c), c.type === CommentType.SUGGESTION, c.resolved);
+  const hasAnyDeleted = comments.some(isDeleted);
 
   const [mineFilter, setMineFilter] = useState<TriState>("off");
   const [repliedFilter, setRepliedFilter] = useState<TriState>("off");
   const [assignedFilter, setAssignedFilter] = useState<TriState>("off");
   const [mentionedFilter, setMentionedFilter] = useState<TriState>("off");
   const [resolvedFilter, setResolvedFilter] = useState<TriState>("off");
+  const [deletedFilter, setDeletedFilter] = useState<TriState>("off");
   const [showMode, setShowMode] = useState<"inbox" | "open" | "resolved" | "all">("inbox");
   const [suggestionsFilter, setSuggestionsFilter] = useState<TriState>("off");
   const [unreadFilter, setUnreadFilter] = useState<TriState>("off");
@@ -668,7 +682,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
   // Re-enable sorting when any filter changes so the new view is properly sorted
   useEffect(() => {
     setSortActive(true);
-  }, [showMode, mineFilter, repliedFilter, assignedFilter, mentionedFilter, resolvedFilter, suggestionsFilter, unreadFilter, isStarredFilter, searchFilter]);
+  }, [showMode, mineFilter, repliedFilter, assignedFilter, mentionedFilter, resolvedFilter, deletedFilter, suggestionsFilter, unreadFilter, isStarredFilter, searchFilter]);
 
   // IDs of comments animating out (slide collapse) before removal from the filtered list
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
@@ -691,6 +705,10 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
     if (mentionedFilter === "exclude" && c.mentionedMe) return true;
     if (resolvedFilter === "include" && !c.resolved) return true;
     if (resolvedFilter === "exclude" && c.resolved) return true;
+    // Only applied while the filter is visible; a stale "include" with no
+    // deleted comments would otherwise hide everything with no way to clear it.
+    if (hasAnyDeleted && deletedFilter === "include" && !isDeleted(c)) return true;
+    if (hasAnyDeleted && deletedFilter === "exclude" && isDeleted(c)) return true;
     if (suggestionsFilter === "include" && c.type !== CommentType.SUGGESTION) return true;
     if (suggestionsFilter === "exclude" && c.type === CommentType.SUGGESTION) return true;
     if (unreadFilter === "include" && isThreadRead(c)) return true;
@@ -1279,6 +1297,8 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
         showAssigned={hasAnyAssigned}
         showMentioned={hasAnyMentioned}
         resolvedFilter={resolvedFilter}
+        deletedFilter={deletedFilter}
+        showDeleted={hasAnyDeleted}
         showMode={showMode}
         suggestionsFilter={suggestionsFilter}
         isStarred={isStarredFilter}
@@ -1289,6 +1309,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
         onAssignedChange={setAssignedFilter}
         onMentionedChange={setMentionedFilter}
         onResolvedChange={setResolvedFilter}
+        onDeletedChange={setDeletedFilter}
         onShowModeChange={setShowMode}
         onSuggestionsChange={setSuggestionsFilter}
         onIsStarredChange={setIsStarredFilter}
@@ -1432,7 +1453,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
                   suggestionContent={comment.type === CommentType.SUGGESTION
                     ? (suggestionContent[commentKey(comment)] ?? (comment.googleCommentId ? suggestionContent[comment.googleCommentId] : undefined))
                     : undefined}
-                  initialThread={threadMap[commentKey(comment)] ?? (comment.googleCommentId ? threadMap[comment.googleCommentId] : undefined)}
+                  initialThread={threadFor(comment)}
                   onUpdate={handleCommentUpdate}
                   onDelete={handleCommentDelete}
                   onThreadUpdate={handleThreadUpdate}

@@ -737,11 +737,12 @@ The doc detail page provides three ways to narrow the comment table:
 - **Assigned** — filter by `assignedToMe` (comment assigned to me). Only shown when any comment has this status.
 - **@Mentioned** — filter by `mentionedMe` (I was @mentioned in the thread). Only shown when any comment has this status.
 - **Resolved** — filter by `resolved`
+- **Deleted** — filter by orphaned threads (extension reported `originalContentDeleted`). Only shown when any comment has this state; ignored while hidden.
 - **Unread** — filter by threads with any unread message (`!isThreadRead`)
 - **Starred** — tri-state star filter (off/starred-only/unstarred-only)
 - **Suggestions** — filter by `type = SUGGESTION`
 
-Mine, Replied, Assigned, and @Mentioned badges only appear in the filter bar when at
+Mine, Replied, Assigned, @Mentioned, and Deleted badges only appear in the filter bar when at
 least one comment in the doc has that status (regardless of current filter/view state).
 
 **Search filter**:
@@ -763,7 +764,7 @@ Both regex and literal substring matching are always attempted:
 - **Green background** — comment is read (default read state). Only shown when neither red nor amber applies.
 - Red takes precedence over amber; both take precedence over green.
 
-The sortable data columns are Created and Modified — the only two with a meaningful single order. Status (which combines star, Mine/Replied/Assigned/@Mentioned badges, and Resolved/Open state into one column) and Unread don't sort. The Assigned badge is shown in a darker style (amber-600) to stand out.
+The sortable data columns are Created and Modified — the only two with a meaningful single order. Status (which combines star, Mine/Replied/Assigned/@Mentioned badges, Resolved/Open state, and the red Deleted badge into one column) and Unread don't sort. The Assigned badge is shown in a darker style (amber-600) to stand out.
 Modified shows "—" when it equals Created (i.e., no replies have been added).
 
 **Sort freezing on single-comment updates:** When you reply to, resolve, refresh, or
@@ -894,7 +895,7 @@ For full suggestion sync details, see [`suggestions.md`](./suggestions.md).
 - **Fields used for thread display**: adds `content, htmlContent, quotedFileContent(mimeType, value), author(displayName), replies(content, htmlContent, createdTime, author(displayName))`
 - **`htmlContent`**: Read-only field with HTML formatting of comment/reply text (bold, italics, @mention links). The API recommends displaying `htmlContent` over plain `content`. The thread panel renders it via `dangerouslySetInnerHTML`, passing it through `sanitizeHtml()` (`src/lib/sanitize-html.ts`, a DOMPurify wrapper) first — Drive already escapes user text, so this is defense in depth. `quotedFileContent.value` is sanitized the same way. The sanitizer also rewrites every link to `target="_blank" rel="noopener noreferrer"`, so clicking a link in a comment opens a new tab instead of replacing the Docreview page.
 - **`quotedFileContent`**: The document text the comment was anchored to at creation time. MIME type is typically `text/html` but in practice the value appears to contain no formatting markup. This is a snapshot — the text may have been edited or deleted since. The Drive API may also truncate long quoted text (the truncation format is undocumented). The thread panel shows one of three warnings when the quoted text doesn't match the current document, based on `originalContentDeleted` (a tri-state from the Chrome extension: `true` = deleted, `false` = checked & not deleted, `undefined` = not checked):
-  - **`true`**: "Original content deleted. This comment/suggestion is not visible in the document." — definitive orphaned warning from the extension's aria-label detection.
+  - **`true`**: "Original content deleted. This comment/suggestion is not visible in the document." — definitive orphaned warning from the extension's aria-label detection. The same condition (computed by `deletedContentWarning()` in `src/lib/deleted-content-warning.ts`) also shows a red **Deleted** badge in the collapsed summary row, with this message as its tooltip, and enables a **Deleted** tri-state filter in the filter bar. The filter is only shown while at least one comment in the doc is in this state, since the state only exists once the extension has reported it; it is also ignored while hidden so a leftover "include" can't blank the table.
   - **`false`** (text not found but extension says still anchored): "This is the original text from when the comment was created." — the text changed but the comment is still attached.
   - **`undefined`** (text not found, no extension data): "This text no longer exists in the document. This comment might not be visible." — uncertain, could be deleted or just edited.
   For Docs, the document text is fetched via `fetchDocData` (a single Docs API `documents.get` call that also extracts suggestion content); for Slides, via `fetchFileTextViaExport` (Drive `files.export` as `text/plain`). Sheets are not checked. Note: `fetchDocData` uses `SUGGESTIONS_INLINE` mode, so the document text includes pending suggestion text — anchor-text matching may false-positive if a suggestion overlaps the anchor region, but the consequence is only a spurious warning.

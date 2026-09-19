@@ -156,6 +156,8 @@ against `app-offline/` as it stands.
 - [ ] Suggestions appear in same table as comments
 - [ ] Orphaned suggestions (original content deleted) show "Original content deleted" warning (using state from the extension)
 - [ ] Orphaned comments (original content deleted) show "Original content deleted" warning (using state from the extension)
+- [ ] Orphaned threads show a "Deleted" badge in the collapsed summary row, with the same warning text as tooltip
+- [ ] "Deleted" filter appears (between Resolved and Unread) only when at least one thread is orphaned; include/exclude filters on that state
 - [ ] When extension confirms comment is NOT orphaned but anchor text doesn't match document, show softer "original text has changed" message instead of "text no longer exists" warning
 - [ ] Show proposed insertion, deletion, or edit text
 - [ ] Text-change suggestions (INSERT/DELETE/EDIT) do not show anchor text blockquote
