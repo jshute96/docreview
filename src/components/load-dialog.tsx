@@ -9,6 +9,7 @@ import {
   formatResultParts,
   dismissProgressToasts,
 } from "@/lib/stream-progress";
+import { showSyncErrorsToast } from "@/lib/sync-errors-toast";
 import { X, Loader2 } from "lucide-react";
 import { AccessState, DocRole, DocStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -77,9 +78,11 @@ const DEFAULT_OPTIONS: LoadOptions = {
 
 interface LoadDialogProps {
   onRefresh: (docs: DocWithLabels[]) => void;
+  /** Client-side title cache (googleDocId → title), for the sync-errors toast. */
+  titles?: Record<string, string>;
 }
 
-export function LoadDialog({ onRefresh }: LoadDialogProps) {
+export function LoadDialog({ onRefresh, titles = {} }: LoadDialogProps) {
   const { allLabels } = useLabels();
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<LoadOptions>(DEFAULT_OPTIONS);
@@ -208,7 +211,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
         }
       });
 
-      const data = await fetchWithProgress<Record<string, number>>("/api/docs?mode=load", {
+      const data = await fetchWithProgress<{ added?: number; updated?: number; deleted?: number; unarchived?: number; errorCount?: number; totalDocuments?: number; errorDocIds?: string[] }>("/api/docs?mode=load", {
         method: "POST",
         contextId,
         headers: { "Content-Type": "application/json" },
@@ -240,6 +243,7 @@ export function LoadDialog({ onRefresh }: LoadDialogProps) {
       setOpen(false);
 
       dismissProgressToasts();
+      showSyncErrorsToast(data.errorDocIds, docs, titles, "load");
       const { summary, errorSuffix } = formatResultParts(data);
       if ((data.errorCount ?? 0) > 0 && (data.added ?? 0) + (data.updated ?? 0) === 0) {
         toast.warning(`Load finished with errors — ${summary}${errorSuffix}`, { duration: 8000 });

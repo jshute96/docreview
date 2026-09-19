@@ -381,6 +381,7 @@ describe("upsertDocsAndSyncComments", () => {
       const result = await executeRefresh(userId, userEmail, { drive: true, gmail: true });
 
       expect(result.errorCount).toBe(1);
+      expect(result.errorDocIds).toEqual(["g1"]);
       expect(updateDriveChangesToken).toHaveBeenCalledWith(userId, "new-token");
       expect(updateGmailTimestamp).toHaveBeenCalledTimes(1);
     });
@@ -525,6 +526,7 @@ describe("executeDirectRefresh", () => {
 
     expect(findDeletedOrDeniedDocIds).toHaveBeenCalledWith("u1", ["g-missing"]);
     expect(result.errorCount).toBe(1);
+    expect(result.errorDocIds).toEqual(["g-transient"]);
   });
 });
 

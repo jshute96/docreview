@@ -11,6 +11,8 @@ After scanning, Docreview fetches metadata for any new documents found and syncs
 
 A toast notification shows real-time progress and a summary when complete: how many documents were added, updated, or removed.
 
+If some documents couldn't be synced (for example, a temporary Google API error), a separate warning lists them by name. Nothing is needed from you: those documents are retried automatically on the next refresh. (The same warning after **Load docs** means those documents weren't loaded — try loading them again.)
+
 If your Google account doesn't have Gmail enabled (some Google accounts that were never set up with Gmail, or Google Workspace users whose admin has disabled the Gmail service), the Gmail scan is skipped and a "No Gmail account" warning is shown. The Drive scan still runs as usual. Email notifications won't be visible to Docreview.
 
 ### Menu refresh options

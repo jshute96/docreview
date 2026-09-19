@@ -15,14 +15,17 @@ import {
   dismissProgressToasts,
   PROGRESS_GMAIL,
 } from "@/lib/stream-progress";
+import { showSyncErrorsToast } from "@/lib/sync-errors-toast";
 
 interface RefreshButtonProps {
   onRefresh: (docs: DocWithLabels[]) => void;
   disabled?: boolean;
   onLoadingChange?: (loading: boolean) => void;
+  /** Client-side title cache (googleDocId → title), for the sync-errors toast. */
+  titles?: Record<string, string>;
 }
 
-export function RefreshButton({ onRefresh, disabled, onLoadingChange }: RefreshButtonProps) {
+export function RefreshButton({ onRefresh, disabled, onLoadingChange, titles = {} }: RefreshButtonProps) {
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {
@@ -37,6 +40,7 @@ export function RefreshButton({ onRefresh, disabled, onLoadingChange }: RefreshB
         deleted?: number;
         unarchived?: number;
         errorCount?: number;
+        errorDocIds?: string[];
         totalDocuments?: number;
         noGmailAccount?: boolean;
       }>("/api/docs/refresh", {
@@ -65,6 +69,8 @@ export function RefreshButton({ onRefresh, disabled, onLoadingChange }: RefreshB
 
       // Keep the "No Gmail account" warning visible alongside the Drive result.
       dismissProgressToasts(data.noGmailAccount ? { keep: [PROGRESS_GMAIL] } : undefined);
+      // Fired before the summary toast so it sits above it in the stack.
+      showSyncErrorsToast(data.errorDocIds, docs, titles);
       const { summary, errorSuffix } = formatResultParts(data);
       toast.success(`Refresh complete — ${summary}${errorSuffix}`, { duration: 8000 });
     } catch (err) {

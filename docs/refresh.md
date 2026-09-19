@@ -155,6 +155,18 @@ Progress events track five distinct phases:
 Once the stream ends, the final result is sent as a `result` event, and the UI displays
 a document-focused summary (e.g., "Refresh complete — 1650 documents (2 new, 5 updated, 1 deleted)").
 
+If any docs failed transiently (`errorCount > 0`), the summary gets an "(N errors)" suffix
+and a separate warning toast (`showSyncErrorsToast()` in `src/lib/sync-errors-toast.tsx`)
+lists the affected docs by title — up to 5, then "…and N more" — each linking to its
+comments page (or to Google Docs for a not-yet-tracked doc), reusing the app's named tab
+targets. The result's `errorDocIds` carries the Google Doc IDs (doc-level errors only —
+`errorCount` can be larger because it also counts email-level Gmail scan failures). The
+toast auto-dismisses after 20s and has a close button; it isn't persistent because the
+docs are retried automatically on the next refresh, and a later error-free refresh
+dismisses it early. The same toast is shown by all refresh variants (Refresh,
+Drive/Gmail-only, selected, full) and by Load — except that Load's note says to retry
+manually, since a doc whose metadata fetch failed during Load never got a DB row.
+
 ---
 
 ## Phase 1 — Doc Discovery

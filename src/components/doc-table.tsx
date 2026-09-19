@@ -43,6 +43,7 @@ import {
   dismissProgressToasts,
   PROGRESS_GMAIL,
 } from "@/lib/stream-progress";
+import { showSyncErrorsToast } from "@/lib/sync-errors-toast";
 import { UNREAD_COMMENTS_TOOLTIP, INBOX_COMMENTS_TOOLTIP, OPEN_COMMENTS_TOOLTIP } from "@/lib/tooltips";
 
 interface DocTableProps {
@@ -245,6 +246,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
         deleted?: number;
         unarchived?: number;
         errorCount?: number;
+        errorDocIds?: string[];
         totalDocuments?: number;
         noGmailAccount?: boolean;
       }>(url, {
@@ -275,6 +277,8 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
       // skip the otherwise-misleading "complete" success toast.
       dismissProgressToasts(data.noGmailAccount ? { keep: [PROGRESS_GMAIL] } : undefined);
       if (data.noGmailAccount && opts?.gmailOnly) return;
+      // Fired before the summary toast so it sits above it in the stack.
+      showSyncErrorsToast(data.errorDocIds, newDocs, cachedTitles);
       const { summary, errorSuffix } = formatResultParts(data);
       toast.success(`${successLabel} — ${summary}${errorSuffix}`, { duration: 8000 });
     } catch (err) {
@@ -363,6 +367,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
             onRefresh={(newDocs) => setDocs(newDocs)}
             disabled={refreshing !== null}
             onLoadingChange={(v) => setRefreshing(v ? "main" : null)}
+            titles={cachedTitles}
           />
           <AddDocDialog
             onDocAdded={handleDocAdded}
@@ -372,7 +377,7 @@ export function DocTable({ initialDocs, initialLabels, isOffline, userId, hasSee
               </Button>
             }
           />
-          <LoadDialog onRefresh={(newDocs) => setDocs(newDocs)} />
+          <LoadDialog onRefresh={(newDocs) => setDocs(newDocs)} titles={cachedTitles} />
           <ManageLabelsDialog />
           <HelpDialog open={showHelp} onOpenChange={setShowHelp} />
           <DeleteAllDialog open={showDeleteAll} onOpenChange={setShowDeleteAll} />

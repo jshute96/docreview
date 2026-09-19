@@ -67,6 +67,7 @@ Update this list when adding or changing user-facing behaviors.
 
 ### Toolbar Actions
 - [ ] Refresh button shows progress toast, updates doc list with summary
+- [ ] Refresh with transient per-doc failures shows a separate warning toast listing the failed docs (max 5 + "…and N more"), each linking to the doc
 - [ ] Add button opens Add Document dialog
 - [ ] Load button opens Load dialog
 - [ ] Manage Labels button opens label management

@@ -83,6 +83,7 @@ describe("POST /api/docs/refresh", () => {
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0,
       errorCount: 0,
+      errorDocIds: [],
     });
 
     const res = await POST(postWithBody({ sources: ["drive"] }));
@@ -102,6 +103,7 @@ describe("POST /api/docs/refresh", () => {
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0,
       errorCount: 0,
+      errorDocIds: [],
     });
 
     const req = new NextRequest("http://localhost/api/docs/refresh", { method: "POST" });
@@ -124,6 +126,7 @@ describe("POST /api/docs/refresh", () => {
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0,
       errorCount: 0,
+      errorDocIds: [],
     });
 
     const res = await POST(postWithBody({ mode: "full" }));
@@ -148,6 +151,7 @@ describe("POST /api/docs/refresh", () => {
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0,
       errorCount: 0,
+      errorDocIds: [],
     });
 
     const res = await POST(postWithBody({ mode: "full" }));
@@ -170,6 +174,7 @@ describe("POST /api/docs/refresh", () => {
       commentsCreated: 0, commentsUpdated: 0,
       suggestionsCreated: 0, suggestionsUpdated: 0,
       errorCount: 0,
+      errorDocIds: [],
     });
 
     const res = await POST(postWithBody({ docIds: ["d1"] }));

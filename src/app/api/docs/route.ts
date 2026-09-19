@@ -343,5 +343,6 @@ async function executeLoad(opts: {
     driveChangesRead: driveDocs.length,
     totalDocuments: driveDocs.length,
     errorCount: metadataErrorIds.length + transientErrors,
+    errorDocIds: [...metadataErrorIds, ...commentDocs.filter((_, i) => syncResults[i].transientError).map(d => d.googleDocId)],
   };
 }

@@ -32,6 +32,11 @@ export interface RefreshResult {
   suggestionsCreated: number;
   suggestionsUpdated: number;
   errorCount: number;
+  /** Google Doc IDs whose metadata fetch or comment sync failed transiently.
+   *  One per doc-level error in errorCount; errorCount can be larger because
+   *  it also includes email-level Gmail scan failures, which have no doc ID.
+   *  Shown to the user so failures aren't silent. */
+  errorDocIds: string[];
   skipNotAuthor?: number;
   driveChangesRead?: number;
   totalDocuments?: number;
@@ -253,7 +258,8 @@ export async function upsertDocsAndSyncComments(
   const suggestionsCreated = syncResults.reduce((sum, r) => sum + r.suggestionsCreated, 0);
   const suggestionsUpdated = syncResults.reduce((sum, r) => sum + r.suggestionsUpdated, 0);
 
-  const errorCount = syncResults.filter(r => r.transientError).length;
+  const errorDocIds = processedDocs.filter((_, i) => syncResults[i].transientError).map(d => d.googleDocId);
+  const errorCount = errorDocIds.length;
   const permissionErrorCount = syncResults.filter(r => r.permissionDenied).length;
   const syncDeletedCount = syncResults.filter(r => r.isDeleted).length;
   const successCount = syncResults.length - errorCount - permissionErrorCount - syncDeletedCount;
@@ -268,6 +274,7 @@ export async function upsertDocsAndSyncComments(
     suggestionsCreated,
     suggestionsUpdated,
     errorCount,
+    errorDocIds,
     successCount,
     totalAttempted: processedDocs.length,
     skipNotAuthor
@@ -409,7 +416,7 @@ async function executeDirectRefresh(
     return {
       added: 0, updated: 0, deleted: 0, unarchived: 0,
       commentsCreated: 0, commentsUpdated: 0, suggestionsCreated: 0, suggestionsUpdated: 0,
-      errorCount: 0
+      errorCount: 0, errorDocIds: [],
     };
   }
 
@@ -449,6 +456,7 @@ async function executeDirectRefresh(
     ...syncRes,
     deleted: syncRes.deleted + additionalDeleted,
     errorCount: syncRes.errorCount + transientErrorIds.length,
+    errorDocIds: [...syncRes.errorDocIds, ...transientErrorIds],
   };
   const counts = [
     pluralize(result.updated, "doc") + " updated",
@@ -821,6 +829,7 @@ export async function executeRefresh(
     deleted: totalDeleted,
     unarchived: syncRes.unarchived + gmailMergeUnarchived,
     errorCount: totalErrorCount,
+    errorDocIds: [...syncRes.errorDocIds, ...metadataTransientIds],
     driveChangesRead,
     totalDocuments: allDiscoveryDocs.length,
     ...(gmailNoAccount ? { noGmailAccount: true } : {}),

@@ -234,6 +234,7 @@ Shadcn/ui components:
 | `sse.ts` | Server-side SSE (Server-Sent Events) streaming — `createProgressStream()` wraps long-running API operations, sends progress/result/error events over a ReadableStream |
 | `status.ts` | Read/write `Status` table — tracks `driveChangesPageToken` and `lastGmailUpdateTimestamp` per user for incremental sync |
 | `stream-progress.ts` | Client-side SSE reader + toast handlers — `fetchWithProgress()` reads SSE streams, `handleRefreshProgress()` maps events to Sonner toasts, `formatResultParts()` formats result summaries |
+| `sync-errors-toast.tsx` | `showSyncErrorsToast()` — warning toast listing docs whose refresh/load failed transiently (capped list, links to each doc) |
 | `textarea-styles.ts` | Shared Tailwind classes for consistent textarea styling |
 | `tooltips.ts` | Shared tooltip text constants for UI components |
 | `tri-state.ts` | `TriState` type (`off`/`include`/`exclude`), cycle function, partition helper |
