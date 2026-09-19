@@ -332,6 +332,10 @@ async function handleMissingGmailDocs(
  * Insert docs discovered via Gmail notifications that we can't access (404/403).
  * Creates new DB entries with the appropriate accessState, skipping docs already in DB.
  * Returns the number of docs inserted.
+ *
+ * DB errors propagate deliberately. During refresh this aborts before the
+ * Gmail timestamp advances; swallowing the error would let the cursor move past
+ * the notification and the doc would never be created.
  */
 export async function insertInaccessibleDocs(
   userId: string,
@@ -350,43 +354,39 @@ export async function insertInaccessibleDocs(
   let count = 0;
   for (const doc of docs) {
     if (existingGoogleDocIds.has(doc.googleDocId)) continue;
-    try {
-      let notes = doc.notes;
-      if (options?.extraNotes) {
-        notes = appendNotes(notes, options.extraNotes);
-      }
+    let notes = doc.notes;
+    if (options?.extraNotes) {
+      notes = appendNotes(notes, options.extraNotes);
+    }
 
-      await prisma.$transaction(async (tx) => {
-        const result = await tx.doc.create({
-          data: {
-            userId,
-            googleDocId: doc.googleDocId,
-            title: doc.title,
-            driveUrl: driveUrlFor(doc.googleDocId),
-            accessState: doc.accessState,
-            status: options?.status ?? DocStatus.INBOX,
-            role: DocRole.REVIEWER,
-            notes,
-            isStarred: options?.isStarred ?? false,
-            createdTimeInDrive: doc.emailDate,
-            lastModifiedInDrive: doc.emailDate,
-            lastCommentActivity: doc.emailDate,
-          },
-        });
-
-        if (options?.labelIds?.length) {
-          await tx.docLabel.createMany({
-            data: options.labelIds.map((labelId) => ({ docId: result.docId, labelId })),
-            skipDuplicates: true,
-          });
-        }
+    await prisma.$transaction(async (tx) => {
+      const result = await tx.doc.create({
+        data: {
+          userId,
+          googleDocId: doc.googleDocId,
+          title: doc.title,
+          driveUrl: driveUrlFor(doc.googleDocId),
+          accessState: doc.accessState,
+          status: options?.status ?? DocStatus.INBOX,
+          role: DocRole.REVIEWER,
+          notes,
+          isStarred: options?.isStarred ?? false,
+          createdTimeInDrive: doc.emailDate,
+          lastModifiedInDrive: doc.emailDate,
+          lastCommentActivity: doc.emailDate,
+        },
       });
 
-      count++;
-      logInfo(`[Sync] Added inaccessible doc ${doc.googleDocId} (${doc.accessState})`);
-    } catch (err) {
-      logWarning(`[Sync] Failed to insert inaccessible doc ${doc.googleDocId}:`, err);
-    }
+      if (options?.labelIds?.length) {
+        await tx.docLabel.createMany({
+          data: options.labelIds.map((labelId) => ({ docId: result.docId, labelId })),
+          skipDuplicates: true,
+        });
+      }
+    });
+
+    count++;
+    logInfo(`[Sync] Added inaccessible doc ${doc.googleDocId} (${doc.accessState})`);
   }
   return count;
 }

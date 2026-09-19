@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { upsertDocsAndSyncComments, executeRefresh } from "./refresh";
+import { upsertDocsAndSyncComments, executeRefresh, insertInaccessibleDocs } from "./refresh";
 import { prisma } from "./prisma";
 import { getDriveClient, listChanges } from "./google-drive";
 import { bumpLastCommentActivity, syncComments } from "./sync-comments";
@@ -460,5 +460,16 @@ describe("upsertDocsAndSyncComments", () => {
         data: { status: "INBOX" },
       })
     );
+  });
+});
+
+describe("insertInaccessibleDocs", () => {
+  it("propagates DB errors instead of swallowing them (so the refresh aborts before cursors advance)", async () => {
+    vi.mocked(prisma.doc.findMany).mockResolvedValue([] as any);
+    vi.mocked(prisma.$transaction).mockRejectedValue(new Error("db down"));
+
+    await expect(insertInaccessibleDocs("u1", [
+      { googleDocId: "g1", title: "t", accessState: "DENIED", notes: null, emailDate: new Date() } as any,
+    ])).rejects.toThrow("db down");
   });
 });

@@ -19,7 +19,7 @@ dialog scan route still uses the full `scanGmailNotifications()` wrapper.
 
 ## Scanner — `scanGmailForDocIds(userId, since)`
 
-The low-level scanner accepts a `Date` and returns `{ docIds, shareNotes, emailMeta, errorCount }`.
+The low-level scanner accepts a `Date` and returns `{ docIds, shareNotes, shareDates, emailMeta, errorCount }`.
 It performs only Gmail API calls (no Drive metadata fetch). The `emailMeta` map captures
 per-doc metadata (subject, from, date, body) for use when Drive API fails — see
 [Inaccessible Docs from Gmail](./access-states.md#inaccessible-docs-from-gmail).
@@ -45,7 +45,9 @@ title and notes extracted from the email.
 6. For sharing and comment notifications, extracts notes (e.g. sharer messages or comment snippets) via the structured parser.
 7. For messages with a doc ID, calls Drive `files.get` to fetch real title,
    mimeType, webViewLink, and role
-8. Messages with no doc link are logged as errors and counted
+8. Messages with no doc link are logged as warnings and skipped. They are **not** counted
+   in `errorCount` — that count holds the Gmail timestamp back, and a link-less email is a
+   permanent condition that would pin the cursor forever. Only `messages.get` failures count.
 9. Docs that fail Drive fetch (404/403) are collected as `inaccessibleDocs` with
    best-effort metadata (titles and notes) extracted from all associated emails.
 10. Deduplicates by googleDocId (multiple emails may reference the same doc),
@@ -121,7 +123,8 @@ upserts — see [`load-dialog.md`](./load-dialog.md) for the full UI flow.
 When Gmail is selected in the Load dialog:
 - Ownership filter and shared drives checkbox are hidden (not applicable)
 - Switching sources clears any existing scan results
-- Error count is displayed in the scan summary (e.g., "3 emails could not be resolved")
+- Error count is displayed in the scan summary (e.g., "3 emails could not be resolved"). This
+  counts only fetch failures; emails with no doc link are skipped silently (logged server-side).
 
 ---
 

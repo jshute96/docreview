@@ -173,8 +173,9 @@ sending the final result.
 }
 ```
 
-`errorCount` is only present for Gmail scans and counts emails where no doc link
-could be extracted.
+`errorCount` is only present for Gmail scans and counts emails that could not be
+fetched. Emails with no recognizable doc link are skipped (logged server-side) and
+are not counted.
 
 For Gmail scans, docs that fail Drive metadata fetch (404/403) are included in the
 results with `accessState`, `notes`, and `emailDate` fields. These are displayed in

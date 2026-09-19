@@ -259,6 +259,7 @@ export async function scanGmailForDocIds(
 
   // Fetch each message and extract doc links
   let errorCount = 0;
+  let noDocLinkCount = 0;
   const docIdSet = new Set<string>();
   const shareNotes = new Map<string, string>();
   const shareDates = new Map<string, Date>();
@@ -351,8 +352,12 @@ export async function scanGmailForDocIds(
             }
           }
         } else {
-          logError(`[Gmail] ${messageId}: no doc link found in notification. (${Date.now() - t0}ms)`);
-          errorCount++;
+          // Permanent condition (the email simply has no recognizable doc link),
+          // so it must NOT count as an error: errors hold the Gmail timestamp
+          // back, and this message would fail the same way on every re-scan,
+          // pinning the cursor forever (issue #24).
+          noDocLinkCount++;
+          logWarning(`[Gmail] ${messageId}: no doc link found in notification, skipping (${Date.now() - t0}ms)`);
         }
       } catch (err) {
         logError(`[Gmail] Failed to fetch message ${messageId} (${Date.now() - t0}ms):`, err);
@@ -365,7 +370,12 @@ export async function scanGmailForDocIds(
   );
 
   const docIds = [...docIdSet];
-  logInfo(`[Gmail] Scan complete: ${docIds.length} unique doc IDs, ${shareNotes.size} share notes, ${errorCount} errors`);
+  const extras = [
+    shareNotes.size > 0 && `${shareNotes.size} share notes`,
+    noDocLinkCount > 0 && `${noDocLinkCount} without doc link`,
+    errorCount > 0 && `${errorCount} errors`,
+  ].filter(Boolean).map(s => `, ${s}`).join("");
+  logInfo(`[Gmail] Scan complete: ${docIds.length} unique doc IDs${extras}`);
   return { docIds, shareNotes, shareDates, emailMeta, errorCount };
 }
 

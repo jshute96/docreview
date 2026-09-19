@@ -342,6 +342,7 @@ against `app-offline/` as it stands.
 - [ ] First Refresh does 7 day lookback, later ones do incremental reads
 - [ ] A refresh where one doc's comment sync fails still advances the Drive token and Gmail timestamp; the failed doc is retried via stale catch-up on the next refresh
 - [ ] A refresh where every doc sync fails keeps both cursors (logged with the kept and would-be values)
+- [ ] A Gmail notification with no recognizable doc link is skipped and does not hold the Gmail timestamp back
 
 ### Full Refresh
 - [ ] Fetches metadata for every tracked document
