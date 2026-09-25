@@ -9,3 +9,16 @@ allowBuilds:
   '@prisma/engines': true
   prisma: true
   unrs-resolver: true
+
+# Force a single copy of these transitive packages.
+overrides:
+  # googleapis-common (used by @googleapis/drive, docs, gmail) pins an older
+  # google-auth-library.  Two copies make our OAuth2Client type incompatible
+  # with the one the API clients expect, breaking typecheck.  If tsc still
+  # reports two copies after an install, delete the stale tsconfig.tsbuildinfo.
+  # Remove once googleapis-common depends on >= 10.9.1 itself.
+  google-auth-library: ^10.9.1
+  # 7.1.x (pulled in by eslint-config-next) adds stricter React Compiler rules
+  # that flag existing ref/setState-in-effect patterns.  Hold at 7.0.1 until
+  # that code is reworked.
+  eslint-plugin-react-hooks: 7.0.1
