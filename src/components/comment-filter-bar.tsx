@@ -4,6 +4,10 @@ import type { TriState } from "@/lib/tri-state";
 import { TriStateButton, type TriStateColorConfig } from "@/components/tri-state-button";
 import { TriStateStarButton } from "@/components/star-button";
 import { XIcon } from "@/components/x-icon";
+import {
+  badgeCountTooltip, modeCountTooltip,
+  type BadgeKey, type FilterCounts, type ShowMode,
+} from "@/lib/comment-filters";
 
 const COMMENT_TRISTATE_COLORS: Record<string, TriStateColorConfig> = {
   mine: {
@@ -48,7 +52,22 @@ const COMMENT_TRISTATE_COLORS: Record<string, TriStateColorConfig> = {
   },
 };
 
-type ShowMode = "inbox" | "open" | "resolved" | "all";
+/** Count chip shown after a filter button's label, tinted from the button's
+ *  text color. `filled` is for the solid (active) button style, where the text
+ *  is white and needs a stronger tint to show. Zero fades so the nonzero
+ *  counts stand out. */
+function CountChip({ count, filled }: { count: number; filled: boolean }) {
+  return (
+    <span
+      className={`rounded-full px-1.5 text-[11px] leading-[14px] tabular-nums ${
+        filled ? "bg-white/25" : "bg-current/15"
+      } ${count === 0 ? "opacity-45" : ""}`}
+    >
+      {count}
+    </span>
+  );
+}
+
 interface CommentFilterBarProps {
   mineFilter: TriState;
   repliedFilter: TriState;
@@ -68,6 +87,7 @@ interface CommentFilterBarProps {
   isStarred: TriState;
   unreadFilter: TriState;
   searchFilter: string;
+  counts: FilterCounts;
   onMineChange: (v: TriState) => void;
   onRepliedChange: (v: TriState) => void;
   onAssignedChange: (v: TriState) => void;
@@ -98,6 +118,7 @@ export function CommentFilterBar({
   isStarred,
   unreadFilter,
   searchFilter,
+  counts,
   onMineChange,
   onRepliedChange,
   onAssignedChange,
@@ -110,6 +131,23 @@ export function CommentFilterBar({
   onUnreadChange,
   onSearchFilterChange,
 }: CommentFilterBarProps) {
+  const badgeTitle = (key: BadgeKey, base: string) =>
+    [base, ...badgeCountTooltip(counts.badges[key], showMode)].join("\n");
+  const badge = (key: BadgeKey, label: string, value: TriState, onChange: (v: TriState) => void, base: string) => {
+    const title = badgeTitle(key, base);
+    return (
+      <TriStateButton
+        label={label}
+        value={value}
+        onChange={onChange}
+        colors={COMMENT_TRISTATE_COLORS[key]}
+        title={title}
+        className="rounded"
+        suffix={<CountChip count={counts.badges[key].shown} filled={value === "include"} />}
+      />
+    );
+  };
+
   return (
     <fieldset className="rounded-lg border border-zinc-200 px-4 py-2">
       <legend className="px-1 text-xs font-medium text-zinc-900 uppercase tracking-wide">
@@ -119,40 +157,51 @@ export function CommentFilterBar({
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
 
         <div className="flex flex-wrap items-center gap-2">
-          {showMine && <TriStateButton label="Mine" value={mineFilter} onChange={onMineChange} colors={COMMENT_TRISTATE_COLORS.mine} title="Threads you started" className="rounded" />}
-          {showReplied && <TriStateButton label="Replied" value={repliedFilter} onChange={onRepliedChange} colors={COMMENT_TRISTATE_COLORS.replied} title="Threads you replied in" className="rounded" />}
-          {showAssigned && <TriStateButton label="Assigned" value={assignedFilter} onChange={onAssignedChange} colors={COMMENT_TRISTATE_COLORS.assigned} title="Comments assigned to you" className="rounded" />}
-          {showMentioned && <TriStateButton label="@Mentioned" value={mentionedFilter} onChange={onMentionedChange} colors={COMMENT_TRISTATE_COLORS.mentioned} title="Threads where you were @mentioned" className="rounded" />}
-          <TriStateButton label="Resolved" value={resolvedFilter} onChange={onResolvedChange} colors={COMMENT_TRISTATE_COLORS.resolved} title="Resolved comments" className="rounded" />
-          {showDeleted && <TriStateButton label="Deleted" value={deletedFilter} onChange={onDeletedChange} colors={COMMENT_TRISTATE_COLORS.deleted} title="Comments on deleted text, not visible in the document" className="rounded" />}
-          <TriStateButton label="Unread" value={unreadFilter} onChange={onUnreadChange} colors={COMMENT_TRISTATE_COLORS.unread} title="Unread comments" className="rounded" />
+          {showMine && badge("mine", "Mine", mineFilter, onMineChange, "Comments you started")}
+          {showReplied && badge("replied", "Replied", repliedFilter, onRepliedChange, "Comments you've replied to")}
+          {showAssigned && badge("assigned", "Assigned", assignedFilter, onAssignedChange, "Comments assigned to you")}
+          {showMentioned && badge("mentioned", "@Mentioned", mentionedFilter, onMentionedChange, "Comments where you were @mentioned")}
+          {badge("resolved", "Resolved", resolvedFilter, onResolvedChange, "Resolved comments")}
+          {showDeleted && badge("deleted", "Deleted", deletedFilter, onDeletedChange, "Comments on deleted text, not visible in the document")}
+          {badge("unread", "Unread", unreadFilter, onUnreadChange, "Unread comments")}
+          <TriStateStarButton
+            value={isStarred}
+            onChange={onIsStarredChange}
+            title={badgeTitle("starred", "Starred comments")}
+            suffix={<CountChip count={counts.badges.starred.shown} filled={isStarred === "include"} />}
+          />
         </div>
         <div className="h-4 w-px bg-zinc-200" />
-        <TriStateStarButton value={isStarred} onChange={onIsStarredChange} />
-        <div className="h-4 w-px bg-zinc-200" />
-        <TriStateButton label="Suggestions" value={suggestionsFilter} onChange={onSuggestionsChange} colors={COMMENT_TRISTATE_COLORS.suggestions} title="Suggestions" className="rounded" />
+        {badge("suggestions", "Suggestions", suggestionsFilter, onSuggestionsChange, "Suggestions")}
 
         <div className="h-4 w-px bg-zinc-200" />
 
         <div className="flex items-center gap-2">
-          {(["inbox", "open", "all"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => onShowModeChange(mode)}
-              title={{
+          {(["inbox", "open", "all"] as const).map((mode) => {
+            const title = [
+              {
                 inbox: "Show inbox comments",
                 open: "Show all unresolved comments",
                 all: "Show all comments including resolved"
-              }[mode]}
-              className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+              }[mode],
+              ...modeCountTooltip(counts.modes[mode]),
+            ].join("\n");
+            return (
+            <button
+              key={mode}
+              onClick={() => onShowModeChange(mode)}
+              title={title}
+              className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium transition-colors ${
                 showMode === mode
                   ? "bg-zinc-800 text-white"
                   : "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-300 hover:bg-zinc-200"
               }`}
             >
               {mode.charAt(0).toUpperCase() + mode.slice(1)}
+              <CountChip count={counts.modes[mode].total} filled={showMode === mode} />
             </button>
-          ))}
+            );
+          })}
         </div>
 
       </div>

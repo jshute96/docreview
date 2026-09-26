@@ -116,7 +116,7 @@ One-line descriptions of every source file, grouped by layer.
 | `doc-detail.tsx` | Single doc detail view (client) — metadata panel, comment filters, comment table; pre-fetches all threads on load for instant expand |
 | `filter-bar.tsx` | Doc list filter bar — tri-state buttons for type/author/starred/labels/active/comments + title regex |
 | `hamburger-button.tsx` | Shared "more options" hamburger trigger for dropdown menus — one drawing for every menu, in three sizes (`default`, `compact`, `mini`) |
-| `comment-filter-bar.tsx` | Comment list filter bar — toggles for my threads/comments, starred, show mode, suggestions, unread |
+| `comment-filter-bar.tsx` | Comment list filter bar — toggles for my threads/comments, starred, show mode, suggestions, unread, each with a count chip |
 | `comment-row.tsx` | Single comment row — expandable, shows content preview, thread panel, status actions; preserves extension-sourced fields (tabName) across refreshes |
 | `comment-thread-panel.tsx` | Expanded thread view — shows all replies, unread markers (rail + "N unread" divider) and per-message read-point controls, reply textarea, resolve/reopen buttons, and an edit/delete menu on your own comments and replies |
 | `add-doc-form.tsx` | Shared add/update/re-add doc form body — URL validation (Add mode) or fixed doc (Re-add mode), label picker, notes; used by dialogs and standalone page |
@@ -220,6 +220,7 @@ Shadcn/ui components:
 | `prisma.ts` | Singleton PrismaClient with dev-mode write-op logging and base64 field obscuring |
 | `prisma-obscure.ts` | Prisma client extension that base64-encodes/decodes Doc.title, Doc.notes, Label.name transparently |
 | `sanitize-html.ts` | `sanitizeHtml()` — DOMPurify wrapper that scrubs Drive comment `htmlContent`/`quotedFileContent` before `dangerouslySetInnerHTML` and forces links to `target="_blank"`; strips tags on the server (no DOM) |
+| `comment-filters.ts` | Comment page filter predicates (show mode, tri-state badges, search) and the counts shown under each filter control, with their tooltips |
 | `deleted-content-warning.ts` | `deletedContentWarning()` — the "Original content deleted" message shown when the extension reports a thread's anchored text is gone; shared by the thread panel warning and the collapsed row's "Deleted" badge tooltip |
 | `bulk-edit.ts` | `BulkEditState` type and `cycleBulkEditState` helper for multi-doc editing |
 | `env-config.ts` | Client-accessible environment config — `CHROME_EXTENSION_URL` with env var override |

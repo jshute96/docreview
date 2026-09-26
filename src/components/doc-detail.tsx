@@ -15,6 +15,7 @@ import { DeleteReAddDialog } from "@/components/delete-readd-dialog";
 import { ROLE_COLORS } from "@/lib/role-colors";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
+import { computeFilterCounts, matchesBadges, matchesShowMode, type BadgeFilters, type FilterContext } from "@/lib/comment-filters";
 import { deletedContentWarning } from "@/lib/deleted-content-warning";
 import { isThreadRead, liveThreadReplies, totalMessageCount, totalSlotCount } from "@/lib/read-state";
 import { CommentRow } from "@/components/comment-row";
@@ -691,31 +692,22 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
   const [expandUnreadSignal, setExpandUnreadSignal] = useState(0);
   const [collapseSignal, setCollapseSignal] = useState(0);
 
+  const badgeFilters: BadgeFilters = {
+    mine: mineFilter,
+    replied: repliedFilter,
+    assigned: assignedFilter,
+    mentioned: mentionedFilter,
+    resolved: resolvedFilter,
+    deleted: deletedFilter,
+    unread: unreadFilter,
+    starred: isStarredFilter,
+    suggestions: suggestionsFilter,
+  };
+  const filterCtx: FilterContext<Comment> = { isDeleted, hasAnyDeleted };
+
+  /** Show mode and badge filters only; search is applied separately in filteredComments. */
   function wouldBeFilteredOut(c: Comment): boolean {
-    if (showMode === "inbox" && (c.status === CommentStatus.ARCHIVED || c.status === CommentStatus.MUTED)) return true;
-    if (showMode === "open" && c.resolved) return true;
-    if (showMode === "resolved" && !c.resolved) return true;
-    if (mineFilter === "include" && !c.isThreadAuthor) return true;
-    if (mineFilter === "exclude" && c.isThreadAuthor) return true;
-    if (repliedFilter === "include" && !c.isReplyAuthor) return true;
-    if (repliedFilter === "exclude" && c.isReplyAuthor) return true;
-    if (assignedFilter === "include" && !c.assignedToMe) return true;
-    if (assignedFilter === "exclude" && c.assignedToMe) return true;
-    if (mentionedFilter === "include" && !c.mentionedMe) return true;
-    if (mentionedFilter === "exclude" && c.mentionedMe) return true;
-    if (resolvedFilter === "include" && !c.resolved) return true;
-    if (resolvedFilter === "exclude" && c.resolved) return true;
-    // Only applied while the filter is visible; a stale "include" with no
-    // deleted comments would otherwise hide everything with no way to clear it.
-    if (hasAnyDeleted && deletedFilter === "include" && !isDeleted(c)) return true;
-    if (hasAnyDeleted && deletedFilter === "exclude" && isDeleted(c)) return true;
-    if (suggestionsFilter === "include" && c.type !== CommentType.SUGGESTION) return true;
-    if (suggestionsFilter === "exclude" && c.type === CommentType.SUGGESTION) return true;
-    if (unreadFilter === "include" && isThreadRead(c)) return true;
-    if (unreadFilter === "exclude" && !isThreadRead(c)) return true;
-    if (isStarredFilter === "include" && !c.isStarred) return true;
-    if (isStarredFilter === "exclude" && c.isStarred) return true;
-    return false;
+    return !matchesShowMode(c, showMode) || !matchesBadges(c, badgeFilters, filterCtx);
   }
 
   function handleSort(col: SortCol) {
@@ -1003,20 +995,26 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
 
   const matcher = useMemo(() => createMatcher(searchFilter), [searchFilter]);
 
+  function matchesSearch(c: Comment): boolean {
+    // commentContent and threadText both derive from threadMap so the initial
+    // comment text appears twice in the search string — harmless for matching.
+    const key = commentKey(c);
+    const text = commentContent[key] ?? "";
+    const sug = suggestionContent[key];
+    const sugText = sug ? `${sug.deletedText} ${sug.insertedText} ${sug.description ?? ""} ${sug.anchorText ?? ""}` : "";
+    const threads = threadText[key] ?? "";
+    const combined = `${text} ${sugText} ${threads}`;
+    return matcher(combined);
+  }
+
+  const filterCounts = computeFilterCounts(comments, showMode, badgeFilters, {
+    ...filterCtx,
+    matchesSearch: searchFilter ? matchesSearch : undefined,
+  });
+
   const filteredComments = comments
     .filter((c) => exitingIds.has(c.commentId) || !wouldBeFilteredOut(c))
-    .filter((c) => {
-      if (!searchFilter) return true;
-      // commentContent and threadText both derive from threadMap so the initial
-      // comment text appears twice in the search string — harmless for matching.
-      const key = commentKey(c);
-      const text = commentContent[key] ?? "";
-      const sug = suggestionContent[key];
-      const sugText = sug ? `${sug.deletedText} ${sug.insertedText} ${sug.description ?? ""} ${sug.anchorText ?? ""}` : "";
-      const threads = threadText[key] ?? "";
-      const combined = `${text} ${sugText} ${threads}`;
-      return matcher(combined);
-    })
+    .filter((c) => !searchFilter || matchesSearch(c))
     .sort((a, b) => {
       if (!sortActive) {
         const aPos = frozenOrderRef.current.get(a.commentId) ?? Infinity;
@@ -1304,6 +1302,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
         isStarred={isStarredFilter}
         unreadFilter={unreadFilter}
         searchFilter={searchFilter}
+        counts={filterCounts}
         onMineChange={setMineFilter}
         onRepliedChange={setRepliedFilter}
         onAssignedChange={setAssignedFilter}

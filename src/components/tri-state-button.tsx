@@ -83,6 +83,8 @@ interface TriStateButtonProps {
   colors: TriStateColorConfig;
   className?: string;
   title?: string;
+  /** Rendered after the label, e.g. a count chip. */
+  suffix?: React.ReactNode;
 }
 
 export function TriStateButton({
@@ -92,15 +94,17 @@ export function TriStateButton({
   colors,
   className = "",
   title,
+  suffix,
 }: TriStateButtonProps) {
   const handleClick = useTriStateCycle(value, onChange);
   return (
     <button
       onClick={handleClick}
       title={title}
-      className={`relative overflow-hidden px-2 py-0.5 text-xs font-medium transition-colors ${colors[value]} ${className}`}
+      className={`relative overflow-hidden px-2 py-0.5 text-xs font-medium transition-colors ${suffix ? "inline-flex items-center gap-1.5" : ""} ${colors[value]} ${className}`}
     >
       {label}
+      {suffix}
       {value === "exclude" && <DiagonalStrike bgColor="#eff6ff" />}
     </button>
   );

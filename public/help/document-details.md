@@ -20,15 +20,17 @@ Three buttons control which comments are visible:
 
 Below the show mode buttons, badge filters let you narrow the list further. Each is a tri-state toggle (off / include / exclude):
 
-- **Mine** -- Threads you started.
-- **Replied** -- Threads you've replied in.
+- **Mine** -- Comments you started.
+- **Replied** -- Comments you've replied to.
 - **Assigned** -- Comments assigned to you (only shown if any exist).
-- **@Mentioned** -- Threads where you were @mentioned (only shown if any exist).
+- **@Mentioned** -- Comments where you were @mentioned (only shown if any exist).
 - **Resolved** -- Filter by resolved/unresolved state.
 - **Deleted** -- Comments whose original text was deleted from the document (they no longer appear in Google Docs). Only shown when the browser extension has reported at least one such comment.
 - **Unread** -- Comments with messages you have not read yet (usually because someone else commented last).
 - **Starred** -- Comment-level stars.
 - **Suggestions** -- Tracked changes from Google Docs suggestion mode.
+
+The number on each filter button is how many comments match it in the current show mode (Inbox, Open, or All), ignoring the other filters and search. For example, the number on **Unread** in Inbox tells you how many unread threads are left. The numbers on the show mode buttons are the total in each mode. Hover over a button to see its count with your current filters applied, and in the other show modes.
 
 ## Search
 

@@ -745,6 +745,16 @@ The doc detail page provides three ways to narrow the comment table:
 Mine, Replied, Assigned, @Mentioned, and Deleted badges only appear in the filter bar when at
 least one comment in the doc has that status (regardless of current filter/view state).
 
+**Filter counts** (`computeFilterCounts()` in `src/lib/comment-filters.ts`): each badge and
+show-mode button shows a count chip after its label.
+- A badge's count is the number of comments with that attribute in the current show mode,
+  ignoring the other badges and search. This keeps it stable while toggling filters, so
+  "Unread 3" in Inbox always means three unread threads are left there.
+- A show-mode button's count is the number of comments in that mode, ignoring badges and search.
+- Tooltips add the other counts only when they differ from the displayed one: the count with
+  all current filters applied (for a badge, its own filter is skipped, since "exclude" would
+  always make it zero), and a badge's count in each of the other show modes.
+
 **Search filter**:
 The search bar at the top of the table allows filtering comments by text. The search is
 case-insensitive and checks against the comment content, suggestion text, and reply threads.
