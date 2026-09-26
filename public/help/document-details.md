@@ -64,6 +64,7 @@ Like the document list, comment rows are highlighted for urgency:
 
 Click a comment row to expand it and see the full thread. The expanded view shows:
 
+- A grey **Resolved** bar across the top if the thread has been resolved.
 - The original comment text with the quoted document text it refers to.
 - Any links in the comment text are clickable and open in a new tab, so you don't lose your place in Docreview.
 - All replies in chronological order. Unread messages have a blue bar on their left edge and a bold author name, and an "N unread" line separates them from the messages above that you've already read.

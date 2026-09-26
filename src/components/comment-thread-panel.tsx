@@ -906,11 +906,23 @@ export function CommentThreadPanel({
     </div>
   );
 
+  // Flush strip across the top of a resolved thread. Marks the state without
+  // fading the text, and pairs with the "Resolved" marker on the resolving
+  // reply at the bottom (only one may be scrolled into view). Shown while
+  // loading too, so it doesn't pop in and push the thread down. Its 7px
+  // corners are the panel's 8px rounded-lg minus the 1px border.
+  const resolvedBar = resolved && (
+    <div title="This comment has been resolved" className="-mx-4 -mt-4 mb-3 rounded-t-[7px] bg-zinc-200 px-4 py-1 text-xs font-semibold text-zinc-700">
+      Resolved
+    </div>
+  );
+
   // Every branch carries `panelRef`: the panel often mounts into the loading
   // branch, and the width has to be measured whichever one is on screen.
   if (loading) {
     return (
       <div ref={panelRef} className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
+        {resolvedBar}
         <p className="text-sm text-zinc-400">Loading comments...</p>
       </div>
     );
@@ -919,6 +931,7 @@ export function CommentThreadPanel({
   if (threads.length === 0) {
     return (
       <div ref={panelRef} className="mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4">
+        {resolvedBar}
         {headerContent}
         <p className="text-sm text-zinc-400">{emptyMessage ?? "Comment thread not available."}</p>
         {footerContent}
@@ -929,13 +942,14 @@ export function CommentThreadPanel({
 
   return (
     <div ref={panelRef} className={`mx-auto w-[90%] my-3 rounded-lg border bg-zinc-50 p-4${isSelected ? " ring-2 ring-blue-400" : ""}`}>
+      {resolvedBar}
       {headerContent}
       {/* Click anywhere in the thread body to select the comment in the Google Doc. */}
       <div className={`divide-y divide-zinc-200${onSelectInDoc ? " cursor-pointer" : ""}`} onClick={onSelectInDoc}>
         {threads.map((thread, threadIndex) => (
           <div
             key={thread.id}
-            className={`py-3 first:pt-0 last:pb-0 ${thread.resolved ? "opacity-60" : ""}`}
+            className="py-3 first:pt-0 last:pb-0"
           >
             <div className={thread.fromMe ? "bg-green-50 -mx-4 px-4 pt-2 pb-1 mb-2" : ""}>
               {threadIndex === 0 && (() => {
@@ -1029,7 +1043,7 @@ export function CommentThreadPanel({
                         </span>
                         <FriendlyDate date={reply.createdTime} className="text-xs text-zinc-400" />
                         {reply.action === "resolve" && (
-                          <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-600">
+                          <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-700">
                             Resolved
                           </span>
                         )}

@@ -31,10 +31,11 @@ const COMMENT_TRISTATE_COLORS: Record<string, TriStateColorConfig> = {
     include: "bg-orange-600 text-white ring-1 ring-orange-700",
     exclude: "bg-orange-100 text-orange-700 ring-1 ring-orange-300",
   },
+  // Darker than the other grays to match the Resolved badge and thread bar.
   resolved: {
-    off: "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-300 hover:bg-zinc-200",
+    off: "bg-zinc-200 text-zinc-700 ring-1 ring-zinc-300 hover:bg-zinc-300",
     include: "bg-zinc-600 text-white ring-1 ring-zinc-700",
-    exclude: "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-300",
+    exclude: "bg-zinc-200 text-zinc-700 ring-1 ring-zinc-300",
   },
   deleted: {
     off: "bg-red-100 text-red-700 ring-1 ring-red-300 hover:bg-red-200",
