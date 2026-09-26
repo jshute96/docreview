@@ -23,7 +23,9 @@ export function StarButton({ starred, onToggle, className = "", title }: StarBut
       className={`inline-flex items-center justify-center transition-colors ${className}`}
     >
       <Star
-        className={`h-4 w-4 ${starred ? "text-amber-400" : "text-zinc-300 hover:text-zinc-400"}`}
+        // Unstarred outline is translucent black rather than a fixed gray so it
+        // stays visible on tinted row backgrounds (selected, unread, etc.).
+        className={`h-4 w-4 ${starred ? "text-amber-400" : "text-black/30 hover:text-black/50"}`}
         fill={starred ? "currentColor" : "none"}
       />
     </button>

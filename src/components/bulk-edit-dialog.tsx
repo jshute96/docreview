@@ -318,7 +318,7 @@ export function BulkEditDialog({
                       className={`h-6 w-6 transition-colors ${
                         starState === "set" || (starState === "as-is" && star.all)
                           ? "text-amber-400"
-                          : "text-zinc-300 hover:text-zinc-400"
+                          : "text-black/30 hover:text-black/50"
                       }`}
                       fill={starState === "set" || (starState === "as-is" && star.all) ? "currentColor" : "none"}
                     />
