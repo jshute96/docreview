@@ -26,6 +26,7 @@ import { sanitizeHtml } from "@/lib/sanitize-html";
 import { deletedContentWarning } from "@/lib/deleted-content-warning";
 import { cn } from "@/lib/utils";
 import { foldEnd as foldThread } from "@/lib/thread-fold";
+import { inferredResolvedPosition } from "@/lib/resolve-marker";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { FriendlyDate } from "@/components/friendly-date";
 
@@ -912,10 +913,29 @@ export function CommentThreadPanel({
   // loading too, so it doesn't pop in and push the thread down. Its 7px
   // corners are the panel's 8px rounded-lg minus the 1px border.
   const resolvedBar = resolved && (
-    <div title="This comment has been resolved" className="-mx-4 -mt-4 mb-3 rounded-t-[7px] bg-zinc-200 px-4 py-1 text-xs font-semibold text-zinc-700">
+    <div title={`This ${isSuggestion ? "suggestion" : "comment"} has been resolved`} className="-mx-4 -mt-4 mb-3 rounded-t-[7px] bg-zinc-200 px-4 py-1 text-xs font-semibold text-zinc-700">
       Resolved
     </div>
   );
+
+  /** "(Resolved)" marker for a resolved thread with no reply saying who closed
+   *  it (see `inferredResolvedPosition`). The parentheses say it's inferred
+   *  from the thread's status rather than from a real resolving reply. */
+  const inferredResolvedMarker = (
+    <span
+      title={isSuggestion
+        ? "Suggestion accepted or rejected"
+        : "This comment thread is marked resolved"}
+      className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-700"
+    >
+      (Resolved)
+    </span>
+  );
+
+  // `resolved` belongs to the whole comment, so only the first thread gets the
+  // inferred marker (the panel shows one thread in practice).
+  const inferredPos = threads.length > 0 ? inferredResolvedPosition(!!resolved, threads[0].replies) : null;
+  const inferredAt = (threadIndex: number) => (threadIndex === 0 ? inferredPos : null);
 
   // Every branch carries `panelRef`: the panel often mounts into the loading
   // branch, and the width has to be measured whichever one is on screen.
@@ -996,6 +1016,7 @@ export function CommentThreadPanel({
                     {thread.author}
                   </span>
                   <FriendlyDate date={thread.createdTime} className="text-xs text-zinc-400" />
+                  {inferredAt(threadIndex) === 0 && inferredResolvedMarker}
                   {canModify(thread.fromMe, null) && (
                     <EntryMenu
                       label="comment"
@@ -1043,25 +1064,26 @@ export function CommentThreadPanel({
                         </span>
                         <FriendlyDate date={reply.createdTime} className="text-xs text-zinc-400" />
                         {reply.action === "resolve" && (
-                          <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-700">
+                          <span title={`This ${reply.content?.trim() ? "reply " : ""}resolves the comment`} className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-700">
                             Resolved
                           </span>
                         )}
                         {reply.action === "reopen" && (
-                          <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
+                          <span title={`This ${reply.content?.trim() ? "reply " : ""}reopens the comment`} className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
                             Reopened
                           </span>
                         )}
                         {reply.action === "accept" && (
-                          <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
+                          <span title="Suggestion accepted" className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
                             Accepted
                           </span>
                         )}
                         {reply.action === "reject" && (
-                          <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
+                          <span title="Suggestion rejected" className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
                             Rejected
                           </span>
                         )}
+                        {inferredAt(threadIndex) === i + 1 && inferredResolvedMarker}
                         {/* Resolve/reopen markers carry no text of their own, so
                             there's nothing to edit on them. */}
                         {!reply.action && canModify(reply.fromMe, reply.id) && (

@@ -209,6 +209,7 @@ Shadcn/ui components:
 | `cross-tab.ts` | Cross-tab state sync via BroadcastChannel — lightweight event types, `broadcastChange()`, `useCrossTabListener()` hook |
 | `doc-filters.ts` | Client-side doc filtering (tri-state logic for inbox/comments/author/starred/mimeType/labels/title regex) and sorting; accepts optional cached titles map for when `doc.title` is empty |
 | `browser-cache.ts` | Generic localStorage cache — namespaced key-value store with JSON values, batch operations, and staleness-based eviction |
+| `resolve-marker.ts` | `inferredResolvedPosition()` — which message of a resolved thread with no resolving reply gets the inferred "(Resolved)" marker |
 | `thread-fold.ts` | Decides which already-read messages an expanded thread folds away — `estimateLines()`, `foldEnd()` |
 | `read-state.ts` | Per-thread read tracking helpers — conversion between slot space (the stored `readSlotCount`, which counts deleted reply slots) and render space (the cached `readMessageCount`, live messages only), plus `unreadMessageCount()`, `isThreadRead()`, `totalMessageCount()`, `nextReadSlotCount()`, `initialReadSlotCount()` (shared by server sync and client UI) |
 | `extension-wire.ts` | `ExtCommentType` / `ExtSuggestionStatus` — the values the Chrome extension sends, with parsers for each boundary (the sync body uses the lowercase spelling, `commentSynced` the Prisma one) |

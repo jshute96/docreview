@@ -124,6 +124,7 @@ Update this list when adding or changing user-facing behaviors.
 - [x] Reopen with text reopens comment (Reopened badge, text shown, open count increases)
 - [x] Resolve with text resolves comment (Resolved badge + text shown, open count decreases)
 - [ ] Expanded resolved thread shows a gray "Resolved" bar across the top, with text at normal color (not faded)
+- [ ] Resolved thread with no resolving reply (e.g. suggestion without the extension) shows an inferred "(Resolved)" marker on its last message
 - [ ] Shows quoted document text
 - [ ] Links inside comment/reply text open in a new tab, leaving the Docreview tab in place
 - [ ] All replies in chronological order

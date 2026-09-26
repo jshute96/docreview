@@ -722,6 +722,21 @@ Used in the docs table UI as a sortable "Last Comment" column (default sort, des
 
 ---
 
+## Resolved Markers in the Thread Panel
+
+A resolved thread shows a gray **Resolved** bar across the top of its expanded panel, and
+a marker at the end of the thread:
+- **Real markers** go on the reply whose Drive `action` records the change: **Resolved**,
+  **Reopened**, or for suggestions **Accepted** / **Rejected**.
+- **Inferred "(Resolved)"** goes on the last message when the thread is resolved but its
+  latest action isn't resolve/accept/reject (`inferredResolvedPosition()` in
+  `src/lib/resolve-marker.ts`). This covers suggestions synthesized without the extension
+  (a single made-up entry with no replies) and threads built from Gmail notifications. The
+  parentheses mean the state comes from the row's `resolved` flag, not from a reply, so
+  for a suggestion we can't tell whether it was accepted or rejected.
+
+---
+
 ## Detail Page Filters
 
 The doc detail page provides three ways to narrow the comment table:

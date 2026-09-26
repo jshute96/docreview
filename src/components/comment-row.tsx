@@ -858,7 +858,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
             </span>
           )}
           {comment.resolved && (
-            <span title="This comment has been resolved" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-zinc-200 text-zinc-700">
+            <span title={`This ${isSuggestion ? "suggestion" : "comment"} has been resolved`} className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-zinc-200 text-zinc-700">
               Resolved
             </span>
           )}
