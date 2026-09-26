@@ -131,7 +131,8 @@ One-line descriptions of every source file, grouped by layer.
 | `refresh-button.tsx` | Combined Refresh button — calls POST `/api/docs/refresh` with both Drive+Gmail sources, then reloads list |
 | `star-button.tsx` | `StarButton` (two-state toggle) and `TriStateStarButton` (tri-state filter) for starring docs and comments |
 | `tri-state-button.tsx` | Tri-state filter buttons (off/include/exclude) with diagonal strikethrough + slow-click-to-reset; exports `useTriStateCycle` and `DiagonalStrike` |
-| `label-badge.tsx` | Colored label pill with optional remove button |
+| `label-badge.tsx` | Colored label pill with optional count chip and remove button |
+| `count-chip.tsx` | `CountChip` — small rounded count shown after a filter button or label name |
 | `label-picker.tsx` | Label selection grid for add/edit dialogs |
 | `manage-labels-dialog.tsx` | Dialog to create/delete/reorder/recolor labels with pointer-based drag reorder; includes delete confirmation with usage count and hover tooltips |
 | `color-picker.tsx` | Popover color grid for label color selection |

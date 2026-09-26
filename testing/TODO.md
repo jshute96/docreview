@@ -197,6 +197,7 @@ against `app-offline/` as it stands.
 - [x] Cancel discards unsaved changes (color, reorder, new labels)
 - [x] Delete label: cancel confirm keeps it; cancel dialog keeps it on docs page
 - [x] Delete label: confirm and save removes from all doc rows and DB (cascade)
+- [x] Each label row shows the label as a colored pill with a count chip of how many docs use it
 
 ### Label Assignment
 - [x] Assign labels to docs via Edit dialog (badges appear on rows, persisted to DB)

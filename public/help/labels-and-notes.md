@@ -8,8 +8,8 @@ Open **Manage Labels** from the menu to create, edit, and organize your labels:
 
 - **Create** -- Enter a name and pick a color from the palette.
 - **Reorder** -- Drag labels up and down to set their display order. This order is used everywhere labels appear: the filter bar, label pickers, and document rows.
-- **Change color** -- Click the color swatch to pick a new color.
-- **Delete** -- Remove a label. The dialog shows how many documents use each label so you can see the impact before deleting.
+- **Change color** -- Click the palette icon to pick a new color.
+- **Delete** -- Remove a label. The number on each label shows how many documents use it, so you can see the impact before deleting.
 
 Changes are saved when you click Save.
 

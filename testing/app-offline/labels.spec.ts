@@ -92,8 +92,8 @@ async function getDialogLabelNames(page: Page): Promise<string[]> {
   const count = await rows.count();
   const names: string[] = [];
   for (let i = 0; i < count; i++) {
-    const text = await rows.nth(i).locator('.text-sm.text-zinc-800').textContent();
-    if (text) names.push(text.trim());
+    const name = await rows.nth(i).getAttribute('data-label-name');
+    if (name) names.push(name);
   }
   return names;
 }
@@ -102,9 +102,8 @@ async function getDialogLabelNames(page: Page): Promise<string[]> {
  * Get the background color of a label's color swatch in the Manage Labels dialog.
  */
 async function getLabelColor(page: Page, labelName: string): Promise<string> {
-  const row = page.locator('[data-label-row]').filter({ hasText: labelName });
-  const swatch = row.getByRole('button', { name: `Change color for ${labelName}` });
-  return await swatch.evaluate(el => el.style.backgroundColor);
+  const pill = page.locator(`[data-label-row][data-label-name="${labelName}"] .rounded-full.text-xs.font-medium`);
+  return await pill.evaluate(el => (el as HTMLElement).style.backgroundColor);
 }
 
 // ---------------------------------------------------------------------------
@@ -269,6 +268,16 @@ test.describe('Labels', () => {
     expect(dbLabels2).toContain(LABEL_B);
     expect(dbLabels2).toContain(LABEL_C);
     expect(dbLabels2).not.toContain(LABEL_A);
+
+    // Verify Manage Labels shows each label's doc count (matching the DB)
+    await openManageLabels(page);
+    const dbCounts = new Map((await dbGetAllLabels()).map((l) => [l.name, l._count.docs]));
+    for (const name of [LABEL_A, LABEL_B, LABEL_C]) {
+      const row = page.locator(`[data-label-row][data-label-name="${name}"]`);
+      await expect(row.getByText(`Label ${name}, count ${dbCounts.get(name)}`)).toBeAttached();
+    }
+    expect(dbCounts.get(LABEL_A)).toBe(2);
+    await cancelDialog(page);
   });
 
   test('reorder labels and change color, then verify on docs page', async () => {

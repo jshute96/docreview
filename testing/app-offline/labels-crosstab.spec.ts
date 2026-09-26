@@ -349,9 +349,9 @@ test.describe('Labels cross-tab sync', () => {
     await expect(mlRows.filter({ hasText: LABEL_2 })).toBeVisible();
     await expect(mlRows.filter({ hasText: LABEL_3 })).toBeVisible();
 
-    // Verify LABEL_2 color swatch is purple
-    const mlLabel2Swatch = mlRows.filter({ hasText: LABEL_2 }).getByRole('button', { name: `Change color for ${LABEL_2}` });
-    const mlLabel2Bg = await mlLabel2Swatch.evaluate(el => el.style.backgroundColor);
+    // Verify LABEL_2 pill is purple
+    const mlLabel2Pill = tabDocsManageLabels.locator(`[data-label-row][data-label-name="${LABEL_2}"] .rounded-full.text-xs.font-medium`);
+    const mlLabel2Bg = await mlLabel2Pill.evaluate(el => (el as HTMLElement).style.backgroundColor);
     expect(mlLabel2Bg).toBe('rgb(139, 92, 246)');
 
     await cancelDialog(tabDocsManageLabels);

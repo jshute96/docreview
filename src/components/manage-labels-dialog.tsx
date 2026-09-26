@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
-import { GripVertical, Trash2 } from "lucide-react";
+import { GripVertical, Palette, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ColorPicker, PRIMARY_COLORS } from "@/components/color-picker";
 import { DialogButtons } from "@/components/dialog-buttons";
+import { LabelBadge } from "@/components/label-badge";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { useLabels } from "@/contexts/label-context";
@@ -320,6 +321,11 @@ export function ManageLabelsDialog({
             className="flex flex-col gap-1"
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
+            // A cancelled pointer (touch scroll, window switch) never sends
+            // pointerup, which would leave the list stuck in drag mode. Not
+            // lostpointercapture: reordering moves the dragged row in the DOM,
+            // which drops capture mid-drag.
+            onPointerCancel={handlePointerUp}
           >
             {draft.length === 0 && (
               <p className="text-sm text-zinc-400">No labels yet.</p>
@@ -328,7 +334,14 @@ export function ManageLabelsDialog({
               <div
                 key={label.labelId}
                 data-label-row
-                title={`Label ${label.name} is attached to ${pluralize(label._count?.docs ?? 0, "document")}`}
+                data-label-name={label.name}
+                title={
+                  // Counts come from the /api/labels refetch on open; if that
+                  // failed, don't claim a count we don't know.
+                  label._count
+                    ? `Label ${label.name} is attached to ${pluralize(label._count.docs, "document")}\nDrag to reorder`
+                    : `Label ${label.name}\nDrag to reorder`
+                }
                 className={`flex items-center justify-between rounded-md px-2 py-1.5 select-none touch-none ${
                   dragActiveIndex === index
                     ? "bg-zinc-100 ring-1 ring-zinc-300 cursor-grabbing"
@@ -342,11 +355,11 @@ export function ManageLabelsDialog({
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => handleDelete(label.labelId)}
                     className={`text-zinc-500 ${dragging ? "" : "hover:text-red-500"}`}
+                    title="Delete label"
                     aria-label={`Delete ${label.name}`}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
-                  <GripVertical className="h-4 w-4 text-zinc-300 flex-shrink-0" />
                   <ColorPicker
                     color={label.color ?? "#e4e4e7"}
                     onChange={(c) => handleColorChange(label, c)}
@@ -354,12 +367,15 @@ export function ManageLabelsDialog({
                     <button
                       type="button"
                       onPointerDown={(e) => e.stopPropagation()}
-                      className="h-4 w-4 rounded-full  ring-1 ring-zinc-200 hover:ring-zinc-400"
-                      style={{ backgroundColor: label.color ?? "#e4e4e7" }}
+                      className={`text-zinc-500 ${dragging ? "" : "hover:text-zinc-800"}`}
+                      title="Change color"
                       aria-label={`Change color for ${label.name}`}
-                    />
+                    >
+                      <Palette className="h-4 w-4" />
+                    </button>
                   </ColorPicker>
-                  <span className="text-sm text-zinc-800">{label.name}</span>
+                  <GripVertical className="h-4 w-4 text-zinc-300 flex-shrink-0" />
+                  <LabelBadge label={label} count={label._count?.docs} />
                 </div>
               </div>
             ))}

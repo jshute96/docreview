@@ -4,6 +4,7 @@ import type { TriState } from "@/lib/tri-state";
 import { TriStateButton, type TriStateColorConfig } from "@/components/tri-state-button";
 import { TriStateStarButton } from "@/components/star-button";
 import { XIcon } from "@/components/x-icon";
+import { CountChip } from "@/components/count-chip";
 import {
   badgeCountTooltip, modeCountTooltip,
   type BadgeKey, type FilterCounts, type ShowMode,
@@ -51,22 +52,6 @@ const COMMENT_TRISTATE_COLORS: Record<string, TriStateColorConfig> = {
     exclude: "bg-green-50 text-green-700 ring-1 ring-green-300",
   },
 };
-
-/** Count chip shown after a filter button's label, tinted from the button's
- *  text color. `filled` is for the solid (active) button style, where the text
- *  is white and needs a stronger tint to show. Zero fades so the nonzero
- *  counts stand out. */
-function CountChip({ count, filled }: { count: number; filled: boolean }) {
-  return (
-    <span
-      className={`rounded-full px-1.5 text-[11px] leading-[14px] tabular-nums ${
-        filled ? "bg-white/25" : "bg-current/15"
-      } ${count === 0 ? "opacity-45" : ""}`}
-    >
-      {count}
-    </span>
-  );
-}
 
 interface CommentFilterBarProps {
   mineFilter: TriState;
