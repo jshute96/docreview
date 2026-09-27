@@ -27,6 +27,7 @@ import { deletedContentWarning } from "@/lib/deleted-content-warning";
 import { cn } from "@/lib/utils";
 import { foldEnd as foldThread } from "@/lib/thread-fold";
 import { inferredResolvedPosition } from "@/lib/resolve-marker";
+import { Badge } from "@/components/badge";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { FriendlyDate } from "@/components/friendly-date";
 
@@ -922,14 +923,14 @@ export function CommentThreadPanel({
    *  it (see `inferredResolvedPosition`). The parentheses say it's inferred
    *  from the thread's status rather than from a real resolving reply. */
   const inferredResolvedMarker = (
-    <span
+    <Badge
+      tone="grayDark"
       title={isSuggestion
         ? "Suggestion accepted or rejected"
         : "This comment thread is marked resolved"}
-      className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-700"
     >
       (Resolved)
-    </span>
+    </Badge>
   );
 
   // `resolved` belongs to the whole comment, so only the first thread gets the
@@ -1064,24 +1065,24 @@ export function CommentThreadPanel({
                         </span>
                         <FriendlyDate date={reply.createdTime} className="text-xs text-zinc-400" />
                         {reply.action === "resolve" && (
-                          <span title={`This ${reply.content?.trim() ? "reply " : ""}resolves the comment`} className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-700">
+                          <Badge tone="grayDark" title={`This ${reply.content?.trim() ? "reply " : ""}resolves the comment`}>
                             Resolved
-                          </span>
+                          </Badge>
                         )}
                         {reply.action === "reopen" && (
-                          <span title={`This ${reply.content?.trim() ? "reply " : ""}reopens the comment`} className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
+                          <Badge tone="green" title={`This ${reply.content?.trim() ? "reply " : ""}reopens the comment`}>
                             Reopened
-                          </span>
+                          </Badge>
                         )}
                         {reply.action === "accept" && (
-                          <span title="Suggestion accepted" className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
+                          <Badge tone="green" title="Suggestion accepted">
                             Accepted
-                          </span>
+                          </Badge>
                         )}
                         {reply.action === "reject" && (
-                          <span title="Suggestion rejected" className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
+                          <Badge tone="red" title="Suggestion rejected">
                             Rejected
-                          </span>
+                          </Badge>
                         )}
                         {inferredAt(threadIndex) === i + 1 && inferredResolvedMarker}
                         {/* Resolve/reopen markers carry no text of their own, so

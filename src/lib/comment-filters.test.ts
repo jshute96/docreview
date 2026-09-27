@@ -3,7 +3,6 @@ import { CommentStatus, CommentType } from "@prisma/client";
 import {
   badgeCountTooltip,
   computeFilterCounts,
-  matchesAllFilters,
   matchesBadges,
   matchesShowMode,
   modeCountTooltip,
@@ -67,14 +66,6 @@ describe("matchesBadges", () => {
   it("can skip one badge", () => {
     const f = { ...OFF, unread: "include" } as BadgeFilters;
     expect(matchesBadges(c("a"), f, ctx, "unread")).toBe(true);
-  });
-});
-
-describe("matchesAllFilters", () => {
-  it("applies search on top of mode and badges", () => {
-    const withSearch = { ...ctx, matchesSearch: (x: C) => x.id === "hit" };
-    expect(matchesAllFilters(c("hit"), "inbox", OFF, withSearch)).toBe(true);
-    expect(matchesAllFilters(c("miss"), "inbox", OFF, withSearch)).toBe(false);
   });
 });
 

@@ -131,6 +131,7 @@ One-line descriptions of every source file, grouped by layer.
 | `refresh-button.tsx` | Combined Refresh button — calls POST `/api/docs/refresh` with both Drive+Gmail sources, then reloads list |
 | `star-button.tsx` | `StarButton` (two-state toggle) and `TriStateStarButton` (tri-state filter) for starring docs and comments |
 | `tri-state-button.tsx` | Tri-state filter buttons (off/include/exclude) with diagonal strikethrough + slow-click-to-reset; exports `useTriStateCycle` and `DiagonalStrike` |
+| `badge.tsx` | `Badge` — small status badge (Author, Mine, Resolved, reply markers) in a shared color tone |
 | `label-badge.tsx` | Colored label pill with optional count chip and remove button |
 | `count-chip.tsx` | `CountChip` — small rounded count shown after a filter button or label name |
 | `label-picker.tsx` | Label selection grid for add/edit dialogs |
@@ -228,7 +229,8 @@ Shadcn/ui components:
 | `env-config.ts` | Client-accessible environment config — `CHROME_EXTENSION_URL` with env var override |
 | `tab-targets.ts` | Named window targets for tab reuse — `commentsTarget()`, `docTarget()`, `openCommentsPage()`, `openDocPage()` |
 | `offline.ts` | Offline mode constants — `OFFLINE_MODE` flag, `OfflineModeError`, fallback user |
-| `role-colors.ts` | Tailwind class maps for Author (blue) and Reviewer (violet) role badges/filters |
+| `tones.ts` | Shared color tones for badges, tri-state filter buttons and toggles (`toneBadgeClass`, `toneTriStateColors`, `toneToggleClass`); `labelToggleStyle()` for label toggles; the selected-ring shadow and default label color |
+| `role-colors.ts` | Tailwind class maps for role (Author/Reviewer) and status (Inbox/Archived) badges and toggles |
 | `load-options.ts` | `parseLoadOptions()` — shared validation for scan/load request body (daysBack, ownership, includeSharedDrives, source) |
 | `log.ts` | `logError()`, `logWarning()`, and `logInfo()` — centralized logging helpers; console output (colored) + daily file output to `logs/` with timestamps and request IDs |
 | `parse-gmail-notification.ts` | Gmail notification parser — extracts structured data from raw `.eml` content (or a pre-parsed `ParsedEmail`) for comment and sharing notifications; `SharingNotification` includes optional sharer-supplied `shareMessage` extracted from the plaintext body and falls back to the Reply-To header for sharer name/email |
@@ -243,7 +245,7 @@ Shadcn/ui components:
 | `tooltips.ts` | Shared tooltip text constants for UI components |
 | `tri-state.ts` | `TriState` type (`off`/`include`/`exclude`), cycle function, partition helper |
 | `url-utils.ts` | `isPublicShortenerUrl()` — server-side redirect whitelist; `tryResolveRedirect()` — follows shortener URLs to resolve Google Doc links |
-| `utils.ts` | `cn()` (clsx+twMerge), `contrastText()` for label colors, `formatDate()` (full timestamp with omitSeconds/omitTime support), `formatDateFriendly()` (relative display format; both take real Dates), `isUnparseableDateString()` (screens free-form date strings), `appendNotes()` (append text to existing notes with newline separator), `appendMissingNotes()` (same, but skips lines already present) |
+| `utils.ts` | `cn()` (clsx+twMerge), `contrastText()`, `tintColor()`, `shadeColor()` and `labelBorderColor()` for label colors, `formatDate()` (full timestamp with omitSeconds/omitTime support), `formatDateFriendly()` (relative display format; both take real Dates), `isUnparseableDateString()` (screens free-form date strings), `appendNotes()` (append text to existing notes with newline separator), `appendMissingNotes()` (same, but skips lines already present) |
 | `__mocks__/prisma.ts` | Vitest mock of PrismaClient for unit tests |
 
 ## Types (`src/types/`)

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { AccessState, DocRole, DocStatus } from "@prisma/client";
 import type { DocWithLabels } from "@/types";
 import { LabelBadge } from "@/components/label-badge";
-import { ROLE_COLORS } from "@/lib/role-colors";
+import { Badge } from "@/components/badge";
 import { EditDocDialog } from "@/components/edit-doc-dialog";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { Button } from "@/components/ui/button";
@@ -114,9 +114,9 @@ export function DocRow({
             </span>
           </a>
           {doc.role === DocRole.AUTHOR && (
-            <span title="You are an author of this document" className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>
+            <Badge tone="blue" title="You are an author of this document">
               Author
-            </span>
+            </Badge>
           )}
           {doc.labels.map((dl) => (
             <LabelBadge key={dl.labelId} label={dl.label} />

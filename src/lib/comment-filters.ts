@@ -73,15 +73,6 @@ export function matchesBadges<C extends FilterableComment>(
   return true;
 }
 
-/** Full filter: show mode, badges, and search. */
-export function matchesAllFilters<C extends FilterableComment>(
-  c: C, showMode: ShowMode, filters: BadgeFilters, ctx: FilterContext<C>,
-): boolean {
-  return matchesShowMode(c, showMode)
-    && matchesBadges(c, filters, ctx)
-    && (!ctx.matchesSearch || ctx.matchesSearch(c));
-}
-
 export interface BadgeCount {
   /** The displayed count: comments with this attribute in the current show
    *  mode, ignoring other badges and search, so it stays stable while toggling

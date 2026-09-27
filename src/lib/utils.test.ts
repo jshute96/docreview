@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appendMissingNotes, appendNotes, contrastText, formatDate, formatDateFriendly, isUnparseableDateString } from "./utils";
+import { appendMissingNotes, appendNotes, contrastText, shadeColor, tintColor, formatDate, formatDateFriendly, isUnparseableDateString } from "./utils";
 
 describe("appendNotes", () => {
   it("returns addition when existing is null", () => {
@@ -213,5 +213,27 @@ describe("isUnparseableDateString", () => {
   it("is true for garbage strings", () => {
     expect(isUnparseableDateString("yesterday")).toBe(true);
     expect(isUnparseableDateString("not a date")).toBe(true);
+  });
+});
+
+describe("tintColor", () => {
+  it("blends toward white by the given amount", () => {
+    expect(tintColor("#000000", 0)).toBe("#000000");
+    expect(tintColor("#000000", 1)).toBe("#ffffff");
+    expect(tintColor("#ff0000", 0.5)).toBe("#ff8080");
+  });
+  it("returns non-hex input unchanged", () => {
+    expect(tintColor("red", 0.5)).toBe("red");
+  });
+});
+
+describe("shadeColor", () => {
+  it("blends toward black by the given amount", () => {
+    expect(shadeColor("#ffffff", 0)).toBe("#ffffff");
+    expect(shadeColor("#ffffff", 1)).toBe("#000000");
+    expect(shadeColor("#ff8000", 0.5)).toBe("#804000");
+  });
+  it("returns non-hex input unchanged", () => {
+    expect(shadeColor("red", 0.5)).toBe("red");
   });
 });

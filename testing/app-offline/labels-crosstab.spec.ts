@@ -299,8 +299,9 @@ test.describe('Labels cross-tab sync', () => {
 
     // LABEL_2 should be purple
     const addLabel2 = tabAdd.getByRole('button', { name: LABEL_2, exact: true });
-    const addLabel2Bg = await addLabel2.evaluate(el => el.style.backgroundColor);
-    expect(addLabel2Bg).toBe('rgb(139, 92, 246)');
+    // Toggle pills draw a light tint when unselected, so read the label's
+    // own color from the data attribute rather than the background.
+    expect(await addLabel2.getAttribute('data-label-color')).toBe('#8b5cf6');
 
     // ---------------------------------------------------------------
     // Verify: /docs + Add dialog (Tab 4)
@@ -322,8 +323,7 @@ test.describe('Labels cross-tab sync', () => {
 
     // LABEL_2 in Edit dialog should be purple
     const editLabel2 = editDialogContent.getByRole('button', { name: LABEL_2, exact: true });
-    const editLabel2Bg = await editLabel2.evaluate(el => el.style.backgroundColor);
-    expect(editLabel2Bg).toBe('rgb(139, 92, 246)');
+    expect(await editLabel2.getAttribute('data-label-color')).toBe('#8b5cf6');
 
     // ---------------------------------------------------------------
     // Verify: /comments/<docId> + Edit dialog (Tab 6)

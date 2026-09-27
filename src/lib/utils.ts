@@ -5,6 +5,34 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Blends a hex color toward `target` (0 or 255 per channel) by `amount`.
+ *  Returns the input unchanged if it isn't a 6-digit hex color. */
+function blendColor(hex: string, target: number, amount: number): string {
+  const h = hex.replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return hex;
+  const channel = (i: number) => {
+    const v = parseInt(h.substring(i, i + 2), 16);
+    return Math.round(v + (target - v) * amount).toString(16).padStart(2, "0");
+  };
+  return `#${channel(0)}${channel(2)}${channel(4)}`;
+}
+
+/** Blends a hex color toward white by `amount` (0 = unchanged, 1 = white). */
+export function tintColor(hex: string, amount: number): string {
+  return blendColor(hex, 255, amount);
+}
+
+/** Blends a hex color toward black by `amount` (0 = unchanged, 1 = black). */
+export function shadeColor(hex: string, amount: number): string {
+  return blendColor(hex, 0, amount);
+}
+
+/** Border drawn around a label pill: a darker shade of its color, so pale labels
+ *  (light cyan, pale pink) still have a visible edge on white rows. */
+export function labelBorderColor(hex: string): string {
+  return shadeColor(hex, 0.2);
+}
+
 /** Returns black or white text color for readable contrast against a hex background. */
 export function contrastText(hex: string): string {
   const h = hex.replace("#", "");

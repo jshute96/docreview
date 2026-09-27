@@ -18,7 +18,7 @@ import { DocTypeIcon } from "@/components/doc-type-icon";
 import { TEXTAREA_CLASSES } from "@/lib/textarea-styles";
 import { BulkEditState, cycleBulkEditState } from "@/lib/bulk-edit";
 import { Star } from "lucide-react";
-import { contrastText, pluralize } from "@/lib/utils";
+import { pluralize } from "@/lib/utils";
 import { ManageLabelsDialog } from "@/components/manage-labels-dialog";
 import { Button } from "@/components/ui/button";
 import { broadcastChange } from "@/lib/cross-tab";
@@ -26,6 +26,7 @@ import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { useLabels } from "@/contexts/label-context";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { commentsTarget } from "@/lib/tab-targets";
+import { DEFAULT_LABEL_COLOR, labelToggleStyle } from "@/lib/tones";
 
 interface BulkEditDialogProps {
   initialDocs: DocWithLabels[];
@@ -343,7 +344,6 @@ export function BulkEditDialog({
               </div>
               <div className="flex flex-wrap gap-3 pt-1">
                 {allLabels.map((label) => {
-                  const bg = label.color ?? "#e4e4e7";
                   const state = labelStates[label.labelId] ?? "as-is";
                   const { all: allHave, mixed: isMixed } = checkConsistency(effectiveDocs, d => d.labels.some(dl => dl.labelId === label.labelId));
                   const active = state === "set" || state === "clear" || (state === "as-is" && allHave);
@@ -353,10 +353,9 @@ export function BulkEditDialog({
                       key={label.labelId}
                       type="button"
                       onClick={(e) => cycleLabel(label.labelId, e)}
-                      className={`relative rounded-full px-2 py-0.5 text-xs font-medium transition-opacity ${
-                        active ? "opacity-100 ring-2 ring-offset-1 ring-zinc-400" : "opacity-40 hover:opacity-70"
-                      }`}
-                      style={{ backgroundColor: bg, color: contrastText(bg) }}
+                      data-label-color={label.color ?? DEFAULT_LABEL_COLOR}
+                      className={`relative rounded-full px-2 py-0.5 text-xs font-medium transition ${active ? "" : "hover:brightness-95"}`}
+                      style={labelToggleStyle(label.color, active)}
                     >
                       {label.name}
                       <StateIndicator state={state} isMixed={isMixed} />

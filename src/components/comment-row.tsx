@@ -10,6 +10,7 @@ import { highlightText } from "@/lib/highlight";
 import { deletedContentWarning } from "@/lib/deleted-content-warning";
 import { FriendlyDate } from "@/components/friendly-date";
 import { StarButton } from "@/components/star-button";
+import { Badge } from "@/components/badge";
 import { broadcastChange } from "@/lib/cross-tab";
 import { apiFetch, generateContextId, isAuthError, THREAD_LOAD_MESSAGES } from "@/lib/api-fetch";
 import { navigateToComment, supportsCommentNavigation, getSuggestionFromDoc, getCommentFromDoc, getExtensionStatus, type ExtensionSuggestion } from "@/lib/bridge-to-extension";
@@ -838,34 +839,34 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
         <div className="flex items-center gap-1 self-stretch pl-0 pr-1" onClick={(e) => e.stopPropagation()}>
           <StarButton starred={comment.isStarred} onToggle={toggleStar} />
           {comment.isThreadAuthor && (
-            <span title="You started this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
+            <Badge tone="blue" title="You started this thread">
               Mine
-            </span>
+            </Badge>
           )}
           {comment.isReplyAuthor && !comment.isThreadAuthor && (
-            <span title="You replied in this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700">
+            <Badge tone="violet" title="You replied in this thread">
               Replied
-            </span>
+            </Badge>
           )}
           {comment.assignedToMe && (
-            <span title="Comment assigned to you" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-amber-600 text-white">
+            <Badge tone="amber" strong title="Comment assigned to you">
               Assigned
-            </span>
+            </Badge>
           )}
           {comment.mentionedMe && (
-            <span title="You were @mentioned in this thread" className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700">
+            <Badge tone="orange" title="You were @mentioned in this thread">
               @Mentioned
-            </span>
+            </Badge>
           )}
           {comment.resolved && (
-            <span title={`This ${isSuggestion ? "suggestion" : "comment"} has been resolved`} className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-zinc-200 text-zinc-700">
+            <Badge tone="grayDark" title={`This ${isSuggestion ? "suggestion" : "comment"} has been resolved`}>
               Resolved
-            </span>
+            </Badge>
           )}
           {deletedWarning && (
-            <span title={deletedWarning} className="inline-flex rounded px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700">
+            <Badge tone="red" title={deletedWarning}>
               Deleted
-            </span>
+            </Badge>
           )}
         </div>
       )}

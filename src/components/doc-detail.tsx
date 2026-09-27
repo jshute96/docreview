@@ -12,10 +12,10 @@ import { DocTypeIcon } from "@/components/doc-type-icon";
 import { LabelBadge } from "@/components/label-badge";
 import { EditDocDialog } from "@/components/edit-doc-dialog";
 import { DeleteReAddDialog } from "@/components/delete-readd-dialog";
-import { ROLE_COLORS } from "@/lib/role-colors";
+import { Badge } from "@/components/badge";
 import type { TriState } from "@/lib/tri-state";
 import { CommentFilterBar } from "@/components/comment-filter-bar";
-import { computeFilterCounts, matchesBadges, matchesShowMode, type BadgeFilters, type FilterContext } from "@/lib/comment-filters";
+import { computeFilterCounts, matchesBadges, matchesShowMode, type BadgeFilters, type FilterContext, type ShowMode } from "@/lib/comment-filters";
 import { deletedContentWarning } from "@/lib/deleted-content-warning";
 import { isThreadRead, liveThreadReplies, totalMessageCount, totalSlotCount } from "@/lib/read-state";
 import { CommentRow } from "@/components/comment-row";
@@ -662,7 +662,7 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
   const [mentionedFilter, setMentionedFilter] = useState<TriState>("off");
   const [resolvedFilter, setResolvedFilter] = useState<TriState>("off");
   const [deletedFilter, setDeletedFilter] = useState<TriState>("off");
-  const [showMode, setShowMode] = useState<"inbox" | "open" | "resolved" | "all">("inbox");
+  const [showMode, setShowMode] = useState<ShowMode>("inbox");
   const [suggestionsFilter, setSuggestionsFilter] = useState<TriState>("off");
   const [unreadFilter, setUnreadFilter] = useState<TriState>("off");
   const [isStarredFilter, setIsStarredFilter] = useState<TriState>("off");
@@ -1007,14 +1007,20 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
     return matcher(combined);
   }
 
+  // Run the search once per render; both the counts and the table use it.
+  const searchHits = searchFilter
+    ? new Set(comments.filter(matchesSearch).map((c) => c.commentId))
+    : null;
+  const inSearch = (c: Comment) => !searchHits || searchHits.has(c.commentId);
+
   const filterCounts = computeFilterCounts(comments, showMode, badgeFilters, {
     ...filterCtx,
-    matchesSearch: searchFilter ? matchesSearch : undefined,
+    matchesSearch: searchHits ? inSearch : undefined,
   });
 
   const filteredComments = comments
     .filter((c) => exitingIds.has(c.commentId) || !wouldBeFilteredOut(c))
-    .filter((c) => !searchFilter || matchesSearch(c))
+    .filter(inSearch)
     .sort((a, b) => {
       if (!sortActive) {
         const aPos = frozenOrderRef.current.get(a.commentId) ?? Infinity;
@@ -1251,9 +1257,9 @@ export function DocDetail({ doc: initialDoc, allLabels: initialLabels, userId, u
           <span className="font-medium text-zinc-400">Labels:</span>
           <StarButton starred={doc.isStarred} onToggle={handleToggleStar} />
           {doc.role === DocRole.AUTHOR && (
-            <span title="You are an author of this document" className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS.AUTHOR.badge}`}>
+            <Badge tone="blue" title="You are an author of this document">
               Author
-            </span>
+            </Badge>
           )}
           {doc.labels.map((dl) => (
             <LabelBadge key={dl.labelId} label={dl.label} />

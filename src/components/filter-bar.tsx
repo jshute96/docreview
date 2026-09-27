@@ -2,6 +2,7 @@
 
 import type { Label } from "@prisma/client";
 import type { TriState } from "@/lib/tri-state";
+import { labelBorderColor, tintColor } from "@/lib/utils";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { XIcon } from "@/components/x-icon";
 import {
@@ -64,17 +65,28 @@ export function FilterBar({
 
         {/* Doc type icons */}
         <div className="flex items-center gap-1">
-          {DOC_TYPES.map(({ mimeType, label, color }) => (
-            <TriStateIconButton
-              key={mimeType}
-              value={mimeTypes[mimeType] ?? "off"}
-              onChange={(v) => onMimeTypeChange(mimeType, v)}
-              title={label}
-              iconColor={color}
-            >
-              <DocTypeIcon mimeType={mimeType} className="h-4 w-4" />
-            </TriStateIconButton>
-          ))}
+          {DOC_TYPES.map(({ mimeType, label, color }) => {
+            const value = mimeTypes[mimeType] ?? "off";
+            // Like the label pills: a light tint with a full-color border when
+            // not selected, full color with a darker border when selected.
+            const selected = value === "include";
+            return (
+              <TriStateIconButton
+                key={mimeType}
+                value={value}
+                onChange={(v) => onMimeTypeChange(mimeType, v)}
+                title={label}
+                iconColor={color}
+              >
+                <DocTypeIcon
+                  mimeType={mimeType}
+                  className="h-4 w-4"
+                  squareFill={selected ? undefined : tintColor(color, 0.55)}
+                  squareStroke={selected ? labelBorderColor(color) : color}
+                />
+              </TriStateIconButton>
+            );
+          })}
         </div>
 
         <div className="h-4 w-px bg-zinc-200" />

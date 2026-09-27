@@ -5,53 +5,23 @@ import { TriStateButton, type TriStateColorConfig } from "@/components/tri-state
 import { TriStateStarButton } from "@/components/star-button";
 import { XIcon } from "@/components/x-icon";
 import { CountChip } from "@/components/count-chip";
+import { toneToggleClass, toneTriStateColors } from "@/lib/tones";
 import {
-  badgeCountTooltip, modeCountTooltip,
+  COUNTED_SHOW_MODES, badgeCountTooltip, modeCountTooltip,
   type BadgeKey, type FilterCounts, type ShowMode,
 } from "@/lib/comment-filters";
 
-const COMMENT_TRISTATE_COLORS: Record<string, TriStateColorConfig> = {
-  mine: {
-    off: "bg-blue-100 text-blue-700 ring-1 ring-blue-300 hover:bg-blue-200",
-    include: "bg-blue-600 text-white ring-1 ring-blue-700",
-    exclude: "bg-blue-100 text-blue-700 ring-1 ring-blue-300",
-  },
-  replied: {
-    off: "bg-violet-100 text-violet-700 ring-1 ring-violet-300 hover:bg-violet-200",
-    include: "bg-violet-600 text-white ring-1 ring-violet-700",
-    exclude: "bg-violet-100 text-violet-700 ring-1 ring-violet-300",
-  },
-  assigned: {
-    off: "bg-amber-100 text-amber-700 ring-1 ring-amber-300 hover:bg-amber-200",
-    include: "bg-amber-600 text-white ring-1 ring-amber-700",
-    exclude: "bg-amber-100 text-amber-700 ring-1 ring-amber-300",
-  },
-  mentioned: {
-    off: "bg-orange-100 text-orange-700 ring-1 ring-orange-300 hover:bg-orange-200",
-    include: "bg-orange-600 text-white ring-1 ring-orange-700",
-    exclude: "bg-orange-100 text-orange-700 ring-1 ring-orange-300",
-  },
-  // Darker than the other grays to match the Resolved badge and thread bar.
-  resolved: {
-    off: "bg-zinc-200 text-zinc-700 ring-1 ring-zinc-300 hover:bg-zinc-300",
-    include: "bg-zinc-600 text-white ring-1 ring-zinc-700",
-    exclude: "bg-zinc-200 text-zinc-700 ring-1 ring-zinc-300",
-  },
-  deleted: {
-    off: "bg-red-100 text-red-700 ring-1 ring-red-300 hover:bg-red-200",
-    include: "bg-red-600 text-white ring-1 ring-red-700",
-    exclude: "bg-red-100 text-red-700 ring-1 ring-red-300",
-  },
-  suggestions: {
-    off: "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-300 hover:bg-zinc-200",
-    include: "bg-zinc-600 text-white ring-1 ring-zinc-700",
-    exclude: "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-300",
-  },
-  unread: {
-    off: "bg-green-50 text-green-700 ring-1 ring-green-300 hover:bg-green-100",
-    include: "bg-green-600 text-white ring-1 ring-green-700",
-    exclude: "bg-green-50 text-green-700 ring-1 ring-green-300",
-  },
+/** Filter button colors, matching the badges they filter on (see `@/lib/tones`).
+ *  Keyed by badge so a missing entry is a type error rather than a render crash. */
+const COMMENT_TRISTATE_COLORS: Record<Exclude<BadgeKey, "starred">, TriStateColorConfig> = {
+  mine: toneTriStateColors("blue"),
+  replied: toneTriStateColors("violet"),
+  assigned: toneTriStateColors("amber"),
+  mentioned: toneTriStateColors("orange"),
+  resolved: toneTriStateColors("grayDark"),
+  deleted: toneTriStateColors("red"),
+  suggestions: toneTriStateColors("gray"),
+  unread: toneTriStateColors("green"),
 };
 
 interface CommentFilterBarProps {
@@ -119,7 +89,7 @@ export function CommentFilterBar({
 }: CommentFilterBarProps) {
   const badgeTitle = (key: BadgeKey, base: string) =>
     [base, ...badgeCountTooltip(counts.badges[key], showMode)].join("\n");
-  const badge = (key: BadgeKey, label: string, value: TriState, onChange: (v: TriState) => void, base: string) => {
+  const badge = (key: Exclude<BadgeKey, "starred">, label: string, value: TriState, onChange: (v: TriState) => void, base: string) => {
     const title = badgeTitle(key, base);
     return (
       <TriStateButton
@@ -163,7 +133,7 @@ export function CommentFilterBar({
         <div className="h-4 w-px bg-zinc-200" />
 
         <div className="flex items-center gap-2">
-          {(["inbox", "open", "all"] as const).map((mode) => {
+          {COUNTED_SHOW_MODES.map((mode) => {
             const title = [
               {
                 inbox: "Show inbox comments",
@@ -177,10 +147,12 @@ export function CommentFilterBar({
               key={mode}
               onClick={() => onShowModeChange(mode)}
               title={title}
+              // Unselected matches the other gray filter buttons; selected stays
+              // near-black since exactly one mode is always on.
               className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium transition-colors ${
                 showMode === mode
-                  ? "bg-zinc-800 text-white"
-                  : "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-300 hover:bg-zinc-200"
+                  ? "bg-zinc-800 text-white ring-1 ring-zinc-900"
+                  : toneToggleClass("gray", false)
               }`}
             >
               {mode.charAt(0).toUpperCase() + mode.slice(1)}

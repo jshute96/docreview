@@ -1,8 +1,9 @@
 "use client";
 
 import type { Label } from "@prisma/client";
-import { contrastText } from "@/lib/utils";
+import { contrastText, labelBorderColor } from "@/lib/utils";
 import { CountChip } from "@/components/count-chip";
+import { DEFAULT_LABEL_COLOR } from "@/lib/tones";
 
 interface LabelBadgeProps {
   label: Label;
@@ -12,12 +13,12 @@ interface LabelBadgeProps {
 }
 
 export function LabelBadge({ label, onRemove, count }: LabelBadgeProps) {
-  const bg = label.color ?? "#e4e4e7";
+  const bg = label.color ?? DEFAULT_LABEL_COLOR;
 
   return (
     <span
       className={`inline-flex items-center ${count !== undefined ? "gap-1.5" : "gap-1"} rounded-full px-2 py-0.5 text-xs font-medium`}
-      style={{ backgroundColor: bg, color: contrastText(bg) }}
+      style={{ backgroundColor: bg, color: contrastText(bg), boxShadow: `inset 0 0 0 1px ${labelBorderColor(bg)}` }}
     >
       {count === undefined ? (
         label.name

@@ -29,6 +29,7 @@ import { apiFetch, generateContextId, isAuthError } from "@/lib/api-fetch";
 import { useLabels } from "@/contexts/label-context";
 import type { LabelWithCount } from "@/types";
 import { pluralize } from "@/lib/utils";
+import { DEFAULT_LABEL_COLOR } from "@/lib/tones";
 
 function randomPrimaryColor(): string {
   return PRIMARY_COLORS[Math.floor(Math.random() * PRIMARY_COLORS.length)];
@@ -361,7 +362,7 @@ export function ManageLabelsDialog({
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                   <ColorPicker
-                    color={label.color ?? "#e4e4e7"}
+                    color={label.color ?? DEFAULT_LABEL_COLOR}
                     onChange={(c) => handleColorChange(label, c)}
                   >
                     <button

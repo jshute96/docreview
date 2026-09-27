@@ -1,9 +1,9 @@
 "use client";
 
-import { contrastText } from "@/lib/utils";
 import { ManageLabelsDialog } from "@/components/manage-labels-dialog";
 import { Button } from "@/components/ui/button";
 import { useLabels } from "@/contexts/label-context";
+import { DEFAULT_LABEL_COLOR, labelToggleStyle } from "@/lib/tones";
 
 interface LabelPickerProps {
   selectedLabelIds: string[];
@@ -45,15 +45,13 @@ export function LabelPicker({
         )}
         {allLabels.map((label) => {
           const active = selectedLabelIds.includes(label.labelId);
-          const bg = label.color ?? "#e4e4e7";
           return (
             <button
               key={label.labelId}
               onClick={() => onToggle(label.labelId)}
-              className={`rounded-full px-2 py-0.5 text-xs font-medium transition-opacity ${
-                active ? "opacity-100 ring-2 ring-offset-1 ring-zinc-400" : "opacity-40 hover:opacity-70"
-              }`}
-              style={{ backgroundColor: bg, color: contrastText(bg) }}
+              data-label-color={label.color ?? DEFAULT_LABEL_COLOR}
+              className={`rounded-full px-2 py-0.5 text-xs font-medium transition ${active ? "" : "hover:brightness-95"}`}
+              style={labelToggleStyle(label.color, active)}
             >
               {label.name}
             </button>

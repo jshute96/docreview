@@ -3,7 +3,8 @@
 import { useCallback, useRef } from "react";
 import type { TriState } from "@/lib/tri-state";
 import { cycleTriState } from "@/lib/tri-state";
-import { contrastText } from "@/lib/utils";
+import { DEFAULT_LABEL_COLOR, labelToggleStyle, toneTriStateColors } from "@/lib/tones";
+import { tintColor } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // useTriStateCycle — slow-click-to-reset behavior
@@ -69,11 +70,7 @@ export interface TriStateColorConfig {
 }
 
 export const TRISTATE_COLORS = {
-  author: {
-    off: "bg-blue-100 text-blue-700 ring-1 ring-blue-300 hover:bg-blue-200",
-    include: "bg-blue-600 text-white ring-1 ring-blue-700",
-    exclude: "bg-blue-100 text-blue-700 ring-1 ring-blue-300",
-  },
+  author: toneTriStateColors("blue"),
 } as const;
 
 interface TriStateButtonProps {
@@ -111,7 +108,7 @@ export function TriStateButton({
 }
 
 // ---------------------------------------------------------------------------
-// TriStateIconButton — for doc type icons (opacity + ring pattern)
+// TriStateIconButton — for doc type icons (the icon shows the state)
 // ---------------------------------------------------------------------------
 
 interface TriStateIconButtonProps {
@@ -130,19 +127,17 @@ export function TriStateIconButton({
   children,
 }: TriStateIconButtonProps) {
   const handleClick = useTriStateCycle(value, onChange);
-  const stateClass =
-    value === "include"
-      ? "opacity-100 ring-2 ring-zinc-400 ring-offset-1"
-      : value === "exclude"
-        ? "opacity-100"
-        : "opacity-35 hover:opacity-60";
+  // The icon itself shows the state (tinted when not selected; see filter-bar);
+  // the button only adds the excluded strike. No selected ring, matching the
+  // Author and star filters next to it.
+  const selected = value === "include";
 
   return (
     <button
       onClick={handleClick}
       title={title}
       aria-label={`Filter by ${title}`}
-      className={`relative overflow-hidden rounded p-0.5 transition-opacity ${stateClass}`}
+      className={`relative overflow-hidden rounded p-0.5 transition ${selected ? "" : "hover:brightness-95"}`}
     >
       {children}
       {value === "exclude" && <DiagonalStrike bgColor={iconColor} />}
@@ -170,23 +165,21 @@ export function TriStateLabelButton({
   title,
 }: TriStateLabelButtonProps) {
   const handleClick = useTriStateCycle(value, onChange);
-  const bg = color ?? "#e4e4e7";
-  const stateClass =
-    value === "include"
-      ? "opacity-100 ring-2 ring-zinc-400 ring-offset-1"
-      : value === "exclude"
-        ? "opacity-100"
-        : "opacity-40 hover:opacity-70";
+  // Only "include" shows the full color. "exclude" keeps the unselected look
+  // under the strike, like every other tri-state filter button.
+  const selected = value === "include";
+  const bg = color ?? DEFAULT_LABEL_COLOR;
 
   return (
     <button
       onClick={handleClick}
       title={title}
-      className={`relative overflow-hidden rounded-full px-2 py-0.5 text-xs font-medium transition-opacity ${stateClass}`}
-      style={{ backgroundColor: bg, color: contrastText(bg) }}
+      data-label-color={bg}
+      className={`relative overflow-hidden rounded-full px-2 py-0.5 text-xs font-medium transition ${selected ? "" : "hover:brightness-95"}`}
+      style={labelToggleStyle(color, selected)}
     >
       {label}
-      {value === "exclude" && <DiagonalStrike bgColor={bg} />}
+      {value === "exclude" && <DiagonalStrike bgColor={tintColor(bg, 0.65)} />}
     </button>
   );
 }
