@@ -17,7 +17,6 @@ Easy:
 * scroll bars for lots of docs
 * Button for search in Drive (from docs search box)
 * load dialog is too tall, collapse the first section
-* Text is hard to read on unselected tags.  Especially white.
 * link URL includes filters, labels, etc.
 
 * Cancel API requests and other work on tab close?
@@ -32,8 +31,6 @@ Easy:
   * show pending permission requests somehow
 
 * chrome extension
-  * bi-directional linking - clicking a comment in the doc should focus it in docreview
-    (docreview → doc already works via in-page comment navigation)
   * accept or reject suggestions by sending clicks to buttons in docs (there's no API for this)
   * maybe: inline/popup docreview status - labels, etc.
   * cosmetic: icon placement in title is glitchy while the page is loading and things move around
@@ -55,7 +52,6 @@ Easy:
 * tooltip display for longer notes
 * editable notes box inline on the comments page?
 * rendering glitch when toggling filters makes scroll bar appear
-* "No comments on this doc" still shows if we try to load and fail.
 * dialog boxes move around too much, because they resize but stay centered
 * when the open/ link resolves links redirect-service links, it blocks loading the page until resolve is done. Maybe something should show up.
 
@@ -86,7 +82,7 @@ Easy:
 * check and refine rules for detecting hasNewActivity on comment threads - reply count, change timestamp, etc.
 * embedded pgvector index for semantic search on docs, titles, comments
 * gmail notificaitons include a reply-to for adding replies to a suggestion by email. we could use that to allow adding replies (but not accept/reject).
-* tabbed docs - capture and show which tab comments are on, allow filter by tab, etc.
+* tabbed docs - capture and show which tab comments are on, allow filter by tab, etc. (Available via extension only, not in drive API)
 * fix prisma-obscure so it's aware of tables, not just column names, and doesn't get confused
 * for non-Gmail users - fetch email notifications from other email, maybe by IMAP
 
@@ -95,7 +91,6 @@ Easy:
 * help for URLs: where to reference /add?doc=ID, etc.
 * when the extension checks for redirect links, it briefly opens a tab to try loading the page.  There are alternative ways, but complicated and with caveats.
 * assembling suggestion text from docs content is complex with multi-fragment overlapping suggestions, and causes some bugs or caveats, including matching to gmail by content hash.
-* new comment detection is based on reply count, and can get confused when replies get deleted
 
 ## wishlish for google APIs
 * suggestions don't work in APIs at all
@@ -112,7 +107,7 @@ Easy:
   * assignee is only reported if it's me. I can see if I was ever assigned, but can't tell if it was assigned to someone else after.
 
 ## Possible V2 features
-* build doc veiwer and diff viewer, take over from doc's lame differ
+* build doc viewer and diff viewer, take over from doc's lame differ
 * support markdown docs too, with the same workflow, with comments in code review tools
 * plugin model so we can support other doc&comments backends
   * code reviews too?
