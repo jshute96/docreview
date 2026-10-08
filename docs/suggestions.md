@@ -82,8 +82,8 @@ Suggestions are stored with two separate ID fields:
 
 - **`googleSuggestionId`** — the Docs API ID (`suggest.xxx`), always set for suggestions.
   Used for Docs API lookups and as the key for suggestion content maps.
-- **`googleCommentId`** — the Drive comment ID (`AAAB0xxx`), set when available (e.g.,
-  from Gmail notification merge). Used for `?disco=` deep links.
+- **`googleCommentId`** — the Drive comment / discussion ID (`AAAB0xxx` or `doco.xxx`), set when available (e.g.,
+  from Gmail notification or extension merge). Used for `?disco=` deep links.
 
 Comments use only `googleCommentId` (Drive comment ID). Both fields have unique indexes
 with `docId`. PostgreSQL treats NULLs as distinct in unique constraints, so NULL values
@@ -129,7 +129,7 @@ stripped before storage.
 | Column | Docs API (Drive sync) | Gmail notification | Merge rule |
 |--------|----------------------|-------------------|------------|
 | `googleSuggestionId` | `suggest.xxx` | — | Drive only |
-| `googleCommentId` | — | `discussionId` (AAA*) | Gmail only |
+| `googleCommentId` | — | `discussionId` (`AAA*` or `doco.*`) | Gmail / Extension |
 | `suggestionContentHash` | computed from text | computed from text | Drive & Extension refresh on each sync; Gmail only fills when missing |
 | `type` | SUGGESTION | SUGGESTION | Either |
 | `suggestionType` | INSERT/DELETE/EDIT/OTHER | mappable from Add/Delete/Replace/Other | Either |

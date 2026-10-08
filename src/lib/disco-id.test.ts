@@ -7,6 +7,8 @@ describe("isDiscoId", () => {
     expect(isDiscoId("AAAB33Ml-HM")).toBe(true);
     expect(isDiscoId("AAAB0test123")).toBe(true);
     expect(isDiscoId("AAAB1c")).toBe(true);
+    expect(isDiscoId("doco.hai_-X4keJDt22nkwRsYyw")).toBe(true);
+    expect(isDiscoId("doco.0XcJGTM8FqmLjqiJRcOAtA")).toBe(true);
   });
 
   it("rejects the placeholder the extension used to synthesize", () => {
@@ -29,6 +31,10 @@ describe("isDiscoId", () => {
     expect(isDiscoId("aaab1abcd")).toBe(false);  // lowercase prefix
     expect(isDiscoId("AAAB1ab cd")).toBe(false); // whitespace
     expect(isDiscoId(" AAAB1abcd")).toBe(false); // leading whitespace
+    expect(isDiscoId("doco.")).toBe(false);      // nothing after doco. prefix
+    expect(isDiscoId("doco")).toBe(false);       // missing dot and body
+    expect(isDiscoId("DOCO.abc123")).toBe(false);// uppercase doco prefix
+    expect(isDiscoId("doco.ab cd")).toBe(false); // whitespace
   });
 
   it("rejects non-string values", () => {

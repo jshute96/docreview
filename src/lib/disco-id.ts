@@ -14,18 +14,22 @@
 // that can't produce a real ID must yield null — never a sentinel string.
 
 /**
- * Google disco IDs look like `AAAB1agdt2A` — the literal prefix `AAA`, an
- * uppercase letter, then base64url-ish characters. Deliberately loose on
- * length (matching `extractIdByPath` in the extension rather than the stricter
- * discovery heuristic): this is a guard against sentinels, empty strings, and
- * obviously-wrong values, not an attempt to predict Google's ID length.
+ * Google disco IDs come in two formats:
+ *   - `AAA[A-Z]...` (e.g. `AAAB1agdt2A`) — the literal prefix `AAA`, an
+ *     uppercase counter letter, then base64url-ish characters.
+ *   - `doco....` (e.g. `doco.hai_-X4keJDt22nkwRsYyw`) — the literal prefix
+ *     `doco.`, then base64url-ish characters (rolled out in late 2026).
+ *
+ * Deliberately loose on length (matching `extractIdByPath` in the extension
+ * rather than the stricter discovery heuristic): this is a guard against
+ * sentinels, empty strings, and obviously-wrong values, not an attempt to
+ * predict Google's ID length.
  *
  * Keep in sync with the patterns in `background-injected.js`. This one is
- * stricter than the extension's `extractIdByPath` check (it's anchored at both
- * ends), so a value can pass the scrape and still be rejected here — callers
- * must treat a rejection as a partial result, not as "nothing was missing".
+ * anchored at both ends (like `extractIdByPath`), so callers must still treat
+ * any rejection as a partial result, not as "nothing was missing".
  */
-const DISCO_ID_PATTERN = /^AAA[A-Z][A-Za-z0-9_-]+$/;
+const DISCO_ID_PATTERN = /^(?:AAA[A-Z]|doco\.)[A-Za-z0-9_-]+$/;
 
 /** True if `id` is a syntactically valid Google Docs disco ID. */
 export function isDiscoId(id: unknown): id is string {

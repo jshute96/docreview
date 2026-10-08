@@ -48,6 +48,9 @@ export async function mergeSuggestionsFromGmail(
     // produce a non-empty but malformed value, and storing that poisons the row
     // the same way the extension's old `'(no ID)'` placeholder did.
     const discoId = isDiscoId(suggestion.discussionId) ? suggestion.discussionId : null;
+    if (suggestion.discussionId && !discoId) {
+      logWarning(`[Suggestions:Gmail] ${googleDocId}: ignoring unrecognized discussionId "${suggestion.discussionId}"`);
+    }
     let existingById: Comment | null = null;
     if (discoId) {
       existingById = await prisma.comment.findFirst({
@@ -97,7 +100,7 @@ export async function mergeSuggestionsFromGmail(
       // Gmail timestamp (actual notification time) is more accurate than
       // Drive's doc.lastModifiedInDrive approximation, so overwrite it.
       const gmailTime = suggestion.time ? new Date(suggestion.time) : emailDate;
-      logInfo(`[Suggestions:Gmail] ${googleDocId}: merged ${suggestion.discussionId} into ${candidates[0].commentId} by hash`);
+      logInfo(`[Suggestions:Gmail] ${googleDocId}: merged ${discoId ?? "(no disco ID)"} into ${candidates[0].commentId} by hash`);
       // Gmail notification = interesting activity → promote unresolved ARCHIVED
       // suggestions to INBOX, but leave already-resolved and MUTED rows alone.
       // A resolved row matched here is usually a late notification for a
@@ -153,7 +156,7 @@ export async function mergeSuggestionsFromGmail(
       merged++;
     } else if (candidates.length === 0) {
       // No match — Gmail arrived before Drive sync. Insert with what we have.
-      logInfo(`[Suggestions:Gmail] ${googleDocId}: inserted ${suggestion.discussionId} ${actionType} (Gmail-first)`);
+      logInfo(`[Suggestions:Gmail] ${googleDocId}: inserted ${discoId ?? "(no disco ID)"} ${actionType} (Gmail-first)`);
       const sugCreatedAt = suggestion.time ? new Date(suggestion.time) : emailDate;
       await prisma.$transaction(async (tx) => {
         await tx.comment.create({
@@ -177,7 +180,7 @@ export async function mergeSuggestionsFromGmail(
       inserted++;
     } else {
       // Multiple matches — ambiguous, skip
-      logWarning(`[Suggestions:Gmail] ${googleDocId}: multiple hash matches for ${suggestion.discussionId} — skipping`);
+      logWarning(`[Suggestions:Gmail] ${googleDocId}: multiple hash matches for ${discoId ?? "(no disco ID)"} — skipping`);
     }
   }
 

@@ -74,7 +74,7 @@ function findDocUrlsInFramesFunc() {
 // them. "Installed here" covers the window.* console helpers too, not just
 // __docreviewDisco: they're assigned below the same early return.
 function injectDiscoIdHelpers() {
-  var VERSION = 3;
+  var VERSION = 4;
   if (window.__docreviewDisco) {
     // `>=`, not `===`: with two builds loaded at once (an unpacked dev build
     // alongside a packed one — a normal dev setup) a strict check makes each
@@ -104,14 +104,15 @@ function injectDiscoIdHelpers() {
   // The disco ID for each comment listitem is stored in Google's Closure Library
   // component tree under minified property names (e.g., .Yd.Ai) that change when
   // Google releases new code. Instead of hardcoding these names, we discover the
-  // path dynamically by walking the tree and looking for AAA[A-Z]-pattern strings
-  // (the 4th char is a counter — older docs start with AAAA, newer with AAAB+).
+  // path dynamically by walking the tree and looking for disco-ID-shaped strings:
+  // either `AAA[A-Z]...` (older format — 4th char is a counter) or `doco....`
+  // (newer format rolled out in late 2026).
   //
   // Discovery strategy:
   //   - With 2+ items: diff two items' trees. Paths that exist in both but have
   //     different values are per-item IDs. Paths through array indices contain the
   //     shared model array (all IDs) — filter those out.
-  //   - With 1 item: find the shortest path to an AAA[A-Z] string that doesn't traverse
+  //   - With 1 item: find the shortest path to a disco ID string that doesn't traverse
   //     an array index. The shared array goes through numeric indices; the per-item
   //     ID is at a short, direct property path.
   //
@@ -119,7 +120,8 @@ function injectDiscoIdHelpers() {
 
   var discoveredIdPath = null;
 
-  // Walk an object tree collecting paths to AAA[A-Z]-pattern strings.
+  // Walk an object tree collecting paths to disco-ID-shaped strings
+  // (AAA[A-Z]... or doco....).
   // Each result: { path: string[], value, throughArray: boolean }
   // throughArray is true if any step in the path was a numeric array index.
   function collectIdPaths(obj, maxDepth) {
@@ -137,7 +139,7 @@ function injectDiscoIdHelpers() {
         var isNum = /^\d+$/.test(key);
         try {
           var v = cur[key];
-          if (typeof v === 'string' && /^AAA[A-Z][A-Za-z0-9_-]{5,}$/.test(v) && v.length < 20) {
+          if (typeof v === 'string' && /^(?:AAA[A-Z][A-Za-z0-9_-]{5,15}|doco\.[A-Za-z0-9_-]{5,35})$/.test(v)) {
             results.push({
               path: isNum ? path.concat('*') : path.concat(key),
               value: v,
@@ -194,7 +196,7 @@ function injectDiscoIdHelpers() {
       var cur = getClickRoot(item);
       if (!cur) return null;
       for (var i = 0; i < pathParts.length; i++) cur = cur[pathParts[i]];
-      return (typeof cur === 'string' && /^AAA[A-Z]/.test(cur)) ? cur : null;
+      return (typeof cur === 'string' && /^(?:AAA[A-Z]|doco\.)[A-Za-z0-9_-]+$/.test(cur)) ? cur : null;
     } catch(e) { return null; }
   }
 
@@ -218,9 +220,15 @@ function injectDiscoIdHelpers() {
   // List all visible comments/suggestions with their disco IDs and text.
   // Call from the Google Docs page console for debugging: listComments()
   function listComments() {
-    var skip = /^(Loading\.\.\.|New|Approver|Show more|Show less|Suggestion was deleted|Reply was deleted|Comment details cannot be verified|\d+ repl(y|ies))$/;
+    var skip = /^(Loading\.\.\.|New|Approver|Resolved|Show more|Show less|Suggestion was deleted|Reply was deleted|Comment details cannot be verified|\d+ repl(y|ies))$/;
 
     function extractText(item, author) {
+      // Primary: read from .docos-replyview-body (or its stream-view container),
+      // which holds both comment text (including multi-line/linked comments) and
+      // suggestion descriptions (including non-colon ones like "Add bookmark").
+      var body = getReplyBody(item);
+      if (body.text) return body.text.replace(/\s+/g, ' ').substring(0, 60);
+
       var divs = item.querySelectorAll('div');
       for (var j = 0; j < divs.length; j++) {
         var t = (divs[j].textContent || '').trim();

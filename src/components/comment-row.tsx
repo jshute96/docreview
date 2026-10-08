@@ -157,7 +157,7 @@ export function CommentRow({ comment, docId, driveUrl, content, suggestionConten
 
   function commentUrl() {
     const url = new URL(driveUrl);
-    // Only add disco= when we have a real Drive comment ID (AAA* format).
+    // Only add disco= when we have a real Drive comment ID (AAA* or doco.* format).
     // Suggestion IDs (suggest.*) don't work with disco=.
     if (comment.googleCommentId) {
       url.searchParams.set("disco", comment.googleCommentId);

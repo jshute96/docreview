@@ -203,7 +203,7 @@ Shadcn/ui components:
 | `suggestion-hash.ts` | Content hash for suggestions — SHA-256 of normalized action type + deleted/inserted text, used for cross-source matching (Docs API ↔ Gmail ↔ extension); `gmailActionToSuggestionType` maps Gmail action labels to canonical `SuggestionType`; `extractHashTextsFromGmail` / `extractHashTextsFromExtension` split each source's suggestion shape into the (deletedText, insertedText) pair used by the hash |
 | `comment-merge.ts` | Merges comment data from Gmail notifications into DB for docs with no comment permission — inserts comment records when Drive API can't list comments |
 | `suggestion-merge.ts` | Merges suggestion data from Gmail notifications into DB — matches by content hash, fills in `googleCommentId` and `replyCount`, or inserts new rows if Gmail arrives first |
-| `disco-id.ts` | Disco ID validation — `isDiscoId()` for the `AAAB…` comment/suggestion identifier |
+| `disco-id.ts` | Disco ID validation — `isDiscoId()` for the `AAAB…` and `doco.…` comment/suggestion identifiers |
 | `bridge-to-extension.ts` | Client-side bridge for communicating with the Chrome extension — handles pinging, URL resolution, in-page comment navigation, and fetching suggestion and comment data (including tabName) from open doc tabs |
 | `extension-suggestions.ts` | Converts extension-scraped suggestion data into display objects — timestamp parsing, CommentThread/SuggestionContent creation (including tabName) for thread panel display |
 | `extension-suggestion-merge.ts` | Server-side merge of extension suggestions into DB — content-hash matching (same algorithm as Gmail merge), inserts or updates suggestion records with disco IDs, author data, computed `readSlotCount`, and comment-parallel unarchive rules |
