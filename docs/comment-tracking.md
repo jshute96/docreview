@@ -665,7 +665,7 @@ in inbox when first synced. See [Phase 3.5 — Smart Unarchive](./refresh.md#pha
   the now-available participation data. This corrects cases like "my suggestion on a REVIEWER
   doc" from ARCHIVED to INBOX, and seeds the read count from the per-reply authorship flags.
 - **Gmail-first inserts**: always `"INBOX"` (notification = interesting activity).
-- Gmail merge promotes `ARCHIVED` suggestions to `INBOX`; `MUTED` stays `MUTED`.
+- Gmail merge promotes unresolved `ARCHIVED` suggestions to `INBOX`; already-resolved and `MUTED` rows stay unchanged.
 - Extension merge applies activity-based status transitions on existing suggestions
   (same rules as comments: new reply @-mention breaks MUTED, new activity + relevance
   promotes ARCHIVED → INBOX).

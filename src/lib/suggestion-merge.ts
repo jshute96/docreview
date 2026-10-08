@@ -98,9 +98,12 @@ export async function mergeSuggestionsFromGmail(
       // Drive's doc.lastModifiedInDrive approximation, so overwrite it.
       const gmailTime = suggestion.time ? new Date(suggestion.time) : emailDate;
       logInfo(`[Suggestions:Gmail] ${googleDocId}: merged ${suggestion.discussionId} into ${candidates[0].commentId} by hash`);
-      // Gmail notification = interesting activity → promote ARCHIVED to INBOX
-      // but respect MUTED (user explicitly silenced this thread).
-      const promoteStatus = candidates[0].status === CommentStatus.ARCHIVED ? CommentStatus.INBOX : undefined;
+      // Gmail notification = interesting activity → promote unresolved ARCHIVED
+      // suggestions to INBOX, but leave already-resolved and MUTED rows alone.
+      const promoteStatus =
+        !candidates[0].resolved && candidates[0].status === CommentStatus.ARCHIVED
+          ? CommentStatus.INBOX
+          : undefined;
       // Both counts take a high-water mark, each against its own field. A
       // notification lists the messages Gmail shows, which never include deleted
       // ones — so its count is a live count, and against the slot column it acts

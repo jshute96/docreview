@@ -191,10 +191,10 @@ Gmail merge later finds by content hash, fills in `googleCommentId`, raises both
 counts to their high-water marks,
 overwrites `driveCreatedAt` with the Gmail notification timestamp (more accurate than
 Drive's `doc.lastModifiedInDrive` approximation), and updates `driveModifiedAt` from
-the last reply timestamp if newer. If the suggestion is `ARCHIVED`, Gmail merge promotes
-it to `INBOX` (a notification means interesting activity). `MUTED` suggestions are left
-alone. Both promotion and insertion set `shouldUnarchive`, which moves the parent doc
-from ARCHIVED to INBOX via `unarchiveDocIfNeeded()`.
+the last reply timestamp if newer. If the suggestion is unresolved and `ARCHIVED`, Gmail
+merge promotes it to `INBOX` (a notification means interesting activity). Already-resolved
+and `MUTED` suggestions are left alone. Both promotion and insertion set `shouldUnarchive`,
+which moves the parent doc from ARCHIVED to INBOX via `unarchiveDocIfNeeded()`.
 
 **Gmail arrives first:** Inserts row with `googleCommentId`, content hash, `suggestionType`,
 `driveCreatedAt` from Gmail time, both reply counts, and `status: "INBOX"`. Drive sync later finds by content hash
@@ -266,8 +266,9 @@ The merge is designed to reach a clean final state regardless of the order that 
 syncs and Gmail notifications arrive.
 
 **Drive first → resolved → Gmail arrives:** Drive creates the row. Next refresh resolves
-it (gone from doc). Gmail merge finds the resolved row by hash (hash lookup doesn't filter
-by resolved), merges in the comment ID. Final state: one resolved row with both IDs.
+and archives it (gone from doc). Gmail merge finds the resolved row by hash (hash lookup
+doesn't filter by resolved), merges in the comment ID without promoting `ARCHIVED` back to
+`INBOX`. Final state: one resolved, archived row with both IDs.
 
 **Gmail first → Drive matches:** Gmail inserts a row. Drive sync finds it by hash fallback,
 fills in `googleSuggestionId`. Resolution check sees the ID in the live set — not resolved.
