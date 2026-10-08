@@ -55,7 +55,7 @@ Click **Add** to import the selected documents.
 
 ## Add doc page
 
-The **Add doc page** (available from the menu) lets you add a single document by URL. Paste a Google Docs, Sheets, or Slides URL and Docreview will validate it, show the document title and owner, and let you set role, labels, notes, and star before adding.
+The **Add doc page** (available from the menu) lets you add a single document by URL. Paste a Google Docs, Sheets, Slides, or Drive Markdown URL and Docreview will validate it, show the document title and owner, and let you set role, labels, notes, and star before adding.
 
 If the document is already tracked, the page shows a link to its comment detail page and offers to update it instead.
 

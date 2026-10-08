@@ -96,9 +96,16 @@ export function parseGoogleDocId(url: string): string | null {
   return null;
 }
 
-/** Build a Drive URL for a file, preferring webViewLink when available. */
+/** Build a Drive URL for a file, preferring webViewLink when available.
+ *  Non-native files edited in Docs (e.g. text/markdown) get a generic
+ *  drive.google.com/file/d/.../view webViewLink from Drive, which opens the
+ *  Drive file preview instead of the Docs editor (and doesn't support ?disco=
+ *  comment links) — fall back to the Docs editor URL for those. */
 export function driveUrlFor(fileId: string, webViewLink?: string | null): string {
-  return webViewLink ?? `https://docs.google.com/document/d/${fileId}/edit`;
+  if (webViewLink && !webViewLink.includes("//drive.google.com/file/")) {
+    return webViewLink;
+  }
+  return `https://docs.google.com/document/d/${fileId}/edit`;
 }
 
 export async function getDriveClient(userId: string) {

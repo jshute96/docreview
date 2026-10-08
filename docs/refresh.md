@@ -45,12 +45,12 @@ Docreview uses three distinct Google APIs for syncing:
 
 ### Drive API v3 — `files.list` (Scan + bootstrap)
 
-Queries for Docs, Sheets, and Slides modified in a time window. Used by the Load dialog's
+Queries for Docs, Sheets, Slides, and Markdown files modified in a time window. Used by the Load dialog's
 scan phase (`POST /api/docs/scan`) and as a bootstrap fallback when no changes page token
 exists (Refresh with no prior sync). **Includes Shared Drives** when the `includeSharedDrives`
 option is selected (uses `corpora: "allDrives"` and `includeItemsFromAllDrives: true`).
 
-**Query:** `mimeType in (doc, sheet, slides) AND modifiedTime > cutoff AND trashed = false`
+**Query:** `mimeType in (doc, sheet, slides, markdown) AND modifiedTime > cutoff AND trashed = false`
 **Fields:** `id, name, mimeType, webViewLink, modifiedTime, createdTime, owners(me, displayName)`
 **Pagination:** `pageSize: 1000`, follows `nextPageToken` until exhausted.
 
@@ -70,7 +70,7 @@ has changed. Always includes changes from **Shared Drives** (uses `includeItemsF
 **Pagination:** `pageSize: 1000`, follows `nextPageToken` until `newStartPageToken` is returned.
 **Deduplication:** Active editing produces multiple change entries per file. Results are
 deduplicated by `fileId`, keeping the last entry per file.
-**Filtering:** Only changes to supported MIME types (Docs, Sheets, Slides) are processed.
+**Filtering:** Only changes to supported MIME types (Docs, Sheets, Slides, Markdown) are processed.
 Changes with `removed: true` or `file.trashed: true` are treated as deletions.
 
 ### Drive API v3 — `changes.getStartPageToken`

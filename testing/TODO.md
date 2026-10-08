@@ -59,7 +59,7 @@ Update this list when adding or changing user-facing behaviors.
 ### Filtering
 - [ ] Tri-state filter toggles: off → include → exclude for inbox/archived, author/reviewer, starred, has comments
 - [ ] Slow-click-to-reset: pause >500ms resets filter instead of cycling to next state
-- [ ] Document type filters (Docs / Sheets / Slides)
+- [ ] Document type filters (Docs / Sheets / Slides / Markdown)
 - [ ] Label filters (one per label, AND logic when multiple active)
 - [ ] Title (and notes) search with regex and substring support
 - [ ] Search highlights matching text in doc titles and notes
@@ -218,7 +218,7 @@ against `app-offline/` as it stands.
 
 ## Add Document Page (`/add`)
 
-- [ ] Paste Google Docs/Sheets/Slides URL, validates and shows title + owner
+- [ ] Paste Google Docs/Sheets/Slides/Markdown URL, validates and shows title + owner
 - [ ] `?doc=` URL parameter auto-validates on load (title resolves, Add buttons enable) — must survive a React Strict Mode remount
 - [ ] Navigating from one `?doc=` URL to another without a reload re-validates the new doc
 - [ ] Accept doc ID as well as full URL

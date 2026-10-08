@@ -16,6 +16,7 @@ import {
   fetchCommentData,
   fetchDocData,
   parseGoogleDocId,
+  driveUrlFor,
   deriveCommentFlags,
   liveReplies,
   isDriveErrorCode,
@@ -23,6 +24,24 @@ import {
   isInvalidGrantError,
   commentsAreHidden,
 } from "./google-drive";
+
+describe("driveUrlFor", () => {
+  it("uses webViewLink for native Docs/Sheets/Slides URLs", () => {
+    expect(
+      driveUrlFor("id1", "https://docs.google.com/spreadsheets/d/id1/edit?usp=drivesdk")
+    ).toBe("https://docs.google.com/spreadsheets/d/id1/edit?usp=drivesdk");
+  });
+
+  it("falls back to Docs editor URL when webViewLink is missing", () => {
+    expect(driveUrlFor("id1", null)).toBe("https://docs.google.com/document/d/id1/edit");
+  });
+
+  it("falls back to Docs editor URL when webViewLink is a Drive file preview link (e.g. Markdown)", () => {
+    expect(
+      driveUrlFor("id1", "https://drive.google.com/file/d/id1/view?usp=drivesdk")
+    ).toBe("https://docs.google.com/document/d/id1/edit");
+  });
+});
 
 describe("parseGoogleDocId", () => {
   it("extracts ID from a Google Docs URL", () => {

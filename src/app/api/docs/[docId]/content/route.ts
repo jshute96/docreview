@@ -3,7 +3,7 @@ import { getValidSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getDriveClient, fetchDocData, fetchFileTextViaExport, invalidGrantResponse } from "@/lib/google-drive";
 import { runWithRequestId } from "@/lib/request-context";
-import { GoogleMimeType } from "@/lib/mime-types";
+import { GoogleMimeType, isDocsEditorMimeType } from "@/lib/mime-types";
 
 export async function GET(
   _req: NextRequest,
@@ -33,7 +33,7 @@ export async function GET(
   }
 
   try {
-    const isDoc = doc.mimeType === GoogleMimeType.Doc;
+    const isDoc = isDocsEditorMimeType(doc.mimeType);
     const isSlides = doc.mimeType === GoogleMimeType.Slides;
 
     if (isDoc) {

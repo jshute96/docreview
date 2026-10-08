@@ -7,6 +7,7 @@ export const GoogleMimeType = {
   Doc: "application/vnd.google-apps.document",
   Sheet: "application/vnd.google-apps.spreadsheet",
   Slides: "application/vnd.google-apps.presentation",
+  Markdown: "text/markdown",
 } as const;
 
 export type GoogleMimeType = (typeof GoogleMimeType)[keyof typeof GoogleMimeType];
@@ -14,14 +15,20 @@ export type GoogleMimeType = (typeof GoogleMimeType)[keyof typeof GoogleMimeType
 /** Every type that can be added as a doc. */
 export const SUPPORTED_MIME_TYPES: ReadonlySet<string> = new Set(Object.values(GoogleMimeType));
 
-/** Short label shown in the UI ("Docs", "Sheets", "Slides"). */
+/** Short label shown in the UI ("Docs", "Sheets", "Slides", "Markdown"). */
 export const MIME_TYPE_LABELS = {
   [GoogleMimeType.Doc]: "Docs",
   [GoogleMimeType.Sheet]: "Sheets",
   [GoogleMimeType.Slides]: "Slides",
+  [GoogleMimeType.Markdown]: "Markdown",
 } as const satisfies Record<GoogleMimeType, string>;
 
 /** Label for a MIME type that may be anything — falls back to the raw value. */
 export function mimeTypeLabel(mimeType: string): string {
   return (MIME_TYPE_LABELS as Record<string, string>)[mimeType] ?? mimeType;
+}
+
+/** Whether a MIME type is backed by the Google Docs editor/API (text + suggestions). */
+export function isDocsEditorMimeType(mimeType: string | null | undefined): boolean {
+  return mimeType === GoogleMimeType.Doc || mimeType === GoogleMimeType.Markdown;
 }

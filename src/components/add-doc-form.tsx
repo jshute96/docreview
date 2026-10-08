@@ -34,7 +34,7 @@ type ValidationState = "idle" | "validating" | "valid" | "invalid";
  */
 const ERROR_MESSAGES: Record<DocErrorCode, string> = {
   [DocErrorCode.InvalidUrl]: "Not a recognized Google Drive URL or doc ID",
-  [DocErrorCode.InvalidMimeType]: "Only Docs, Sheets, and Slides are supported",
+  [DocErrorCode.InvalidMimeType]: "Only Docs, Sheets, Slides, and Markdown are supported",
   [DocErrorCode.Trashed]: "This document is in the trash",
   [DocErrorCode.NoAccess]: "Document not found or you don't have access",
   [DocErrorCode.LookupFailed]: "Couldn't reach Google Drive — try again",
