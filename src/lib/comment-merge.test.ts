@@ -153,6 +153,17 @@ describe("mergeCommentsFromGmail", () => {
     expect(mockComment.create).not.toHaveBeenCalled();
   });
 
+  it("inserts a comment whose discussionId uses the doco. format", async () => {
+    mockParse.mockReturnValue(makeNotification({
+      comments: [makeCommentThread({ discussionId: "doco.Zm9vYmFyYmF6cXV4MTIz" })],
+    }));
+    mockComment.findFirst.mockResolvedValue(null);
+
+    const result = await mergeCommentsFromGmail("d1", "gdoc1", email);
+    expect(result).toEqual({ inserted: 1, shouldUnarchive: true });
+    expect(mockComment.create.mock.calls[0][0].data.googleCommentId).toBe("doco.Zm9vYmFyYmF6cXV4MTIz");
+  });
+
   it("skips threads whose discussionId is malformed, not just empty", async () => {
     // extractDiscoId is an unvalidated regex capture off the notification URL,
     // so a mangled link yields a non-empty but malformed value. Storing it

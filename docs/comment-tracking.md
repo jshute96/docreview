@@ -815,7 +815,7 @@ table but syncs from different APIs:
 | **Created by** | Insert menu or comment icon on selected text | Switching to "Suggesting" mode and typing |
 | **API source** | Drive API (`comments.list`, `comments.get`) | Docs API (`documents.get` with `SUGGESTIONS_INLINE`) |
 | **DB type** | `COMMENT` | `SUGGESTION` |
-| **ID format** | `googleCommentId` — Drive comment ID (`AAAB...`) | `googleSuggestionId` — Docs API ID (`suggest.xxx`) |
+| **ID format** | `googleCommentId` — Drive comment ID (`AAAB...` or `doco....`) | `googleSuggestionId` — Docs API ID (`suggest.xxx`) |
 | **Replies** | Full thread with reply count, author tracking, @mentions | Not tracked by Docs API; available when Chrome extension provides DOM data |
 | **Status fields** | `isThreadAuthor`, `isReplyAuthor`, `mentionedMe`, `readSlotCount`, etc. from Drive | Default to `false`/`0` from Docs API; `isThreadAuthor`/`isReplyAuthor`/`mentionedMe`/`readSlotCount` populated by extension merge when available |
 | **Resolution** | Resolved/reopened via Drive API | Accepted/rejected — disappears from doc body |
@@ -823,15 +823,15 @@ table but syncs from different APIs:
 
 ### ID formats and navigation
 
-Both comments and suggestions have Drive comment IDs (`AAAB...`), visible in the Closure
+Both comments and suggestions have Drive comment/discussion IDs (`AAAB...` or `doco....`), visible in the Closure
 Library component tree attached to their DOM list items. For comments, this ID is the
 primary identifier — it's used in Drive API calls, DB lookups, and `?disco=` navigation.
 
-Suggestions also have these `AAAB...` IDs in the DOM, and they work for `?disco=` navigation
+Suggestions also have these disco IDs in the DOM, and they work for `?disco=` navigation
 (scrolling to the suggestion in the document). However, they **cannot be used in Drive API
-calls** — `comments.get` with a suggestion's `AAAB...` ID doesn't reliably return data. The
+calls** — `comments.get` with a suggestion's disco ID doesn't reliably return data. The
 Docs API uses a separate `suggest.xxx` ID format. When a suggestion has a `googleCommentId`
-(from Gmail notification merge), Docreview uses it for `?disco=` deep links. Otherwise the
+(from Gmail notification or extension merge), Docreview uses it for `?disco=` deep links. Otherwise the
 doc opens without scrolling to the suggestion.
 
 ### Missing disco IDs are transient, never placeholders

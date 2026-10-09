@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { logInfo } from "@/lib/log";
+import { logInfo, logWarning } from "@/lib/log";
 import { bumpLastCommentActivity } from "@/lib/sync-comments";
 import { parseGmailNotificationFromParsed, type ParsedEmail } from "@/lib/parse-gmail-notification";
 import { isDiscoId } from "@/lib/disco-id";
@@ -51,7 +51,12 @@ export async function mergeCommentsFromGmail(
     // non-empty but malformed value. Validate rather than just checking for
     // emptiness — this is the same join key the extension path guards, and a
     // malformed value corrupts a row exactly as thoroughly as a placeholder.
-    if (!isDiscoId(thread.discussionId)) continue;
+    if (!isDiscoId(thread.discussionId)) {
+      if (thread.discussionId) {
+        logWarning(`[Comments:Gmail] ${googleDocId}: skipping comment with unrecognized discussionId ${JSON.stringify(String(thread.discussionId).slice(0, 40))}`);
+      }
+      continue;
+    }
 
     // Idempotency: skip if this discussion ID is already in the DB
     const existing = await prisma.comment.findFirst({
