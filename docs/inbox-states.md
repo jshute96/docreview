@@ -33,7 +33,7 @@ I am not longer interested in acting like the author.
   1. If I am Author on the doc, new suggestions go to Inbox.
   2. Otherwise (Reviewer), new suggestions start as Archived.
   3. Exception: if a Gmail notification arrives for the suggestion, it goes to Inbox
-     (notification = interesting activity), unless it was Muted.
+     (notification = interesting activity), unless it was Muted or is already resolved.
   4. Exception: when the extension enriches a suggestion with participation data
      (e.g., I created it), the comment rules below are applied to correct the
      initial status.

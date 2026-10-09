@@ -100,6 +100,11 @@ export async function mergeSuggestionsFromGmail(
       logInfo(`[Suggestions:Gmail] ${googleDocId}: merged ${suggestion.discussionId} into ${candidates[0].commentId} by hash`);
       // Gmail notification = interesting activity → promote unresolved ARCHIVED
       // suggestions to INBOX, but leave already-resolved and MUTED rows alone.
+      // A resolved row matched here is usually a late notification for a
+      // suggestion the Docs API sync already resolved; promoting it would strand
+      // it in INBOX, since the resolve pass only looks at unresolved rows.
+      // Docs-API rows start at replyCount 0, so we can't tell a late original
+      // notification apart from genuinely new replies on a resolved suggestion.
       const promoteStatus =
         !candidates[0].resolved && candidates[0].status === CommentStatus.ARCHIVED
           ? CommentStatus.INBOX
