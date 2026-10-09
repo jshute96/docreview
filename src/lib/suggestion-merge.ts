@@ -49,7 +49,7 @@ export async function mergeSuggestionsFromGmail(
     // the same way the extension's old `'(no ID)'` placeholder did.
     const discoId = isDiscoId(suggestion.discussionId) ? suggestion.discussionId : null;
     if (suggestion.discussionId && !discoId) {
-      logWarning(`[Suggestions:Gmail] ${googleDocId}: ignoring unrecognized discussionId "${suggestion.discussionId}"`);
+      logWarning(`[Suggestions:Gmail] ${googleDocId}: ignoring unrecognized discussionId ${JSON.stringify(String(suggestion.discussionId).slice(0, 40))}`);
     }
     let existingById: Comment | null = null;
     if (discoId) {

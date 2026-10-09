@@ -197,6 +197,21 @@ describe("mergeSuggestionsFromGmail", () => {
     expect(createCall.data.driveCreatedAt).toEqual(new Date("2026-03-20T15:00:00Z"));
   });
 
+  it("keeps a doco.-format discussionId on insert", async () => {
+    mockParse.mockReturnValue({
+      type: "comment",
+      subject: "", from: "", to: "", date_str: "",
+      documentId: "gdoc1", documentTitle: "Test", documentUrl: "https://docs.google.com/document/d/gdoc1/edit",
+      comments: [],
+      suggestions: [makeSuggestion({ discussionId: "doco.Zm9vYmFyYmF6cXV4MTIz" })],
+    });
+    mockComment.findFirst.mockResolvedValue(null);
+    mockComment.findMany.mockResolvedValue([]);
+
+    await mergeSuggestionsFromGmail("d1", "gdoc1", email);
+    expect(mockComment.create.mock.calls[0][0].data.googleCommentId).toBe("doco.Zm9vYmFyYmF6cXV4MTIz");
+  });
+
   it("stores null rather than a malformed discussionId", async () => {
     // A mangled notification URL yields a non-empty but malformed disco ID.
     // It must land as null, not be written verbatim: a bad googleCommentId can

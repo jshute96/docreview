@@ -61,7 +61,7 @@ click[0]
 **What the discovery algorithm relies on:**
 1. `closure_lm` prefix exists on listitem elements (to find the Closure component)
 2. The Closure component has a `.listeners.click` array (to find click handlers)
-3. The per-item disco ID is an `AAAB`-prefixed string at a short, non-array path from the click handler
+3. The per-item disco ID is an `AAA[A-Z]...` or `doco.`-prefixed string at a short, non-array path from the click handler
 4. The shared model array is reachable through numeric array indices (distinguishing it from per-item paths)
 
 If any of these structural assumptions break, the discovery algorithm will fail
@@ -291,7 +291,9 @@ There are two unrelated ID systems for the same comment:
 | Gmail notification disco | `AAAB1agdt2A` | `AAAB1agdt2E` | Gmail notification email URLs |
 | "Get link" disco | `AAAB1agdt2A` | `AAAB1agdt2I` (different!) | Google Docs "Get link to this comment" |
 
-- Comments use the same `AAAB...` ID across all systems
+Newer comments and suggestions may instead get `doco.<base64url>` IDs (e.g. `doco.Zm9vYmFyYmF6cXV4MTIz`) in place of `AAAB...`.
+
+- Comments use the same disco ID across all systems
 - Suggestions have **different IDs** in each system — no known way to translate between them
 
 ### What doesn't work for in-page navigation

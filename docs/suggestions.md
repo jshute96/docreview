@@ -401,7 +401,7 @@ Extension suggestions are not persisted — they exist only for the current page
 ## Disco URLs (Jumping to a Suggestion)
 
 Google Docs supports `?disco={id}` to open the doc and jump directly to a comment or
-suggestion thread. The ID must be a Drive comment ID (`AAAB0xxx`).
+suggestion thread. The ID must be a Drive comment ID (`AAAB0xxx`, or the newer `doco.<base64url>` format).
 
 When a suggestion has `googleCommentId` set (from Gmail notification merge), the Open
 button uses `?disco=` to jump directly to it. When only `googleSuggestionId` is available,

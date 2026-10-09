@@ -53,7 +53,7 @@ export async function mergeCommentsFromGmail(
     // malformed value corrupts a row exactly as thoroughly as a placeholder.
     if (!isDiscoId(thread.discussionId)) {
       if (thread.discussionId) {
-        logWarning(`[Comments:Gmail] ${googleDocId}: skipping comment with unrecognized discussionId "${thread.discussionId}"`);
+        logWarning(`[Comments:Gmail] ${googleDocId}: skipping comment with unrecognized discussionId ${JSON.stringify(String(thread.discussionId).slice(0, 40))}`);
       }
       continue;
     }
