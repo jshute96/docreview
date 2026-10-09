@@ -13,6 +13,12 @@ Google Docs has two distinct annotation features:
 
 Docreview tracks both. This document covers how suggestions work and how they are synced.
 
+Suggestions are only synced for native Google Docs. Markdown files (`text/markdown`) open in
+the Docs editor but have no suggestion mode, and the Docs API rejects them like Office files
+("The document must not be an Office file"). So Markdown docs get Drive comments only: no
+`documents.get` call, no suggestion sync, and no document text (the comment panel's
+"quoted text no longer exists" check is skipped).
+
 ---
 
 ## Why Drive API Is Not Used for Suggestions

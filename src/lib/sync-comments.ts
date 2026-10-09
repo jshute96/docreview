@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { fetchCommentData, fetchDocData, fetchThreadDetail, getDriveClient, isDriveErrorCode, isInvalidGrantError } from "@/lib/google-drive";
 import { logError, logWarning, logInfo } from "@/lib/log";
 import { ExtCommentType } from "@/lib/extension-wire";
-import { isDocsEditorMimeType } from "@/lib/mime-types";
+import { GoogleMimeType } from "@/lib/mime-types";
 import { computeSuggestionHash } from "@/lib/suggestion-hash";
 import { initialReadSlotCount, nextReadSlotCount, renderReadCount } from "@/lib/read-state";
 import { CommentStatus, CommentType, DocRole, DocStatus, type Doc, type Comment, type Prisma } from "@prisma/client";
@@ -338,7 +338,7 @@ export async function syncComments(
   // --- Phase 3: Sync suggestions from Docs API ---
   // (only for Google Docs, and only if the suggestion fetch succeeded)
 
-  if (skipSuggestions || !isDocsEditorMimeType(doc.mimeType)) {
+  if (skipSuggestions || doc.mimeType !== GoogleMimeType.Doc) {
     // Hint-based syncs don't stamp commentsLastSyncedAt — let the periodic
     // full sync handle reconciliation of the skipped phase.
     if (!hints) await stampSyncTime(doc.docId, syncStartedAt);
@@ -415,14 +415,14 @@ async function fetchDriveComments(
 }
 
 /**
- * Fetches suggestions from the Docs API (only for Google Docs / Markdown).
+ * Fetches suggestions from the Docs API (only for Google Docs).
  * Returns the suggestions array and error flags.
  */
 async function fetchDocsSuggestions(
   doc: Doc,
   driveAuth: Awaited<ReturnType<typeof getDriveClient>>,
 ): Promise<{ suggestions: DriveSuggestion[]; failed: boolean; denied: boolean }> {
-  if (!isDocsEditorMimeType(doc.mimeType)) {
+  if (doc.mimeType !== GoogleMimeType.Doc) {
     return { suggestions: [], failed: false, denied: false };
   }
   try {

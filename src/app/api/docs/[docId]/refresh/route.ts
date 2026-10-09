@@ -6,7 +6,7 @@ import type { ThreadMap, SuggestionContent, DriveSuggestion, DriveDoc, DocDataRe
 import { upsertDocsAndSyncComments } from "@/lib/refresh";
 import { docWithCommentsInclude, stripServerOnly } from "@/lib/doc-queries";
 import { logError, logWarning } from "@/lib/log";
-import { GoogleMimeType, isDocsEditorMimeType } from "@/lib/mime-types";
+import { GoogleMimeType } from "@/lib/mime-types";
 import { runWithRequestId } from "@/lib/request-context";
 import { AccessState, DocRole } from "@prisma/client";
 
@@ -116,7 +116,7 @@ export async function POST(
           }
           return null;
         }),
-        (isDocsEditorMimeType(mimeType)
+        (mimeType === GoogleMimeType.Doc
           ? fetchDocData(driveAuth, doc.googleDocId).catch((err) => {
               // An expired token was already logged by fetchDocData (the raw
               // gaxios error would include the refresh token).

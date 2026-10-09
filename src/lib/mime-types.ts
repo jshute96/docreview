@@ -27,8 +27,3 @@ export const MIME_TYPE_LABELS = {
 export function mimeTypeLabel(mimeType: string): string {
   return (MIME_TYPE_LABELS as Record<string, string>)[mimeType] ?? mimeType;
 }
-
-/** Whether a MIME type is backed by the Google Docs editor/API (text + suggestions). */
-export function isDocsEditorMimeType(mimeType: string | null | undefined): boolean {
-  return mimeType === GoogleMimeType.Doc || mimeType === GoogleMimeType.Markdown;
-}

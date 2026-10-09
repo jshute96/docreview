@@ -93,6 +93,8 @@ When the Chrome extension is active and a doc tab is open, you can **Refresh** a
 
 You can still archive, mute, star, and filter suggestions like regular comments.
 
+Suggestions are only tracked for Google Docs. Markdown files from Drive get comments only.
+
 ## Bulk actions
 
 The toolbar above the comment list provides bulk operations. All of them act on the comments
