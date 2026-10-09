@@ -219,6 +219,7 @@ against `app-offline/` as it stands.
 ## Add Document Page (`/add`)
 
 - [ ] Paste Google Docs/Sheets/Slides/Markdown URL, validates and shows title + owner
+- [ ] Markdown file: Open link goes to the Docs editor URL; suggestions sync (or settle cleanly if the Docs API rejects the file)
 - [ ] `?doc=` URL parameter auto-validates on load (title resolves, Add buttons enable) — must survive a React Strict Mode remount
 - [ ] Navigating from one `?doc=` URL to another without a reload re-validates the new doc
 - [ ] Accept doc ID as well as full URL

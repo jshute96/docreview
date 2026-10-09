@@ -172,6 +172,11 @@ export async function POST(
         return NextResponse.json({ comment: commentRecord, threads: {} });
       }
       const docData = await fetchDocData(driveAuth, doc.googleDocId);
+      // An empty list from a failed or denied fetch says nothing about whether
+      // the suggestion is still open, so don't resolve it on that basis.
+      if (docData.suggestionsUnavailable) {
+        return NextResponse.json({ comment: commentRecord, threads: {} });
+      }
       const liveSuggestions = docData.suggestions;
       const stillLive = liveSuggestions.some((s) => s.id === commentRecord.googleSuggestionId);
 

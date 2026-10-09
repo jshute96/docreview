@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
       error: DocErrorCode.Trashed,
       title: f.name ?? "",
       mimeType: f.mimeType,
-      driveUrl: driveUrlFor(fileId, f.webViewLink),
+      driveUrl: driveUrlFor(fileId, f.webViewLink, f.mimeType),
     }, { status: 400 });
   }
 
@@ -114,7 +114,7 @@ export async function GET(req: NextRequest) {
       error: DocErrorCode.InvalidMimeType,
       title: f.name ?? "",
       mimeType: f.mimeType,
-      driveUrl: driveUrlFor(fileId, f.webViewLink),
+      driveUrl: driveUrlFor(fileId, f.webViewLink, f.mimeType),
     }, { status: 400 });
   }
 
@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
     googleDocId: fileId,
     title: f.name ?? "",
     mimeType: f.mimeType,
-    driveUrl: driveUrlFor(fileId, f.webViewLink),
+    driveUrl: driveUrlFor(fileId, f.webViewLink, f.mimeType),
     role: isOwner ? DocRole.AUTHOR : DocRole.REVIEWER,
     lastModifiedInDrive: f.modifiedTime ?? null,
     createdTimeInDrive: f.createdTime ?? null,

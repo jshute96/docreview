@@ -18,7 +18,7 @@ Right-click any link to a Google Doc or Drive file -- on any web page -- and cho
 
 ### Toolbar icon
 
-Click the Docreview extension icon in Chrome's toolbar to open the current page's document in Docreview. This works on Google Docs and Gmail notification pages. On blank pages, it opens Docreview's document list page.
+Click the Docreview extension icon in Chrome's toolbar to open the current page's document in Docreview. This works on Google Docs, Drive file preview pages (e.g. a Markdown file opened from Drive), and Gmail notification pages. On blank pages, it opens Docreview's document list page.
 
 ### Google Docs, Sheets, and Slides
 

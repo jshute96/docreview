@@ -12,7 +12,7 @@ scan looks for documents.
 ### Drive (default)
 
 Queries `files.list` with time window, ownership, and shared drives filters.
-Returns Google Docs/Sheets/Slides modified within the time window.
+Returns Google Docs/Sheets/Slides/Markdown files modified within the time window.
 
 ### Gmail
 

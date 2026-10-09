@@ -109,9 +109,11 @@ async function handleToolbarClick(tab) {
     return;
   }
 
-  // Only open in Docreview if the URL contains a document ID (Docs/Sheets/Slides).
-  // Drive pages (drive.google.com/drive/...) don't identify a single document.
-  if (!tab.url.match(/docs\.google\.com\/(document|spreadsheets|presentation)\/d\//)) {
+  // Only open in Docreview if the URL contains a document ID (Docs/Sheets/Slides,
+  // or a Drive file preview page, which is how Drive shows Markdown files).
+  // Drive folder pages (drive.google.com/drive/...) don't identify a single document.
+  var isDrivePreview = /drive\.google\.com\/file\/d\//.test(tab.url);
+  if (!isDrivePreview && !tab.url.match(/docs\.google\.com\/(document|spreadsheets|presentation)\/d\//)) {
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: function() { alert('Page is not a document supported in Docreview'); }
@@ -121,8 +123,9 @@ async function handleToolbarClick(tab) {
     return;
   }
 
-  // Track this tab so comment navigation can reuse it instead of opening a new one
-  var docMatch = tab.url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  // Track this tab so comment navigation can reuse it instead of opening a new one.
+  // Not for Drive previews: comment navigation needs the Docs editor.
+  var docMatch = !isDrivePreview && tab.url.match(/\/d\/([a-zA-Z0-9_-]+)/);
   if (docMatch) {
     await setDocTab(docMatch[1], tab.id);
     setDocTabName(tab.id, docMatch[1]);

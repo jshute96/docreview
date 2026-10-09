@@ -496,7 +496,7 @@ export async function scanGmailNotifications(
           googleDocId: docId,
           title: file.name ?? docId,
           mimeType: file.mimeType ?? "",
-          driveUrl: driveUrlFor(docId, file.webViewLink),
+          driveUrl: driveUrlFor(docId, file.webViewLink, file.mimeType),
           role: isOwner ? DocRole.AUTHOR : DocRole.REVIEWER,
         });
 

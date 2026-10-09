@@ -3,7 +3,9 @@
 // can access the page's DOM and Closure Library internals but cannot use
 // chrome.* APIs.
 
-// Injected into page frames via executeScript to find Google Docs/Sheets/Slides URLs.
+// Injected into page frames via executeScript to find Google Docs/Sheets/Slides
+// URLs, plus Drive file links (drive.google.com/file/d/...), which is how
+// notifications link to non-native files like Markdown.
 // Deduplicates by document ID since the same doc appears in multiple links
 // (chip, "Open" button, notification settings, etc.) with different query params.
 function findDocUrlsInFramesFunc() {
@@ -12,11 +14,14 @@ function findDocUrlsInFramesFunc() {
 
   function addUrl(raw) {
     var m = raw.match(/docs\.google\.com\/(document|spreadsheets|presentation)\/d\/([a-zA-Z0-9_-]+)/);
-    if (!m) return;
-    var id = m[2];
+    var fileMatch = !m && raw.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (!m && !fileMatch) return;
+    var id = m ? m[2] : fileMatch[1];
     if (seenIds[id]) return;
     seenIds[id] = true;
-    urls.push('https://docs.google.com/' + m[1] + '/d/' + id + '/edit');
+    urls.push(m
+      ? 'https://docs.google.com/' + m[1] + '/d/' + id + '/edit'
+      : 'https://drive.google.com/file/d/' + id + '/view');
   }
 
   // In the top-level Gmail frame, scope the search to only expanded (visible) messages.
@@ -40,7 +45,7 @@ function findDocUrlsInFramesFunc() {
     if (chip) addUrl(chip.getAttribute('data-docurl') || '');
 
     // Notification emails have <a> tags linking to the doc
-    var links = root.querySelectorAll('a[href*="docs.google.com/document/d/"], a[href*="docs.google.com/spreadsheets/d/"], a[href*="docs.google.com/presentation/d/"]');
+    var links = root.querySelectorAll('a[href*="docs.google.com/document/d/"], a[href*="docs.google.com/spreadsheets/d/"], a[href*="docs.google.com/presentation/d/"], a[href*="drive.google.com/file/d/"]');
     for (var i = 0; i < links.length; i++) {
       addUrl(links[i].href);
     }

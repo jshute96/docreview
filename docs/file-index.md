@@ -139,7 +139,7 @@ One-line descriptions of every source file, grouped by layer.
 | `color-picker.tsx` | Popover color grid for label color selection |
 | `dialog-buttons.tsx` | Reusable Save/Cancel button pair for dialogs |
 | `friendly-date.tsx` | `<FriendlyDate>` — renders relative timestamps: time-only (today), weekday + time (<6d), date (older); full timestamp on hover; the one place date strings are converted to Dates |
-| `doc-type-icon.tsx` | SVG icons for Google Docs/Sheets/Slides by mime type |
+| `doc-type-icon.tsx` | SVG icons for Google Docs/Sheets/Slides/Markdown by mime type |
 | `hide-until-titles.tsx` | `<HideUntilTitles>` — inline script that hides the page body until cached titles are rendered; emitted only on an initial document request |
 | `x-icon.tsx` | Small X (close) icon used in badges and buttons |
 | `help-dialog.tsx` | Multi-page help viewer dialog — iframe + pages.json navigation, keyboard shortcuts, page dropdown |

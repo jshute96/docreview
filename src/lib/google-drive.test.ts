@@ -36,10 +36,16 @@ describe("driveUrlFor", () => {
     expect(driveUrlFor("id1", null)).toBe("https://docs.google.com/document/d/id1/edit");
   });
 
-  it("falls back to Docs editor URL when webViewLink is a Drive file preview link (e.g. Markdown)", () => {
+  it("uses the Docs editor URL for Markdown files with a Drive file preview link", () => {
     expect(
-      driveUrlFor("id1", "https://drive.google.com/file/d/id1/view?usp=drivesdk")
+      driveUrlFor("id1", "https://drive.google.com/file/d/id1/view?usp=drivesdk", "text/markdown")
     ).toBe("https://docs.google.com/document/d/id1/edit");
+  });
+
+  it("keeps the Drive file preview link for other non-native files (e.g. PDF)", () => {
+    expect(
+      driveUrlFor("id1", "https://drive.google.com/file/d/id1/view?usp=drivesdk", "application/pdf")
+    ).toBe("https://drive.google.com/file/d/id1/view?usp=drivesdk");
   });
 });
 
