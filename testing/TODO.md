@@ -456,6 +456,8 @@ in Google Docs (or from Docreview) and then a sync, so they belong to the live s
 ### Notification Scanning
 - [ ] Discovers docs from comment notification emails (comments-noreply@docs.google.com)
 - [ ] Discovers docs from sharing notifications (drive-shares-dm-noreply@google.com)
+- [ ] Sharing notification for a Markdown file (links to drive.google.com/file/d/) discovers the file and records its share note
+- [ ] Comment notification for a Markdown file discovers the file and merges its comments (Gmail-first rows match Drive comments by disco ID)
 - [ ] Extracts document URLs from email body
 
 ### Share Notes
@@ -536,6 +538,8 @@ in Google Docs (or from Docreview) and then a sync, so they belong to the live s
 - [x] On non-doc page, shows error alert
 - [ ] On a google doc, go to /open for that doc
 - [ ] On gmail, go to /open for that doc if it's a notification email
+- [ ] On a Drive file preview page (drive.google.com/file/d/..., e.g. Markdown), go to /open for that file; the tab is not tracked as a doc tab
+- [ ] On gmail, a Markdown notification (links only to drive.google.com/file/d/) opens that file; a Docs notification that also links to Drive attachments still opens the Doc without a "multiple documents" alert
 - [ ] New tabs open in the clicked tab's own window (toolbar, context menu, comment navigation), not in whatever window Chrome last recorded as focused — needs two windows where Chrome's last-focused window is not the one the gesture came from
 
 ### Content Script Injection

@@ -24,7 +24,7 @@ For Docs notification emails (comments, suggestions, sharing), an "Open in Docre
 ### Toolbar icon
 Click the Docreview icon in Chrome's toolbar:
 - On a blank or new tab, opens Docreview directly.
-- On Google Docs/Sheets/Slides, opens the current document in Docreview.
+- On Google Docs/Sheets/Slides, or a Drive file preview page (e.g. a Markdown file), opens the current document in Docreview.
 - On Gmail, finds the document link in the current email and opens it. Shows an alert if no document is found or if multiple different documents are linked.
 
 Right-click the toolbar icon for:

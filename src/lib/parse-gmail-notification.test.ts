@@ -179,6 +179,57 @@ describe("parseGmailNotification", () => {
     });
   });
 
+  describe("sharing a Markdown file (Drive preview link)", () => {
+    const raw = readFileSync(join(EXAMPLES_DIR, "shared_markdown_file.eml"), "utf-8");
+    const result = parseGmailNotification(raw) as SharingNotification;
+
+    it("extracts the document from a drive.google.com/file/d/ link", () => {
+      expect(result.type).toBe("sharing");
+      expect(result.documentTitle).toBe("Docreview README (markdown test).md");
+      expect(result.documentId).toBe("1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM");
+      expect(result.documentUrl).toContain("drive.google.com/file/d/1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM/view");
+    });
+
+    it("has no permission word ('has shared the following item') but keeps the share note", () => {
+      expect(result.permission).toBe("");
+      expect(result.isRequest).toBe(false);
+      expect(result.shareMessage).toBe("Test sharing");
+    });
+
+    it("gets the sharer from the Reply-To fallback", () => {
+      expect(result.sharerName).not.toBe("");
+      expect(result.sharerEmail).toBe("docreview.owner@gmail.com");
+    });
+  });
+
+  describe("share request for a Markdown file (Drive preview link)", () => {
+    const raw = readFileSync(join(EXAMPLES_DIR, "share_request_markdown.eml"), "utf-8");
+    const result = parseGmailNotification(raw) as SharingNotification;
+
+    it("extracts the request, role, and document", () => {
+      expect(result.type).toBe("sharing");
+      expect(result.isRequest).toBe(true);
+      expect(result.permission).toBe("writer");
+      expect(result.documentId).toBe("1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM");
+      expect(result.documentUrl).toContain("drive.google.com/file/d/1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM/view");
+    });
+  });
+
+  describe("comment notification for a Markdown file", () => {
+    // Comment emails for Markdown link to the Docs editor (docs.google.com),
+    // unlike share emails, which link to the Drive preview.
+    const raw = readFileSync(join(EXAMPLES_DIR, "markdown_comment_mentions.eml"), "utf-8");
+    const result = parseGmailNotification(raw) as CommentNotification;
+
+    it("extracts both threads with their disco IDs", () => {
+      expect(result.type).toBe("comment");
+      expect(result.documentId).toBe("1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM");
+      expect(result.comments.map((c) => c.discussionId)).toEqual(["AAACIWy6YQk", "AAACIWy6YQo"]);
+      expect(result.comments[1].assignedTo).toBe("you");
+      expect(result.comments[0].openUrl).toContain("docs.google.com/document/d/1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM/edit?disco=AAACIWy6YQk");
+    });
+  });
+
   describe("sharing invitation — textBody fallback & shareMessage", () => {
     function shareEmail(overrides: Partial<{
       headers: Record<string, string>;

@@ -1,0 +1,63 @@
+{
+  "type": "comment",
+  "subject": "Docreview README (markdown test).md",
+  "from": "\"Dave (Google Docs)\" <comments-noreply@docs.google.com>",
+  "to": "docreview.owner@gmail.com",
+  "date_str": "Thu, 08 Oct 2026 23:17:46 -0700",
+  "date": "2026-10-09T06:17:46.000Z",
+  "documentId": "1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM",
+  "documentTitle": "Docreview README (markdown test).md",
+  "documentUrl": "https://docs.google.com/document/d/1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM/edit?usp=comment_email_document&ts=6ac8870a&tab=t.0",
+  "xDocumentId": "1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM",
+  "feedbackId": "MailTypeComment:EditorsNotification",
+  "recipientUserId": "109150937150093658149",
+  "comments": [
+    {
+      "quotedText": "Both pages support labeling, starring",
+      "discussionId": "AAACIWn_gB8",
+      "openUrl": "https://docs.google.com/document/d/1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM/edit?disco=AAACIWn_gB8&usp=comment_email_discussion&ts=6ac8870a&usp_dm=false",
+      "replies": [
+        {
+          "author": "Dave",
+          "time_str": "11:07 PM, Oct 8 (PDT)",
+          "time": "2026-10-09T06:07:00.000Z",
+          "text": "Comment from dave",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocIqvyihLhlu7EAe6OmyCV7RO2oyNqECfq3phRYNw2oiTFJqEw=s50-c-k-no"
+        }
+      ]
+    },
+    {
+      "quotedText": "Click a document to open its details page.",
+      "discussionId": "AAACIWy6YQQ",
+      "openUrl": "https://docs.google.com/document/d/1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM/edit?disco=AAACIWy6YQQ&usp=comment_email_discussion&ts=6ac8870a&usp_dm=false",
+      "replies": [
+        {
+          "author": "Jeff Shute",
+          "time_str": "8:00 PM, Oct 8 (PDT)",
+          "time": "2026-10-09T03:00:00.000Z",
+          "text": "added a comment",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocIxuegy4QSJ60NlWSRbB9Jhjxmo4nJPrWMEMgNp5Zn0_vD4c8--iA=s50-c-k-no"
+        },
+        {
+          "author": "Jeff Shute",
+          "time_str": "8:01 PM, Oct 8 (PDT)",
+          "time": "2026-10-09T03:01:00.000Z",
+          "text": "and then replied",
+          "isNew": false,
+          "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocIxuegy4QSJ60NlWSRbB9Jhjxmo4nJPrWMEMgNp5Zn0_vD4c8--iA=s50-c-k-no"
+        },
+        {
+          "author": "Dave",
+          "time_str": "11:07 PM, Oct 8 (PDT)",
+          "time": "2026-10-09T06:07:00.000Z",
+          "text": "reply from dave",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocIqvyihLhlu7EAe6OmyCV7RO2oyNqECfq3phRYNw2oiTFJqEw=s50-c-k-no"
+        }
+      ]
+    }
+  ],
+  "suggestions": []
+}

@@ -1,7 +1,7 @@
 /**
- * The Google Workspace MIME types this app tracks. Client-safe (no Drive
- * imports), so both server code and components can use the same constants
- * instead of repeating the literal strings.
+ * The MIME types this app tracks: Google Workspace types plus Markdown.
+ * Client-safe (no Drive imports), so both server code and components can use
+ * the same constants instead of repeating the literal strings.
  */
 export const GoogleMimeType = {
   Doc: "application/vnd.google-apps.document",
