@@ -42,15 +42,24 @@ async function findDocUrlsInTab(tabId) {
     return [];
   }
 
+  var allUrls = [];
+  for (var i = 0; i < results.length; i++) {
+    allUrls = allUrls.concat(results[i].result || []);
+  }
+  // Drive file links only count when there's no Docs/Sheets/Slides link: a Docs
+  // notification can also link to unrelated Drive files (PDFs, attachments),
+  // which shouldn't trigger the "multiple documents" alert. Markdown share
+  // emails link only to drive.google.com/file/d/. Filter before deduping so a
+  // Drive link for a doc can't shadow that doc's docs.google.com link.
+  var docsUrls = allUrls.filter(function(u) { return u.indexOf('//docs.google.com/') !== -1; });
+  var candidates = docsUrls.length ? docsUrls : allUrls;
+
   var seenIds = {};
   var urls = [];
-  for (var i = 0; i < results.length; i++) {
-    var frameUrls = results[i].result || [];
-    for (var j = 0; j < frameUrls.length; j++) {
-      var m = frameUrls[j].match(/\/d\/([a-zA-Z0-9_-]+)\//);
-      var id = m ? m[1] : frameUrls[j];
-      if (!seenIds[id]) { urls.push(frameUrls[j]); seenIds[id] = true; }
-    }
+  for (var j = 0; j < candidates.length; j++) {
+    var m = candidates[j].match(/\/d\/([a-zA-Z0-9_-]+)\//);
+    var id = m ? m[1] : candidates[j];
+    if (!seenIds[id]) { urls.push(candidates[j]); seenIds[id] = true; }
   }
   return urls;
 }
@@ -83,7 +92,8 @@ async function openDocFromGmailTab(tabId) {
 // Toolbar icon click: open current doc in Docreview.
 // For Docs (including Sheets/Slides), the tab URL contains the doc ID directly.
 // For Gmail, delegate to openDocFromGmailTab which searches frame contents.
-// Drive pages show file lists, not single documents, so the toolbar doesn't apply there.
+// Drive file preview pages (drive.google.com/file/d/..., e.g. Markdown) also carry
+// the ID in the URL. Drive list pages don't identify a single document.
 // Named function (not anonymous) so the _test:toolbarClick message handler below
 // can call it. Playwright can't click the extension toolbar icon directly.
 async function handleToolbarClick(tab) {
@@ -109,9 +119,11 @@ async function handleToolbarClick(tab) {
     return;
   }
 
-  // Only open in Docreview if the URL contains a document ID (Docs/Sheets/Slides).
-  // Drive pages (drive.google.com/drive/...) don't identify a single document.
-  if (!tab.url.match(/docs\.google\.com\/(document|spreadsheets|presentation)\/d\//)) {
+  // Only open in Docreview if the URL contains a document ID (Docs/Sheets/Slides,
+  // or a Drive file preview page, which is how Drive shows Markdown files).
+  // Drive folder pages (drive.google.com/drive/...) don't identify a single document.
+  var isDrivePreview = /drive\.google\.com\/file\/d\//.test(tab.url);
+  if (!isDrivePreview && !tab.url.match(/docs\.google\.com\/(document|spreadsheets|presentation)\/d\//)) {
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: function() { alert('Page is not a document supported in Docreview'); }
@@ -121,8 +133,9 @@ async function handleToolbarClick(tab) {
     return;
   }
 
-  // Track this tab so comment navigation can reuse it instead of opening a new one
-  var docMatch = tab.url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  // Track this tab so comment navigation can reuse it instead of opening a new one.
+  // Not for Drive previews: comment navigation needs the Docs editor.
+  var docMatch = !isDrivePreview && tab.url.match(/\/d\/([a-zA-Z0-9_-]+)/);
   if (docMatch) {
     await setDocTab(docMatch[1], tab.id);
     setDocTabName(tab.id, docMatch[1]);

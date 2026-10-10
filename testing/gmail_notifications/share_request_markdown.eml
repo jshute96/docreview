@@ -1,0 +1,445 @@
+Delivered-To: docreview.owner@gmail.com
+Received: by 2002:ac0:f984:0:b0:40a:1cea:b99 with SMTP id f4csp2969763ims;
+        Thu, 8 Oct 2026 23:06:30 -0700 (PDT)
+X-Received: by 2002:a05:6820:811:b0:6de:66e3:a1da with SMTP id 006d021491bc7-6ef0f0bfa3cmr719127eaf.50.1791525990581;
+        Thu, 08 Oct 2026 23:06:30 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1791525990; cv=none;
+        d=google.com; s=arc-20260327;
+        b=stbEWcTgjwcNUIKhffAcnWCBwyvWTzuEWwbSnEcQBfjWP5G3hAFvC87vimQ9IWn/EZ
+         i9FcQvq7KPbx594MVuaDXI0258Er7McOJ5WQMQeRoTtFDdlRl6GcWgm015X8UM0ftYtV
+         R0bop9P7NWcFsXwtd3ypdX4GRUOg9PmgH2mwEiXm8xo69Sm4ey9tfBCz9OCXmvFgnic+
+         sm3Sq4Svh3Bo+kZ4Zl03uWiH8uMYM29XXCWRDG56pEmzrCH4LnVjT7nsUpXJVo6vFweb
+         2R6EUKJsxfNWzgJW6rBOwKLGOwQXANfWmq0BPBrjiSWpsMJTUYTyvK3KUVunhUQbdunh
+         fsMw==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
+        h=to:from:subject:date:message-id:references:reply-to:mime-version
+         :dkim-signature;
+        bh=13h0RlhBrX3d56bqi1CJh6GIMzVgl8/UPA47xYFrat4=;
+        fh=bsqVagncr8Sfz6b7Su9hKsi7C5sB2kal6l45kKQAYs8=;
+        b=ch+Cd5FVmGJbT0wNCinsM49Pf07GMUZHXrW3pTN0ohuhLdr7jZ7bIXQaFL3PqG2cVD
+         8dRmX4GcdDq7bnClWM+fHcfdDNWtEwoF3vgRGCCK3nV6W7YICaQVasEGHNRsLU8z5mla
+         oGSs49iqPACSaReRrmyQBrnzzATEnKc+5q4QztDSHfaaongnCpXGCZydVDZdptHjoOu5
+         MnRr1ckVT+gSk+0bB9VbZVnR+IM1OF03EFk7V3E/teEYHVGDDPV/PQ51btuK226IBi8l
+         oCRmLQDccYahJ9XNCsqUJAIECyYLOLnUIoPrAPlJ93Pm2OrnH0LHIdqPSuHR49qX7ooy
+         o28g==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@google.com header.s=20251104 header.b=gCuO9BT+;
+       spf=pass (google.com: domain of 3zotiahckbu0sgxkt-hwpgth-sb-cdgteanvddvat.rdbyhwjitvbpxa.rdb@doclist.bounces.google.com designates 209.85.220.69 as permitted sender) smtp.mailfrom=3ZoTIahcKBu0SgXkT-hWPgTh-Sb-cdgTeanVddVaT.RdbYhWjiTVbPXa.Rdb@doclist.bounces.google.com;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=google.com;
+       dara=pass header.i=@gmail.com
+Return-Path: <3ZoTIahcKBu0SgXkT-hWPgTh-Sb-cdgTeanVddVaT.RdbYhWjiTVbPXa.Rdb@doclist.bounces.google.com>
+Received: from mail-sor-f69.google.com (mail-sor-f69.google.com. [209.85.220.69])
+        by mx.google.com with SMTPS id 006d021491bc7-6eefd0506f2sor387958eaf.2.2026.10.08.23.06.30
+        for <docreview.owner@gmail.com>
+        (Google Transport Security);
+        Thu, 08 Oct 2026 23:06:30 -0700 (PDT)
+Received-SPF: pass (google.com: domain of 3zotiahckbu0sgxkt-hwpgth-sb-cdgteanvddvat.rdbyhwjitvbpxa.rdb@doclist.bounces.google.com designates 209.85.220.69 as permitted sender) client-ip=209.85.220.69;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@google.com header.s=20251104 header.b=gCuO9BT+;
+       spf=pass (google.com: domain of 3zotiahckbu0sgxkt-hwpgth-sb-cdgteanvddvat.rdbyhwjitvbpxa.rdb@doclist.bounces.google.com designates 209.85.220.69 as permitted sender) smtp.mailfrom=3ZoTIahcKBu0SgXkT-hWPgTh-Sb-cdgTeanVddVaT.RdbYhWjiTVbPXa.Rdb@doclist.bounces.google.com;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=google.com;
+       dara=pass header.i=@gmail.com
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=google.com; s=20251104; t=1791525990; x=1792130790; dara=google.com;
+        h=content-type:to:from:subject:date:message-id:references:reply-to
+         :mime-version:from:to:cc:subject:date:message-id:reply-to
+         :content-type;
+        bh=13h0RlhBrX3d56bqi1CJh6GIMzVgl8/UPA47xYFrat4=;
+        b=gCuO9BT+n3asZMJaD+8I7A87WGvjshSFz97edBzt1JSzci9YcemLaGZcWmGfYWR7gn
+         pHnee6BYKNT9Yxz/EdiAZbRiNpKXHbsKwA42tguS/7B1L7Z6g5/tfgKhz4MH1fS/eTNW
+         UqnXjKghTHFtnt/X6KXqhaPhoUI/SqU7/b2RReNqFAERLkpCvS/if6z/1TwYA3sgOToS
+         vaR7Zj2/dbUUL2DrAlFyj5GHlBOzqwbS07HqfbCfar2g7e3efsFVQ6tkgCOjagJaAp1e
+         /tK3+jh7oXwKzX8IH/m/H0umIY2K/hyZwcFzDaHskqKk/zu1VL4+rRoIe0SWGye0bgX6
+         nqEw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20260707; t=1791525990; x=1792130790;
+        h=content-type:to:from:subject:date:message-id:references:reply-to
+         :mime-version:x-gm-message-state:from:to:cc:subject:date:message-id
+         :reply-to:content-type;
+        bh=13h0RlhBrX3d56bqi1CJh6GIMzVgl8/UPA47xYFrat4=;
+        b=er7EXK1ZRJvAS+s/zXbj0RgLLJDc8ZDRNLChI9l25k5Pl40fo/EDE3YJ5azV3zwTlZ
+         uBZRqVxizNmnMq+qvf7CeB+4GgaNAKeaOS1B5F/cRr75SKcMdW71uTmCeeYKH3Q5G0WT
+         r7ZyMebgCvxZLQrVj0XnEWk6JXEiMpRyDzqRPC7CJL7XtBGt2DfPWNoS6mC8pT6muFQv
+         +baWySJJ+ybkrAXChWREJT7xeM2Cd8mHGz4PKysNPjAOZDkYHyQK8qGFjYXdGX2BHjm4
+         diaqwuH9KNejMT9YQBUab/JXMZNtgKmAy4AA9b9WgllHFNHxXos52IO1agmYHIXFkNai
+         6Qjg==
+X-Gm-Message-State: AFuF++kW/44zDCynrq+mUGt0OYy/pQ5nRgjsHJo2epKHSTTDgz4PIQyX
+	+TokWItMqVHUxdWk+j+erys1lTFPVQQnWpTFAK6EMYUVjiHdMQSF6Hw9hlwfgRurIjAtROLQpg=
+	=
+MIME-Version: 1.0
+X-Received: by 2002:a05:6820:1628:b0:6b4:c316:6fdd with SMTP id
+ 006d021491bc7-6ef0d323ed3mr729306eaf.19.1791525990030; Thu, 08 Oct 2026
+ 23:06:30 -0700 (PDT)
+Reply-To: Dave <docreview.dave@gmail.com>
+X-No-Auto-Attachment: 1
+References: <09f2e68d-5b4e-4090-b509-e60f9b306a2f@docs-share.google.com>
+Message-ID: <autogen-java-538a4f1e-744d-411e-a004-32d61558c8b9@google.com>
+Date: Fri, 09 Oct 2026 06:06:30 +0000
+Subject: Share request for "Docreview README (markdown test).md"
+From: "Dave (via Google Drive)" <drive-shares-dm-noreply@google.com>
+To: docreview.owner@gmail.com
+Content-Type: multipart/alternative; boundary="0000000000003de426065d622676"
+
+--0000000000003de426065d622676
+Content-Type: text/plain; charset="UTF-8"; format=flowed; delsp=yes
+
+docreview.dave@gmail.com requests access to an item:
+
+Docreview README (markdown test).md
+https://drive.google.com/file/d/1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM/view?usp=sharing&userstoinvite=docreview.dave@gmail.com&sharingaction=manageaccess&role=writer&ts=6ac88466
+
+You are the owner of this document. To give this user access, click the  
+link above and add them as a collaborator or viewer.
+
+--0000000000003de426065d622676
+Content-Type: text/x-amp-html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!doctype html><html amp4email><head><meta charset=3D"utf-8"><script async =
+src=3D"https://cdn.ampproject.org/v0.js"></script><script async custom-elem=
+ent=3D"amp-form" src=3D"https://cdn.ampproject.org/v0/amp-form-0.1.js"></sc=
+ript><script async custom-element=3D"amp-bind" src=3D"https://cdn.ampprojec=
+t.org/v0/amp-bind-0.1.js"></script><script async custom-element=3D"amp-list=
+" src=3D"https://cdn.ampproject.org/v0/amp-list-0.1.js"></script><script as=
+ync custom-template=3D"amp-mustache" src=3D"https://cdn.ampproject.org/v0/a=
+mp-mustache-0.2.js"></script><style amp4email-boilerplate>body{visibility:h=
+idden}</style><style amp-custom>.material-button{-webkit-appearance: none; =
+cursor: pointer; outline: none;}.material-button:focus {outline: 1px solid =
+transparent;}.material-button:disabled{cursor: initial; outline: none;}.mat=
+erial-dropdown-select{appearance: none; -webkit-appearance: none; -mozkit-a=
+ppearance: none; font-family: Roboto, Arial, Helvetica, sans-serif; font-si=
+ze: 14px; background: url(https://www.gstatic.com/images/icons/material/sys=
+tem_gm/1x/arrow_drop_down_black_48dp.png) no-repeat right 10px top 50%/24px=
+ 24px #f1f3f4; border: none; border-radius: 4px; color: #202124; letter-spa=
+cing: 0.2px; line-height: 20px; padding: 0 44px 0 14px;}.material-button-fi=
+lled{background-color: #0B57D0; color: #fff; outline: 2px solid transparent=
+;}.material-button-filled:hover{background-color: #1f64d4; box-shadow: 0 1p=
+x 2px 0 rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15);}.material-button-f=
+illed:focus{background-color: #276bd6;}.material-button-filled:active{backg=
+round-color: #276bd6;}.material-button-filled:disabled{background-color: rg=
+ba(31,31,31,.12); color: rgba(31,31,31,.38);}.material-button-transparent {=
+background-color: transparent; color: #0B57D0;}.material-button-transparent=
+:hover {background-color: rgba(11, 87, 208, .08);}.material-button-transpar=
+ent:focus {background-color: rgba(11, 87, 208, .10);}.material-button-trans=
+parent:active {background-color: rgba(11, 87, 208, .10); box-shadow: 0 1px =
+3px 1px rgba(60, 64, 67, .15);}.material-button-transparent:disabled{backgr=
+ound-color: transparent; color: #3c4043; opacity: 0.38;}.material-text-inpu=
+t{border: none; border-bottom: 1px solid #3c4043;}.material-text-input:focu=
+s{border-bottom: 2px solid #2277e8;}@media screen and (max-width: 600px){.c=
+ontent-spacer{height: 24px;}.content-spacer-small{height: 12px;}}@media scr=
+een and (min-width: 601px){.content-spacer{height: 32px;}.content-spacer-sm=
+all{height: 20px;}}.submitting-form{opacity: 0.4;}input:disabled{opacity: 0=
+.4;}</style></head><body><amp-list diffable binding=3D"refresh-evaluate" sr=
+c=3D"https://drive.google.com/sharing/boq/dynamicmail/fetchstatefulaccess?t=
+s=3D6ac88466&amp;shareService=3Dtexmex&amp;hl=3Den&amp;userstoinvite=3Ddocr=
+eview.dave@gmail.com&amp;id=3D1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM&amp;dynamic=
+EmailToken=3DAZxI-Nf3BHI4umU7Eda2jMMdxjI8GCw_aDiXsrVn8aIpFhj2Qw0Rn27yVwNtkK=
+VIiG1MWvPF0t8gEiFP1vmxyGuQTE8fbCCY4nMY5xOOvDb271iPli6l9ds8mnubWNIeTbOSSiJVR=
+W07JGMZUM9D-cUEuJAE4etVNQ%3D%3D&amp;resourcekey&amp;requesterEmail=3Ddocrev=
+iew.dave@gmail.com&amp;buildLabel=3Ddrive.explorer_20261002.01_p0" single-i=
+tem items=3D"." layout=3D"container"><div role=3D"list"><table style=3D"bor=
+der-collapse: collapse; width: 100%; background-color: white; text-align: c=
+enter;" role=3D"presentation"><tr><td style=3D"padding: 24px 0 16px 0;"><ta=
+ble style=3D"border-collapse: collapse;font-family: Roboto, Arial, Helvetic=
+a, sans-serif;hyphens: auto; overflow-wrap: break-word; word-wrap: break-wo=
+rd; word-break: break-word;width: 90%; margin: auto;max-width: 700px;min-wi=
+dth: 280px; text-align: left;" role=3D"presentation"><tr><td style=3D"paddi=
+ng: 0;"><table style=3D"width:100%; border: 1px solid #dadce0; border-radiu=
+s: 8px; border-spacing: 0; table-layout:fixed; border-collapse: separate;" =
+role=3D"presentation"><tr><td style=3D"padding: 4.5%;" dir=3D"ltr"><div sty=
+le=3D"margin-bottom:32px;font-family: Google Sans, Roboto, Arial, Helvetica=
+, sans-serif; font-style: normal; font-size: 28px; line-height: 36px; color=
+: #3c4043;">Share an item?</div><table style=3D"border-collapse: collapse;f=
+ont-family: Roboto, Arial, Helvetica, sans-serif; font-size:16px; line-heig=
+ht:24px; color:#202124; letter-spacing:0.1px; table-layout:fixed; width:100=
+%; overflow-wrap: break-word;" role=3D"presentation"><tr><td style=3D"paddi=
+ng: 0; vertical-align:top; width:50px;"><div><amp-img style=3D"border-radiu=
+s:50%; display:block;" width=3D"50" height=3D"50" src=3D"https://lh3.google=
+usercontent.com/a/ACg8ocKC1QJZpJHe-tHm0BTdsGgo6U9PViMhBFpwrkm9tDK_IzRrHQ=3D=
+s64" alt=3D"Header profile photo"></amp-img></div></td><td style=3D"padding=
+: 0; vertical-align:top; padding-left:12px;"><div style=3D"padding-top:12px=
+;">Dave (<a href=3D"mailto:docreview.dave@gmail.com" style=3D"color:inherit=
+;text-decoration:none">docreview.dave@gmail.com</a>) is <b>requesting acces=
+s</b> to the following item:</div></td></tr></table><table style=3D"border-=
+spacing:0 4px; table-layout:fixed; width:100%; overflow-wrap: break-word;" =
+role=3D"presentation"><tr style=3D"height:28px;"></tr><tr><td style=3D"padd=
+ing: 0;"><a href=3D"https://drive.google.com/file/d/1BMdstbgqdjsu8VMHsLuQQB=
+TAsVs9POoM/view?usp=3Dsharing_esl_dm&amp;userstoinvite=3Ddocreview.dave@gma=
+il.com&amp;sharingaction=3Dmanageaccess&amp;role=3Dwriter&amp;ts=3D6ac88466=
+" target=3D"_blank" style=3D"color: #3c4043; display: inline-block; max-wid=
+th: 100%; text-decoration: none; vertical-align: top;border: 1px solid #DAD=
+CE0; border-radius: 16px; white-space: nowrap;"><div style=3D"line-height: =
+18px; overflow: hidden; text-overflow: ellipsis;padding: 6px 12px;"><span s=
+tyle=3D"display: inline-block; vertical-align: middle; min-width: 26px; wid=
+th: 26px;"><amp-img src=3D"https://ssl.gstatic.com/docs/documents/share/ima=
+ges/services/generic-1.png" width=3D"18" height=3D"18" style=3D"vertical-al=
+ign: top;" role=3D"presentation"></amp-img></span><span style=3D"font: 500 =
+14px/18px Google Sans, Roboto, Arial, Helvetica, sans-serif; display: inlin=
+e; letter-spacing: 0.2px; vertical-align: middle;">Docreview README (markdo=
+wn test).md</span></div></a></td></tr></table><div class=3D"content-spacer"=
+></div><div fetch-error><a href=3D"https://drive.google.com/file/d/1BMdstbg=
+qdjsu8VMHsLuQQBTAsVs9POoM/view?usp=3Dsharing_esp_dm&amp;userstoinvite=3Ddoc=
+review.dave@gmail.com&amp;sharingaction=3Dmanageaccess&amp;role=3Dwriter&am=
+p;ts=3D6ac88466" class=3D"material-button material-button-filled" target=3D=
+"_blank" tabindex=3D"0" role=3D"link" style=3D"padding: 0 24px;font: 500 14=
+px/36px Google Sans, Roboto, Arial, Helvetica, sans-serif; border: none; bo=
+rder-radius: 18px; box-sizing: border-box; display: inline-block; letter-sp=
+acing: .25px; min-height: 36px; text-align: center; text-decoration: none;"=
+>Manage sharing</a></div></td></tr></table><table style=3D"border-collapse:=
+ collapse; width: 100%;" role=3D"presentation"><tr><td style=3D"padding: 24=
+px 4.5%"><table style=3D"border-collapse: collapse; width: 100%;" dir=3D"lt=
+r"><tr><td style=3D"padding: 0;font-family: Roboto, Arial, Helvetica, sans-=
+serif; color: #5F6368; width: 100%; font-size: 12px; line-height: 16px; min=
+-height: 40px; letter-spacing: .3px;">Google LLC, 1600 Amphitheatre Parkway=
+, Mountain View, CA 94043, USA<br/> You have received this email because <a=
+ href=3D"mailto:docreview.dave@gmail.com" style=3D"color:inherit;text-decor=
+ation:none">docreview.dave@gmail.com</a> requested access to a file or fold=
+er located in Google Drive.</td><td style=3D"padding: 0;padding-left: 20px;=
+ min-width: 96px"><a href=3D"https://www.google.com/" target=3D"_blank" sty=
+le=3D"text-decoration: none"><amp-img src=3D"https://www.gstatic.com/images=
+/branding/googlelogo/2x/googlelogo_grey_tm_color_96x40dp.png" width=3D"96" =
+height=3D"40" alt=3D"Google" style=3D"font-size:16px;font-weight:500;color:=
+#5F6368"></amp-img></a></td></tr></table></td></tr></table></td></tr></tabl=
+e></td></tr></table></div><template type=3D"amp-mustache"><table style=3D"b=
+order-collapse: collapse; width: 100%; background-color: white; text-align:=
+ center;" role=3D"presentation"><tr><td style=3D"padding: 24px 0 16px 0;"><=
+table style=3D"border-collapse: collapse;font-family: Roboto, Arial, Helvet=
+ica, sans-serif;hyphens: auto; overflow-wrap: break-word; word-wrap: break-=
+word; word-break: break-word;width: 90%; margin: auto;max-width: 700px;min-=
+width: 280px; text-align: left;" role=3D"presentation"><tr><td style=3D"pad=
+ding: 0;"><table style=3D"width:100%; border: 1px solid #dadce0; border-rad=
+ius: 8px; border-spacing: 0; table-layout:fixed; border-collapse: separate;=
+" role=3D"presentation"><tr><td style=3D"padding: 4.5%;" dir=3D"ltr"><div s=
+tyle=3D"margin-bottom:32px;font-family: Google Sans, Roboto, Arial, Helveti=
+ca, sans-serif; font-style: normal; font-size: 28px; line-height: 36px; col=
+or: #3c4043;">Share an item?</div><table style=3D"border-collapse: collapse=
+;font-family: Roboto, Arial, Helvetica, sans-serif; font-size:16px; line-he=
+ight:24px; color:#202124; letter-spacing:0.1px; table-layout:fixed; width:1=
+00%; overflow-wrap: break-word;" role=3D"presentation"><tr><td style=3D"pad=
+ding: 0; vertical-align:top; width:50px;"><div><amp-img style=3D"border-rad=
+ius:50%; display:block;" width=3D"50" height=3D"50" src=3D"https://lh3.goog=
+leusercontent.com/a/ACg8ocKC1QJZpJHe-tHm0BTdsGgo6U9PViMhBFpwrkm9tDK_IzRrHQ=
+=3Ds64" alt=3D"Header profile photo"></amp-img></div></td><td style=3D"padd=
+ing: 0; vertical-align:top; padding-left:12px;"><div style=3D"padding-top:1=
+2px;">Dave (<a href=3D"mailto:docreview.dave@gmail.com" style=3D"color:inhe=
+rit;text-decoration:none">docreview.dave@gmail.com</a>) is <b>requesting ac=
+cess</b> to the following item:</div></td></tr></table><table style=3D"bord=
+er-spacing:0 4px; table-layout:fixed; width:100%; overflow-wrap: break-word=
+;" role=3D"presentation"><tr style=3D"height:28px;"></tr><tr><td style=3D"p=
+adding: 0;"><a href=3D"https://drive.google.com/file/d/1BMdstbgqdjsu8VMHsLu=
+QQBTAsVs9POoM/view?usp=3Dsharing_esl_dm&amp;userstoinvite=3Ddocreview.dave@=
+gmail.com&amp;sharingaction=3Dmanageaccess&amp;role=3Dwriter&amp;ts=3D6ac88=
+466" target=3D"_blank" style=3D"color: #3c4043; display: inline-block; max-=
+width: 100%; text-decoration: none; vertical-align: top;border: 1px solid #=
+DADCE0; border-radius: 16px; white-space: nowrap;"><div style=3D"line-heigh=
+t: 18px; overflow: hidden; text-overflow: ellipsis;padding: 6px 12px;"><spa=
+n style=3D"display: inline-block; vertical-align: middle; min-width: 26px; =
+width: 26px;"><amp-img src=3D"https://ssl.gstatic.com/docs/documents/share/=
+images/services/generic-1.png" width=3D"18" height=3D"18" style=3D"vertical=
+-align: top;" role=3D"presentation"></amp-img></span><span style=3D"font: 5=
+00 14px/18px Google Sans, Roboto, Arial, Helvetica, sans-serif; display: in=
+line; letter-spacing: 0.2px; vertical-align: middle;">Docreview README (mar=
+kdown test).md</span></div></a></td></tr></table><div class=3D"content-spac=
+er-small"></div>{{#isPendingRequest}}<form id=3D"resolve-access-form" metho=
+d=3D"post" autocomplete=3D"off" action-xhr=3D"https://drive.google.com/shar=
+ing/boq/dynamicmail/resolvestatefulaccess?ts=3D6ac88466&amp;shareService=3D=
+texmex&amp;hl=3Den&amp;userstoinvite=3Ddocreview.dave@gmail.com&amp;id=3D1B=
+Mdstbgqdjsu8VMHsLuQQBTAsVs9POoM&amp;dynamicEmailToken=3DAZxI-Nf3BHI4umU7Eda=
+2jMMdxjI8GCw_aDiXsrVn8aIpFhj2Qw0Rn27yVwNtkKVIiG1MWvPF0t8gEiFP1vmxyGuQTE8fbC=
+CY4nMY5xOOvDb271iPli6l9ds8mnubWNIeTbOSSiJVRW07JGMZUM9D-cUEuJAE4etVNQ%3D%3D&=
+amp;resourcekey&amp;requesterEmail=3Ddocreview.dave@gmail.com&amp;buildLabe=
+l=3Ddrive.explorer_20261002.01_p0" on=3D"submit: message-textarea.toggleCla=
+ss('class' =3D 'submitting-form'), hide-on-submit-success.hide(), response-=
+error-message.hide(), share-button.hide(), decline-button.hide(), AMP.setSt=
+ate({scope: {'resolveAccessButtonsDisabled': true},}); submit-success: mess=
+age-textarea.toggleClass('class' =3D 'submitting-form'), share-button.hide(=
+), decline-button.hide(), response-success-message.show(); submit-error: re=
+sponse-error-message.show(), AMP.setState({scope: {'resolveAccessButtonsDis=
+abled': false, 'shareErrorMsg': event.response.errorMessage || 'Could not s=
+hare'},});"><div id=3D"hide-on-submit-success"><select id=3D"role-select" n=
+ame=3D"selectedRole" class=3D"material-dropdown-select" data-type=3D"text" =
+style=3D"height:48px; max-width:100%; margin-top:12px;" required><option va=
+lue=3D"READER">Viewer</option><option value=3D"COMMENTER">Commenter</option=
+><option value=3D"WRITER" selected>Editor</option></select><div class=3D"co=
+ntent-spacer-small"></div><div style=3D"display:flex;align-items:center;"><=
+input type=3D"hidden" name=3D"notify" value=3D"true" data-amp-bind-value=3D=
+"scope['notify']"><input type=3D"checkbox" value=3D"selected" checked style=
+=3D"margin-right:10px; color: #3c4043; width:18px;height:18px;" on=3D"chang=
+e: AMP.setState({scope: {'notify': event.checked ? 'true' : 'false'},});"><=
+label>Notify</label></div><div style=3D"margin-left:32px; margin-top: 6px; =
+font-size: 12px; color: #3c4043;">If you notify the recipient, they will se=
+e your name and decision</div><div class=3D"content-spacer-small"></div><di=
+v id=3D"message-textarea"><textarea autoexpand style=3D"font-family: Roboto=
+, Arial, Helvetica, sans-serif; font-size: 14px; background-color: #fbfbfb;=
+ border-radius: 4px 4px 0 0; box-sizing: border-box; color: #3c4043; height=
+: 54px; letter-spacing: .2px; line-height: 20px; outline: none; padding: 16=
+px 10px; resize: none; width: 100%; word-break: break-word; vertical-align:=
+ top;" class=3D"material-text-input" name=3D"message" autocomplete=3D"off" =
+placeholder=3D"Message" aria-label=3D" Message"></textarea></div><div class=
+=3D"content-spacer-small"></div></div><div style=3D"display:flex;flex-wrap:=
+wrap;" role=3D"region" aria-live=3D"polite"><input type=3D"hidden" name=3D"=
+grantAccess" data-amp-bind-value=3D"scope['grantAccess']"><button style=3D"=
+padding: 0 24px;font: 500 14px/36px Google Sans, Roboto, Arial, Helvetica, =
+sans-serif; border: none; border-radius: 18px; box-sizing: border-box; disp=
+lay: inline-block; letter-spacing: .25px; min-height: 36px; text-align: cen=
+ter; text-decoration: none;margin-top:12px; margin-right:9px;" type=3D"butt=
+on" id=3D"share-button" class=3D"material-button material-button-filled" da=
+ta-amp-bind-disabled=3D"scope['resolveAccessButtonsDisabled']" on=3D"tap: A=
+MP.setState({scope: {'grantAccess': 'true', 'hideShareMessage': false, 'hid=
+eDeclineMessage': true,},}), resolve-access-form.submit;">Share</button><bu=
+tton style=3D"padding: 0 8px;font: 500 14px/36px Google Sans, Roboto, Arial=
+, Helvetica, sans-serif; border: none; border-radius: 18px; box-sizing: bor=
+der-box; display: inline-block; letter-spacing: .25px; min-height: 36px; te=
+xt-align: center; text-decoration: none;border: 1px solid #747775; padding:=
+ 0 24px;margin-top:12px; margin-right:9px;" type=3D"button" id=3D"decline-b=
+utton" class=3D"material-button material-button-transparent" data-amp-bind-=
+disabled=3D"scope['resolveAccessButtonsDisabled']" on=3D"tap: AMP.setState(=
+{scope: {'grantAccess': 'false', 'hideShareMessage': true, 'hideDeclineMess=
+age': false,},}), resolve-access-form.submit;">Decline</button><div style=
+=3D"display:flex;align-items:center;flex-wrap:wrap;"><div style=3D"margin-t=
+op:12px;" id=3D"response-success-message" hidden><div id=3D"share-success-m=
+essage" hidden data-amp-bind-hidden=3D"scope['hideShareMessage']"><div styl=
+e=3D"display:flex; align-items:center;"><div style=3D"height:24px; margin-r=
+ight:8px;"><amp-img width=3D"24" height=3D"24" src=3D"https://www.gstatic.c=
+om/docs/documents/share/images/check_circle_outline_green.png"></amp-img></=
+div><span style=3D"margin-right:8px"><span>You shared this file</span></spa=
+n></div></div><div id=3D"decline-success-message" hidden data-amp-bind-hidd=
+en=3D"scope['hideDeclineMessage']"><div style=3D"display:flex; align-items:=
+center;"><div style=3D"height:24px; margin-right:8px;"><amp-img width=3D"24=
+" height=3D"24" src=3D"https://www.gstatic.com/docs/documents/share/images/=
+cancel_red.png"></amp-img></div><span style=3D"margin-right:8px"><span>You =
+declined access</span></span></div></div></div><div style=3D"margin-top:12p=
+x;" id=3D"response-error-message" hidden><div id=3D"share-error-message" hi=
+dden data-amp-bind-hidden=3D"scope['hideShareMessage']"><div style=3D"displ=
+ay:flex; align-items:center;"><div style=3D"height:24px; margin-right:8px;"=
+><amp-img width=3D"24" height=3D"24" src=3D"https://www.gstatic.com/docs/do=
+cuments/share/images/warn_circle_outline_red.png"></amp-img></div><span sty=
+le=3D"margin-right:8px"><span data-amp-bind-text=3D"scope['shareErrorMsg']"=
+></span></span></div></div><div id=3D"decline-error-message" hidden data-am=
+p-bind-hidden=3D"scope['hideDeclineMessage']"><div style=3D"display:flex; a=
+lign-items:center;"><div style=3D"height:24px; margin-right:8px;"><amp-img =
+width=3D"24" height=3D"24" src=3D"https://www.gstatic.com/docs/documents/sh=
+are/images/warn_circle_outline_red.png"></amp-img></div><span style=3D"marg=
+in-right:8px"><span>Something went wrong and the request could not be decli=
+ned</span></span></div></div></div><a href=3D"https://drive.google.com/file=
+/d/1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM/view?usp=3Dsharing_esp_dm&amp;userstoi=
+nvite=3Ddocreview.dave@gmail.com&amp;sharingaction=3Dmanageaccess&amp;role=
+=3Dwriter&amp;ts=3D6ac88466" class=3D"material-button material-button-trans=
+parent" target=3D"_blank" tabindex=3D"0" role=3D"link" style=3D"padding: 0 =
+8px;font: 500 14px/36px Google Sans, Roboto, Arial, Helvetica, sans-serif; =
+border: none; border-radius: 18px; box-sizing: border-box; display: inline-=
+block; letter-spacing: .25px; min-height: 36px; text-align: center; text-de=
+coration: none;margin-top:12px;">Manage sharing</a></div></div></form>{{/is=
+PendingRequest}}{{^isPendingRequest}}<div class=3D"content-spacer-small"></=
+div><div style=3D"display:flex; align-items:center;"><div style=3D"margin-t=
+op:12px;font-size:14px;line-height:36px;"><div style=3D"display:flex; align=
+-items:center;"><span style=3D"margin-right:8px">This request no longer exi=
+sts</span></div></div><a href=3D"https://drive.google.com/file/d/1BMdstbgqd=
+jsu8VMHsLuQQBTAsVs9POoM/view?usp=3Dsharing_esp_dm&amp;userstoinvite=3Ddocre=
+view.dave@gmail.com&amp;sharingaction=3Dmanageaccess&amp;role=3Dwriter&amp;=
+ts=3D6ac88466" class=3D"material-button material-button-transparent" target=
+=3D"_blank" tabindex=3D"0" role=3D"link" style=3D"padding: 0 8px;font: 500 =
+14px/36px Google Sans, Roboto, Arial, Helvetica, sans-serif; border: none; =
+border-radius: 18px; box-sizing: border-box; display: inline-block; letter-=
+spacing: .25px; min-height: 36px; text-align: center; text-decoration: none=
+;margin-top:12px;">Manage sharing</a></div>{{/isPendingRequest}}</td></tr><=
+/table><table style=3D"border-collapse: collapse; width: 100%;" role=3D"pre=
+sentation"><tr><td style=3D"padding: 24px 4.5%"><table style=3D"border-coll=
+apse: collapse; width: 100%;" dir=3D"ltr"><tr><td style=3D"padding: 0;font-=
+family: Roboto, Arial, Helvetica, sans-serif; color: #5F6368; width: 100%; =
+font-size: 12px; line-height: 16px; min-height: 40px; letter-spacing: .3px;=
+">Google LLC, 1600 Amphitheatre Parkway, Mountain View, CA 94043, USA<br/> =
+You have received this email because <a href=3D"mailto:docreview.dave@gmail=
+.com" style=3D"color:inherit;text-decoration:none">docreview.dave@gmail.com=
+</a> requested access to a file or folder located in Google Drive.</td><td =
+style=3D"padding: 0;padding-left: 20px; min-width: 96px"><a href=3D"https:/=
+/www.google.com/" target=3D"_blank" style=3D"text-decoration: none"><amp-im=
+g src=3D"https://www.gstatic.com/images/branding/googlelogo/2x/googlelogo_g=
+rey_tm_color_96x40dp.png" width=3D"96" height=3D"40" alt=3D"Google" style=
+=3D"font-size:16px;font-weight:500;color:#5F6368"></amp-img></a></td></tr><=
+/table></td></tr></table></td></tr></table></td></tr></table></template></a=
+mp-list></body></html>
+--0000000000003de426065d622676
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<html><head></head><body><table style=3D"border-collapse: collapse; width: =
+100%; background-color: white; text-align: center;" role=3D"presentation"><=
+tr><td style=3D"padding: 24px 0 16px 0;"><table style=3D"border-collapse: c=
+ollapse;font-family: Roboto, Arial, Helvetica, sans-serif;hyphens: auto; ov=
+erflow-wrap: break-word; word-wrap: break-word; word-break: break-word;widt=
+h: 90%; margin: auto;max-width: 700px;min-width: 280px; text-align: left;" =
+role=3D"presentation"><tr><td style=3D"padding: 0;"><table style=3D"width:1=
+00%; border: 1px solid #dadce0; border-radius: 8px; border-spacing: 0; tabl=
+e-layout:fixed; border-collapse: separate;" role=3D"presentation"><tr><td s=
+tyle=3D"padding: 4.5%;" dir=3D"ltr"><div style=3D"margin-bottom:32px;font-f=
+amily: Google Sans, Roboto, Arial, Helvetica, sans-serif; font-style: norma=
+l; font-size: 28px; line-height: 36px; color: #3c4043;">Share an item?</div=
+><table style=3D"border-collapse: collapse;font-family: Roboto, Arial, Helv=
+etica, sans-serif; font-size:16px; line-height:24px; color:#202124; letter-=
+spacing:0.1px; table-layout:fixed; width:100%; overflow-wrap: break-word;" =
+role=3D"presentation"><tr><td style=3D"padding: 0; vertical-align:top; widt=
+h:50px;"><!--[if mso]><v:oval xmlns:v=3D"urn:schemas-microsoft-com:vml" xml=
+ns:w=3D"urn:schemas-microsoft-com:office:word" style=3D"height:50px;width:5=
+0px;" fill=3D"t" stroke=3D"f"><v:fill type=3D"frame" src=3D"https://lh3.goo=
+gleusercontent.com/a/ACg8ocKC1QJZpJHe-tHm0BTdsGgo6U9PViMhBFpwrkm9tDK_IzRrHQ=
+=3Ds64" alt=3D"Header profile photo" style=3D"height:50px;width:50px;"/></v=
+:oval><![endif]--><div style=3D"mso-hide:all;"><img style=3D"border-radius:=
+50%; display:block;" width=3D"50" height=3D"50" src=3D"https://lh3.googleus=
+ercontent.com/a/ACg8ocKC1QJZpJHe-tHm0BTdsGgo6U9PViMhBFpwrkm9tDK_IzRrHQ=3Ds6=
+4" alt=3D"Header profile photo"></div></td><td style=3D"padding: 0; vertica=
+l-align:top; padding-left:12px;"><div style=3D"padding-top:12px;">Dave (<a =
+href=3D"mailto:docreview.dave@gmail.com" style=3D"color:inherit;text-decora=
+tion:none">docreview.dave@gmail.com</a>) is <b>requesting access</b> to the=
+ following item:</div></td></tr></table><table style=3D"border-spacing:0 4p=
+x; table-layout:fixed; width:100%; overflow-wrap: break-word;" role=3D"pres=
+entation"><tr style=3D"height:28px;"></tr><tr><td style=3D"padding: 0;"><a =
+href=3D"https://drive.google.com/file/d/1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM/v=
+iew?usp=3Dsharing_esl&amp;userstoinvite=3Ddocreview.dave@gmail.com&amp;shar=
+ingaction=3Dmanageaccess&amp;role=3Dwriter&amp;ts=3D6ac88466" target=3D"_bl=
+ank" style=3D"color: #3c4043; display: inline-block; max-width: 100%; text-=
+decoration: none; vertical-align: top;border: 1px solid #DADCE0; border-rad=
+ius: 16px; white-space: nowrap;"><div style=3D"line-height: 18px; overflow:=
+ hidden; text-overflow: ellipsis;padding: 6px 12px;"><span style=3D"display=
+: inline-block; vertical-align: middle; min-width: 26px; width: 26px;"><img=
+ src=3D"https://ssl.gstatic.com/docs/documents/share/images/services/generi=
+c-1.png" width=3D"18" height=3D"18" style=3D"vertical-align: top;" role=3D"=
+presentation"></span><span style=3D"font: 500 14px/18px Google Sans, Roboto=
+, Arial, Helvetica, sans-serif; display: inline; letter-spacing: 0.2px; ver=
+tical-align: middle;">Docreview README (markdown test).md</span></div></a><=
+/td></tr></table><table style=3D"border-collapse: collapse;" role=3D"presen=
+tation"><tr style=3D"height: 32px"><td></td></tr></table><div><!--[if mso]>=
+<v:roundrect xmlns:v=3D"urn:schemas-microsoft-com:vml" xmlns:w=3D"urn:schem=
+as-microsoft-com:office:word" href=3D"https://drive.google.com/file/d/1BMds=
+tbgqdjsu8VMHsLuQQBTAsVs9POoM/view?usp=3Dsharing_esp&amp;userstoinvite=3Ddoc=
+review.dave@gmail.com&amp;sharingaction=3Dmanageaccess&amp;role=3Dwriter&am=
+p;ts=3D6ac88466" style=3D"height:36px; width:100px; v-text-anchor:middle;" =
+arcsize=3D"50%" stroke=3D"f" fillcolor=3D"#1a73e8"><w:anchorlock/><center s=
+tyle=3D"color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-weight:50=
+0;font-size:14px;">Manage sharing </center></v:roundrect><![endif]--><a hre=
+f=3D"https://drive.google.com/file/d/1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM/view=
+?usp=3Dsharing_esp&amp;userstoinvite=3Ddocreview.dave@gmail.com&amp;sharing=
+action=3Dmanageaccess&amp;role=3Dwriter&amp;ts=3D6ac88466" class=3D"materia=
+l-button material-button-filled" target=3D"_blank" tabindex=3D"0" role=3D"l=
+ink" style=3D"mso-hide:all;padding: 0 24px;font: 500 14px/36px Google Sans,=
+ Roboto, Arial, Helvetica, sans-serif; border: none; border-radius: 18px; b=
+ox-sizing: border-box; display: inline-block; letter-spacing: .25px; min-he=
+ight: 36px; text-align: center; text-decoration: none;background-color: #0B=
+57D0; color: #fff; cursor: pointer;">Manage sharing</a></div></td></tr></ta=
+ble><table style=3D"border-collapse: collapse; width: 100%;" role=3D"presen=
+tation"><tr><td style=3D"padding: 24px 4.5%"><table style=3D"border-collaps=
+e: collapse; width: 100%;" dir=3D"ltr"><tr><td style=3D"padding: 0;font-fam=
+ily: Roboto, Arial, Helvetica, sans-serif; color: #5F6368; width: 100%; fon=
+t-size: 12px; line-height: 16px; min-height: 40px; letter-spacing: .3px;">G=
+oogle LLC, 1600 Amphitheatre Parkway, Mountain View, CA 94043, USA<br/> You=
+ have received this email because <a href=3D"mailto:docreview.dave@gmail.co=
+m" style=3D"color:inherit;text-decoration:none">docreview.dave@gmail.com</a=
+> requested access to a file or folder located in Google Drive.</td><td sty=
+le=3D"padding: 0;padding-left: 20px; min-width: 96px"><a href=3D"https://ww=
+w.google.com/" target=3D"_blank" style=3D"text-decoration: none"><img src=
+=3D"https://www.gstatic.com/images/branding/googlelogo/2x/googlelogo_grey_t=
+m_color_96x40dp.png" width=3D"96" height=3D"40" alt=3D"Google" style=3D"fon=
+t-size:16px;font-weight:500;color:#5F6368"></a></td></tr></table></td></tr>=
+</table></td></tr></table></td></tr></table></body></html>
+--0000000000003de426065d622676--

@@ -141,7 +141,7 @@ export async function addDoc(params: AddDocParams): Promise<NextResponse> {
       }
     : {
         title: f!.name ?? "",
-        driveUrl: driveUrlFor(googleDocId, f!.webViewLink),
+        driveUrl: driveUrlFor(googleDocId, f!.webViewLink, f!.mimeType),
         mimeType: f!.mimeType!,
         role: isOwner ? DocRole.AUTHOR : DocRole.REVIEWER,
         lastModifiedInDrive: f!.modifiedTime ? new Date(f!.modifiedTime) : null,

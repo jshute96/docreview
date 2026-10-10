@@ -2,7 +2,7 @@
 
 Each row in the document list shows:
 
-- **Type icon** -- Google Docs, Sheets, or Slides.
+- **Type icon** -- Google Docs, Sheets, Slides, or Markdown.
 - **Title** -- Click to open the comment detail page in Docreview. The title links to Google Drive on hover.
 - **Role badge** -- Author (blue) or Reviewer (violet).
 - **Star** -- Click to toggle. Use the star filter to find starred documents quickly.
@@ -42,7 +42,7 @@ The filter bar sits below the toolbar and provides tri-state filters for:
 - **Author / Reviewer** -- Your role on the document.
 - **Starred** -- Whether the document is starred.
 - **Has comments** -- Whether the document has inbox or open comments.
-- **Document type** -- Docs, Sheets, or Slides icons.
+- **Document type** -- Docs, Sheets, Slides, or Markdown icons.
 - **Labels** -- Each label appears as a separate filter toggle.
 - **Title search** -- Type to filter by title. Supports regular expressions.
 

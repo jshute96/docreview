@@ -28,12 +28,8 @@ vi.mock("@/lib/google-drive", async () => {
     // Pure helpers — use the real implementations so error-code checks work
     getDriveErrorCode: actual.getDriveErrorCode,
     isDriveErrorCode: actual.isDriveErrorCode,
-    driveUrlFor: vi.fn((fileId: string, link?: string | null) => link ?? `https://docs.google.com/document/d/${fileId}/edit`),
-    SUPPORTED_MIME_TYPES: new Set([
-      "application/vnd.google-apps.document",
-      "application/vnd.google-apps.spreadsheet",
-      "application/vnd.google-apps.presentation",
-    ]),
+    driveUrlFor: vi.fn(actual.driveUrlFor),
+    SUPPORTED_MIME_TYPES: actual.SUPPORTED_MIME_TYPES,
   };
 });
 
@@ -303,6 +299,28 @@ describe("addDoc", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "invalid_mime_type" });
     expect(mockDoc.create).not.toHaveBeenCalled();
+  });
+
+  it("accepts Markdown files (text/markdown) and normalizes Drive file preview URL to Docs editor URL", async () => {
+    mockDriveFilesGet({
+      name: "README.md",
+      mimeType: "text/markdown",
+      webViewLink: `https://drive.google.com/file/d/${googleDocId}/view?usp=drivesdk`,
+      owners: [{ me: true }],
+      trashed: false,
+    });
+    mockDoc.findUnique.mockResolvedValue({ docId: "new-doc-id", title: "README.md", labels: [], comments: [] });
+
+    const res = await addDoc({
+      userId, googleDocId, labelIds: [],
+      fallback: makeFallback(),
+    });
+
+    expect(res.status).toBe(201);
+    const data = mockDoc.create.mock.calls[0][0].data;
+    expect(data.mimeType).toBe("text/markdown");
+    expect(data.driveUrl).toBe(`https://docs.google.com/document/d/${googleDocId}/edit`);
+    expect(mockSyncComments).toHaveBeenCalledTimes(1);
   });
 
   it("falls back to DENIED record when Drive API rejects access", async () => {

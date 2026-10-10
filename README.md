@@ -1,6 +1,6 @@
 # Docreview
 
-Docreview makes reviewing Google Docs, Sheets, and Slides, and tracking your comment threads, manageable.
+Docreview makes reviewing Google Docs, Sheets, Slides, and Markdown files, and tracking your comment threads, manageable.
 
 Docreview connects to Google Drive to find your documents, and to Gmail to get notifications on comment threads.
 

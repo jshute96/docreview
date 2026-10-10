@@ -59,7 +59,7 @@ title and notes extracted from the email.
 
 The scanner uses the structured parser to extract rich context from notifications:
 
-- **Sharing Notifications**: extracts the sharer name, date, and any custom share message.
+- **Sharing Notifications**: extracts the sharer name, date, and any custom share message. The document link is a `docs.google.com` URL, or `drive.google.com/file/d/ID/view` for non-native files like Markdown (whose emails also omit the permission word, so `permission` is empty).
 - **Comment Notifications**: extracts the author and text of the latest reply.
 - **Doc-specific Notes**: During scanning, these notes are collected in `shareNotes` (a map of doc ID to note string). For `inaccessibleDocs`, these are bundled directly into the doc entry.
 

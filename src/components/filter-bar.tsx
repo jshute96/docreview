@@ -18,6 +18,7 @@ const DOC_TYPES = [
   { mimeType: GoogleMimeType.Doc, label: MIME_TYPE_LABELS[GoogleMimeType.Doc], color: "#4285F4" },
   { mimeType: GoogleMimeType.Sheet, label: MIME_TYPE_LABELS[GoogleMimeType.Sheet], color: "#34A853" },
   { mimeType: GoogleMimeType.Slides, label: MIME_TYPE_LABELS[GoogleMimeType.Slides], color: "#FBBC04" },
+  { mimeType: GoogleMimeType.Markdown, label: MIME_TYPE_LABELS[GoogleMimeType.Markdown], color: "#4285F4" },
 ] as const;
 
 interface FilterBarProps {

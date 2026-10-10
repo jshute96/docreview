@@ -1,0 +1,48 @@
+{
+  "type": "comment",
+  "subject": "Docreview README.md",
+  "from": "\"Jeff Shute (Google Docs)\" <comments-noreply@docs.google.com>",
+  "to": "docreview.owner@gmail.com",
+  "date_str": "Thu, 08 Oct 2026 20:29:18 -0700",
+  "date": "2026-10-09T03:29:18.000Z",
+  "documentId": "1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM",
+  "documentTitle": "Docreview README.md",
+  "documentUrl": "https://docs.google.com/document/d/1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM/edit?usp=comment_email_document&ts=6ac85f8e&tab=t.0",
+  "xDocumentId": "1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM",
+  "feedbackId": "MailTypeComment:EditorsNotification",
+  "recipientUserId": "109150937150093658149",
+  "comments": [
+    {
+      "quotedText": "suggestions than the Docs",
+      "discussionId": "AAACIWy6YQk",
+      "openUrl": "https://docs.google.com/document/d/1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM/edit?disco=AAACIWy6YQk&usp=comment_email_discussion&ts=6ac85f8e&usp_dm=false",
+      "replies": [
+        {
+          "author": "Jeff Shute",
+          "time_str": "8:18 PM, Oct 8 (PDT)",
+          "time": "2026-10-09T03:18:00.000Z",
+          "text": "can I mention @docreview.owner@gmail.com and get a notification?",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocIxuegy4QSJ60NlWSRbB9Jhjxmo4nJPrWMEMgNp5Zn0_vD4c8--iA=s50-c-k-no"
+        }
+      ]
+    },
+    {
+      "quotedText": "Drive APIs expose",
+      "assignedTo": "you",
+      "discussionId": "AAACIWy6YQo",
+      "openUrl": "https://docs.google.com/document/d/1BMdstbgqdjsu8VMHsLuQQBTAsVs9POoM/edit?disco=AAACIWy6YQo&usp=todo_email_discussion&ts=6ac85f8e&usp_dm=false",
+      "replies": [
+        {
+          "author": "Jeff Shute",
+          "time_str": "8:18 PM, Oct 8 (PDT)",
+          "time": "2026-10-09T03:18:00.000Z",
+          "text": "Can I assign to @docreview.owner@gmail.com",
+          "isNew": true,
+          "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocIxuegy4QSJ60NlWSRbB9Jhjxmo4nJPrWMEMgNp5Zn0_vD4c8--iA=s50-c-k-no"
+        }
+      ]
+    }
+  ],
+  "suggestions": []
+}

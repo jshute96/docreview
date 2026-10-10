@@ -455,6 +455,28 @@ describe("POST /api/docs/[docId]/threads", () => {
     expect(data.comment.status).toBe("ARCHIVED");
   });
 
+  it.each(["error", "denied"] as const)("does not resolve a suggestion when the suggestion fetch is unavailable (%s)", async (unavailable) => {
+    mockAuth.mockResolvedValue({ user: { id: "u1" } });
+    mockDoc.findUnique.mockResolvedValue(docRecord);
+    const commentRecord = {
+      commentId: "cr1", docId: "d1", googleSuggestionId: "suggest.abc",
+      type: "SUGGESTION", status: "INBOX", resolved: false,
+    };
+    mockComment.findFirst.mockResolvedValue(commentRecord);
+    mockGetDriveClient.mockResolvedValue({} as Awaited<ReturnType<typeof getDriveClient>>);
+    // Empty because the fetch failed or was denied, not because the suggestion is gone
+    mockFetchDocData.mockResolvedValue({ suggestions: [], suggestionContent: {}, documentText: null, suggestionsUnavailable: unavailable });
+
+    const req = new NextRequest(
+      "http://localhost/api/docs/d1/threads?commentId=suggest.abc",
+      { method: "POST" }
+    );
+    const res = await POST(req, makeParams("d1"));
+    const data = await res.json();
+    expect(data.comment.resolved).toBe(false);
+    expect(mockComment.update).not.toHaveBeenCalled();
+  });
+
   it("returns suggestion unchanged when still live", async () => {
     mockAuth.mockResolvedValue({ user: { id: "u1" } });
     mockDoc.findUnique.mockResolvedValue(docRecord);

@@ -59,7 +59,7 @@ export async function POST(
     driveDoc = {
       googleDocId: f.id!,
       title: f.name!,
-      driveUrl: driveUrlFor(f.id!, f.webViewLink),
+      driveUrl: driveUrlFor(f.id!, f.webViewLink, f.mimeType),
       mimeType: f.mimeType!,
       role: isOwner ? DocRole.AUTHOR : DocRole.REVIEWER,
       lastModifiedInDrive: f.modifiedTime ? new Date(f.modifiedTime) : null,

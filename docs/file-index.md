@@ -139,7 +139,7 @@ One-line descriptions of every source file, grouped by layer.
 | `color-picker.tsx` | Popover color grid for label color selection |
 | `dialog-buttons.tsx` | Reusable Save/Cancel button pair for dialogs |
 | `friendly-date.tsx` | `<FriendlyDate>` — renders relative timestamps: time-only (today), weekday + time (<6d), date (older); full timestamp on hover; the one place date strings are converted to Dates |
-| `doc-type-icon.tsx` | SVG icons for Google Docs/Sheets/Slides by mime type |
+| `doc-type-icon.tsx` | SVG icons for Google Docs/Sheets/Slides/Markdown by mime type |
 | `hide-until-titles.tsx` | `<HideUntilTitles>` — inline script that hides the page body until cached titles are rendered; emitted only on an initial document request |
 | `x-icon.tsx` | Small X (close) icon used in badges and buttons |
 | `help-dialog.tsx` | Multi-page help viewer dialog — iframe + pages.json navigation, keyboard shortcuts, page dropdown |
@@ -215,7 +215,7 @@ Shadcn/ui components:
 | `read-state.ts` | Per-thread read tracking helpers — conversion between slot space (the stored `readSlotCount`, which counts deleted reply slots) and render space (the cached `readMessageCount`, live messages only), plus `unreadMessageCount()`, `isThreadRead()`, `totalMessageCount()`, `nextReadSlotCount()`, `initialReadSlotCount()` (shared by server sync and client UI) |
 | `extension-wire.ts` | `ExtCommentType` / `ExtSuggestionStatus` — the values the Chrome extension sends, with parsers for each boundary (the sync body uses the lowercase spelling, `commentSynced` the Prisma one) |
 | `suggestion-labels.ts` | `SuggestionLabel` — Google's Add/Delete/Replace/Other labels, shared by the Gmail parser and the extension scrape |
-| `mime-types.ts` | `GoogleMimeType` — the Doc/Sheet/Slides MIME types, plus `SUPPORTED_MIME_TYPES` and UI labels; client-safe (no Drive imports) |
+| `mime-types.ts` | `GoogleMimeType` — the Doc/Sheet/Slides/Markdown MIME types, plus `SUPPORTED_MIME_TYPES` and UI labels; client-safe (no Drive imports) |
 | `doc-error-codes.ts` | `DocErrorCode` — the `{ error: <code> }` values the doc validate/add routes return, shared with the client that words them |
 | `doc-queries.ts` | Shared Prisma include constants (`labelInclude`, `docWithCountsInclude`, `docWithCommentsInclude`) + `withCommentCounts` transform + `stripServerOnly` (strips titles from API responses for privacy) |
 | `highlight.tsx` | `highlightText()` — regex/substring highlighter for plain text; `highlightHtml()` — same for HTML strings (highlights text outside tags, returns null if no match); `matchesFilter()` — centralized dual regex/substring search; `createMatcher()` — compiled reusable matcher |

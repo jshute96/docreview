@@ -625,8 +625,9 @@ function parseSharingNotification(email: ParsedEmail): SharingNotification {
   const titleMatch = html.match(/vertical-align: middle;">([^<]+)<\/span><\/div><\/a>/);
   const documentTitle = titleMatch ? decodeHtmlEntities(titleMatch[1]) : "";
 
-  // Document URL
-  const urlMatch = html.match(/href="(https:\/\/docs\.google\.com\/[^"]*\/d\/[^"]+)"[^>]*target="_blank"[^>]*style="[^"]*text-decoration: none/);
+  // Document URL. Non-native files like Markdown link to the Drive preview
+  // (drive.google.com/file/d/ID/view) instead of docs.google.com.
+  const urlMatch = html.match(/href="(https:\/\/(?:docs\.google\.com\/[^"]*|drive\.google\.com\/file)\/d\/[^"]+)"[^>]*target="_blank"[^>]*style="[^"]*text-decoration: none/);
   const documentUrl = urlMatch ? decodeHtmlEntities(urlMatch[1]) : "";
   const documentId = extractDocIdFromUrl(documentUrl);
 

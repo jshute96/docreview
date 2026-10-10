@@ -27,6 +27,11 @@ Current examples:
 - `mentioned_me_in_unshared_doc` — @mention comment on an unshared doc
 - `invitation_to_edit` — sharing invitation with edit permission
 - `share_request` — access request from another user
+- `shared_markdown_file` — Markdown file shared from Drive; links are `drive.google.com/file/d/ID/view` and the text has no permission word
+- `share_request_markdown` — access request for a Markdown file; links to the Drive preview
+- `markdown_comment_mentions` — comment notification on a Markdown file (a mention and an assignment); links to the Docs editor (`docs.google.com/document/d/`)
+- `markdown_comment_replies` — comment notification on a Markdown file with a new comment and a new reply on an existing thread
+
 - `suggestion_accept_reject` — format suggestion with reply thread
 - `suggestion_add_link` — "add link" suggestion (Other action type) with @mention reply
 - `suggestion_format_change` — comment, suggestion with accept/reject replies, resolved suggestions

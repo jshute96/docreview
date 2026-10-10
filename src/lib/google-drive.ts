@@ -96,9 +96,17 @@ export function parseGoogleDocId(url: string): string | null {
   return null;
 }
 
-/** Build a Drive URL for a file, preferring webViewLink when available. */
-export function driveUrlFor(fileId: string, webViewLink?: string | null): string {
-  return webViewLink ?? `https://docs.google.com/document/d/${fileId}/edit`;
+/** Build a Drive URL for a file, preferring webViewLink when available.
+ *  Markdown files get a generic drive.google.com/file/d/.../view webViewLink
+ *  from Drive, which opens the Drive file preview instead of the Docs editor
+ *  (and doesn't support ?disco= comment links), so use the Docs editor URL for
+ *  those. Other non-native files (PDFs, images) keep their preview link, since
+ *  the Docs editor can't open them. */
+export function driveUrlFor(fileId: string, webViewLink?: string | null, mimeType?: string | null): string {
+  if (webViewLink && !(mimeType === GoogleMimeType.Markdown && webViewLink.includes("//drive.google.com/file/"))) {
+    return webViewLink;
+  }
+  return `https://docs.google.com/document/d/${fileId}/edit`;
 }
 
 export async function getDriveClient(userId: string) {
@@ -1289,7 +1297,7 @@ export async function listChanges(
     docs.push({
       googleDocId: file.id,
       title: file.name,
-      driveUrl: driveUrlFor(file.id, file.webViewLink),
+      driveUrl: driveUrlFor(file.id, file.webViewLink, file.mimeType),
       mimeType: file.mimeType,
       role: isOwner ? DocRole.AUTHOR : DocRole.REVIEWER,
       lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,
@@ -1347,7 +1355,7 @@ export async function fetchDocsByIds(
         return {
           googleDocId: id,
           title: file.name ?? id,
-          driveUrl: driveUrlFor(id, file.webViewLink),
+          driveUrl: driveUrlFor(id, file.webViewLink, file.mimeType),
           mimeType: file.mimeType ?? "",
           role: isOwner ? DocRole.AUTHOR : DocRole.REVIEWER,
           lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,
@@ -1441,7 +1449,7 @@ export async function listRecentDocs(
       docs.push({
         googleDocId: file.id,
         title: file.name,
-        driveUrl: driveUrlFor(file.id, file.webViewLink),
+        driveUrl: driveUrlFor(file.id, file.webViewLink, file.mimeType),
         mimeType: file.mimeType ?? "",
         role: isOwner ? DocRole.AUTHOR : DocRole.REVIEWER,
         lastModifiedInDrive: file.modifiedTime ? new Date(file.modifiedTime) : null,
