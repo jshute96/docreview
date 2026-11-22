@@ -181,6 +181,7 @@ Shadcn/ui components:
 | `run-test.sh` | Run Playwright e2e tests — finds the right config file automatically |
 | `parse-gmail-notification.ts` | CLI wrapper around `parseGmailNotification()` — parses `.eml` files to structured JSON, optionally saves alongside |
 | `check-gmail-notifications.ts` | Checks saved `.json` fixtures under `testing/gmail_notifications/` against current parser output; `--update` rewrites any that differ |
+| `probe-suggestion-threads.ts` | Research probe for the Docs API suggestion-thread fields (`suggestions[]`, `commentsViewMode`) and accept/reject/reply requests against a real doc, using a stored user token; text redacted unless `--show-text` |
 | `extract-email-body.ts` | Extracts HTML/plaintext body from Gmail `.eml` files — prints to stdout or saves alongside |
 
 ## Contexts (`src/contexts/`)
