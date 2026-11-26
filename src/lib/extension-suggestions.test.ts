@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { parseExtensionTimestamp, extensionToThread, extensionToSuggestionContent } from "./extension-suggestions";
 import type { ExtensionSuggestion } from "./bridge-to-extension";
 
@@ -29,14 +29,19 @@ describe("parseExtensionTimestamp", () => {
   });
 
   it("rolls back to previous year if parsed date is in the future", () => {
-    // Use a month that's definitely in the future
-    const futureMonth = new Date();
-    futureMonth.setMonth(futureMonth.getMonth() + 2);
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const ts = `1:00 PM ${monthNames[futureMonth.getMonth()]} 15`;
-    const result = parseExtensionTimestamp(ts);
-    expect(result).toBeInstanceOf(Date);
-    expect(result!.getFullYear()).toBe(new Date().getFullYear() - 1);
+    // Pin the clock so "Aug 15" is always later in the current year.  Picking
+    // a month relative to the real date fails in Nov/Dec, when +2 months wraps
+    // into January, which is already past.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2026, 5, 1)); // Jun 1, 2026
+      const result = parseExtensionTimestamp("1:00 PM Aug 15");
+      expect(result).toBeInstanceOf(Date);
+      expect(result!.getFullYear()).toBe(2025);
+      expect(result!.getMonth()).toBe(7); // August
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("parses 'Yesterday' relative timestamp", () => {
